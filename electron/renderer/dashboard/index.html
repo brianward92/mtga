@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MTGA Tracker</title>
+  <link rel="stylesheet" href="./dashboard.css">
+</head>
+<body>
+  <div class="app">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+          <path d="M2 17l10 5 10-5"/>
+          <path d="M2 12l10 5 10-5"/>
+        </svg>
+        <span>MTGA Tracker</span>
+      </div>
+
+      <nav class="nav">
+        <a href="#" class="nav-item active" data-section="overview">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7"/>
+            <rect x="14" y="3" width="7" height="7"/>
+            <rect x="14" y="14" width="7" height="7"/>
+            <rect x="3" y="14" width="7" height="7"/>
+          </svg>
+          Overview
+        </a>
+        <a href="#" class="nav-item" data-section="matches">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+            <polyline points="14 2 14 8 20 8"/>
+          </svg>
+          Matches
+        </a>
+        <a href="#" class="nav-item" data-section="decks">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="4" width="20" height="16" rx="2"/>
+            <path d="M6 8h12"/>
+            <path d="M6 12h8"/>
+          </svg>
+          Decks
+        </a>
+        <a href="#" class="nav-item" data-section="inventory">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M12 6v12"/>
+            <path d="M6 12h12"/>
+          </svg>
+          Inventory
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <span class="version">v0.1.0</span>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Overview Section -->
+      <section id="overview" class="section active">
+        <header class="section-header">
+          <h1>Overview</h1>
+          <p class="subtitle">Your MTGA statistics at a glance</p>
+        </header>
+
+        <!-- Stats Cards -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon win">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 6L9 17l-5-5"/>
+              </svg>
+            </div>
+            <div class="stat-content">
+              <span class="stat-value" id="totalWins">0</span>
+              <span class="stat-label">Wins</span>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon loss">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 6L6 18M6 6l12 12"/>
+              </svg>
+            </div>
+            <div class="stat-content">
+              <span class="stat-value" id="totalLosses">0</span>
+              <span class="stat-label">Losses</span>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon rate">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2v20M2 12h20"/>
+                <circle cx="12" cy="12" r="4"/>
+              </svg>
+            </div>
+            <div class="stat-content">
+              <span class="stat-value" id="winRate">0%</span>
+              <span class="stat-label">Win Rate</span>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon total">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="4" width="18" height="18" rx="2"/>
+                <path d="M16 2v4M8 2v4M3 10h18"/>
+              </svg>
+            </div>
+            <div class="stat-content">
+              <span class="stat-value" id="totalMatches">0</span>
+              <span class="stat-label">Total Matches</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent Matches -->
+        <div class="card">
+          <div class="card-header">
+            <h2>Recent Matches</h2>
+            <button class="btn-secondary" id="viewAllMatches">View All</button>
+          </div>
+          <div class="match-list" id="recentMatchList">
+            <div class="empty-state">
+              <p>No matches recorded yet</p>
+              <p class="hint">Play a match in MTGA to see it here</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Matches Section -->
+      <section id="matches" class="section">
+        <header class="section-header">
+          <h1>Match History</h1>
+          <p class="subtitle">All your recorded matches</p>
+        </header>
+
+        <div class="filters">
+          <select id="formatFilter" class="filter-select">
+            <option value="">All Formats</option>
+            <option value="Standard">Standard</option>
+            <option value="Historic">Historic</option>
+            <option value="Explorer">Explorer</option>
+            <option value="Alchemy">Alchemy</option>
+            <option value="Timeless">Timeless</option>
+            <option value="Draft">Draft</option>
+          </select>
+          <select id="resultFilter" class="filter-select">
+            <option value="">All Results</option>
+            <option value="win">Wins</option>
+            <option value="loss">Losses</option>
+          </select>
+        </div>
+
+        <div class="card">
+          <div class="match-list" id="fullMatchList">
+            <div class="empty-state">
+              <p>No matches found</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Decks Section -->
+      <section id="decks" class="section">
+        <header class="section-header">
+          <h1>Deck Performance</h1>
+          <p class="subtitle">Statistics by deck</p>
+        </header>
+
+        <div class="card">
+          <div class="deck-list" id="deckList">
+            <div class="empty-state">
+              <p>No deck data yet</p>
+              <p class="hint">Play matches to see deck statistics</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Inventory Section -->
+      <section id="inventory" class="section">
+        <header class="section-header">
+          <h1>Inventory</h1>
+          <p class="subtitle">Your resources and wildcards</p>
+        </header>
+
+        <div class="inventory-grid">
+          <div class="inventory-card">
+            <div class="inventory-icon gems">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <polygon points="12,2 22,8.5 22,15.5 12,22 2,15.5 2,8.5"/>
+              </svg>
+            </div>
+            <div class="inventory-content">
+              <span class="inventory-value" id="gems">-</span>
+              <span class="inventory-label">Gems</span>
+            </div>
+          </div>
+
+          <div class="inventory-card">
+            <div class="inventory-icon gold">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <circle cx="12" cy="12" r="10"/>
+              </svg>
+            </div>
+            <div class="inventory-content">
+              <span class="inventory-value" id="gold">-</span>
+              <span class="inventory-label">Gold</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h2>Wildcards</h2>
+          </div>
+          <div class="wildcards-grid">
+            <div class="wildcard-item mythic">
+              <span class="wc-rarity">Mythic</span>
+              <span class="wc-count" id="wcMythic">-</span>
+            </div>
+            <div class="wildcard-item rare">
+              <span class="wc-rarity">Rare</span>
+              <span class="wc-count" id="wcRare">-</span>
+            </div>
+            <div class="wildcard-item uncommon">
+              <span class="wc-rarity">Uncommon</span>
+              <span class="wc-count" id="wcUncommon">-</span>
+            </div>
+            <div class="wildcard-item common">
+              <span class="wc-rarity">Common</span>
+              <span class="wc-count" id="wcCommon">-</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h2>Vault Progress</h2>
+          </div>
+          <div class="vault-progress">
+            <div class="progress-bar">
+              <div class="progress-fill" id="vaultProgress" style="width: 0%"></div>
+            </div>
+            <span class="progress-label" id="vaultLabel">0%</span>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="./dashboard.ts"></script>
+</body>
+</html>

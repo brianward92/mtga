@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MTGA Tracker Overlay</title>
+  <link rel="stylesheet" href="./overlay.css">
+</head>
+<body>
+  <div id="overlay" class="overlay">
+    <!-- Header with match info -->
+    <header class="overlay-header">
+      <div class="match-info" id="matchInfo">
+        <span class="status" id="matchStatus">Waiting for match...</span>
+      </div>
+      <button class="minimize-btn" id="minimizeBtn" title="Minimize">−</button>
+    </header>
+
+    <!-- Deck tracker content -->
+    <main class="overlay-content" id="overlayContent">
+      <!-- Deck name -->
+      <div class="deck-header" id="deckHeader">
+        <span class="deck-name" id="deckName">No deck loaded</span>
+        <span class="deck-count" id="deckCount">0 cards</span>
+      </div>
+
+      <!-- Card list grouped by type -->
+      <div class="card-groups" id="cardGroups">
+        <div class="empty-state">
+          <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <path d="M12 8v8M8 12h8" />
+          </svg>
+          <p>Start a match to see your deck</p>
+        </div>
+      </div>
+    </main>
+
+    <!-- Quick stats footer -->
+    <footer class="overlay-footer">
+      <div class="stat">
+        <span class="stat-label">Library</span>
+        <span class="stat-value" id="libraryCount">-</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Hand</span>
+        <span class="stat-value" id="handCount">-</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Graveyard</span>
+        <span class="stat-value" id="graveyardCount">-</span>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Match result overlay -->
+  <div class="match-result-overlay" id="matchResultOverlay">
+    <span class="match-result-text" id="matchResultText"></span>
+  </div>
+
+  <script type="module" src="./overlay.ts"></script>
+</body>
+</html>

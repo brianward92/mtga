@@ -1,0 +1,589 @@
+/**
+ * MTGA Tracker Dashboard Styles
+ */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  /* Colors */
+  --bg-primary: #0a0a0f;
+  --bg-secondary: #12121a;
+  --bg-tertiary: #1a1a24;
+  --bg-hover: #22222e;
+  --bg-active: #2a2a38;
+
+  --text-primary: #f0f0f5;
+  --text-secondary: #a0a0b0;
+  --text-muted: #606070;
+
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(255, 255, 255, 0.12);
+
+  --accent-primary: #5090ff;
+  --accent-win: #3dd68c;
+  --accent-loss: #f04848;
+  --accent-gold: #ffc857;
+  --accent-purple: #a855f7;
+  --accent-cyan: #22d3ee;
+
+  /* Wildcards */
+  --wc-mythic: #ff7b00;
+  --wc-rare: #ffd700;
+  --wc-uncommon: #c0c0c0;
+  --wc-common: #2a2a2a;
+
+  /* Shadows */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+
+  /* Transitions */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.25s ease;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* App Layout */
+.app {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 220px;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 20px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.logo svg {
+  width: 28px;
+  height: 28px;
+  color: var(--accent-primary);
+}
+
+.logo span {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.nav {
+  flex: 1;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: all var(--transition-fast);
+}
+
+.nav-item svg {
+  width: 18px;
+  height: 18px;
+}
+
+.nav-item:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.nav-item.active {
+  background: var(--accent-primary);
+  color: white;
+}
+
+.sidebar-footer {
+  padding: 16px 20px;
+  border-top: 1px solid var(--border-color);
+}
+
+.version {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Main Content */
+.main-content {
+  flex: 1;
+  padding: 24px 32px;
+  overflow-y: auto;
+  background: var(--bg-primary);
+}
+
+/* Sections */
+.section {
+  display: none;
+}
+
+.section.active {
+  display: block;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.section-header {
+  margin-bottom: 24px;
+}
+
+.section-header h1 {
+  font-size: 28px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.subtitle {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+/* Stats Grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 1200px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.stat-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  transition: all var(--transition-fast);
+}
+
+.stat-card:hover {
+  border-color: var(--border-hover);
+  transform: translateY(-2px);
+}
+
+.stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stat-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.stat-icon.win {
+  background: rgba(61, 214, 140, 0.15);
+  color: var(--accent-win);
+}
+
+.stat-icon.loss {
+  background: rgba(240, 72, 72, 0.15);
+  color: var(--accent-loss);
+}
+
+.stat-icon.rate {
+  background: rgba(80, 144, 255, 0.15);
+  color: var(--accent-primary);
+}
+
+.stat-icon.total {
+  background: rgba(168, 85, 247, 0.15);
+  color: var(--accent-purple);
+}
+
+.stat-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.stat-label {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Cards */
+.card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.card-header h2 {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* Buttons */
+.btn-secondary {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-secondary:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--border-hover);
+}
+
+/* Match List */
+.match-list {
+  padding: 8px;
+}
+
+.match-row {
+  display: grid;
+  grid-template-columns: 80px 1fr 1fr 1fr auto;
+  align-items: center;
+  padding: 12px 16px;
+  border-radius: 8px;
+  transition: background var(--transition-fast);
+}
+
+.match-row:hover {
+  background: var(--bg-hover);
+}
+
+.match-result {
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.match-result.win {
+  background: rgba(61, 214, 140, 0.15);
+  color: var(--accent-win);
+}
+
+.match-result.loss {
+  background: rgba(240, 72, 72, 0.15);
+  color: var(--accent-loss);
+}
+
+.match-result.draw {
+  background: rgba(160, 160, 176, 0.15);
+  color: var(--text-secondary);
+}
+
+.match-deck {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.match-opponent {
+  color: var(--text-secondary);
+}
+
+.match-format {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.match-time {
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: right;
+}
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--text-muted);
+}
+
+.empty-state p {
+  margin-bottom: 4px;
+}
+
+.empty-state .hint {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Filters */
+.filters {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.filter-select {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  min-width: 150px;
+}
+
+.filter-select:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+/* Inventory */
+.inventory-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.inventory-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.inventory-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.inventory-icon svg {
+  width: 28px;
+  height: 28px;
+}
+
+.inventory-icon.gems {
+  background: linear-gradient(135deg, #a855f7, #7c3aed);
+  color: white;
+}
+
+.inventory-icon.gold {
+  background: linear-gradient(135deg, #ffc857, #f59e0b);
+  color: white;
+}
+
+.inventory-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.inventory-value {
+  font-size: 24px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.inventory-label {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Wildcards Grid */
+.wildcards-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--border-color);
+  border-radius: 0 0 12px 12px;
+  overflow: hidden;
+}
+
+.wildcard-item {
+  background: var(--bg-secondary);
+  padding: 20px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wc-rarity {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.wildcard-item.mythic .wc-rarity { color: var(--wc-mythic); }
+.wildcard-item.rare .wc-rarity { color: var(--wc-rare); }
+.wildcard-item.uncommon .wc-rarity { color: var(--wc-uncommon); }
+.wildcard-item.common .wc-rarity { color: var(--text-muted); }
+
+.wc-count {
+  font-size: 28px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Vault Progress */
+.vault-progress {
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.progress-bar {
+  flex: 1;
+  height: 12px;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-primary), var(--accent-cyan));
+  border-radius: 6px;
+  transition: width 0.5s ease;
+}
+
+.progress-label {
+  font-size: 14px;
+  font-weight: 600;
+  min-width: 48px;
+  text-align: right;
+}
+
+/* Deck List */
+.deck-list {
+  padding: 8px;
+}
+
+.deck-row {
+  display: grid;
+  grid-template-columns: 1fr repeat(3, 80px) 100px;
+  align-items: center;
+  padding: 16px;
+  border-radius: 8px;
+  transition: background var(--transition-fast);
+}
+
+.deck-row:hover {
+  background: var(--bg-hover);
+}
+
+.deck-name {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.deck-stat {
+  text-align: center;
+}
+
+.deck-stat-value {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.deck-stat-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.deck-winrate {
+  text-align: right;
+}
+
+.deck-winrate-value {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.deck-winrate-value.positive { color: var(--accent-win); }
+.deck-winrate-value.negative { color: var(--accent-loss); }
+.deck-winrate-value.neutral { color: var(--text-secondary); }
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-hover);
+}

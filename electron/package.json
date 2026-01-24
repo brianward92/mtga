@@ -1,0 +1,40 @@
+{
+  "name": "mtga-tracker",
+  "version": "0.1.0",
+  "description": "MTGA Log Parser and Overlay Tracker",
+  "main": "dist/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "package": "electron-builder",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.6.0",
+    "chokidar": "^4.0.3"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.10.2",
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8",
+    "electron-rebuild": "^3.2.9",
+    "electron-vite": "^2.3.0",
+    "typescript": "^5.7.2"
+  },
+  "build": {
+    "appId": "com.mtga.tracker",
+    "productName": "MTGA Tracker",
+    "mac": {
+      "category": "public.app-category.games",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "directories": {
+      "output": "release"
+    }
+  }
+}
