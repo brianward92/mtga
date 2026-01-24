@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+
+# Media
+*.mov
+
+# Generated data
+data/
+app/data/
+
+# Electron build artifacts
+electron/node_modules/
+electron/dist/
+electron/out/
+*.dmg
+
+# OS files
+.DS_Store

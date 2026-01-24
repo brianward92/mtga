@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MTG Registry</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="hero">
+    <div>
+      <h1>Magic: The Gathering Registry</h1>
+      <p class="lede">Filter a set, flip cards fast, log counts, and spot value.</p>
+    </div>
+    <div class="hero-actions">
+      <div class="field compact">
+        <label class="inline-label" for="setSelect">Set</label>
+        <select id="setSelect"></select>
+      </div>
+      <div class="field compact">
+        <label class="inline-label" for="colorFilter">Color</label>
+        <select id="colorFilter">
+          <option value="ALL">All</option>
+          <option value="W">White</option>
+          <option value="U">Blue</option>
+          <option value="B">Black</option>
+          <option value="R">Red</option>
+          <option value="G">Green</option>
+          <option value="MULTI">Multicolor</option>
+          <option value="C">Colorless</option>
+        </select>
+      </div>
+      <div class="field compact">
+        <label class="inline-label" for="nameSearch">Name</label>
+        <input id="nameSearch" type="text" placeholder="Type to filter">
+      </div>
+      <button id="resetFilters" class="ghost">Clear filters</button>
+    </div>
+  </header>
+
+  <main class="single-layout">
+    <section class="panel card-view">
+      <div class="card-header">
+        <div class="header-left">
+          <div class="chips">
+            <span id="setBadge" class="chip"></span>
+            <span id="rarityBadge" class="chip"></span>
+          </div>
+        </div>
+        <div class="nav inline-nav">
+          <button id="prevCard" class="ghost">&#8592; Prev</button>
+          <span id="position" class="position"></span>
+          <button id="nextCard" class="ghost">Next &#8594;</button>
+        </div>
+      </div>
+      <div class="card-body three-col">
+        <aside class="card-info skinny">
+          <div class="card-heading">
+            <div class="card-title" id="cardName"></div>
+            <div class="flavor" id="flavorText">-</div>
+          </div>
+          <div class="fact-grid">
+            <div class="fact-row">
+              <span class="fact-label">Name</span>
+              <span class="fact-value" id="metaName"></span>
+            </div>
+            <div class="fact-row">
+              <span class="fact-label">Number</span>
+              <span class="fact-value" id="metaNumber"></span>
+            </div>
+            <div class="fact-row">
+              <span class="fact-label">Color</span>
+              <span class="fact-value" id="metaColor"></span>
+            </div>
+            <div class="fact-row">
+              <span class="fact-label">Mana Cost</span>
+              <span class="fact-value" id="metaMana"></span>
+            </div>
+            <div class="fact-row">
+              <span class="fact-label">Type</span>
+              <span class="fact-value" id="metaType"></span>
+            </div>
+            <div class="fact-row">
+              <span class="fact-label">Subtype</span>
+              <span class="fact-value" id="metaSubtype"></span>
+            </div>
+          </div>
+          <div class="price-block">
+            <div class="price-row">
+              <span class="price-label">Non-foil</span>
+              <span class="price-value" id="priceUsd">—</span>
+            </div>
+            <div class="price-row">
+              <span class="price-label">Foil</span>
+              <span class="price-value" id="priceFoil">—</span>
+            </div>
+            <div class="price-row">
+              <span class="price-label">Etched</span>
+              <span class="price-value" id="priceEtched">—</span>
+            </div>
+            <div class="price-hint" id="valueHint"></div>
+          </div>
+        </aside>
+        <div class="card-visual">
+          <img id="cardImage" alt="Card art" />
+          <div id="noImage" class="no-image">No image available</div>
+        </div>
+        <aside class="inventory skinny">
+          <div class="inventory-row">
+            <div class="label">On hand</div>
+            <div class="value" id="currentCount">0</div>
+          </div>
+          <div class="inventory-row">
+            <label class="label" for="setCountInput">Set exact count</label>
+            <div class="controls-inline">
+              <input id="setCountInput" type="number" step="1" inputmode="numeric">
+              <button id="setCountSave">Save</button>
+            </div>
+          </div>
+          <div class="inventory-row">
+            <label class="label" for="deltaInput">Adjust by</label>
+            <div class="controls-inline">
+              <input id="deltaInput" type="number" step="1" inputmode="numeric" value="1">
+              <button id="addDelta">+ Add</button>
+              <button id="subtractDelta">- Subtract</button>
+              <button id="zeroOut" class="ghost">Zero out</button>
+            </div>
+          </div>
+          <div class="inventory-note">Negative totals are allowed for tracking promised/owed cards.</div>
+          <div class="clear-row">
+            <button id="clearRegistry" class="danger">Clear registry</button>
+          </div>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div>Data stays local (stored in your browser). Expand the data file to include more sets.</div>
+  </footer>
+
+  <script src="data/cards.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
