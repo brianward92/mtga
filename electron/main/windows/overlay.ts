@@ -1,15 +1,80 @@
 import { BrowserWindow, screen } from 'electron'
 import { join } from 'path'
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
+import { homedir } from 'os'
+
+// Position storage file location
+const CONFIG_DIR = join(homedir(), '.mtga-tracker')
+const POSITION_FILE = join(CONFIG_DIR, 'overlay-position.json')
+
+interface OverlayPosition {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+/**
+ * Load saved overlay position from disk
+ */
+function loadOverlayPosition(): OverlayPosition | null {
+  try {
+    if (existsSync(POSITION_FILE)) {
+      const data = readFileSync(POSITION_FILE, 'utf-8')
+      const position = JSON.parse(data) as OverlayPosition
+
+      // Validate the position is within screen bounds
+      const displays = screen.getAllDisplays()
+      const validPosition = displays.some(display => {
+        const { x, y, width, height } = display.bounds
+        return (
+          position.x >= x &&
+          position.x < x + width &&
+          position.y >= y &&
+          position.y < y + height
+        )
+      })
+
+      if (validPosition) {
+        return position
+      }
+    }
+  } catch {
+    // Ignore errors, use default position
+  }
+  return null
+}
+
+/**
+ * Save overlay position to disk
+ */
+function saveOverlayPosition(position: OverlayPosition): void {
+  try {
+    if (!existsSync(CONFIG_DIR)) {
+      mkdirSync(CONFIG_DIR, { recursive: true })
+    }
+    writeFileSync(POSITION_FILE, JSON.stringify(position, null, 2))
+  } catch (error) {
+    console.error('[Overlay] Failed to save position:', error)
+  }
+}
 
 export function createOverlayWindow(): BrowserWindow {
   const primaryDisplay = screen.getPrimaryDisplay()
-  const { width, height } = primaryDisplay.workAreaSize
+  const { width } = primaryDisplay.workAreaSize
+
+  // Load saved position or use defaults
+  const savedPosition = loadOverlayPosition()
+  const defaultX = width - 300
+  const defaultY = 100
+  const defaultWidth = 280
+  const defaultHeight = 500
 
   const overlayWindow = new BrowserWindow({
-    width: 280,
-    height: 500,
-    x: width - 300,  // Position on right side
-    y: 100,
+    width: savedPosition?.width || defaultWidth,
+    height: savedPosition?.height || defaultHeight,
+    x: savedPosition?.x ?? defaultX,
+    y: savedPosition?.y ?? defaultY,
     transparent: true,
     frame: false,
     alwaysOnTop: true,
@@ -41,9 +106,31 @@ export function createOverlayWindow(): BrowserWindow {
     overlayWindow.loadFile(join(__dirname, '../renderer/overlay/index.html'))
   }
 
+  // Save position when window is moved or resized
+  let saveTimeout: NodeJS.Timeout | null = null
+  const debouncedSave = () => {
+    if (saveTimeout) {
+      clearTimeout(saveTimeout)
+    }
+    saveTimeout = setTimeout(() => {
+      const bounds = overlayWindow.getBounds()
+      saveOverlayPosition({
+        x: bounds.x,
+        y: bounds.y,
+        width: bounds.width,
+        height: bounds.height
+      })
+    }, 500)  // Debounce saves by 500ms
+  }
+
+  overlayWindow.on('move', debouncedSave)
+  overlayWindow.on('resize', debouncedSave)
+
   // Handle window events
   overlayWindow.on('closed', () => {
-    // Window was closed
+    if (saveTimeout) {
+      clearTimeout(saveTimeout)
+    }
   })
 
   return overlayWindow

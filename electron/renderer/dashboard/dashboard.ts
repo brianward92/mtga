@@ -3,6 +3,9 @@
  * Main dashboard for viewing match history, stats, and inventory
  */
 
+// Export to make this a proper ES module (avoids duplicate function errors in TS)
+export {}
+
 interface Match {
   id: string
   eventId: string

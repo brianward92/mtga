@@ -131,6 +131,10 @@ export class LogParser extends EventEmitter {
 
     const obj = data as Record<string, unknown>
 
+    // Check raw line for deck name patterns before JSON parsing
+    // MTGA logs often have deck info in specific line patterns
+    this.extractDeckNameFromRawLine(rawLine)
+
     // Inventory and collection data (from StartHook/Authenticate response)
     if ('InventoryInfo' in obj || 'PlayerInventory' in obj || 'inventoryInfo' in obj) {
       const inventoryResult = parseInventory(obj)
@@ -170,8 +174,24 @@ export class LogParser extends EventEmitter {
         if (gameStateResult.type === 'game-state') {
           this.emit('game-state', gameStateResult.data as GameStateData)
         } else if (gameStateResult.type === 'deck-submission') {
-          this.state.currentDeck = gameStateResult.data as DeckSubmissionData
-          this.emit('deck-submission', gameStateResult.data as DeckSubmissionData)
+          const deckData = gameStateResult.data as DeckSubmissionData
+
+          // If deck name is unknown but we have a deckId, try to look it up from summaries
+          if ((!deckData.deckName || deckData.deckName === 'Unknown Deck') && deckData.deckId) {
+            const knownName = this.state.deckSummaries.get(deckData.deckId)
+            if (knownName) {
+              deckData.deckName = knownName
+              console.log(`[Parser] Resolved deck name from summaries: ${knownName}`)
+            }
+          }
+
+          // Update currentDeckName if we have a valid name
+          if (deckData.deckName && deckData.deckName !== 'Unknown Deck') {
+            this.state.currentDeckName = deckData.deckName
+          }
+
+          this.state.currentDeck = deckData
+          this.emit('deck-submission', deckData)
         }
       }
       return
@@ -181,11 +201,27 @@ export class LogParser extends EventEmitter {
     if ('Payload' in obj && typeof obj.Payload === 'string') {
       try {
         const payload = JSON.parse(obj.Payload as string)
-        if (payload.deckCards || payload.mainDeck) {
-          const deckData = parseGameState({ deckPayload: payload })
-          if (deckData && deckData.type === 'deck-submission') {
-            this.state.currentDeck = deckData.data as DeckSubmissionData
-            this.emit('deck-submission', deckData.data as DeckSubmissionData)
+        if (payload.deckCards || payload.mainDeck || payload.MainDeck) {
+          const deckResult = parseGameState({ deckPayload: payload })
+          if (deckResult && deckResult.type === 'deck-submission') {
+            const deckData = deckResult.data as DeckSubmissionData
+
+            // If deck name is unknown but we have a deckId, try to look it up from summaries
+            if ((!deckData.deckName || deckData.deckName === 'Unknown Deck') && deckData.deckId) {
+              const knownName = this.state.deckSummaries.get(deckData.deckId)
+              if (knownName) {
+                deckData.deckName = knownName
+                console.log(`[Parser] Resolved deck name from summaries (payload): ${knownName}`)
+              }
+            }
+
+            // Update currentDeckName if we have a valid name
+            if (deckData.deckName && deckData.deckName !== 'Unknown Deck') {
+              this.state.currentDeckName = deckData.deckName
+            }
+
+            this.state.currentDeck = deckData
+            this.emit('deck-submission', deckData)
           }
         }
       } catch {
@@ -216,6 +252,61 @@ export class LogParser extends EventEmitter {
           this.emit('deck-selected', { deckId, deckName })
         }
       }
+    }
+
+    // Handle Event_SetDeck requests which contain deck selection info
+    if ('request' in obj || 'Request' in obj) {
+      const request = (obj.request || obj.Request) as string | Record<string, unknown> | undefined
+      if (typeof request === 'string') {
+        try {
+          const requestData = JSON.parse(request)
+          this.extractDeckNameFromRequest(requestData)
+        } catch {
+          // Not JSON
+        }
+      } else if (request && typeof request === 'object') {
+        this.extractDeckNameFromRequest(request as Record<string, unknown>)
+      }
+    }
+
+    // Check for deck info in nested params
+    if ('params' in obj && typeof obj.params === 'object') {
+      const params = obj.params as Record<string, unknown>
+      this.extractDeckNameFromRequest(params)
+    }
+  }
+
+  /**
+   * Extract deck name from request payloads (Event_SetDeck, etc.)
+   */
+  private extractDeckNameFromRequest(data: Record<string, unknown>): void {
+    // Check for deck field variations
+    const deck = (data.deck || data.Deck || data.deckPayload || data.DeckPayload) as Record<string, unknown> | undefined
+    if (deck) {
+      const deckId = (deck.id as string) || (deck.Id as string) || (deck.deckId as string) || (deck.DeckId as string) || ''
+      const deckName = (deck.name as string) || (deck.Name as string) || (deck.deckName as string) || (deck.DeckName as string) || ''
+
+      if (deckName && deckName !== 'Unknown Deck') {
+        this.state.currentDeckName = deckName
+        if (deckId) {
+          this.state.deckSummaries.set(deckId, deckName)
+        }
+        this.emit('deck-selected', { deckId, deckName })
+        console.log(`[Parser] Deck name from request: ${deckName}`)
+      }
+    }
+
+    // Also check for direct deck name fields in the data
+    const directDeckName = (data.deckName as string) || (data.DeckName as string) || (data.Name as string)
+    const directDeckId = (data.deckId as string) || (data.DeckId as string) || (data.Id as string) || ''
+
+    if (directDeckName && directDeckName !== 'Unknown Deck' && !this.state.currentDeckName) {
+      this.state.currentDeckName = directDeckName
+      if (directDeckId) {
+        this.state.deckSummaries.set(directDeckId, directDeckName)
+      }
+      this.emit('deck-selected', { deckId: directDeckId, deckName: directDeckName })
+      console.log(`[Parser] Deck name from direct field: ${directDeckName}`)
     }
   }
 
@@ -312,5 +403,74 @@ export class LogParser extends EventEmitter {
    */
   getCurrentDeckName(): string | null {
     return this.state.currentDeckName || this.state.currentDeck?.deckName || null
+  }
+
+  /**
+   * Extract deck name from raw log line patterns.
+   * MTGA often logs deck info in Event_SetDeck or similar formats.
+   */
+  private extractDeckNameFromRawLine(line: string): void {
+    // Pattern: Event_SetDeck with deck name
+    // Format: ==> Event_SetDeck(...) {"deckId":"...", "deckName":"...", ...}
+    if (line.includes('Event_SetDeck') || line.includes('SetDeck')) {
+      // Try to find the deck name in the line
+      const deckNameMatch = line.match(/"(?:deckName|DeckName|name|Name)"\s*:\s*"([^"]+)"/i)
+      if (deckNameMatch && deckNameMatch[1] && deckNameMatch[1] !== 'Unknown Deck') {
+        const deckName = deckNameMatch[1]
+        if (this.state.currentDeckName !== deckName) {
+          this.state.currentDeckName = deckName
+          console.log(`[Parser] Deck name from raw line (SetDeck): ${deckName}`)
+
+          // Also extract deckId if present
+          const deckIdMatch = line.match(/"(?:deckId|DeckId|id|Id)"\s*:\s*"([^"]+)"/i)
+          const deckId = deckIdMatch ? deckIdMatch[1] : ''
+
+          if (deckId) {
+            this.state.deckSummaries.set(deckId, deckName)
+          }
+          this.emit('deck-selected', { deckId, deckName })
+        }
+      }
+    }
+
+    // Pattern: DeckSubmit or DeckSubmitV3 events
+    if (line.includes('DeckSubmit') || line.includes('SubmitDeck')) {
+      const deckNameMatch = line.match(/"(?:deckName|DeckName|name|Name)"\s*:\s*"([^"]+)"/i)
+      if (deckNameMatch && deckNameMatch[1] && deckNameMatch[1] !== 'Unknown Deck') {
+        const deckName = deckNameMatch[1]
+        if (this.state.currentDeckName !== deckName) {
+          this.state.currentDeckName = deckName
+          console.log(`[Parser] Deck name from raw line (Submit): ${deckName}`)
+
+          const deckIdMatch = line.match(/"(?:deckId|DeckId|id|Id)"\s*:\s*"([^"]+)"/i)
+          const deckId = deckIdMatch ? deckIdMatch[1] : ''
+
+          if (deckId) {
+            this.state.deckSummaries.set(deckId, deckName)
+          }
+          this.emit('deck-selected', { deckId, deckName })
+        }
+      }
+    }
+
+    // Pattern: CourseDeck in Event_Join or Event_GetCourses
+    if (line.includes('CourseDeck') || line.includes('courseDeck')) {
+      const deckNameMatch = line.match(/"(?:deckName|DeckName|name|Name)"\s*:\s*"([^"]+)"/i)
+      if (deckNameMatch && deckNameMatch[1] && deckNameMatch[1] !== 'Unknown Deck') {
+        const deckName = deckNameMatch[1]
+        if (this.state.currentDeckName !== deckName) {
+          this.state.currentDeckName = deckName
+          console.log(`[Parser] Deck name from raw line (CourseDeck): ${deckName}`)
+
+          const deckIdMatch = line.match(/"(?:deckId|DeckId|id|Id)"\s*:\s*"([^"]+)"/i)
+          const deckId = deckIdMatch ? deckIdMatch[1] : ''
+
+          if (deckId) {
+            this.state.deckSummaries.set(deckId, deckName)
+          }
+          this.emit('deck-selected', { deckId, deckName })
+        }
+      }
+    }
   }
 }

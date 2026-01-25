@@ -448,6 +448,25 @@ body {
   transition: color var(--transition-fast);
 }
 
+/* Draw probability */
+.draw-pct {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-muted);
+  min-width: 28px;
+  text-align: right;
+  margin-left: auto;
+  padding-right: 4px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+  transition: opacity var(--transition-fast);
+}
+
+.card-row:hover .draw-pct {
+  opacity: 1;
+  color: var(--accent-gold);
+}
+
 /* Card count */
 .card-count {
   font-size: 11px;
@@ -662,23 +681,54 @@ body {
 .tooltip {
   position: absolute;
   background: var(--bg-glass-darker);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--border-glass);
-  border-radius: 6px;
-  padding: 8px 12px;
+  border-radius: 8px;
+  padding: 10px 14px;
   font-size: 11px;
   color: var(--text-primary);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-lg);
   pointer-events: none;
   opacity: 0;
-  transform: translateY(-4px);
+  transform: translateX(4px);
   transition: all var(--transition-fast);
   z-index: 1000;
-  max-width: 200px;
+  min-width: 140px;
+  max-width: 220px;
 }
 
 .tooltip.visible {
   opacity: 1;
-  transform: translateY(0);
+  transform: translateX(0);
+}
+
+.tooltip-name {
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+  line-height: 1.3;
+}
+
+.tooltip-type {
+  font-size: 10px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.tooltip-cost {
+  display: flex;
+  gap: 3px;
+  margin-top: 4px;
+}
+
+.tooltip-cost .mana-symbol {
+  width: 16px;
+  height: 16px;
+  font-size: 9px;
 }
 
 /* Loading skeleton */

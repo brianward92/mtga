@@ -3,6 +3,9 @@
  * Displays deck tracking information during matches
  */
 
+// Export to make this a proper ES module (avoids duplicate function errors in TS)
+export {}
+
 // Type definitions
 interface CardInDeck {
   name: string
@@ -67,6 +70,12 @@ const graveyardCount = document.getElementById('graveyardCount')!
 const minimizeBtn = document.getElementById('minimizeBtn')!
 const matchResultOverlay = document.getElementById('matchResultOverlay')!
 const matchResultText = document.getElementById('matchResultText')!
+const winRateBadge = document.getElementById('winRateBadge')!
+const winRateValue = document.getElementById('winRateValue')!
+const cardTooltip = document.getElementById('cardTooltip')!
+const tooltipName = document.getElementById('tooltipName')!
+const tooltipType = document.getElementById('tooltipType')!
+const tooltipCost = document.getElementById('tooltipCost')!
 
 /**
  * Initialize the overlay
@@ -75,6 +84,42 @@ function init(): void {
   setupEventListeners()
   setupTrackerEvents()
   loadCardData()
+  loadWinRate()
+}
+
+/**
+ * Load and display the current win rate
+ */
+async function loadWinRate(): Promise<void> {
+  if (!window.mtgaTracker) return
+
+  try {
+    const stats = await window.mtgaTracker.getMatchStats()
+    updateWinRateBadge(stats.winRate, stats.wins + stats.losses)
+  } catch (error) {
+    console.error('[Overlay] Failed to load win rate:', error)
+  }
+}
+
+/**
+ * Update the win rate badge display
+ */
+function updateWinRateBadge(winRate: number, totalMatches: number): void {
+  if (totalMatches === 0) {
+    winRateBadge.style.display = 'none'
+    return
+  }
+
+  winRateBadge.style.display = 'inline-flex'
+  winRateValue.textContent = `${winRate.toFixed(0)}%`
+
+  // Update badge color class based on win rate
+  winRateBadge.className = 'win-rate-badge'
+  if (winRate >= 55) {
+    winRateBadge.classList.add('positive')
+  } else if (winRate <= 45) {
+    winRateBadge.classList.add('negative')
+  }
 }
 
 /**
@@ -92,6 +137,69 @@ async function loadCardData(): Promise<void> {
  */
 function setupEventListeners(): void {
   minimizeBtn.addEventListener('click', toggleMinimize)
+  setupTooltips()
+}
+
+/**
+ * Setup card tooltip event delegation
+ */
+function setupTooltips(): void {
+  cardGroups.addEventListener('mouseover', (e) => {
+    const target = e.target as HTMLElement
+    const cardRow = target.closest('.card-row') as HTMLElement
+    if (cardRow) {
+      const cardName = cardRow.dataset.card
+      if (cardName && deckState) {
+        const card = deckState.cards.get(cardName)
+        if (card) {
+          showTooltip(cardRow, card)
+        }
+      }
+    }
+  })
+
+  cardGroups.addEventListener('mouseout', (e) => {
+    const target = e.target as HTMLElement
+    const cardRow = target.closest('.card-row')
+    if (cardRow || !cardGroups.contains(e.relatedTarget as Node)) {
+      hideTooltip()
+    }
+  })
+}
+
+/**
+ * Show tooltip for a card
+ */
+function showTooltip(cardRow: HTMLElement, card: CardInDeck): void {
+  tooltipName.textContent = card.name
+  tooltipType.textContent = formatTypeName(card.type)
+  tooltipCost.innerHTML = renderManaCost(card.manaCost)
+
+  // Position tooltip
+  const rect = cardRow.getBoundingClientRect()
+  const overlayRect = overlay.getBoundingClientRect()
+
+  // Position to the left of the card row
+  let left = -cardTooltip.offsetWidth - 8
+  let top = rect.top - overlayRect.top
+
+  // Make sure tooltip doesn't go above the overlay
+  if (top < 0) top = 0
+
+  // Make sure tooltip doesn't go below the overlay
+  const maxTop = overlayRect.height - cardTooltip.offsetHeight
+  if (top > maxTop) top = maxTop
+
+  cardTooltip.style.left = `${left}px`
+  cardTooltip.style.top = `${top}px`
+  cardTooltip.classList.add('visible')
+}
+
+/**
+ * Hide the tooltip
+ */
+function hideTooltip(): void {
+  cardTooltip.classList.remove('visible')
 }
 
 /**
@@ -128,6 +236,9 @@ function setupTrackerEvents(): void {
     // Update status
     matchStatus.textContent = result.result.toUpperCase()
     matchStatus.className = `status ${result.result}`
+
+    // Refresh win rate after match ends
+    loadWinRate()
 
     // Clear deck after delay
     setTimeout(() => {
@@ -410,6 +521,14 @@ function renderDeck(): void {
 }
 
 /**
+ * Calculate draw probability for a card
+ */
+function calculateDrawProbability(remaining: number, librarySize: number): number {
+  if (librarySize <= 0 || remaining <= 0) return 0
+  return Math.min((remaining / librarySize) * 100, 100)
+}
+
+/**
  * Render a single card row
  */
 function renderCard(card: CardInDeck): string {
@@ -425,10 +544,16 @@ function renderCard(card: CardInDeck): string {
 
   const manaHtml = renderManaCost(card.manaCost)
 
+  // Calculate draw percentage if we have library info
+  const libSize = deckState?.cardsRemaining || 0
+  const drawPct = calculateDrawProbability(card.remaining, libSize)
+  const showProbability = libSize > 0 && card.remaining > 0
+
   return `
     <div class="${classes}" data-card="${escapeHtml(card.name)}">
       ${manaHtml ? `<div class="mana-cost">${manaHtml}</div>` : ''}
       <span class="card-name">${escapeHtml(card.name)}</span>
+      ${showProbability ? `<span class="draw-pct">${drawPct.toFixed(0)}%</span>` : ''}
       <span class="card-count ${card.remaining === 0 ? 'zero' : ''}">${card.remaining}</span>
     </div>
   `
@@ -491,21 +616,6 @@ function escapeHtml(text: string): string {
   const div = document.createElement('div')
   div.textContent = text
   return div.innerHTML
-}
-
-// Extend window type for mtgaTracker API
-declare global {
-  interface Window {
-    mtgaTracker?: {
-      onMatchStart: (callback: (data: unknown) => void) => void
-      onMatchEnd: (callback: (data: unknown) => void) => void
-      onDeckSubmission: (callback: (data: unknown) => void) => void
-      onGameState: (callback: (data: unknown) => void) => void
-      onDeckSelected?: (callback: (data: unknown) => void) => void
-      getCardName: (grpId: number) => Promise<string | null>
-      getCard: (grpId: number) => Promise<{ name: string; manaCost: string; type: string } | null>
-    }
-  }
 }
 
 // Start the overlay

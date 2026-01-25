@@ -164,24 +164,76 @@ function parseMatchEnd(gameRoomInfo: GameRoomInfo): MatchEvent | null {
     }
   }
 
-  // Find the match-scope result
+  // Find the match-scope result first, fall back to game results
   const matchResult = result.resultList?.find(r => r.scope === 'MatchScope_Match')
-  const winningTeamId = matchResult?.winningTeamId ?? result.resultList?.[0]?.winningTeamId ?? -1
+  const gameResults = result.resultList?.filter(r => r.scope === 'MatchScope_Game') || []
+  const gameCount = gameResults.length || 1
+
+  // Try multiple sources for winning team
+  let winningTeamId = matchResult?.winningTeamId ?? -1
+
+  // If match result doesn't have a winner, count game wins
+  if (winningTeamId <= 0 && gameResults.length > 0) {
+    const teamWins = new Map<number, number>()
+    for (const game of gameResults) {
+      if (game.winningTeamId && game.winningTeamId > 0) {
+        teamWins.set(game.winningTeamId, (teamWins.get(game.winningTeamId) || 0) + 1)
+      }
+    }
+    // Team with most game wins is the match winner
+    let maxWins = 0
+    for (const [teamId, wins] of teamWins) {
+      if (wins > maxWins) {
+        maxWins = wins
+        winningTeamId = teamId
+      }
+    }
+  }
+
+  // Fall back to first result's winning team
+  if (winningTeamId <= 0 && result.resultList?.[0]?.winningTeamId) {
+    winningTeamId = result.resultList[0].winningTeamId
+  }
+
   const reason = matchResult?.reason || result.matchCompletedReason || 'Unknown'
 
-  // Determine our result
+  // Determine our result using multiple strategies
   let ourResult: 'win' | 'loss' | 'draw' = 'draw'
 
   if (winningTeamId > 0 && currentPlayerInfo) {
+    // Primary: compare winning team to our team
     ourResult = currentPlayerInfo.teamId === winningTeamId ? 'win' : 'loss'
   } else if (winningTeamId > 0) {
-    // If we don't know our team, assume team 2 is us (common case)
+    // Fallback: assume team 2 is us (common case on Mac)
     ourResult = winningTeamId === 2 ? 'win' : 'loss'
-  }
+  } else if (currentPlayerInfo) {
+    // No winning team ID - check match result reason and individual results
+    const reasonLower = reason.toLowerCase()
 
-  // Count games from result list
-  const gameResults = result.resultList?.filter(r => r.scope === 'MatchScope_Game') || []
-  const gameCount = gameResults.length || 1
+    // Concession: if opponent conceded, we win
+    if (reasonLower.includes('concede') || reasonLower.includes('concession')) {
+      // Check if any result indicates a win for us
+      const ourTeamResult = result.resultList?.find(r =>
+        r.winningTeamId === currentPlayerInfo?.teamId ||
+        (r.result?.toLowerCase().includes('win') && r.scope === 'MatchScope_Match')
+      )
+      ourResult = ourTeamResult ? 'win' : 'loss'
+      // If we can't determine who conceded, assume opponent (we're still here parsing)
+      if (!ourTeamResult && !result.resultList?.some(r => r.winningTeamId && r.winningTeamId !== currentPlayerInfo?.teamId)) {
+        ourResult = 'win'
+      }
+    }
+
+    // Timeout: if opponent timed out, we win
+    if (reasonLower.includes('timeout') || reasonLower.includes('idle')) {
+      ourResult = 'win'
+    }
+
+    // Disconnect: if opponent disconnected, we likely win
+    if (reasonLower.includes('disconnect') || reasonLower.includes('connection')) {
+      ourResult = 'win'
+    }
+  }
 
   // Clear player info for next match
   const matchData: MatchEndData = {

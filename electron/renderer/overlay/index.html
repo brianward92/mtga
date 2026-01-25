@@ -12,6 +12,9 @@
     <header class="overlay-header">
       <div class="match-info" id="matchInfo">
         <span class="status" id="matchStatus">Waiting for match...</span>
+        <span class="win-rate-badge" id="winRateBadge" style="display: none;">
+          <span id="winRateValue">0%</span>
+        </span>
       </div>
       <button class="minimize-btn" id="minimizeBtn" title="Minimize">−</button>
     </header>
@@ -56,6 +59,13 @@
   <!-- Match result overlay -->
   <div class="match-result-overlay" id="matchResultOverlay">
     <span class="match-result-text" id="matchResultText"></span>
+  </div>
+
+  <!-- Card tooltip -->
+  <div class="tooltip" id="cardTooltip">
+    <div class="tooltip-name" id="tooltipName"></div>
+    <div class="tooltip-type" id="tooltipType"></div>
+    <div class="tooltip-cost" id="tooltipCost"></div>
   </div>
 
   <script type="module" src="./overlay.ts"></script>

@@ -19,6 +19,7 @@ import {
   closeDatabase,
   insertMatch,
   updateMatchEnd,
+  updateMatchDeckName,
   getRecentMatches,
   getMatchStats,
   updateCollection,
@@ -136,6 +137,16 @@ function setupLogParser(): void {
 
     if (data.deckName && data.deckName !== 'Unknown Deck') {
       currentDeckName = data.deckName
+
+      // Update the database if we're in a match and got a valid deck name
+      if (currentMatchId) {
+        try {
+          updateMatchDeckName(currentMatchId, data.deckName, data.deckId || null)
+          console.log('[Parser] Updated match deck name:', data.deckName)
+        } catch (error) {
+          console.error('[DB] Failed to update match deck name:', error)
+        }
+      }
     }
     console.log('[Parser] Deck:', data.deckName)
   })
@@ -146,6 +157,16 @@ function setupLogParser(): void {
       currentDeckName = data.deckName
       overlayWindow?.webContents.send('deck-selected', data)
       console.log('[Parser] Deck selected:', data.deckName)
+
+      // Update the database if we're in a match
+      if (currentMatchId) {
+        try {
+          updateMatchDeckName(currentMatchId, data.deckName, data.deckId || null)
+          console.log('[Parser] Updated match deck name from selection:', data.deckName)
+        } catch (error) {
+          console.error('[DB] Failed to update match deck name:', error)
+        }
+      }
     }
   })
 }
