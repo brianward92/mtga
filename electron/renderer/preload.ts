@@ -12,11 +12,20 @@ contextBridge.exposeInMainWorld('mtgaTracker', {
   getState: () => ipcRenderer.invoke('get-state'),
   getMatchHistory: (limit?: number) => ipcRenderer.invoke('get-match-history', limit),
   getMatchStats: (deckId?: string) => ipcRenderer.invoke('get-match-stats', deckId),
+  getPlayDrawStats: (deckId?: string) => ipcRenderer.invoke('get-play-draw-stats', deckId),
+  getStatsByFormat: (deckId?: string) => ipcRenderer.invoke('get-stats-by-format', deckId),
+  getOpponentStats: (deckId?: string) => ipcRenderer.invoke('get-opponent-stats', deckId),
   getCollection: () => ipcRenderer.invoke('get-collection'),
+  getCollectionStats: () => ipcRenderer.invoke('get-collection-stats'),
+  getSetList: () => ipcRenderer.invoke('get-set-list'),
+  getCardsBySet: (setCode: string) => ipcRenderer.invoke('get-cards-by-set', setCode),
 
   // Card data
   getCard: (grpId: number) => ipcRenderer.invoke('get-card', grpId),
   getCardName: (grpId: number) => ipcRenderer.invoke('get-card-name', grpId),
+
+  // Match updates
+  updateMatchNotes: (matchId: string, notes: string) => ipcRenderer.invoke('update-match-notes', matchId, notes),
 
   // Event listeners
   onInventoryUpdate: (callback: (data: unknown) => void) => {
@@ -60,9 +69,16 @@ declare global {
       getState: () => Promise<unknown>
       getMatchHistory: (limit?: number) => Promise<unknown[]>
       getMatchStats: (deckId?: string) => Promise<{ wins: number; losses: number; draws: number; winRate: number }>
+      getPlayDrawStats: (deckId?: string) => Promise<{ onPlay: { wins: number; losses: number; winRate: number }; onDraw: { wins: number; losses: number; winRate: number } }>
+      getStatsByFormat: (deckId?: string) => Promise<Array<{ format: string; eventId: string; wins: number; losses: number; draws: number; winRate: number; total: number }>>
+      getOpponentStats: (deckId?: string) => Promise<Array<any>>
       getCollection: () => Promise<Record<number, number>>
+      getCollectionStats: () => Promise<{ totalCards: number; uniqueCards: number; byRarity: Record<string, number> }>
+      getSetList: () => Promise<string[]>
+      getCardsBySet: (setCode: string) => Promise<Array<any>>
       getCard: (grpId: number) => Promise<{ name: string; manaCost: string; type: string } | null>
       getCardName: (grpId: number) => Promise<string | null>
+      updateMatchNotes: (matchId: string, notes: string) => Promise<boolean>
       onInventoryUpdate: (callback: (data: unknown) => void) => void
       onCollectionUpdate: (callback: (data: unknown) => void) => void
       onMatchStart: (callback: (data: unknown) => void) => void

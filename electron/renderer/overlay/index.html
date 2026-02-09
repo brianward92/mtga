@@ -12,6 +12,7 @@
     <header class="overlay-header">
       <div class="match-info" id="matchInfo">
         <span class="status" id="matchStatus">Waiting for match...</span>
+        <span class="turn-counter" id="turnCounter"></span>
         <span class="win-rate-badge" id="winRateBadge" style="display: none;">
           <span id="winRateValue">0%</span>
         </span>
@@ -36,6 +37,17 @@
           </svg>
           <p>Start a match to see your deck</p>
         </div>
+      </div>
+
+      <!-- Sideboard section -->
+      <div class="sideboard-section" id="sideboardSection">
+        <button class="sideboard-toggle" id="sideboardToggle" aria-expanded="false">
+          <span class="sideboard-label">Sideboard</span>
+          <svg class="sideboard-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </button>
+        <div class="sideboard-cards" id="sideboardCards"></div>
       </div>
     </main>
 

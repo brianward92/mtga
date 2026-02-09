@@ -121,7 +121,7 @@ body {
 .match-info {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 
 .status {
@@ -130,6 +130,15 @@ body {
   color: var(--text-secondary);
   letter-spacing: 0.2px;
   transition: color var(--transition-fast);
+}
+
+.turn-counter {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-blue);
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  min-height: 14px;
 }
 
 .status.in-match {
@@ -259,6 +268,63 @@ body {
 
 /* Card groups container */
 .card-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Sideboard section */
+.sideboard-section {
+  margin-top: 12px;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 8px;
+  display: none;
+}
+
+.sideboard-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--bg-glass-lighter);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.sideboard-toggle:hover {
+  background: var(--bg-hover);
+}
+
+.sideboard-toggle:active {
+  transform: scale(0.98);
+}
+
+.sideboard-arrow {
+  width: 16px;
+  height: 16px;
+  transition: transform var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.sideboard-toggle[aria-expanded="true"] .sideboard-arrow {
+  transform: rotate(180deg);
+}
+
+.sideboard-cards {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height var(--transition-smooth);
+}
+
+.sideboard-section.expanded .sideboard-cards {
+  max-height: 500px;
+  margin-top: 8px;
   display: flex;
   flex-direction: column;
   gap: 8px;

@@ -20,13 +20,19 @@ import {
   insertMatch,
   updateMatchEnd,
   updateMatchDeckName,
+  updateMatchNotes,
   getRecentMatches,
   getMatchStats,
+  getPlayDrawStats,
+  getStatsByFormat,
+  getOpponentStats,
   updateCollection,
   getCollection,
+  getCollectionStats,
   recordInventorySnapshot
 } from './data/database'
-import { loadCardRegistry, getCard, getCardName } from './data/card-registry'
+import { loadCardRegistry, getCard, getCardName, getSetList, getCardsBySet } from './data/card-registry'
+import { formatEventId } from './utils/format-utils'
 
 // Window references
 let overlayWindow: BrowserWindow | null = null
@@ -219,6 +225,27 @@ ipcMain.handle('get-match-stats', (_, deckId?: string) => {
   }
 })
 
+ipcMain.handle('get-play-draw-stats', (_, deckId?: string) => {
+  try {
+    return getPlayDrawStats(deckId)
+  } catch (error) {
+    console.error('[IPC] Failed to get play/draw stats:', error)
+    return {
+      onPlay: { wins: 0, losses: 0, winRate: 0 },
+      onDraw: { wins: 0, losses: 0, winRate: 0 }
+    }
+  }
+})
+
+ipcMain.handle('get-stats-by-format', (_, deckId?: string) => {
+  try {
+    return getStatsByFormat(deckId)
+  } catch (error) {
+    console.error('[IPC] Failed to get stats by format:', error)
+    return []
+  }
+})
+
 ipcMain.handle('get-collection', () => {
   try {
     return getCollection()
@@ -234,6 +261,61 @@ ipcMain.handle('get-card', (_, grpId: number) => {
 
 ipcMain.handle('get-card-name', (_, grpId: number) => {
   return getCardName(grpId)
+})
+
+ipcMain.handle('get-collection-stats', () => {
+  try {
+    return getCollectionStats()
+  } catch (error) {
+    console.error('[IPC] Failed to get collection stats:', error)
+    return { totalCards: 0, uniqueCards: 0, byRarity: {} }
+  }
+})
+
+ipcMain.handle('get-set-list', () => {
+  try {
+    return getSetList()
+  } catch (error) {
+    console.error('[IPC] Failed to get set list:', error)
+    return []
+  }
+})
+
+ipcMain.handle('get-cards-by-set', (_, setCode: string) => {
+  try {
+    return getCardsBySet(setCode)
+  } catch (error) {
+    console.error('[IPC] Failed to get cards by set:', error)
+    return []
+  }
+})
+
+ipcMain.handle('update-match-notes', (_, matchId: string, notes: string) => {
+  try {
+    updateMatchNotes(matchId, notes)
+    return true
+  } catch (error) {
+    console.error('[IPC] Failed to update match notes:', error)
+    return false
+  }
+})
+
+ipcMain.handle('get-opponent-stats', (_, deckId?: string) => {
+  try {
+    return getOpponentStats(deckId)
+  } catch (error) {
+    console.error('[IPC] Failed to get opponent stats:', error)
+    return []
+  }
+})
+
+ipcMain.handle('format-event-id', (_, eventId: string) => {
+  try {
+    return formatEventId(eventId)
+  } catch (error) {
+    console.error('[IPC] Failed to format event ID:', error)
+    return eventId
+  }
 })
 
 // ============================================================================

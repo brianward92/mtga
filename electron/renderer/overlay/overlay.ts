@@ -23,6 +23,8 @@ interface DeckState {
   name: string
   cards: Map<string, CardInDeck>  // Keyed by card name
   grpIdToName: Map<number, string>  // Lookup from grpId to card name
+  sideboardCards: Map<string, CardInDeck>  // Sideboard cards
+  sideboardGrpIdToName: Map<number, string>  // Sideboard grpId lookup
   totalCards: number
   cardsRemaining: number
 }
@@ -34,6 +36,7 @@ interface GameState {
   cardsDrawn: number[]
   cardsOnBattlefield: number[]
   cardsInExile: number[]
+  turnNumber?: number
 }
 
 interface MatchStartData {
@@ -54,16 +57,22 @@ const cardNames: Map<number, { name: string; manaCost: string; type: string }> =
 // State
 let deckState: DeckState | null = null
 let isMinimized = false
+let isSideboardExpanded = false
 let previousLibraryCount = -1
 let previousHandCount = -1
 let previousGraveyardCount = -1
+let turnNumber = 0
 
 // DOM elements
 const overlay = document.getElementById('overlay')!
 const matchStatus = document.getElementById('matchStatus')!
+const turnCounter = document.getElementById('turnCounter')!
 const deckNameEl = document.getElementById('deckName')!
 const deckCount = document.getElementById('deckCount')!
 const cardGroups = document.getElementById('cardGroups')!
+const sideboardToggle = document.getElementById('sideboardToggle')!
+const sideboardSection = document.getElementById('sideboardSection')!
+const sideboardCards = document.getElementById('sideboardCards')!
 const libraryCount = document.getElementById('libraryCount')!
 const handCount = document.getElementById('handCount')!
 const graveyardCount = document.getElementById('graveyardCount')!
@@ -137,7 +146,27 @@ async function loadCardData(): Promise<void> {
  */
 function setupEventListeners(): void {
   minimizeBtn.addEventListener('click', toggleMinimize)
+  sideboardToggle.addEventListener('click', toggleSideboard)
   setupTooltips()
+  setupKeyboardShortcuts()
+}
+
+/**
+ * Setup keyboard shortcuts for overlay
+ */
+function setupKeyboardShortcuts(): void {
+  document.addEventListener('keydown', (e) => {
+    // Ctrl/Cmd + M: Toggle minimize
+    if ((e.ctrlKey || e.metaKey) && e.key === 'm') {
+      e.preventDefault()
+      toggleMinimize()
+    }
+    // Ctrl/Cmd + B: Toggle sideboard
+    if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+      e.preventDefault()
+      toggleSideboard()
+    }
+  })
 }
 
 /**
@@ -213,6 +242,15 @@ function toggleMinimize(): void {
 }
 
 /**
+ * Toggle sideboard expansion
+ */
+function toggleSideboard(): void {
+  isSideboardExpanded = !isSideboardExpanded
+  sideboardSection.classList.toggle('expanded', isSideboardExpanded)
+  sideboardToggle.setAttribute('aria-expanded', String(isSideboardExpanded))
+}
+
+/**
  * Setup IPC event handlers
  */
 function setupTrackerEvents(): void {
@@ -246,9 +284,13 @@ function setupTrackerEvents(): void {
       renderDeck()
       matchStatus.textContent = 'Waiting for match...'
       matchStatus.className = 'status'
+      turnNumber = 0
+      turnCounter.textContent = ''
       previousLibraryCount = -1
       previousHandCount = -1
       previousGraveyardCount = -1
+      isSideboardExpanded = false
+      sideboardSection.classList.remove('expanded')
     }, 5000)
   })
 
@@ -257,12 +299,15 @@ function setupTrackerEvents(): void {
     const deck = data as {
       deckName: string
       mainDeck: Array<{ grpId: number; quantity: number }>
+      sideboard?: Array<{ grpId: number; quantity: number }>
     }
 
     deckState = {
       name: deck.deckName,
       cards: new Map(),
       grpIdToName: new Map(),
+      sideboardCards: new Map(),
+      sideboardGrpIdToName: new Map(),
       totalCards: 0,
       cardsRemaining: 0
     }
@@ -316,6 +361,50 @@ function setupTrackerEvents(): void {
 
       deckState.totalCards += card.quantity
       deckState.cardsRemaining += card.quantity
+    }
+
+    // Process sideboard if available
+    if (deck.sideboard) {
+      for (const card of deck.sideboard) {
+        let cardInfo = cardNames.get(card.grpId)
+
+        if (!cardInfo && window.mtgaTracker) {
+          const name = await window.mtgaTracker.getCardName(card.grpId)
+          const fullCard = await window.mtgaTracker.getCard(card.grpId)
+          cardInfo = {
+            name: name || `Card #${card.grpId}`,
+            manaCost: fullCard?.manaCost || '',
+            type: fullCard?.type || 'other'
+          }
+          cardNames.set(card.grpId, cardInfo)
+        }
+
+        if (!cardInfo) {
+          cardInfo = { name: `Card #${card.grpId}`, manaCost: '', type: 'other' }
+        }
+
+        const cardName = cardInfo.name
+        deckState.sideboardGrpIdToName.set(card.grpId, cardName)
+
+        const existingCard = deckState.sideboardCards.get(cardName)
+        if (existingCard) {
+          if (!existingCard.grpIds.includes(card.grpId)) {
+            existingCard.grpIds.push(card.grpId)
+          }
+          existingCard.quantity += card.quantity
+          existingCard.remaining += card.quantity
+        } else {
+          deckState.sideboardCards.set(cardName, {
+            name: cardName,
+            grpIds: [card.grpId],
+            manaCost: cardInfo.manaCost,
+            type: inferCardType(cardInfo.type),
+            quantity: card.quantity,
+            remaining: card.quantity,
+            inHand: 0
+          })
+        }
+      }
     }
 
     renderDeck()
@@ -373,6 +462,12 @@ function inferCardType(typeString: string): CardType {
  * Update game state and trigger animations
  */
 function updateGameState(state: GameState): void {
+  // Update turn counter
+  if (state.turnNumber !== undefined && state.turnNumber !== turnNumber) {
+    turnNumber = state.turnNumber
+    turnCounter.textContent = `Turn ${turnNumber}`
+  }
+
   // Update stats with animations
   updateStatWithAnimation(libraryCount, state.librarySize, previousLibraryCount)
   updateStatWithAnimation(handCount, state.handSize, previousHandCount)
@@ -454,6 +549,55 @@ function updateStatWithAnimation(element: HTMLElement, newValue: number, oldValu
 }
 
 /**
+ * Render the sideboard section
+ */
+function renderSideboard(): void {
+  if (!deckState || deckState.sideboardCards.size === 0) {
+    sideboardSection.style.display = 'none'
+    return
+  }
+
+  sideboardSection.style.display = 'block'
+
+  // Group cards by type
+  const groups: Map<CardType, CardInDeck[]> = new Map()
+  const typeOrder: CardType[] = ['creature', 'planeswalker', 'instant', 'sorcery', 'enchantment', 'artifact', 'land', 'other']
+
+  for (const type of typeOrder) {
+    groups.set(type, [])
+  }
+
+  for (const card of deckState.sideboardCards.values()) {
+    const group = groups.get(card.type) || groups.get('other')!
+    group.push(card)
+  }
+
+  let html = ''
+  for (const type of typeOrder) {
+    const cards = groups.get(type)!
+    if (cards.length === 0) continue
+
+    cards.sort((a, b) => a.name.localeCompare(b.name))
+    const totalRemaining = cards.reduce((sum, c) => sum + c.remaining, 0)
+    const totalQuantity = cards.reduce((sum, c) => sum + c.quantity, 0)
+
+    html += `
+      <div class="card-group">
+        <div class="group-header">
+          <span>${formatTypeName(type)}</span>
+          <span class="group-count">${totalRemaining}/${totalQuantity}</span>
+        </div>
+        <div class="card-list">
+          ${cards.map(renderCard).join('')}
+        </div>
+      </div>
+    `
+  }
+
+  sideboardCards.innerHTML = html
+}
+
+/**
  * Render the deck tracker
  */
 function renderDeck(): void {
@@ -518,6 +662,9 @@ function renderDeck(): void {
   }
 
   cardGroups.innerHTML = html
+
+  // Render sideboard
+  renderSideboard()
 }
 
 /**

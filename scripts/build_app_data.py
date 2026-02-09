@@ -39,6 +39,7 @@ def create_parser():
     parser.add_argument("--sets", nargs="*", help="Set codes to include.")
     return parser
 
+
 def read_with_error(fpath):
     if not fpath.exists():
         raise FileNotFoundError(f"File not found: {fpath}")

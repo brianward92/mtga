@@ -52,9 +52,26 @@
           </svg>
           Inventory
         </a>
+        <a href="#" class="nav-item" data-section="collection">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
+            <polyline points="13 2 13 9 20 9"/>
+          </svg>
+          Collection
+        </a>
+        <a href="#" class="nav-item" data-section="opponents">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+          Opponents
+        </a>
       </nav>
 
       <div class="sidebar-footer">
+        <button class="help-btn" id="helpBtn" title="Keyboard shortcuts">?</button>
         <span class="version">v0.1.0</span>
       </div>
     </aside>
@@ -67,6 +84,9 @@
           <h1>Overview</h1>
           <p class="subtitle">Your MTGA statistics at a glance</p>
         </header>
+
+        <!-- Session Stats -->
+        <div id="sessionStatsContainer" style="margin-bottom: 24px;"></div>
 
         <!-- Stats Cards -->
         <div class="stats-grid">
@@ -121,6 +141,31 @@
           </div>
         </div>
 
+        <!-- Play/Draw & Format Stats -->
+        <div class="card">
+          <div class="card-header">
+            <h2>Detailed Stats</h2>
+          </div>
+          <div id="playDrawStatsContainer"></div>
+          <div style="border-top: 1px solid rgba(255, 255, 255, 0.08); margin-top: 16px; padding-top: 16px;">
+            <h3 style="font-size: 14px; margin-bottom: 12px; color: var(--text-secondary);">By Format</h3>
+            <div id="formatStatsContainer"></div>
+          </div>
+        </div>
+
+        <!-- Win Rate Trends -->
+        <div class="card">
+          <div class="card-header">
+            <h2>Win Rate Trend (Last 30 Days)</h2>
+          </div>
+          <div id="winTrendChart" style="padding: 16px 20px;">
+            <svg id="trendChartSvg" style="width: 100%; height: 300px; display: none;"></svg>
+            <div id="trendChartEmpty" class="empty-state">
+              <p>No trend data available</p>
+            </div>
+          </div>
+        </div>
+
         <!-- Recent Matches -->
         <div class="card">
           <div class="card-header">
@@ -158,6 +203,13 @@
             <option value="win">Wins</option>
             <option value="loss">Losses</option>
           </select>
+          <input type="search" id="deckSearch" class="filter-select" placeholder="Search decks..." style="flex: 1; max-width: 200px;">
+          <input type="date" id="dateFrom" class="filter-select" title="From date">
+          <input type="date" id="dateTo" class="filter-select" title="To date">
+          <div style="margin-left: auto; display: flex; gap: 8px;">
+            <button class="btn-export" id="exportCsvBtn">Export CSV</button>
+            <button class="btn-export" id="exportJsonBtn">Export JSON</button>
+          </div>
         </div>
 
         <div class="card">
@@ -177,6 +229,41 @@
         </header>
 
         <div class="card">
+          <div class="card-header">
+            <h2>Import Deck from Arena</h2>
+          </div>
+          <div style="padding: 16px 20px;">
+            <textarea id="deckImportText" class="notes-textarea" placeholder="Paste your MTG Arena deck list here..." style="min-height: 150px;"></textarea>
+            <div style="margin-top: 12px; display: flex; gap: 8px;">
+              <button class="btn-export" id="deckImportBtn">Import & Export Deck</button>
+              <button class="btn-secondary" id="deckImportClear">Clear</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h2>Deck Win Rates</h2>
+          </div>
+          <div style="padding: 16px 20px;">
+            <div class="deck-win-rate-chart">
+              <div class="deck-chart-header">
+                <span>Deck</span>
+                <span style="text-align: right;">Win Rate</span>
+              </div>
+              <div class="deck-chart-bars" id="deckChartBars">
+                <div class="empty-state">
+                  <p>No deck data yet</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h2>Deck Statistics</h2>
+          </div>
           <div class="deck-list" id="deckList">
             <div class="empty-state">
               <p>No deck data yet</p>
@@ -217,6 +304,41 @@
               <span class="inventory-label">Gold</span>
             </div>
           </div>
+
+          <div class="inventory-card">
+            <div class="inventory-icon tokens">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+              </svg>
+            </div>
+            <div class="inventory-content">
+              <span class="inventory-value" id="draftTokens">-</span>
+              <span class="inventory-label">Draft Tokens</span>
+            </div>
+          </div>
+
+          <div class="inventory-card">
+            <div class="inventory-icon tokens">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+              </svg>
+            </div>
+            <div class="inventory-content">
+              <span class="inventory-value" id="sealedTokens">-</span>
+              <span class="inventory-label">Sealed Tokens</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h2>Boosters</h2>
+          </div>
+          <div class="boosters-grid" id="boostersContainer">
+            <div class="booster-item empty">
+              <span class="booster-name">No boosters</span>
+            </div>
+          </div>
         </div>
 
         <div class="card">
@@ -255,7 +377,128 @@
           </div>
         </div>
       </section>
+
+      <!-- Opponents Section -->
+      <section id="opponents" class="section">
+        <header class="section-header">
+          <h1>Opponent Meta</h1>
+          <p class="subtitle">Track your performance against opponents</p>
+        </header>
+
+        <div class="card">
+          <div class="card-header">
+            <h2>Most Played Opponents</h2>
+          </div>
+          <div class="opponent-list" id="opponentList">
+            <div class="empty-state">
+              <p>Loading opponent data...</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Collection Section -->
+      <section id="collection" class="section">
+        <header class="section-header">
+          <h1>Collection</h1>
+          <p class="subtitle">Your card collection and completion status</p>
+        </header>
+
+        <div class="card">
+          <div class="card-header">
+            <h2>Collection Stats</h2>
+          </div>
+          <div class="collection-stats">
+            <div class="stat-item">
+              <span class="stat-item-label">Unique Cards</span>
+              <span class="stat-item-value" id="collectionUnique">-</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-item-label">Total Cards</span>
+              <span class="stat-item-value" id="collectionTotal">-</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h2>Filter by Set</h2>
+          </div>
+          <div style="padding: 16px 20px;">
+            <select id="collectionSetFilter" class="filter-select" style="width: 100%;">
+              <option value="">All Sets</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h2>Cards</h2>
+          </div>
+          <div class="collection-grid" id="collectionGrid">
+            <div class="empty-state">
+              <p>Loading collection...</p>
+            </div>
+          </div>
+        </div>
+      </section>
     </main>
+
+    <!-- Footer -->
+    <footer class="dashboard-footer">
+      <div class="footer-info">
+        <span class="footer-stat"><strong id="totalRecordedMatches">0</strong> matches recorded</span>
+        <span class="footer-divider">•</span>
+        <span class="footer-stat">Last sync: <span id="lastSyncTime">never</span></span>
+      </div>
+      <div class="footer-version">
+        <span>MTGA Tracker v1.0</span>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Help Modal -->
+  <div class="modal" id="helpModal">
+    <div class="modal-content" style="max-width: 500px;">
+      <div class="modal-header">
+        <h2>Keyboard Shortcuts</h2>
+        <button class="modal-close" id="helpModalClose">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="display: grid; grid-template-columns: auto 1fr; gap: 12px; font-size: 13px;">
+          <kbd>Ctrl+K</kbd> <span>Focus deck search</span>
+          <kbd>Ctrl+R</kbd> <span>Reload dashboard</span>
+          <kbd>Ctrl+1</kbd> <span>Go to Overview</span>
+          <kbd>Ctrl+2</kbd> <span>Go to Matches</span>
+          <kbd>Ctrl+3</kbd> <span>Go to Decks</span>
+          <kbd>Ctrl+4</kbd> <span>Go to Inventory</span>
+          <kbd>Ctrl+5</kbd> <span>Go to Collection</span>
+          <kbd>Ctrl+6</kbd> <span>Go to Opponents</span>
+          <hr style="grid-column: 1/-1; border: none; border-top: 1px solid rgba(255,255,255,0.08); margin: 8px 0;">
+          <kbd>Ctrl+M</kbd> <span>Toggle overlay minimize</span>
+          <kbd>Ctrl+B</kbd> <span>Toggle sideboard</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Match Notes Modal -->
+  <div class="modal" id="notesModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Match Notes</h2>
+        <button class="modal-close" id="notesModalClose">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="notesMatchInfo" style="margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.08);">
+        </div>
+        <textarea id="notesInput" class="notes-textarea" placeholder="Add notes about this match..."></textarea>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" id="notesCancel">Cancel</button>
+        <button class="btn-export" id="notesSave">Save Notes</button>
+      </div>
+    </div>
   </div>
 
   <script type="module" src="./dashboard.ts"></script>
