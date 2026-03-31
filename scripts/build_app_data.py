@@ -29,6 +29,7 @@ DEFAULT_SET_CODES = [
     "EOE",
     "SPM",
     "TLA",
+    "TMT",
 ]
 
 
