@@ -626,6 +626,17 @@ body {
   transition: color var(--transition-fast), transform var(--transition-fast);
 }
 
+.stat-value.opp {
+  color: var(--text-muted);
+  font-size: 16px;
+}
+
+.stat-separator {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin: 0 1px;
+}
+
 .stat-value.changed {
   animation: statPulse 0.4s ease;
 }

@@ -19,6 +19,9 @@ interface Match {
   endedAt: string | null
   onPlay: boolean
   notes?: string
+  winCondition?: string
+  finalTurn?: number
+  opponentPlatform?: string
 }
 
 interface MatchStats {
@@ -501,17 +504,31 @@ function renderMatchRow(match: Match): string {
   const opponent = match.opponentName || 'Unknown'
   const format = formatFormatName(match.format || match.eventId)
   const hasNotes = match.notes && match.notes.trim().length > 0
+  const platformIcon = formatPlatform(match.opponentPlatform)
+  const turnInfo = match.finalTurn ? `T${match.finalTurn}` : ''
+  const winCondTag = match.winCondition && match.winCondition !== 'Unknown'
+    ? `<span class="match-win-condition">${escapeHtml(match.winCondition)}</span>` : ''
 
   return `
     <div class="match-row" data-match-id="${match.id}" role="button" tabindex="0">
       <span class="match-result ${match.result}">${match.result}</span>
+      ${winCondTag}
       <span class="match-deck">${escapeHtml(deckName)}</span>
-      <span class="match-opponent">vs ${escapeHtml(opponent)}</span>
+      <span class="match-opponent">vs ${escapeHtml(opponent)}${platformIcon ? ` <span class="platform-icon" title="${escapeHtml(match.opponentPlatform || '')}">${platformIcon}</span>` : ''}</span>
       <span class="match-format">${format}</span>
+      ${turnInfo ? `<span class="match-turn">${turnInfo}</span>` : ''}
       <span class="match-time">${timeAgo}</span>
       ${hasNotes ? `<span class="match-notes-indicator" title="This match has notes">📝</span>` : ''}
     </div>
   `
+}
+
+function formatPlatform(platform?: string): string {
+  if (!platform) return ''
+  const lower = platform.toLowerCase()
+  if (lower.includes('android') || lower.includes('ios') || lower.includes('phone')) return '📱'
+  if (lower.includes('mac') || lower.includes('windows') || lower.includes('pc')) return '🖥'
+  return ''
 }
 
 /**

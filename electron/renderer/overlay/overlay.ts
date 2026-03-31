@@ -37,6 +37,8 @@ interface GameState {
   cardsOnBattlefield: number[]
   cardsInExile: number[]
   turnNumber?: number
+  playerLife?: number
+  opponentLife?: number
 }
 
 interface MatchStartData {
@@ -73,6 +75,8 @@ const cardGroups = document.getElementById('cardGroups')!
 const sideboardToggle = document.getElementById('sideboardToggle')!
 const sideboardSection = document.getElementById('sideboardSection')!
 const sideboardCards = document.getElementById('sideboardCards')!
+const playerLifeEl = document.getElementById('playerLife')!
+const opponentLifeEl = document.getElementById('opponentLife')!
 const libraryCount = document.getElementById('libraryCount')!
 const handCount = document.getElementById('handCount')!
 const graveyardCount = document.getElementById('graveyardCount')!
@@ -466,6 +470,14 @@ function updateGameState(state: GameState): void {
   if (state.turnNumber !== undefined && state.turnNumber !== turnNumber) {
     turnNumber = state.turnNumber
     turnCounter.textContent = `Turn ${turnNumber}`
+  }
+
+  // Update life totals
+  if (state.playerLife !== undefined && state.playerLife > 0) {
+    playerLifeEl.textContent = String(state.playerLife)
+  }
+  if (state.opponentLife !== undefined && state.opponentLife > 0) {
+    opponentLifeEl.textContent = String(state.opponentLife)
   }
 
   // Update stats with animations
