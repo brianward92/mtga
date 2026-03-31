@@ -8,6 +8,7 @@ export interface MatchStartData {
   eventId: string
   opponentName: string
   opponentRank: string
+  opponentPlatform: string
   seatId: number
   teamId: number
   gameMode: string
@@ -136,6 +137,7 @@ function parseMatchStart(gameRoomInfo: GameRoomInfo): MatchEvent | null {
       eventId: config.eventId || localPlayer.eventId || 'Unknown',
       opponentName: opponent?.playerName || 'Unknown',
       opponentRank: '',
+      opponentPlatform: opponent?.platformId || '',
       seatId: localPlayer.systemSeatId || 0,
       teamId: localPlayer.teamId || 0,
       gameMode: config.gameMode || 'Unknown',
@@ -252,43 +254,8 @@ function parseMatchEnd(gameRoomInfo: GameRoomInfo): MatchEvent | null {
   }
 }
 
-/**
- * Get human-readable format name from eventId.
- */
-export function parseFormatFromEventId(eventId: string): string {
-  const patterns: Record<string, string> = {
-    'Historic_Ladder': 'Historic Ranked',
-    'Traditional_Historic_Ladder': 'Traditional Historic',
-    'Ladder': 'Standard Ranked',
-    'Traditional_Ladder': 'Traditional Standard',
-    'Alchemy_Ladder': 'Alchemy Ranked',
-    'Explorer_Ladder': 'Explorer Ranked',
-    'Timeless_Ladder': 'Timeless Ranked',
-    'Historic_Play': 'Historic Play',
-    'Play': 'Standard Play',
-    'Bot_Match': 'Bot Match',
-    'DirectChallenge': 'Direct Challenge',
-    'PremierDraft': 'Premier Draft',
-    'QuickDraft': 'Quick Draft',
-    'TradDraft': 'Traditional Draft',
-    'Sealed': 'Sealed',
-    'Cube': 'Cube'
-  }
-
-  // Exact match first
-  if (patterns[eventId]) {
-    return patterns[eventId]
-  }
-
-  // Partial match
-  for (const [pattern, format] of Object.entries(patterns)) {
-    if (eventId.toLowerCase().includes(pattern.toLowerCase())) {
-      return format
-    }
-  }
-
-  return eventId
-}
+// Format detection consolidated in utils/format-utils.ts
+// Use formatEventId() from there instead of the removed parseFormatFromEventId()
 
 /**
  * Reset player tracking (call when app starts or connection resets).

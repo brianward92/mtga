@@ -38,6 +38,9 @@ export interface GameStateData {
   cardsDrawn: number[]
   cardsOnBattlefield: number[]
   cardsInExile: number[]
+  // Life totals
+  playerLife: number
+  opponentLife: number
 }
 
 export interface DeckSubmissionData {
@@ -195,6 +198,22 @@ function parseGameStateMessage(msg: Record<string, unknown>): GameStateData | nu
     }
   }
 
+  // Parse life totals from players array
+  let playerLife = 0
+  let opponentLife = 0
+  const playersArray = gameStateMessage.players as Array<Record<string, unknown>> | undefined
+  if (playersArray && Array.isArray(playersArray)) {
+    for (const player of playersArray) {
+      const seatNumber = player.systemSeatNumber as number | undefined
+      const lifeTotal = player.lifeTotal as number | undefined
+      if (seatNumber === 1 && lifeTotal !== undefined) {
+        playerLife = lifeTotal
+      } else if (seatNumber === 2 && lifeTotal !== undefined) {
+        opponentLife = lifeTotal
+      }
+    }
+  }
+
   // Parse turn info
   const turnInfo = gameStateMessage.turnInfo as Record<string, unknown> | undefined
 
@@ -263,7 +282,9 @@ function parseGameStateMessage(msg: Record<string, unknown>): GameStateData | nu
     graveyardCards,
     cardsDrawn,
     cardsOnBattlefield,
-    cardsInExile
+    cardsInExile,
+    playerLife,
+    opponentLife
   }
 }
 

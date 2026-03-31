@@ -46,6 +46,11 @@ let logParser: LogParser | null = null
 let currentMatchId: string | null = null
 let currentDeckName: string | null = null
 
+// Track last game state for win condition derivation
+let lastTurnNumber = 0
+let lastOpponentLife = 20
+let lastPlayerLife = 20
+
 /**
  * Create all application windows
  */
@@ -95,9 +100,12 @@ function setupLogParser(): void {
   logParser.on('match-start', (data) => {
     overlayWindow?.webContents.send('match-start', data)
     currentMatchId = data.matchId
+    lastTurnNumber = 0
+    lastOpponentLife = 20
+    lastPlayerLife = 20
 
     const deckName = currentDeckName || logParser?.getCurrentDeckName() || null
-    console.log('[Parser] Match started:', data.matchId, 'Deck:', deckName || 'Unknown')
+    console.log('[Parser] Match started:', data.matchId, 'vs', data.opponentName, `(${data.opponentPlatform || '?'})`, 'Deck:', deckName || 'Unknown')
 
     try {
       insertMatch({
@@ -110,7 +118,8 @@ function setupLogParser(): void {
         result: 'draw',
         gameCount: 1,
         startedAt: new Date(),
-        onPlay: data.seatId === 1
+        onPlay: data.seatId === 1,
+        opponentPlatform: data.opponentPlatform
       })
     } catch (error) {
       console.error('[DB] Failed to insert match:', error)
@@ -121,10 +130,13 @@ function setupLogParser(): void {
   logParser.on('match-end', (data) => {
     overlayWindow?.webContents.send('match-end', data)
     registryWindow?.webContents.send('match-end', data)
-    console.log('[Parser] Match ended:', data.matchId, 'Result:', data.result)
+
+    // Derive win condition from match reason and game state
+    const winCondition = deriveWinCondition(data.result, data.reason, lastOpponentLife, lastPlayerLife)
+    console.log('[Parser] Match ended:', data.matchId, 'Result:', data.result, `(${winCondition}) Turn ${lastTurnNumber}`)
 
     try {
-      updateMatchEnd(data.matchId, data.result, data.gameCount)
+      updateMatchEnd(data.matchId, data.result, data.gameCount, winCondition, lastTurnNumber)
     } catch (error) {
       console.error('[DB] Failed to update match:', error)
     }
@@ -135,6 +147,10 @@ function setupLogParser(): void {
   // Game state updates (for deck tracker)
   logParser.on('game-state', (data) => {
     overlayWindow?.webContents.send('game-state', data)
+    // Track for win condition derivation
+    if (data.turnNumber > 0) lastTurnNumber = data.turnNumber
+    if (data.playerLife > 0) lastPlayerLife = data.playerLife
+    if (data.opponentLife > 0) lastOpponentLife = data.opponentLife
   })
 
   // Deck submission (cards in deck)
@@ -197,6 +213,40 @@ function setupLogWatcher(): void {
   })
 
   logWatcher.start()
+}
+
+/**
+ * Derive a human-readable win condition from match end data and last known game state.
+ */
+function deriveWinCondition(
+  result: 'win' | 'loss' | 'draw',
+  reason: string,
+  opponentLife: number,
+  playerLife: number
+): string {
+  const reasonLower = reason.toLowerCase()
+
+  if (reasonLower.includes('concede') || reasonLower.includes('concession')) {
+    return result === 'win' ? 'Opponent Conceded' : 'Conceded'
+  }
+  if (reasonLower.includes('timeout') || reasonLower.includes('idle')) {
+    return result === 'win' ? 'Opponent Timed Out' : 'Timed Out'
+  }
+  if (reasonLower.includes('disconnect') || reasonLower.includes('connection')) {
+    return result === 'win' ? 'Opponent Disconnected' : 'Disconnected'
+  }
+
+  // Game ended normally — check life totals to distinguish damage vs mill
+  if (result === 'win') {
+    // If opponent still had life, they were milled (drew from empty library)
+    if (opponentLife > 0) return 'Milled'
+    return 'Damage'
+  } else if (result === 'loss') {
+    if (playerLife > 0) return 'Milled'
+    return 'Damage'
+  }
+
+  return 'Unknown'
 }
 
 // ============================================================================

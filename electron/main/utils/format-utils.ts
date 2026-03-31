@@ -19,8 +19,12 @@ const FORMAT_PATTERNS: Record<string, string> = {
   'PremierDraft': 'Premier Draft',
   'QuickDraft': 'Quick Draft',
   'TradDraft': 'Trad. Draft',
+  'CompDraft': 'Competitive Draft',
+  'PickTwoDraft': 'Pick Two Draft',
   'Sealed': 'Sealed',
-  'Cube': 'Cube'
+  'Cube': 'Cube',
+  'JumpIn': 'Jump In',
+  'MidweekMagic': 'Midweek Magic'
 }
 
 /**
@@ -43,12 +47,27 @@ export function formatEventId(eventId: string): string {
     }
   }
 
-  // Extract format from eventId (before first underscore or as-is)
-  if (eventId.includes('_')) {
-    return eventId.split('_')[0]
+  // Strip trailing set codes (3-4 uppercase letters) and dates (YYYYMMDD) from event ID
+  // e.g. "PickTwoDraft_TMT_20260303" → "PickTwoDraft"
+  const stripped = eventId
+    .replace(/_\d{6,8}$/, '')       // trailing date
+    .replace(/_[A-Z]{2,4}$/, '')    // trailing set code
+    .replace(/_\d{6,8}$/, '')       // date before set code
+    .replace(/_[A-Z]{2,4}$/, '')    // nested set code
+
+  // Check partial match again after stripping
+  for (const [pattern, format] of Object.entries(FORMAT_PATTERNS)) {
+    if (stripped.toLowerCase().includes(pattern.toLowerCase())) {
+      return format
+    }
   }
 
-  return eventId
+  // CamelCase to spaced: "PickTwoDraft" → "Pick Two Draft"
+  if (stripped && !stripped.includes('_')) {
+    return stripped.replace(/([a-z])([A-Z])/g, '$1 $2')
+  }
+
+  return stripped || eventId
 }
 
 /**
