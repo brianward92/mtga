@@ -1,0 +1,9 @@
+# Runtime dependencies for the MTG Registry (mtga) project.
+# Installed into the project-local .venv by scripts/setup.sh.
+# Direct imports: pandas, numpy, scipy, requests; pyarrow backs
+# pandas' to_parquet/read_parquet calls in the scryfall pipeline.
+pandas
+numpy
+scipy
+requests
+pyarrow
