@@ -5,6 +5,11 @@ import json
 import requests
 
 BULK_DATA_URL = "https://api.scryfall.com/bulk-data"
+REQUEST_TIMEOUT = 30
+SCRYFALL_HEADERS = {
+    "Accept": "application/json",
+    "User-Agent": "mtga/0.2 (brian.ward.92@gmail.com)",
+}
 
 _BULK_DATA = None
 
@@ -13,7 +18,9 @@ def get_bulk_data_urls(refresh=False):
     global _BULK_DATA
     if refresh or (_BULK_DATA is None):
         print(f"Fetching bulk data info from {BULK_DATA_URL}.")
-        response = requests.get(BULK_DATA_URL)
+        response = requests.get(
+            BULK_DATA_URL, headers=SCRYFALL_HEADERS, timeout=REQUEST_TIMEOUT
+        )
         response.raise_for_status()
         _BULK_DATA = response.json()
     return _BULK_DATA
@@ -42,7 +49,7 @@ def get_download_url(data_type, refresh=False):
 def get_latest_all_cards_data():
     download_url = get_download_url("all_cards")
     data_response = requests.get(
-        download_url, headers={"User-Agent": "mtga/0.2 (brian.ward.92@gmail.com)"}
+        download_url, headers=SCRYFALL_HEADERS, timeout=REQUEST_TIMEOUT
     )
     data_response.raise_for_status()
     return data_response.content
