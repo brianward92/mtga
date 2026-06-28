@@ -57,6 +57,7 @@ Generated web data lives under `app/data/` and is ignored by git:
 
 ```text
 app/data/
+  index.html
   bootstrap.js
   bootstrap.js.gz
   manifest.json
@@ -67,9 +68,11 @@ app/data/
     ...
 ```
 
-`bootstrap.js` is the startup path. It defines `window.MTG_REGISTRY_BOOTSTRAP`
-with the manifest plus the default set payload, so the first card renders from
-already-loaded script data instead of waiting for app-code fetches.
+`index.html` is the startup path served at `/`. It already contains the default
+card metadata and local thumbnail before JavaScript runs. `bootstrap.js` then
+defines `window.MTG_REGISTRY_BOOTSTRAP` with the manifest plus the default set
+payload, so hydration does not wait for app-code manifest or default-set
+fetches.
 
 `manifest.json` contains schema version `4`, the build id, default set, set
 metadata, optional `thumbnailCachePath`, and `thumbnailSetCodes` for sets with
@@ -84,10 +87,11 @@ The full field list is `id`, `name`, `collectorNumber`, `colors`, `manaCost`,
 `typeLine`, `rarity`, `priceUsd`, `priceUsdFoil`, `priceUsdEtched`,
 `valueHint`, `imageSmallUrl`, and `imageNormalUrl`.
 
-The browser renders the bootstrapped default set first, then waits before
-prefetching other set files into the HTTP cache in the background. It keeps only
-a small LRU of decoded sets in memory, so set switching is snappy after prefetch
-without holding every parsed card object forever.
+The browser paints the server-rendered default card first, hydrates it from
+bootstrap data, then waits before prefetching other set files into the HTTP
+cache in the background. It keeps only a small LRU of decoded sets in memory, so
+set switching is snappy after prefetch without holding every parsed card object
+forever.
 
 The default generator includes a strict union of the historical inventory
 baseline and released Scryfall `expansion` sets discovered from processed set

@@ -27,6 +27,7 @@ The card database comes from Scryfall bulk data:
    files under `/opt/$USER/dat/mtga/processed/`.
 3. `scripts/build_app_data.py` converts those parquet files into the web app's
    lazy-load schema v4 JSON files:
+   - `app/data/index.html`
    - `app/data/bootstrap.js`
    - `app/data/bootstrap.js.gz`
    - `app/data/manifest.json`
@@ -79,12 +80,14 @@ The app runtime is:
 The server sends no-store headers for the app shell and manifest. Generated set
 JSON is versioned by manifest `buildId`, served with immutable cache headers,
 and sent from the precompressed `.json.gz` sidecar when the browser accepts
-gzip. Startup uses `data/bootstrap.js`, which contains the manifest plus the
-default set payload, so the default set renders without fetching manifest or set
-JSON from app code. The browser decodes only the current/recent sets in a small
-LRU cache and delays other set prefetches until after startup. Card images load
-from local thumbnails or Scryfall `small` URLs first, then only the current card
-is upgraded to `normal` after startup idle time. The live image preload cache is
+gzip. Startup serves generated `data/index.html` at `/`; it already contains
+the default card metadata and local thumbnail before JavaScript runs. Hydration
+then uses `data/bootstrap.js`, which contains the manifest plus the default set
+payload, so the default set renders without fetching manifest or set JSON from
+app code. The browser decodes only the current/recent sets in a small LRU cache
+and delays other set prefetches until after startup. Card images load from local
+thumbnails or Scryfall `small` URLs first, then only the current card is
+upgraded to `normal` after startup idle time. The live image preload cache is
 capped at the current card plus nearby cards.
 
 Health checks:
@@ -99,7 +102,7 @@ Healthy means:
 
 - `screen -ls` shows a detached `mtga` session.
 - `lsof` shows Python listening on `*:8000`.
-- `curl` returns `HTTP/1.0 200 OK`.
+- `curl` returns `200 OK`.
 
 Restart:
 

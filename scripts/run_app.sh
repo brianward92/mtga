@@ -56,6 +56,7 @@ cleanup() {
     rm -f "$DATA_DIR/cards.js"
     rm -f "$DATA_DIR/bootstrap.js"
     rm -f "$DATA_DIR/bootstrap.js.gz"
+    rm -f "$DATA_DIR/index.html"
     rm -f "$DATA_DIR/manifest.json"
     rm -f "$DATA_DIR/manifest.json.gz"
     rm -rf "$DATA_DIR/sets"

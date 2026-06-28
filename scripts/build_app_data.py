@@ -1,6 +1,7 @@
 import argparse
 from datetime import date
 import gzip
+from html import escape
 import json
 import os
 from pathlib import Path
@@ -177,6 +178,137 @@ def write_bootstrap(path, manifest, default_set_payload):
     write_gzip_copy(path)
 
 
+def write_initial_index(path, template_path, manifest, default_set_payload):
+    html = template_path.read_text(encoding="utf-8")
+    default_set_code = default_set_payload["setCode"]
+    set_meta = next(
+        (item for item in manifest["sets"] if item["setCode"] == default_set_code),
+        {"setCode": default_set_code, "setName": default_set_code},
+    )
+    cards = [dict(zip(default_set_payload["fields"], row)) for row in default_set_payload["cards"]]
+    cards = sorted(
+        cards,
+        key=lambda card: collector_sort_key(card.get("collectorNumber")),
+    )
+    first_card = cards[0]
+    set_label = f"{set_meta['setName']} ({default_set_code})"
+    type_parts = split_type_line(first_card.get("typeLine"))
+    image_url = initial_image_url(first_card, manifest, default_set_code)
+
+    replacements = {
+        '<select id="setSelect"></select>': render_set_select(manifest),
+        '<span id="setBadge" class="chip"></span>': (
+            f'<span id="setBadge" class="chip">{escape(set_label)}</span>'
+        ),
+        '<span id="rarityBadge" class="chip"></span>': (
+            f'<span id="rarityBadge" class="chip">{escape(first_card.get("rarity") or "")}</span>'
+        ),
+        '<span id="position" class="position"></span>': (
+            f'<span id="position" class="position">1 / {len(cards)}</span>'
+        ),
+        '<div class="card-title" id="cardName"></div>': (
+            f'<div class="card-title" id="cardName">{escape(first_card["name"])}</div>'
+        ),
+        '<div class="flavor" id="flavorText">-</div>': (
+            '<div class="flavor" id="flavorText">-</div>'
+        ),
+        '<span class="fact-value" id="metaName"></span>': (
+            f'<span class="fact-value" id="metaName">{escape(first_card["name"])}</span>'
+        ),
+        '<span class="fact-value" id="metaNumber"></span>': (
+            f'<span class="fact-value" id="metaNumber">#{escape(str(first_card["collectorNumber"]))}</span>'
+        ),
+        '<span class="fact-value" id="metaColor"></span>': (
+            f'<span class="fact-value" id="metaColor">{escape(display_colors(first_card.get("colors") or []))}</span>'
+        ),
+        '<span class="fact-value" id="metaMana"></span>': (
+            f'<span class="fact-value" id="metaMana">{escape(first_card.get("manaCost") or "-")}</span>'
+        ),
+        '<span class="fact-value" id="metaType"></span>': (
+            f'<span class="fact-value" id="metaType">{escape(type_parts[0] or "-")}</span>'
+        ),
+        '<span class="fact-value" id="metaSubtype"></span>': (
+            f'<span class="fact-value" id="metaSubtype">{escape(type_parts[1] or "-")}</span>'
+        ),
+        '<span class="price-value" id="priceUsd">—</span>': (
+            f'<span class="price-value" id="priceUsd">{escape(format_price(first_card.get("priceUsd")))}</span>'
+        ),
+        '<span class="price-value" id="priceFoil">—</span>': (
+            f'<span class="price-value" id="priceFoil">{escape(format_price(first_card.get("priceUsdFoil")))}</span>'
+        ),
+        '<span class="price-value" id="priceEtched">—</span>': (
+            f'<span class="price-value" id="priceEtched">{escape(format_price(first_card.get("priceUsdEtched")))}</span>'
+        ),
+        '<div class="price-hint" id="valueHint"></div>': (
+            f'<div class="price-hint" id="valueHint">{escape(first_card.get("valueHint") or "")}</div>'
+        ),
+        '<img id="cardImage" alt="Card art" loading="eager" decoding="async" fetchpriority="high" />': (
+            f'<img id="cardImage" alt="{escape(first_card["name"])} card image" '
+            f'loading="eager" decoding="async" fetchpriority="high" src="{escape(image_url)}" />'
+        ),
+        '<div id="noImage" class="no-image">No image available</div>': (
+            '<div id="noImage" class="no-image" style="display:none">No image available</div>'
+        ),
+    }
+
+    for old, new in replacements.items():
+        html = html.replace(old, new)
+
+    path.write_text(html, encoding="utf-8")
+
+
+def render_set_select(manifest):
+    options = []
+    default_set_code = manifest.get("defaultSetCode")
+    for set_meta in manifest.get("sets", []):
+        set_code = set_meta["setCode"]
+        selected = " selected" if set_code == default_set_code else ""
+        label = f"{set_meta.get('setName') or set_code} ({set_code})"
+        options.append(
+            f'<option value="{escape(set_code)}"{selected}>{escape(label)}</option>'
+        )
+    return '<select id="setSelect">' + "".join(options) + "</select>"
+
+
+def collector_sort_key(value):
+    text = str(value or "")
+    try:
+        return (0, int(text), text)
+    except ValueError:
+        return (1, 0, text)
+
+
+def split_type_line(value):
+    parts = [part.strip() for part in str(value or "").split("—") if part.strip()]
+    if len(parts) >= 2:
+        return parts[0], " — ".join(parts[1:])
+    return str(value or ""), ""
+
+
+def display_colors(colors):
+    if not colors:
+        return "Colorless"
+    if len(colors) > 1:
+        return "Multicolor"
+    return {"W": "White", "U": "Blue", "B": "Black", "R": "Red", "G": "Green"}.get(
+        colors[0], ", ".join(colors)
+    )
+
+
+def format_price(value):
+    if value is None or value == "":
+        return "-"
+    return f"${float(value):.2f}"
+
+
+def initial_image_url(card, manifest, set_code):
+    thumbnail_sets = set(manifest.get("thumbnailSetCodes") or [])
+    thumbnail_path = manifest.get("thumbnailCachePath")
+    if thumbnail_path and set_code in thumbnail_sets:
+        return f"data/{thumbnail_path}/{card['id']}.jpg"
+    return card.get("imageSmallUrl") or card.get("imageNormalUrl") or ""
+
+
 def compact_card_row(card, colors, value_hint):
     image_normal_url = clean_value(card.get("image_normal_url"))
     legacy_image_url = clean_value(card.get("image_url"))
@@ -244,6 +376,8 @@ if __name__ == "__main__":
     output_dir = repo_root / "app" / "data"
     manifest_path = output_dir / "manifest.json"
     bootstrap_path = output_dir / "bootstrap.js"
+    index_path = output_dir / "index.html"
+    index_template_path = repo_root / "app" / "index.html"
     sets_dir = output_dir / "sets"
 
     # Read Cards
@@ -301,6 +435,8 @@ if __name__ == "__main__":
     for stale_path in (bootstrap_path, bootstrap_path.with_suffix(".js.gz")):
         if stale_path.exists():
             stale_path.unlink()
+    if index_path.exists():
+        index_path.unlink()
 
     manifest_sets = []
     set_payloads = {}
@@ -342,8 +478,10 @@ if __name__ == "__main__":
         manifest["thumbnailSetCodes"] = thumbnail_set_codes
     write_json(manifest_path, manifest, indent=2)
     write_bootstrap(bootstrap_path, manifest, set_payloads[default_set_code])
+    write_initial_index(index_path, index_template_path, manifest, set_payloads[default_set_code])
 
     print(f"Wrote manifest for {len(manifest_sets):,} sets to {manifest_path}")
     print(f"Wrote default bootstrap payload to {bootstrap_path}")
+    print(f"Wrote server-rendered startup page to {index_path}")
     print(f"Wrote gzip copies for manifest and set files.")
     print(f"Wrote {total_cards:,} cards across split set files.")

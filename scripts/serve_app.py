@@ -33,6 +33,32 @@ class RegistryHandler(SimpleHTTPRequestHandler):
     def send_head(self):
         parsed = urlparse(self.path)
         suffix = Path(parsed.path).suffix.lower()
+        if parsed.path in {"", "/"}:
+            generated_index = Path(self.directory) / "data" / "index.html"
+            if generated_index.is_file():
+                try:
+                    raw_bytes = generated_index.read_bytes()
+                except OSError:
+                    self.send_error(HTTPStatus.NOT_FOUND, "File not found")
+                    return None
+
+                accept_gzip = accepts_gzip(self.headers.get("Accept-Encoding", ""))
+                response_bytes = (
+                    gzip.compress(raw_bytes, compresslevel=6, mtime=0)
+                    if accept_gzip
+                    else raw_bytes
+                )
+                stat = generated_index.stat()
+                self.send_response(HTTPStatus.OK)
+                self.send_header("Content-type", "text/html")
+                if accept_gzip:
+                    self.send_header("Content-Encoding", "gzip")
+                    self.send_header("Vary", "Accept-Encoding")
+                self.send_header("Content-Length", str(len(response_bytes)))
+                self.send_header("Last-Modified", self.date_time_string(stat.st_mtime))
+                self.end_headers()
+                return BytesIO(response_bytes)
+
         accept_gzip = accepts_gzip(self.headers.get("Accept-Encoding", ""))
         if suffix in PRECOMPRESSED_SUFFIXES and accept_gzip:
             raw_path = Path(self.translate_path(parsed.path))
