@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import argparse
 from functools import partial
+import gzip
+from io import BytesIO
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from http import HTTPStatus
 from pathlib import Path
@@ -10,6 +12,7 @@ from urllib.parse import urlparse
 NO_CACHE_SUFFIXES = {".html", ".js", ".css"}
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".avif"}
 PRECOMPRESSED_SUFFIXES = {".json", ".js"}
+TEXT_GZIP_SUFFIXES = {".css", ".js", ".html"}
 
 
 def accepts_gzip(value):
@@ -25,12 +28,13 @@ def accepts_gzip(value):
 
 
 class RegistryHandler(SimpleHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
+
     def send_head(self):
         parsed = urlparse(self.path)
         suffix = Path(parsed.path).suffix.lower()
-        if suffix in PRECOMPRESSED_SUFFIXES and accepts_gzip(
-            self.headers.get("Accept-Encoding", "")
-        ):
+        accept_gzip = accepts_gzip(self.headers.get("Accept-Encoding", ""))
+        if suffix in PRECOMPRESSED_SUFFIXES and accept_gzip:
             raw_path = Path(self.translate_path(parsed.path))
             gz_path = raw_path.with_suffix(raw_path.suffix + ".gz")
             if gz_path.is_file():
@@ -48,6 +52,25 @@ class RegistryHandler(SimpleHTTPRequestHandler):
                 self.send_header("Last-Modified", self.date_time_string(stat.st_mtime))
                 self.end_headers()
                 return f
+
+        if suffix in TEXT_GZIP_SUFFIXES and accept_gzip:
+            raw_path = Path(self.translate_path(parsed.path))
+            if raw_path.is_file():
+                try:
+                    raw_bytes = raw_path.read_bytes()
+                except OSError:
+                    self.send_error(HTTPStatus.NOT_FOUND, "File not found")
+                    return None
+
+                gz_bytes = gzip.compress(raw_bytes, compresslevel=6, mtime=0)
+                stat = raw_path.stat()
+                self.send_response(HTTPStatus.OK)
+                self.send_header("Content-type", self.guess_type(str(raw_path)))
+                self.send_header("Content-Encoding", "gzip")
+                self.send_header("Content-Length", str(len(gz_bytes)))
+                self.send_header("Last-Modified", self.date_time_string(stat.st_mtime))
+                self.end_headers()
+                return BytesIO(gz_bytes)
 
         return super().send_head()
 
