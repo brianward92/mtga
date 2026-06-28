@@ -53,8 +53,10 @@ dropdown.
 
 Generated app data is ignored by git and rebuilt by the runtime script. If
 `app/data/images/` exists as a generated thumbnail directory or symlink, the
-manifest advertises it and the browser tries those local thumbnails before
-falling back to Scryfall `small` image URLs.
+manifest advertises the set codes with enough local thumbnail coverage and the
+browser tries those local thumbnails before falling back to Scryfall `small`
+image URLs. The runtime script fills this cache for the default set so the first
+viewport does not depend on a cold Scryfall image request.
 
 ## Prod Runtime
 

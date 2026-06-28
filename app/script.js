@@ -22,7 +22,8 @@
     imageLoadToken: 0,
     buildId: "",
     prefetchStarted: false,
-    thumbnailCachePath: ""
+    thumbnailCachePath: "",
+    thumbnailSetCodes: new Set()
   };
 
   const setSelect = document.getElementById("setSelect");
@@ -111,6 +112,7 @@
       }
       state.buildId = manifest.buildId || "dev";
       state.thumbnailCachePath = normalizeThumbnailPath(manifest.thumbnailCachePath);
+      state.thumbnailSetCodes = normalizeSetCodeSet(manifest.thumbnailSetCodes);
       state.sets = normalizeSets(manifest);
       state.setMap = new Map(state.sets.map((set) => [set.setCode, set]));
 
@@ -147,6 +149,11 @@
 
   function normalizeThumbnailPath(path) {
     return path ? String(path).replace(/^\/+|\/+$/g, "") : "";
+  }
+
+  function normalizeSetCodeSet(values) {
+    if (!Array.isArray(values)) return new Set();
+    return new Set(values.filter(Boolean).map((value) => String(value).toUpperCase()));
   }
 
   function populateSetSelect() {
@@ -527,10 +534,17 @@
   }
 
   function preferredSmallImageUrl(card) {
-    if (state.thumbnailCachePath && card.id) {
+    if (shouldUseLocalThumbnail(card)) {
       return `${DATA_ROOT}/${state.thumbnailCachePath}/${encodeURIComponent(card.id)}.jpg`;
     }
     return remoteSmallImageUrl(card);
+  }
+
+  function shouldUseLocalThumbnail(card) {
+    if (!state.thumbnailCachePath || !card.id) return false;
+    if (!state.thumbnailSetCodes.size) return true;
+    const setCode = String(card.setCode || state.currentSet?.setCode || "").toUpperCase();
+    return state.thumbnailSetCodes.has(setCode);
   }
 
   function remoteSmallImageUrl(card) {

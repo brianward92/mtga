@@ -68,6 +68,10 @@ trap cleanup EXIT INT TERM
 echo "Building app data..."
 cd "$REPO_ROOT"
 "$PYTHON" scripts/build_app_data.py
+echo "Caching default set thumbnails..."
+"$PYTHON" scripts/build_thumbnail_cache.py
+echo "Refreshing app data manifest..."
+"$PYTHON" scripts/build_app_data.py
 
 # Get local IP for LAN access
 LOCAL_IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || echo "unknown")

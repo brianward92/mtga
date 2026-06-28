@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 
 
 NO_CACHE_SUFFIXES = {".html", ".js", ".css"}
+IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".avif"}
 
 
 def accepts_gzip(value):
@@ -53,6 +54,11 @@ class RegistryHandler(SimpleHTTPRequestHandler):
         if suffix == ".json":
             self.send_header("Vary", "Accept-Encoding")
         if parsed.path.startswith("/data/sets/") and suffix == ".json":
+            self.send_header(
+                "Cache-Control",
+                "public, max-age=31536000, immutable",
+            )
+        elif parsed.path.startswith("/data/images/") and suffix in IMAGE_SUFFIXES:
             self.send_header(
                 "Cache-Control",
                 "public, max-age=31536000, immutable",

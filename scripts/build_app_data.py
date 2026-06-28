@@ -51,7 +51,7 @@ SET_FIELDS = [
     "imageSmallUrl",
     "imageNormalUrl",
 ]
-IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".avif"}
+THUMBNAIL_CACHE_MIN_COVERAGE = 0.85
 
 
 def create_parser():
@@ -188,15 +188,33 @@ def compact_card_row(card, colors, value_hint):
     return [values[field] for field in SET_FIELDS]
 
 
-def resolve_thumbnail_cache_path(output_dir):
+def resolve_thumbnail_cache_metadata(output_dir, app_sets):
     images_dir = output_dir / "images"
     if not images_dir.is_dir():
-        return None
-    has_images = any(
-        child.is_file() and child.suffix.lower() in IMAGE_SUFFIXES
-        for child in images_dir.iterdir()
-    )
-    return "images" if has_images else None
+        return None, []
+
+    id_index = SET_FIELDS.index("id")
+    image_small_index = SET_FIELDS.index("imageSmallUrl")
+    image_normal_index = SET_FIELDS.index("imageNormalUrl")
+    thumbnail_set_codes = []
+    for set_code, card_rows in app_sets.items():
+        image_rows = [
+            row for row in card_rows if row[image_small_index] or row[image_normal_index]
+        ]
+        if not image_rows:
+            continue
+        available_count = sum(
+            (images_dir / f"{row[id_index]}.jpg").is_file()
+            and (images_dir / f"{row[id_index]}.jpg").stat().st_size > 0
+            for row in image_rows
+        )
+        coverage = available_count / len(image_rows)
+        if coverage >= THUMBNAIL_CACHE_MIN_COVERAGE:
+            thumbnail_set_codes.append(set_code)
+
+    if not thumbnail_set_codes:
+        return None, []
+    return "images", thumbnail_set_codes
 
 
 if __name__ == "__main__":
@@ -213,7 +231,6 @@ if __name__ == "__main__":
     output_dir = repo_root / "app" / "data"
     manifest_path = output_dir / "manifest.json"
     sets_dir = output_dir / "sets"
-    thumbnail_cache_path = resolve_thumbnail_cache_path(output_dir)
 
     # Read Cards
     cards_path = processed_prefix / "cards.parquet"
@@ -253,6 +270,10 @@ if __name__ == "__main__":
             value_hint = f"${card['price_best']:.2f}"
 
         app_sets[card["set"]].append(compact_card_row(card, colors, value_hint))
+
+    thumbnail_cache_path, thumbnail_set_codes = resolve_thumbnail_cache_metadata(
+        output_dir, app_sets
+    )
 
     # Write compact JSON for the web app.
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -298,6 +319,7 @@ if __name__ == "__main__":
     }
     if thumbnail_cache_path:
         manifest["thumbnailCachePath"] = thumbnail_cache_path
+        manifest["thumbnailSetCodes"] = thumbnail_set_codes
     write_json(manifest_path, manifest, indent=2)
 
     print(f"Wrote manifest for {len(manifest_sets):,} sets to {manifest_path}")

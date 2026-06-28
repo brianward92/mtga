@@ -22,8 +22,10 @@ The prod runtime is cron plus `screen`, not a separate service manager.
 That script:
 
 1. rebuilds app data from `/opt/$USER/dat/mtga/processed`
-2. starts a detached `screen` session named `mtga`
-3. serves this directory with `scripts/serve_app.py` on port `8000`
+2. caches missing default-set thumbnails under `/opt/$USER/dat/mtga/app-thumbnails`
+3. refreshes the manifest so local thumbnail coverage is advertised
+4. starts a detached `screen` session named `mtga`
+5. serves this directory with `scripts/serve_app.py` on port `8000`
 
 The static server sends no-store cache headers for the app shell and manifest.
 Generated set JSON is loaded with a manifest `buildId` query string, served
@@ -64,8 +66,9 @@ app/data/
 ```
 
 `manifest.json` contains schema version `4`, the build id, default set, set
-metadata, and optional `thumbnailCachePath`. Each `sets/<SETCODE>.json` file
-contains only that set's cards in compact v4 form:
+metadata, optional `thumbnailCachePath`, and `thumbnailSetCodes` for sets with
+local thumbnail coverage. Each `sets/<SETCODE>.json` file contains only that
+set's cards in compact v4 form:
 
 ```json
 {"schemaVersion":4,"setCode":"MSH","fields":["id","name"],"cards":[["...","..."]]}
@@ -92,11 +95,12 @@ card metadata immediately, loads `imageSmallUrl` first, and upgrades only the
 current card to `imageNormalUrl` during idle time. The live browser image cache
 is capped at eight images: the current card plus nearby cards.
 
-For an optional local thumbnail cache, generate `app/data/images/<CARD_ID>.jpg`
-or make `app/data/images` a symlink to an ignored `/opt/$USER/dat/...` cache.
-When that directory contains images, the build writes `thumbnailCachePath` into
-the manifest; the client tries the local thumbnail first and falls back to the
-remote Scryfall `small` URL if it is missing.
+The runtime script generates the default set's local thumbnail cache at
+`/opt/$USER/dat/mtga/app-thumbnails` and exposes it through the ignored
+`app/data/images` symlink. When a set has enough cached thumbnails, the build
+writes `thumbnailCachePath` and `thumbnailSetCodes` into the manifest; the
+client tries local thumbnails for those sets and falls back to the remote
+Scryfall `small` URL if needed.
 
 ## Inventory Storage
 
