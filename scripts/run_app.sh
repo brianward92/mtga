@@ -82,4 +82,4 @@ echo
 echo "Stop with: screen -S $SESSION -X quit  (runs cleanup)"
 echo
 cd "$APP_DIR"
-"$PYTHON" -m http.server 8000 --bind 0.0.0.0
+"$PYTHON" "$REPO_ROOT/scripts/serve_app.py" --directory "$APP_DIR" --host 0.0.0.0 --port 8000

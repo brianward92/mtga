@@ -50,9 +50,12 @@ Crontab entries:
 The app runtime is:
 
 - `screen` session name: `mtga`
-- server command: Python `http.server`
+- server command: `scripts/serve_app.py`
 - bind address: `0.0.0.0`
 - port: `8000`
+
+The server adds no-store cache headers for HTML, JS, CSS, and JSON so browsers
+do not mix stale app code with freshly generated card data.
 
 Health checks:
 

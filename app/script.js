@@ -48,6 +48,7 @@
   const clearRegistry = document.getElementById("clearRegistry");
 
   function init() {
+    setInventoryEnabled(false);
     bindEvents();
     loadManifest();
   }
@@ -132,6 +133,7 @@
       option.textContent = `${set.setName} (${set.setCode})`;
       setSelect.appendChild(option);
     });
+    setSelect.disabled = false;
   }
 
   async function onSetChange() {
@@ -183,7 +185,7 @@
   }
 
   async function fetchJson(url) {
-    const response = await fetch(url, { cache: "no-cache" });
+    const response = await fetch(url, { cache: "no-store" });
     if (!response.ok) {
       throw new Error(`${response.status} ${response.statusText}: ${url}`);
     }
@@ -265,6 +267,7 @@
     const count = inv[card.id] ?? 0;
     currentCount.textContent = count;
     setCountInput.value = count;
+    setInventoryEnabled(true);
 
     prevCard.disabled = state.index === 0;
     nextCard.disabled = state.index >= state.filteredCards.length - 1;
@@ -292,8 +295,19 @@
     cardImage.removeAttribute("src");
     cardImage.style.display = "none";
     noImage.style.display = "block";
+    setInventoryEnabled(false);
     prevCard.disabled = true;
     nextCard.disabled = true;
+  }
+
+  function setInventoryEnabled(enabled) {
+    setCountInput.disabled = !enabled;
+    setCountSave.disabled = !enabled;
+    deltaInput.disabled = !enabled;
+    addDelta.disabled = !enabled;
+    subtractDelta.disabled = !enabled;
+    zeroOut.disabled = !enabled;
+    clearRegistry.disabled = !enabled;
   }
 
   function currentSetLabel() {

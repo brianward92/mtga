@@ -23,7 +23,10 @@ That script:
 
 1. rebuilds app data from `/opt/$USER/dat/mtga/processed`
 2. starts a detached `screen` session named `mtga`
-3. serves this directory with Python `http.server` on port `8000`
+3. serves this directory with `scripts/serve_app.py` on port `8000`
+
+The static server sends no-store cache headers for HTML, JS, CSS, and JSON so a
+browser cannot keep an old app shell while the generated card data changes.
 
 Health checks:
 
