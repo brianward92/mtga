@@ -430,33 +430,86 @@
 
     const imageToken = ++state.imageLoadToken;
     renderCardImage(card, imageToken);
-    preloadNearbyImages();
+    runIdle(preloadNearbyImages, 500);
   }
 
   function renderCardImage(card, imageToken) {
-    hideCardImage();
-    loadCardSmallImage(card)
-      .then((displayedUrl) => {
-        if (!isCurrentCard(card, imageToken)) return;
-        showCardImage(displayedUrl, card.name);
-        scheduleCurrentImageUpgrade(card, imageToken, displayedUrl);
-      })
-      .catch(() => {
-        if (isCurrentCard(card, imageToken)) hideCardImage();
-      });
+    const primaryUrl = preferredSmallImageUrl(card);
+    const fallbackUrl = remoteSmallImageUrl(card);
+    if (!primaryUrl) {
+      hideCardImage();
+      return;
+    }
+
+    const normalUrl = remoteNormalImageUrl(card);
+    if (
+      cardImage.currentCardId === card.id
+      && (cardImage.currentImageUrl === primaryUrl || cardImage.currentImageUrl === normalUrl)
+    ) {
+      cardImage.style.display = "block";
+      noImage.style.display = "none";
+      scheduleCurrentImageUpgrade(card, imageToken, cardImage.currentImageUrl);
+      return;
+    }
+
+    setCurrentImageSource(card, imageToken, primaryUrl, fallbackUrl);
+    scheduleCurrentImageUpgrade(card, imageToken, primaryUrl);
   }
 
   function hideCardImage() {
+    cardImage.onload = null;
+    cardImage.onerror = null;
+    cardImage.currentCardId = "";
+    cardImage.currentImageUrl = "";
     cardImage.removeAttribute("src");
     cardImage.style.display = "none";
     noImage.style.display = "block";
   }
 
-  function showCardImage(url, name) {
+  function showCardImage(url, name, cardId = "") {
+    cardImage.onload = null;
+    cardImage.onerror = null;
+    cardImage.currentCardId = cardId;
+    cardImage.currentImageUrl = url;
     cardImage.alt = name ? `${name} card image` : "Card image";
     cardImage.src = url;
     cardImage.style.display = "block";
     noImage.style.display = "none";
+  }
+
+  function setCurrentImageSource(card, imageToken, url, fallbackUrl = "") {
+    if (!url || failedImageUrls.has(url)) {
+      if (fallbackUrl && fallbackUrl !== url) {
+        setCurrentImageSource(card, imageToken, fallbackUrl);
+      } else {
+        hideCardImage();
+      }
+      return;
+    }
+
+    cardImage.alt = card.name ? `${card.name} card image` : "Card image";
+    cardImage.fetchPriority = "high";
+    cardImage.currentCardId = card.id;
+    cardImage.onload = () => {
+      if (!isCurrentCard(card, imageToken)) return;
+      cardImage.style.display = "block";
+      noImage.style.display = "none";
+    };
+    cardImage.onerror = () => {
+      failedImageUrls.add(url);
+      if (!isCurrentCard(card, imageToken)) return;
+      if (fallbackUrl && fallbackUrl !== url) {
+        setCurrentImageSource(card, imageToken, fallbackUrl);
+      } else {
+        hideCardImage();
+      }
+    };
+    cardImage.style.display = "block";
+    noImage.style.display = "none";
+    if (cardImage.currentImageUrl !== url) {
+      cardImage.currentImageUrl = url;
+      cardImage.src = url;
+    }
   }
 
   function loadCardSmallImage(card) {
@@ -497,7 +550,7 @@
       preloadImage(normalUrl)
         .then(() => {
           if (isCurrentCard(card, imageToken)) {
-            showCardImage(normalUrl, card.name);
+            showCardImage(normalUrl, card.name, card.id);
           }
         })
         .catch(() => {});
@@ -506,10 +559,10 @@
 
   function preloadNearbyImages() {
     if (!state.filteredCards.length) return;
-    const offsets = [0, 1, -1, 2, -2, 3, -3];
+    const offsets = [1, -1, 2, -2, 3, -3, 4, -4];
     let queued = 0;
     for (const offset of offsets) {
-      if (queued >= NEARBY_IMAGE_LIMIT + 1) break;
+      if (queued >= NEARBY_IMAGE_LIMIT) break;
       const index = state.index + offset;
       if (index < 0 || index >= state.filteredCards.length) continue;
       const card = state.filteredCards[index];
