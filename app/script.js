@@ -1,22 +1,16 @@
 (() => {
-  const allCards = Array.isArray(window.MTG_CARDS) ? window.MTG_CARDS : [];
+  const DATA_ROOT = "data";
+  const STORAGE_PREFIX = "mtg_registry_v1";
 
-  // Group cards by set
-  const sets = [];
-  const setMap = new Map();
-
-  allCards.forEach(card => {
-    if (!setMap.has(card.setCode)) {
-      const setObj = {
-        setCode: card.setCode,
-        setName: card.setName,
-        cards: []
-      };
-      setMap.set(card.setCode, setObj);
-      sets.push(setObj);
-    }
-    setMap.get(card.setCode).cards.push(card);
-  });
+  const state = {
+    sets: [],
+    setMap: new Map(),
+    loadedSets: new Map(),
+    currentSet: null,
+    filteredCards: [],
+    index: 0,
+    loadToken: 0
+  };
 
   const setSelect = document.getElementById("setSelect");
   const colorFilter = document.getElementById("colorFilter");
@@ -53,35 +47,15 @@
   const zeroOut = document.getElementById("zeroOut");
   const clearRegistry = document.getElementById("clearRegistry");
 
-  const STORAGE_PREFIX = "mtg_registry_v1";
-  const state = {
-    currentSet: null,
-    filteredCards: [],
-    index: 0
-  };
-
   function init() {
-    populateSetSelect();
     bindEvents();
-    const firstSetCode = sets[0]?.setCode;
-    if (firstSetCode) {
-      setSelect.value = firstSetCode;
-      onSetChange();
-    }
-  }
-
-  function populateSetSelect() {
-    setSelect.innerHTML = "";
-    sets.forEach((set) => {
-      const option = document.createElement("option");
-      option.value = set.setCode;
-      option.textContent = `${set.setName} (${set.setCode})`;
-      setSelect.appendChild(option);
-    });
+    loadManifest();
   }
 
   function bindEvents() {
-    setSelect.addEventListener("change", onSetChange);
+    setSelect.addEventListener("change", () => {
+      onSetChange();
+    });
     colorFilter.addEventListener("change", filterCards);
     nameSearch.addEventListener("input", filterCards);
     resetFilters.addEventListener("click", () => {
@@ -103,6 +77,8 @@
     clearRegistry.addEventListener("click", clearCurrentSet);
 
     window.addEventListener("keydown", (e) => {
+      const target = e.target;
+      if (target && ["INPUT", "SELECT", "TEXTAREA"].includes(target.tagName)) return;
       if (e.key === "ArrowLeft") {
         moveIndex(-1);
       } else if (e.key === "ArrowRight") {
@@ -111,15 +87,111 @@
     });
   }
 
-  function onSetChange() {
+  async function loadManifest() {
+    renderStatus("Loading card database...");
+    try {
+      const manifest = await fetchJson(`${DATA_ROOT}/manifest.json`);
+      state.sets = normalizeSets(manifest);
+      state.setMap = new Map(state.sets.map((set) => [set.setCode, set]));
+
+      if (!state.sets.length) {
+        renderStatus("No sets available");
+        return;
+      }
+
+      populateSetSelect();
+      const defaultSetCode =
+        state.setMap.has(manifest.defaultSetCode)
+          ? manifest.defaultSetCode
+          : state.sets[state.sets.length - 1].setCode;
+      setSelect.value = defaultSetCode;
+      await onSetChange();
+    } catch (error) {
+      console.error(error);
+      renderStatus("Card database unavailable");
+    }
+  }
+
+  function normalizeSets(manifest) {
+    if (!manifest || !Array.isArray(manifest.sets)) return [];
+    return manifest.sets
+      .filter((set) => set && set.setCode)
+      .map((set) => ({
+        setCode: set.setCode,
+        setName: set.setName || set.setCode,
+        cardCount: set.cardCount || 0,
+        cardsPath: set.cardsPath || `sets/${set.setCode}.json`
+      }));
+  }
+
+  function populateSetSelect() {
+    setSelect.innerHTML = "";
+    state.sets.forEach((set) => {
+      const option = document.createElement("option");
+      option.value = set.setCode;
+      option.textContent = `${set.setName} (${set.setCode})`;
+      setSelect.appendChild(option);
+    });
+  }
+
+  async function onSetChange() {
     const setCode = setSelect.value;
-    state.currentSet = sets.find((s) => s.setCode === setCode) || null;
+    const setMeta = state.setMap.get(setCode);
+    if (!setMeta) {
+      state.currentSet = null;
+      state.filteredCards = [];
+      renderStatus("Set unavailable");
+      return;
+    }
+
+    const token = ++state.loadToken;
+    state.currentSet = { ...setMeta, cards: [] };
+    state.filteredCards = [];
     state.index = 0;
-    filterCards();
+    renderStatus(`Loading ${setMeta.setCode}...`);
+
+    try {
+      const loadedSet = await loadSet(setMeta);
+      if (token !== state.loadToken) return;
+      state.currentSet = loadedSet;
+      filterCards();
+    } catch (error) {
+      if (token !== state.loadToken) return;
+      console.error(error);
+      state.currentSet = { ...setMeta, cards: [] };
+      state.filteredCards = [];
+      renderStatus(`Could not load ${setMeta.setCode}`);
+    }
+  }
+
+  async function loadSet(setMeta) {
+    if (state.loadedSets.has(setMeta.setCode)) {
+      return state.loadedSets.get(setMeta.setCode);
+    }
+
+    const cards = await fetchJson(`${DATA_ROOT}/${setMeta.cardsPath}`);
+    if (!Array.isArray(cards)) {
+      throw new Error(`Expected array for ${setMeta.setCode}`);
+    }
+
+    const loadedSet = {
+      ...setMeta,
+      cards
+    };
+    state.loadedSets.set(setMeta.setCode, loadedSet);
+    return loadedSet;
+  }
+
+  async function fetchJson(url) {
+    const response = await fetch(url, { cache: "no-cache" });
+    if (!response.ok) {
+      throw new Error(`${response.status} ${response.statusText}: ${url}`);
+    }
+    return response.json();
   }
 
   function filterCards() {
-    if (!state.currentSet) {
+    if (!state.currentSet || !state.currentSet.cards.length) {
       state.filteredCards = [];
       renderCard();
       return;
@@ -157,21 +229,7 @@
   function renderCard() {
     const card = state.filteredCards[state.index];
     if (!card) {
-      cardName.textContent = "No cards match this filter";
-      metaName.textContent = "";
-      metaNumber.textContent = "";
-      metaColor.textContent = "";
-      metaMana.textContent = "";
-      metaType.textContent = "";
-      metaSubtype.textContent = "";
-      valueHint.textContent = "";
-      setBadge.textContent = state.currentSet ? `${state.currentSet.setName} (${state.currentSet.setCode})` : "";
-      rarityBadge.textContent = "";
-      position.textContent = "0 / 0";
-      currentCount.textContent = "0";
-      setCountInput.value = "";
-      prevCard.disabled = true;
-      nextCard.disabled = true;
+      renderStatus("No cards match this filter");
       return;
     }
 
@@ -179,16 +237,16 @@
     metaName.textContent = card.name;
     metaNumber.textContent = `#${card.collectorNumber}`;
     metaColor.textContent = displayColors(card);
-    metaMana.textContent = card.manaCost || "—";
+    metaMana.textContent = card.manaCost || "-";
     const { mainType, subType } = splitTypeLine(card.typeLine);
-    metaType.textContent = mainType || "—";
-    metaSubtype.textContent = subType || "—";
-    flavorText.textContent = card.flavorText ? `"${card.flavorText}"` : "—";
+    metaType.textContent = mainType || "-";
+    metaSubtype.textContent = subType || "-";
+    flavorText.textContent = card.flavorText ? `"${card.flavorText}"` : "-";
     valueHint.textContent = card.valueHint || "";
     priceUsd.textContent = formatPrice(card.priceUsd || card.price || null);
     priceFoil.textContent = formatPrice(card.priceUsdFoil || null);
     priceEtched.textContent = formatPrice(card.priceUsdEtched || null);
-    setBadge.textContent = `${state.currentSet.setName} (${state.currentSet.setCode})`;
+    setBadge.textContent = currentSetLabel();
     rarityBadge.textContent = card.rarity;
     rarityBadge.className = `chip ${rarityClass(card.rarity)}`;
     position.textContent = `${state.index + 1} / ${state.filteredCards.length}`;
@@ -212,6 +270,38 @@
     nextCard.disabled = state.index >= state.filteredCards.length - 1;
   }
 
+  function renderStatus(message) {
+    cardName.textContent = message;
+    metaName.textContent = "";
+    metaNumber.textContent = "";
+    metaColor.textContent = "";
+    metaMana.textContent = "";
+    metaType.textContent = "";
+    metaSubtype.textContent = "";
+    flavorText.textContent = "-";
+    valueHint.textContent = "";
+    priceUsd.textContent = "-";
+    priceFoil.textContent = "-";
+    priceEtched.textContent = "-";
+    setBadge.textContent = currentSetLabel();
+    rarityBadge.textContent = "";
+    rarityBadge.className = "chip";
+    position.textContent = "0 / 0";
+    currentCount.textContent = "0";
+    setCountInput.value = "";
+    cardImage.removeAttribute("src");
+    cardImage.style.display = "none";
+    noImage.style.display = "block";
+    prevCard.disabled = true;
+    nextCard.disabled = true;
+  }
+
+  function currentSetLabel() {
+    return state.currentSet
+      ? `${state.currentSet.setName} (${state.currentSet.setCode})`
+      : "";
+  }
+
   function displayColors(card) {
     if (!card.colors || card.colors.length === 0) return "Colorless";
     if (card.colors.length > 1) return "Multicolor";
@@ -227,7 +317,7 @@
   }
 
   function formatPrice(val) {
-    if (val === null || val === undefined || val === "") return "—";
+    if (val === null || val === undefined || val === "") return "-";
     const num = typeof val === "number" ? val : parseFloat(val);
     if (Number.isNaN(num)) return val;
     return `$${num.toFixed(2)}`;

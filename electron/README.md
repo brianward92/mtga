@@ -2,6 +2,10 @@
 
 A lightweight deck tracker and overlay for Magic: The Gathering Arena on macOS.
 
+This is separate from MTG Registry, the live web card database and physical
+inventory tracker served from `app/` on port `8000`. The Electron app is not the
+prod web service.
+
 ## Features
 
 - **Deck Tracker Overlay**: See remaining cards in your deck during matches
