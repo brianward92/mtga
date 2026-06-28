@@ -164,6 +164,19 @@ def write_gzip_copy(path):
     gz_path.write_bytes(gzip.compress(path.read_bytes(), compresslevel=9, mtime=0))
 
 
+def write_bootstrap(path, manifest, default_set_payload):
+    bootstrap = {
+        "schemaVersion": DATA_SCHEMA_VERSION,
+        "manifest": manifest,
+        "defaultSet": default_set_payload,
+    }
+    with path.open("w", encoding="utf-8") as f:
+        f.write("window.MTG_REGISTRY_BOOTSTRAP=")
+        json.dump(bootstrap, f, separators=(",", ":"), ensure_ascii=False)
+        f.write(";\n")
+    write_gzip_copy(path)
+
+
 def compact_card_row(card, colors, value_hint):
     image_normal_url = clean_value(card.get("image_normal_url"))
     legacy_image_url = clean_value(card.get("image_url"))
@@ -230,6 +243,7 @@ if __name__ == "__main__":
     repo_root = script_dir.parent
     output_dir = repo_root / "app" / "data"
     manifest_path = output_dir / "manifest.json"
+    bootstrap_path = output_dir / "bootstrap.js"
     sets_dir = output_dir / "sets"
 
     # Read Cards
@@ -284,8 +298,12 @@ if __name__ == "__main__":
     old_cards_path = output_dir / "cards.js"
     if old_cards_path.exists():
         old_cards_path.unlink()
+    for stale_path in (bootstrap_path, bootstrap_path.with_suffix(".js.gz")):
+        if stale_path.exists():
+            stale_path.unlink()
 
     manifest_sets = []
+    set_payloads = {}
     total_cards = 0
     for set_code in set_codes:
         set_cards = app_sets[set_code]
@@ -296,6 +314,7 @@ if __name__ == "__main__":
             "fields": SET_FIELDS,
             "cards": set_cards,
         }
+        set_payloads[set_code] = set_payload
         write_json(set_path, set_payload)
 
         set_rows = sets_df[sets_df["set"] == set_code]
@@ -311,17 +330,20 @@ if __name__ == "__main__":
         total_cards += len(set_cards)
         print(f"Wrote {len(set_cards):,} cards to {set_path}")
 
+    default_set_code = resolve_default_set_code(set_codes, sets_df)
     manifest = {
         "schemaVersion": DATA_SCHEMA_VERSION,
         "buildId": resolve_build_id([cards_path, sets_path]),
-        "defaultSetCode": resolve_default_set_code(set_codes, sets_df),
+        "defaultSetCode": default_set_code,
         "sets": manifest_sets,
     }
     if thumbnail_cache_path:
         manifest["thumbnailCachePath"] = thumbnail_cache_path
         manifest["thumbnailSetCodes"] = thumbnail_set_codes
     write_json(manifest_path, manifest, indent=2)
+    write_bootstrap(bootstrap_path, manifest, set_payloads[default_set_code])
 
     print(f"Wrote manifest for {len(manifest_sets):,} sets to {manifest_path}")
+    print(f"Wrote default bootstrap payload to {bootstrap_path}")
     print(f"Wrote gzip copies for manifest and set files.")
     print(f"Wrote {total_cards:,} cards across split set files.")

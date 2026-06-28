@@ -6,6 +6,9 @@
   const DECODED_SET_CACHE_LIMIT = 4;
   const IMAGE_CACHE_LIMIT = 8;
   const NEARBY_IMAGE_LIMIT = 6;
+  const BACKGROUND_PREFETCH_DELAY_MS = 6000;
+  const NEARBY_PRELOAD_DELAY_MS = 1500;
+  const NORMAL_IMAGE_UPGRADE_DELAY_MS = 3500;
 
   const imageCache = new Map();
   const failedImageUrls = new Set();
@@ -65,7 +68,7 @@
     setSelect.disabled = true;
     setInventoryEnabled(false);
     bindEvents();
-    loadManifest();
+    loadStartupData();
   }
 
   function bindEvents() {
@@ -103,30 +106,67 @@
     });
   }
 
+  function loadStartupData() {
+    const bootstrap = window.MTG_REGISTRY_BOOTSTRAP;
+    if (bootstrap && bootstrap.manifest && bootstrap.defaultSet) {
+      try {
+        const defaultSetCode = applyManifest(bootstrap.manifest);
+        if (!defaultSetCode) return;
+
+        const bootstrapSetCode = bootstrap.defaultSet.setCode || defaultSetCode;
+        const setMeta = state.setMap.get(bootstrapSetCode) || state.setMap.get(defaultSetCode);
+        if (!setMeta) {
+          throw new Error(`Bootstrap set unavailable: ${bootstrapSetCode}`);
+        }
+
+        const loadedSet = decodeSetPayload(bootstrap.defaultSet, setMeta);
+        state.loadToken += 1;
+        state.currentSet = loadedSet;
+        state.filteredCards = [];
+        state.index = 0;
+        setSelect.value = loadedSet.setCode;
+        cacheDecodedSet(loadedSet);
+        filterCards();
+        scheduleBackgroundPrefetch(loadedSet.setCode);
+        return;
+      } catch (error) {
+        console.error("Bootstrap data unavailable", error);
+      }
+    }
+
+    loadManifest();
+  }
+
+  function applyManifest(manifest) {
+    if (manifest.schemaVersion > DATA_SCHEMA_VERSION) {
+      console.warn(`Manifest schema ${manifest.schemaVersion} is newer than client schema ${DATA_SCHEMA_VERSION}`);
+    }
+    state.buildId = manifest.buildId || "dev";
+    state.thumbnailCachePath = normalizeThumbnailPath(manifest.thumbnailCachePath);
+    state.thumbnailSetCodes = normalizeSetCodeSet(manifest.thumbnailSetCodes);
+    state.sets = normalizeSets(manifest);
+    state.setMap = new Map(state.sets.map((set) => [set.setCode, set]));
+
+    if (!state.sets.length) {
+      renderStatus("No sets available");
+      return "";
+    }
+
+    populateSetSelect();
+    const defaultSetCode =
+      state.setMap.has(manifest.defaultSetCode)
+        ? manifest.defaultSetCode
+        : state.sets[state.sets.length - 1].setCode;
+    setSelect.value = defaultSetCode;
+    return defaultSetCode;
+  }
+
   async function loadManifest() {
     renderStatus("Loading card database...");
     try {
       const manifest = await fetchJson(`${DATA_ROOT}/manifest.json`);
-      if (manifest.schemaVersion > DATA_SCHEMA_VERSION) {
-        console.warn(`Manifest schema ${manifest.schemaVersion} is newer than client schema ${DATA_SCHEMA_VERSION}`);
-      }
-      state.buildId = manifest.buildId || "dev";
-      state.thumbnailCachePath = normalizeThumbnailPath(manifest.thumbnailCachePath);
-      state.thumbnailSetCodes = normalizeSetCodeSet(manifest.thumbnailSetCodes);
-      state.sets = normalizeSets(manifest);
-      state.setMap = new Map(state.sets.map((set) => [set.setCode, set]));
-
-      if (!state.sets.length) {
-        renderStatus("No sets available");
-        return;
-      }
-
-      populateSetSelect();
-      const defaultSetCode =
-        state.setMap.has(manifest.defaultSetCode)
-          ? manifest.defaultSetCode
-          : state.sets[state.sets.length - 1].setCode;
-      setSelect.value = defaultSetCode;
+      const defaultSetCode = applyManifest(manifest);
+      if (!defaultSetCode) return;
       await onSetChange();
       scheduleBackgroundPrefetch(defaultSetCode);
     } catch (error) {
@@ -317,13 +357,11 @@
     if (state.prefetchStarted) return;
     state.prefetchStarted = true;
     const startPrefetch = () => {
-      prefetchSets(currentSetCode);
+      runIdle(() => {
+        prefetchSets(currentSetCode);
+      }, 2000);
     };
-    if ("requestIdleCallback" in window) {
-      window.requestIdleCallback(startPrefetch, { timeout: 1500 });
-    } else {
-      window.setTimeout(startPrefetch, 500);
-    }
+    window.setTimeout(startPrefetch, BACKGROUND_PREFETCH_DELAY_MS);
   }
 
   async function prefetchSets(currentSetCode) {
@@ -437,7 +475,11 @@
 
     const imageToken = ++state.imageLoadToken;
     renderCardImage(card, imageToken);
-    runIdle(preloadNearbyImages, 500);
+    window.setTimeout(() => {
+      if (imageToken === state.imageLoadToken) {
+        runIdle(preloadNearbyImages, 1500);
+      }
+    }, NEARBY_PRELOAD_DELAY_MS);
   }
 
   function renderCardImage(card, imageToken) {
@@ -559,16 +601,18 @@
     const normalUrl = remoteNormalImageUrl(card);
     if (!normalUrl || normalUrl === displayedUrl) return;
 
-    runIdle(() => {
-      if (!isCurrentCard(card, imageToken)) return;
-      preloadImage(normalUrl)
-        .then(() => {
-          if (isCurrentCard(card, imageToken)) {
-            showCardImage(normalUrl, card.name, card.id);
-          }
-        })
-        .catch(() => {});
-    }, 700);
+    window.setTimeout(() => {
+      runIdle(() => {
+        if (!isCurrentCard(card, imageToken)) return;
+        preloadImage(normalUrl)
+          .then(() => {
+            if (isCurrentCard(card, imageToken)) {
+              showCardImage(normalUrl, card.name, card.id);
+            }
+          })
+          .catch(() => {});
+      }, 1500);
+    }, NORMAL_IMAGE_UPGRADE_DELAY_MS);
   }
 
   function preloadNearbyImages() {

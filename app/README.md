@@ -57,6 +57,8 @@ Generated web data lives under `app/data/` and is ignored by git:
 
 ```text
 app/data/
+  bootstrap.js
+  bootstrap.js.gz
   manifest.json
   manifest.json.gz
   sets/
@@ -64,6 +66,10 @@ app/data/
     MSH.json.gz
     ...
 ```
+
+`bootstrap.js` is the startup path. It defines `window.MTG_REGISTRY_BOOTSTRAP`
+with the manifest plus the default set payload, so the first card renders from
+already-loaded script data instead of waiting for app-code fetches.
 
 `manifest.json` contains schema version `4`, the build id, default set, set
 metadata, optional `thumbnailCachePath`, and `thumbnailSetCodes` for sets with
@@ -78,10 +84,10 @@ The full field list is `id`, `name`, `collectorNumber`, `colors`, `manaCost`,
 `typeLine`, `rarity`, `priceUsd`, `priceUsdFoil`, `priceUsdEtched`,
 `valueHint`, `imageSmallUrl`, and `imageNormalUrl`.
 
-The browser loads and decodes the default set first, then prefetches the other
-set files into the HTTP cache in the background. It keeps only a small LRU of
-decoded sets in memory, so set switching is snappy after prefetch without
-holding every parsed card object forever.
+The browser renders the bootstrapped default set first, then waits before
+prefetching other set files into the HTTP cache in the background. It keeps only
+a small LRU of decoded sets in memory, so set switching is snappy after prefetch
+without holding every parsed card object forever.
 
 The default generator includes a strict union of the historical inventory
 baseline and released Scryfall `expansion` sets discovered from processed set
@@ -91,9 +97,10 @@ metadata. The default selected set is the latest released included set by
 ## Image Loading
 
 The processor stores Scryfall `small` and `normal` image URLs. The app displays
-card metadata immediately, loads `imageSmallUrl` first, and upgrades only the
-current card to `imageNormalUrl` during idle time. The live browser image cache
-is capped at eight images: the current card plus nearby cards.
+card metadata immediately, loads a local thumbnail or `imageSmallUrl` first, and
+upgrades only the current card to `imageNormalUrl` after startup idle time. The
+live browser image cache is capped at eight images: the current card plus nearby
+cards.
 
 The runtime script generates the default set's local thumbnail cache at
 `/opt/$USER/dat/mtga/app-thumbnails` and exposes it through the ignored

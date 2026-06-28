@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 
 NO_CACHE_SUFFIXES = {".html", ".js", ".css"}
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".avif"}
+PRECOMPRESSED_SUFFIXES = {".json", ".js"}
 
 
 def accepts_gzip(value):
@@ -27,7 +28,9 @@ class RegistryHandler(SimpleHTTPRequestHandler):
     def send_head(self):
         parsed = urlparse(self.path)
         suffix = Path(parsed.path).suffix.lower()
-        if suffix == ".json" and accepts_gzip(self.headers.get("Accept-Encoding", "")):
+        if suffix in PRECOMPRESSED_SUFFIXES and accepts_gzip(
+            self.headers.get("Accept-Encoding", "")
+        ):
             raw_path = Path(self.translate_path(parsed.path))
             gz_path = raw_path.with_suffix(raw_path.suffix + ".gz")
             if gz_path.is_file():
@@ -51,14 +54,24 @@ class RegistryHandler(SimpleHTTPRequestHandler):
     def end_headers(self):
         parsed = urlparse(self.path)
         suffix = Path(parsed.path).suffix.lower()
-        if suffix == ".json":
+        if suffix in PRECOMPRESSED_SUFFIXES:
             self.send_header("Vary", "Accept-Encoding")
         if parsed.path.startswith("/data/sets/") and suffix == ".json":
             self.send_header(
                 "Cache-Control",
                 "public, max-age=31536000, immutable",
             )
+        elif parsed.path == "/data/bootstrap.js":
+            self.send_header(
+                "Cache-Control",
+                "public, max-age=300, stale-while-revalidate=3600",
+            )
         elif parsed.path.startswith("/data/images/") and suffix in IMAGE_SUFFIXES:
+            self.send_header(
+                "Cache-Control",
+                "public, max-age=31536000, immutable",
+            )
+        elif suffix in {".js", ".css"} and parsed.query:
             self.send_header(
                 "Cache-Control",
                 "public, max-age=31536000, immutable",

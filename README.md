@@ -27,6 +27,8 @@ The card database comes from Scryfall bulk data:
    files under `/opt/$USER/dat/mtga/processed/`.
 3. `scripts/build_app_data.py` converts those parquet files into the web app's
    lazy-load schema v4 JSON files:
+   - `app/data/bootstrap.js`
+   - `app/data/bootstrap.js.gz`
    - `app/data/manifest.json`
    - `app/data/manifest.json.gz`
    - `app/data/sets/<SETCODE>.json`
@@ -77,11 +79,13 @@ The app runtime is:
 The server sends no-store headers for the app shell and manifest. Generated set
 JSON is versioned by manifest `buildId`, served with immutable cache headers,
 and sent from the precompressed `.json.gz` sidecar when the browser accepts
-gzip. The browser decodes only the current/recent sets in a small LRU cache and
-prefetches the other set files into the HTTP cache after the first card renders.
-Card images load from Scryfall `small` URLs first, then only the current card is
-upgraded to `normal` during idle time. The live image preload cache is capped at
-the current card plus nearby cards.
+gzip. Startup uses `data/bootstrap.js`, which contains the manifest plus the
+default set payload, so the default set renders without fetching manifest or set
+JSON from app code. The browser decodes only the current/recent sets in a small
+LRU cache and delays other set prefetches until after startup. Card images load
+from local thumbnails or Scryfall `small` URLs first, then only the current card
+is upgraded to `normal` after startup idle time. The live image preload cache is
+capped at the current card plus nearby cards.
 
 Health checks:
 
