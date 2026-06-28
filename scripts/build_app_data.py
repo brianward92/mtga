@@ -1,12 +1,14 @@
 import argparse
+from datetime import date
 import json
 import os
 from pathlib import Path
 
 import pandas as pd
 
-# Default: Main expansion sets from 2021-2025 (sorted by release date)
-DEFAULT_SET_CODES = [
+# Historical floor for the app. Default builds union this list with released
+# Scryfall expansion sets so the registry grows automatically over time.
+BASE_SET_CODES = [
     "MH2",
     "NEO",
     "SNC",
@@ -31,10 +33,11 @@ DEFAULT_SET_CODES = [
     "TLA",
     "TMT",
 ]
+AUTO_SET_TYPES = {"expansion"}
 
 
 def create_parser():
-    desc = "Build app/data/cards.js from processed parquet files"
+    desc = "Build lazy-load app/data JSON files from processed parquet files"
     parser = argparse.ArgumentParser(description=desc)
     parser.add_argument("--sets", nargs="*", help="Set codes to include.")
     return parser
@@ -63,16 +66,74 @@ def clean_price(value):
     return None if value is None else float(value)
 
 
+def dedupe_preserving_order(values):
+    seen = set()
+    result = []
+    for value in values:
+        if value not in seen:
+            seen.add(value)
+            result.append(value)
+    return result
+
+
+def resolve_default_set_codes(cards_df, sets_df):
+    card_set_codes = set(cards_df["set"].dropna().str.upper().unique())
+    baseline = [code for code in BASE_SET_CODES if code in card_set_codes]
+    union = set(baseline)
+
+    sets_with_dates = sets_df.copy()
+    sets_with_dates["released_at"] = pd.to_datetime(
+        sets_with_dates["released_at"], errors="coerce"
+    )
+    baseline_dates = sets_with_dates[
+        sets_with_dates["set"].isin(baseline)
+    ]["released_at"].dropna()
+    min_release_date = baseline_dates.min() if not baseline_dates.empty else None
+
+    if "set_type" in sets_with_dates.columns:
+        today = pd.Timestamp(date.today())
+        auto_mask = (
+            sets_with_dates["set"].isin(card_set_codes)
+            & sets_with_dates["set_type"].isin(AUTO_SET_TYPES)
+            & sets_with_dates["released_at"].notna()
+            & (sets_with_dates["released_at"] <= today)
+        )
+        if min_release_date is not None:
+            auto_mask &= sets_with_dates["released_at"] >= min_release_date
+        auto_sets = sets_with_dates[auto_mask]["set"].tolist()
+        union.update(auto_sets)
+
+    baseline_rank = {code: index for index, code in enumerate(BASE_SET_CODES)}
+    ordered_sets = sets_with_dates[sets_with_dates["set"].isin(union)].copy()
+    ordered_sets["baseline_rank"] = (
+        ordered_sets["set"].map(baseline_rank).fillna(len(BASE_SET_CODES)).astype(int)
+    )
+    ordered_sets = ordered_sets.sort_values(
+        ["released_at", "baseline_rank", "set"],
+        na_position="first",
+    )
+    return ordered_sets["set"].tolist()
+
+
+def resolve_default_set_code(set_codes, sets_df):
+    sets_with_dates = sets_df[sets_df["set"].isin(set_codes)].copy()
+    sets_with_dates["released_at"] = pd.to_datetime(
+        sets_with_dates["released_at"], errors="coerce"
+    )
+    sets_with_dates = sets_with_dates.sort_values(
+        ["released_at", "set"],
+        na_position="first",
+    )
+    if sets_with_dates.empty:
+        return set_codes[-1]
+    return sets_with_dates.iloc[-1]["set"]
+
+
 if __name__ == "__main__":
 
     # Parser -> args -> unpack args
     parser = create_parser()
     args = parser.parse_args()
-    if args.sets:
-        set_codes = [s.upper() for s in args.sets]
-    else:
-        set_codes = DEFAULT_SET_CODES
-    print(f"Building app data for sets: {', '.join(set_codes)}")
 
     # Determine paths
     user = os.getenv("USER", "unknown")
@@ -87,12 +148,18 @@ if __name__ == "__main__":
     cards_path = processed_prefix / "cards.parquet"
     cards_df = read_with_error(cards_path)
     cards_df["set"] = cards_df["set"].str.upper()
-    cards_df = cards_df[cards_df["set"].isin(set_codes)]
 
     # Read Sets
     sets_path = processed_prefix / "sets.parquet"
     sets_df = read_with_error(sets_path)
     sets_df["set"] = sets_df["set"].str.upper()
+    if args.sets:
+        set_codes = dedupe_preserving_order([s.upper() for s in args.sets])
+    else:
+        set_codes = resolve_default_set_codes(cards_df, sets_df)
+    print(f"Building app data for sets: {', '.join(set_codes)}")
+
+    cards_df = cards_df[cards_df["set"].isin(set_codes)]
     sets_df = sets_df[sets_df["set"].isin(set_codes)]
 
     # Check
@@ -164,7 +231,7 @@ if __name__ == "__main__":
         print(f"Wrote {len(set_cards):,} cards to {set_path}")
 
     manifest = {
-        "defaultSetCode": set_codes[-1],
+        "defaultSetCode": resolve_default_set_code(set_codes, sets_df),
         "sets": manifest_sets,
     }
     output_dir.mkdir(parents=True, exist_ok=True)

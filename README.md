@@ -30,6 +30,12 @@ The card database comes from Scryfall bulk data:
    - `app/data/manifest.json`
    - `app/data/sets/<SETCODE>.json`
 
+Default app builds use a strict union: the historical inventory baseline plus
+released Scryfall `expansion` sets discovered from `sets.parquet`. That makes
+new main sets appear automatically after the nightly Scryfall refresh without
+adding commander decks, tokens, promos, or art-series sets to the normal
+dropdown.
+
 Generated app data is ignored by git and rebuilt by the runtime script.
 
 ## Prod Runtime

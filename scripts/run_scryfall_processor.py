@@ -131,6 +131,7 @@ def process_cards(cards_iter):
             sets_data[set_code] = {
                 "set": set_code,
                 "set_name": card.get("set_name"),
+                "set_type": card.get("set_type"),
                 "released_at": card.get("released_at"),
             }
 

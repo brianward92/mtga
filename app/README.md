@@ -61,6 +61,11 @@ app/data/
 `sets/<SETCODE>.json` file contains only that set's cards, so the browser loads
 the latest set first and fetches other sets only when selected.
 
+The default generator includes a strict union of the historical inventory
+baseline and released Scryfall `expansion` sets discovered from processed set
+metadata. The default selected set is the latest released included set by
+`released_at`.
+
 ## Inventory Storage
 
 Inventory counts are stored in browser `localStorage`.
