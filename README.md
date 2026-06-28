@@ -1,12 +1,12 @@
 # MTGA Repo
 
-This repo contains the live MTG Registry web app plus supporting Magic card data
-tools.
+This repo contains the live MTG Registry card database and inventory tracker
+plus supporting Magic card data tools.
 
 ## Live Product: MTG Registry
 
-MTG Registry is the card browser and physical inventory tracker served from
-`app/`.
+MTG Registry is the card database browser and physical inventory tracker served
+from `app/`.
 
 - Local URL on the prod box: <http://localhost:8000>
 - LAN URL currently observed on this box: <http://192.168.4.25:8000>
@@ -26,9 +26,24 @@ The card database comes from Scryfall bulk data:
 2. `scripts/run_scryfall_processor.py` converts that raw JSON into parquet
    files under `/opt/$USER/dat/mtga/processed/`.
 3. `scripts/build_app_data.py` converts those parquet files into the web app's
-   lazy-load JSON files:
+   lazy-load schema v4 JSON files:
    - `app/data/manifest.json`
+   - `app/data/manifest.json.gz`
    - `app/data/sets/<SETCODE>.json`
+   - `app/data/sets/<SETCODE>.json.gz`
+
+Set files use compact row arrays:
+
+```json
+{"schemaVersion":4,"setCode":"MSH","fields":["id","name"],"cards":[["...","..."]]}
+```
+
+The full v4 field list is `id`, `name`, `collectorNumber`, `colors`,
+`manaCost`, `typeLine`, `rarity`, `priceUsd`, `priceUsdFoil`,
+`priceUsdEtched`, `valueHint`, `imageSmallUrl`, and `imageNormalUrl`.
+The processor writes both Scryfall `small` and `normal` image URLs; older
+processed data with only `image_url` still builds by using it as the normal
+fallback.
 
 Default app builds use a strict union: the historical inventory baseline plus
 released Scryfall `expansion` sets discovered from `sets.parquet`. That makes
@@ -36,7 +51,10 @@ new main sets appear automatically after the nightly Scryfall refresh without
 adding commander decks, tokens, promos, or art-series sets to the normal
 dropdown.
 
-Generated app data is ignored by git and rebuilt by the runtime script.
+Generated app data is ignored by git and rebuilt by the runtime script. If
+`app/data/images/` exists as a generated thumbnail directory or symlink, the
+manifest advertises it and the browser tries those local thumbnails before
+falling back to Scryfall `small` image URLs.
 
 ## Prod Runtime
 
@@ -55,8 +73,13 @@ The app runtime is:
 - port: `8000`
 
 The server sends no-store headers for the app shell and manifest. Generated set
-JSON is versioned by manifest `buildId` and cacheable, so set switching stays
-fast after first load or background prefetch.
+JSON is versioned by manifest `buildId`, served with immutable cache headers,
+and sent from the precompressed `.json.gz` sidecar when the browser accepts
+gzip. The browser decodes only the current/recent sets in a small LRU cache and
+prefetches the other set files into the HTTP cache after the first card renders.
+Card images load from Scryfall `small` URLs first, then only the current card is
+upgraded to `normal` during idle time. The live image preload cache is capped at
+the current card plus nearby cards.
 
 Health checks:
 

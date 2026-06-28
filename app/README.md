@@ -1,6 +1,6 @@
 # MTG Registry
 
-MTG Registry is the live web card browser and physical inventory tracker.
+MTG Registry is the live web card database and physical inventory tracker.
 
 It serves static files from `app/`, loads card data by set, and stores inventory
 counts in the browser. The server does not persist user inventory.
@@ -26,8 +26,9 @@ That script:
 3. serves this directory with `scripts/serve_app.py` on port `8000`
 
 The static server sends no-store cache headers for the app shell and manifest.
-Generated set JSON is loaded with a manifest `buildId` query string and can be
-cached for fast set switching.
+Generated set JSON is loaded with a manifest `buildId` query string, served
+from precompressed `.json.gz` sidecars when `Accept-Encoding` allows gzip, and
+cached immutably for fast set switching.
 
 Health checks:
 
@@ -55,22 +56,47 @@ Generated web data lives under `app/data/` and is ignored by git:
 ```text
 app/data/
   manifest.json
+  manifest.json.gz
   sets/
-    TMT.json
-    TLA.json
+    MSH.json
+    MSH.json.gz
     ...
 ```
 
-`manifest.json` contains the default set and set metadata. Each
-`sets/<SETCODE>.json` file contains only that set's cards, so the browser loads
-the latest set first and fetches other sets only when selected.
-After the latest set renders, the app prefetches the other set files in the
-background.
+`manifest.json` contains schema version `4`, the build id, default set, set
+metadata, and optional `thumbnailCachePath`. Each `sets/<SETCODE>.json` file
+contains only that set's cards in compact v4 form:
+
+```json
+{"schemaVersion":4,"setCode":"MSH","fields":["id","name"],"cards":[["...","..."]]}
+```
+
+The full field list is `id`, `name`, `collectorNumber`, `colors`, `manaCost`,
+`typeLine`, `rarity`, `priceUsd`, `priceUsdFoil`, `priceUsdEtched`,
+`valueHint`, `imageSmallUrl`, and `imageNormalUrl`.
+
+The browser loads and decodes the default set first, then prefetches the other
+set files into the HTTP cache in the background. It keeps only a small LRU of
+decoded sets in memory, so set switching is snappy after prefetch without
+holding every parsed card object forever.
 
 The default generator includes a strict union of the historical inventory
 baseline and released Scryfall `expansion` sets discovered from processed set
 metadata. The default selected set is the latest released included set by
-`released_at`.
+`released_at`; with the current processed data this defaults to `MSH`.
+
+## Image Loading
+
+The processor stores Scryfall `small` and `normal` image URLs. The app displays
+card metadata immediately, loads `imageSmallUrl` first, and upgrades only the
+current card to `imageNormalUrl` during idle time. The live browser image cache
+is capped at eight images: the current card plus nearby cards.
+
+For an optional local thumbnail cache, generate `app/data/images/<CARD_ID>.jpg`
+or make `app/data/images` a symlink to an ignored `/opt/$USER/dat/...` cache.
+When that directory contains images, the build writes `thumbnailCachePath` into
+the manifest; the client tries the local thumbnail first and falls back to the
+remote Scryfall `small` URL if it is missing.
 
 ## Inventory Storage
 

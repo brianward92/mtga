@@ -44,30 +44,41 @@ def extract_best_price(prices):
     }
 
 
-def extract_image_url(card):
-    """Extract best available image URL."""
+def extract_image_urls(card):
+    """Extract thumbnail and normal image URLs from card or first image-bearing face."""
 
-    def pick_best(img_block):
+    def pick(img_block, keys):
         if not img_block:
             return None
-        for key in ("normal", "large", "png"):
+        for key in keys:
             if img_block.get(key):
                 return img_block[key]
         return None
 
-    # Try card-level image_uris first
-    img = pick_best(card.get("image_uris"))
-    if img:
-        return img
+    def urls_for(img_block):
+        small = pick(img_block, ("small", "normal", "large", "png"))
+        normal = pick(img_block, ("normal", "large", "png", "small"))
+        return {
+            "image_small_url": small,
+            "image_normal_url": normal,
+            "image_url": normal,
+        }
 
-    # Fall back to first face
+    # Try card-level image_uris first.
+    if card.get("image_uris"):
+        return urls_for(card.get("image_uris"))
+
+    # Fall back to first image-bearing face.
     faces = card.get("card_faces") or []
     for face in faces:
-        img = pick_best(face.get("image_uris"))
-        if img:
-            return img
+        if face.get("image_uris"):
+            return urls_for(face.get("image_uris"))
 
-    return None
+    return {
+        "image_small_url": None,
+        "image_normal_url": None,
+        "image_url": None,
+    }
 
 
 def process_cards(cards_iter):
@@ -102,6 +113,7 @@ def process_cards(cards_iter):
         prices = extract_best_price(card.get("prices") or {})
 
         # Core card data
+        image_urls = extract_image_urls(card)
         card_row = {
             "id": card.get("id"),
             "name": card.get("name"),
@@ -120,7 +132,7 @@ def process_cards(cards_iter):
             "loyalty": card.get("loyalty"),
             "keywords": ",".join(card.get("keywords") or []),
             "layout": card.get("layout"),
-            "image_url": extract_image_url(card),
+            **image_urls,
             **prices,
         }
         cards_data.append(card_row)

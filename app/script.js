@@ -1,19 +1,28 @@
 (() => {
   const DATA_ROOT = "data";
+  const DATA_SCHEMA_VERSION = 4;
   const STORAGE_PREFIX = "mtg_registry_v1";
   const PREFETCH_CONCURRENCY = 3;
+  const DECODED_SET_CACHE_LIMIT = 4;
+  const IMAGE_CACHE_LIMIT = 8;
+  const NEARBY_IMAGE_LIMIT = 6;
+
+  const imageCache = new Map();
+  const failedImageUrls = new Set();
 
   const state = {
     sets: [],
     setMap: new Map(),
-    loadedSets: new Map(),
+    decodedSets: new Map(),
     loadingSets: new Map(),
     currentSet: null,
     filteredCards: [],
     index: 0,
     loadToken: 0,
+    imageLoadToken: 0,
     buildId: "",
-    prefetchStarted: false
+    prefetchStarted: false,
+    thumbnailCachePath: ""
   };
 
   const setSelect = document.getElementById("setSelect");
@@ -97,7 +106,11 @@
     renderStatus("Loading card database...");
     try {
       const manifest = await fetchJson(`${DATA_ROOT}/manifest.json`);
+      if (manifest.schemaVersion > DATA_SCHEMA_VERSION) {
+        console.warn(`Manifest schema ${manifest.schemaVersion} is newer than client schema ${DATA_SCHEMA_VERSION}`);
+      }
       state.buildId = manifest.buildId || "dev";
+      state.thumbnailCachePath = normalizeThumbnailPath(manifest.thumbnailCachePath);
       state.sets = normalizeSets(manifest);
       state.setMap = new Map(state.sets.map((set) => [set.setCode, set]));
 
@@ -130,6 +143,10 @@
         cardCount: set.cardCount || 0,
         cardsPath: set.cardsPath || `sets/${set.setCode}.json`
       }));
+  }
+
+  function normalizeThumbnailPath(path) {
+    return path ? String(path).replace(/^\/+|\/+$/g, "") : "";
   }
 
   function populateSetSelect() {
@@ -174,23 +191,18 @@
   }
 
   async function loadSet(setMeta) {
-    if (state.loadedSets.has(setMeta.setCode)) {
-      return state.loadedSets.get(setMeta.setCode);
+    const cachedSet = getDecodedSet(setMeta.setCode);
+    if (cachedSet) {
+      return cachedSet;
     }
     if (state.loadingSets.has(setMeta.setCode)) {
       return state.loadingSets.get(setMeta.setCode);
     }
 
     const loadPromise = fetchJson(setDataUrl(setMeta), "force-cache")
-      .then((cards) => {
-        if (!Array.isArray(cards)) {
-          throw new Error(`Expected array for ${setMeta.setCode}`);
-        }
-        const loadedSet = {
-          ...setMeta,
-          cards
-        };
-        state.loadedSets.set(setMeta.setCode, loadedSet);
+      .then((payload) => decodeSetPayload(payload, setMeta))
+      .then((loadedSet) => {
+        cacheDecodedSet(loadedSet);
         return loadedSet;
       })
       .finally(() => {
@@ -199,6 +211,94 @@
 
     state.loadingSets.set(setMeta.setCode, loadPromise);
     return loadPromise;
+  }
+
+  function getDecodedSet(setCode) {
+    if (!state.decodedSets.has(setCode)) return null;
+    const loadedSet = state.decodedSets.get(setCode);
+    state.decodedSets.delete(setCode);
+    state.decodedSets.set(setCode, loadedSet);
+    return loadedSet;
+  }
+
+  function cacheDecodedSet(loadedSet) {
+    if (state.decodedSets.has(loadedSet.setCode)) {
+      state.decodedSets.delete(loadedSet.setCode);
+    }
+    state.decodedSets.set(loadedSet.setCode, loadedSet);
+    while (state.decodedSets.size > DECODED_SET_CACHE_LIMIT) {
+      const oldestSetCode = state.decodedSets.keys().next().value;
+      state.decodedSets.delete(oldestSetCode);
+    }
+  }
+
+  function decodeSetPayload(payload, setMeta) {
+    if (Array.isArray(payload)) {
+      return {
+        ...setMeta,
+        cards: payload.map((card) => normalizeCard(card, setMeta.setCode))
+      };
+    }
+
+    if (!payload || !Array.isArray(payload.cards)) {
+      throw new Error(`Expected cards for ${setMeta.setCode}`);
+    }
+
+    const setCode = payload.setCode || setMeta.setCode;
+    let cards;
+    if (payload.cards.length && Array.isArray(payload.cards[0])) {
+      if (!Array.isArray(payload.fields) || !payload.fields.length) {
+        throw new Error(`Missing compact fields for ${setMeta.setCode}`);
+      }
+      cards = payload.cards.map((row) => normalizeCard(rowToCard(payload.fields, row), setCode));
+    } else {
+      cards = payload.cards.map((card) => normalizeCard(card, setCode));
+    }
+
+    return {
+      ...setMeta,
+      setCode,
+      cards
+    };
+  }
+
+  function rowToCard(fields, row) {
+    const card = {};
+    fields.forEach((field, index) => {
+      card[field] = row[index];
+    });
+    return card;
+  }
+
+  function normalizeCard(card, setCode) {
+    const imageNormalUrl =
+      card.imageNormalUrl || card.image_normal_url || card.imageUrl || card.image_url || "";
+    const imageSmallUrl =
+      card.imageSmallUrl || card.image_small_url || imageNormalUrl;
+    return {
+      id: card.id || "",
+      name: card.name || "",
+      setCode: card.setCode || card.set_code || setCode,
+      collectorNumber: card.collectorNumber || card.collector_number || "",
+      colors: normalizeColors(card.colors),
+      manaCost: card.manaCost || card.mana_cost || "",
+      typeLine: card.typeLine || card.type_line || "",
+      rarity: card.rarity || "",
+      priceUsd: card.priceUsd ?? card.price_usd ?? card.price ?? null,
+      priceUsdFoil: card.priceUsdFoil ?? card.price_usd_foil ?? null,
+      priceUsdEtched: card.priceUsdEtched ?? card.price_usd_etched ?? null,
+      valueHint: card.valueHint || card.value_hint || "",
+      imageSmallUrl,
+      imageNormalUrl,
+      imageUrl: card.imageUrl || card.image_url || imageNormalUrl,
+      flavorText: card.flavorText || card.flavor_text || ""
+    };
+  }
+
+  function normalizeColors(colors) {
+    if (Array.isArray(colors)) return colors.filter(Boolean);
+    if (typeof colors === "string" && colors) return colors.split(",").filter(Boolean);
+    return [];
   }
 
   function setDataUrl(setMeta) {
@@ -231,7 +331,7 @@
         const setMeta = queue[nextIndex];
         nextIndex += 1;
         try {
-          await loadSet(setMeta);
+          await prefetchSetFile(setMeta);
         } catch (error) {
           console.warn(`Could not prefetch ${setMeta.setCode}`, error);
         }
@@ -239,6 +339,15 @@
     }
 
     await Promise.all(Array.from({ length: workerCount }, worker));
+  }
+
+  async function prefetchSetFile(setMeta) {
+    const url = setDataUrl(setMeta);
+    const response = await fetch(url, { cache: "force-cache" });
+    if (!response.ok) {
+      throw new Error(`${response.status} ${response.statusText}: ${url}`);
+    }
+    await response.arrayBuffer();
   }
 
   async function fetchJson(url, cacheMode = "no-store") {
@@ -302,23 +411,13 @@
     metaSubtype.textContent = subType || "-";
     flavorText.textContent = card.flavorText ? `"${card.flavorText}"` : "-";
     valueHint.textContent = card.valueHint || "";
-    priceUsd.textContent = formatPrice(card.priceUsd || card.price || null);
-    priceFoil.textContent = formatPrice(card.priceUsdFoil || null);
-    priceEtched.textContent = formatPrice(card.priceUsdEtched || null);
+    priceUsd.textContent = formatPrice(card.priceUsd);
+    priceFoil.textContent = formatPrice(card.priceUsdFoil);
+    priceEtched.textContent = formatPrice(card.priceUsdEtched);
     setBadge.textContent = currentSetLabel();
     rarityBadge.textContent = card.rarity;
     rarityBadge.className = `chip ${rarityClass(card.rarity)}`;
     position.textContent = `${state.index + 1} / ${state.filteredCards.length}`;
-
-    if (card.imageUrl) {
-      cardImage.src = card.imageUrl;
-      cardImage.style.display = "block";
-      noImage.style.display = "none";
-    } else {
-      cardImage.removeAttribute("src");
-      cardImage.style.display = "none";
-      noImage.style.display = "block";
-    }
 
     const inv = getInventoryForSet(state.currentSet.setCode);
     const count = inv[card.id] ?? 0;
@@ -328,9 +427,151 @@
 
     prevCard.disabled = state.index === 0;
     nextCard.disabled = state.index >= state.filteredCards.length - 1;
+
+    const imageToken = ++state.imageLoadToken;
+    renderCardImage(card, imageToken);
+    preloadNearbyImages();
+  }
+
+  function renderCardImage(card, imageToken) {
+    hideCardImage();
+    loadCardSmallImage(card)
+      .then((displayedUrl) => {
+        if (!isCurrentCard(card, imageToken)) return;
+        showCardImage(displayedUrl, card.name);
+        scheduleCurrentImageUpgrade(card, imageToken, displayedUrl);
+      })
+      .catch(() => {
+        if (isCurrentCard(card, imageToken)) hideCardImage();
+      });
+  }
+
+  function hideCardImage() {
+    cardImage.removeAttribute("src");
+    cardImage.style.display = "none";
+    noImage.style.display = "block";
+  }
+
+  function showCardImage(url, name) {
+    cardImage.alt = name ? `${name} card image` : "Card image";
+    cardImage.src = url;
+    cardImage.style.display = "block";
+    noImage.style.display = "none";
+  }
+
+  function loadCardSmallImage(card) {
+    const primaryUrl = preferredSmallImageUrl(card);
+    const fallbackUrl = remoteSmallImageUrl(card);
+    if (!primaryUrl) {
+      return Promise.reject(new Error("No image URL"));
+    }
+    return preloadImage(primaryUrl)
+      .then(() => primaryUrl)
+      .catch(() => {
+        if (!fallbackUrl || fallbackUrl === primaryUrl) throw new Error("No fallback image URL");
+        return preloadImage(fallbackUrl).then(() => fallbackUrl);
+      });
+  }
+
+  function preferredSmallImageUrl(card) {
+    if (state.thumbnailCachePath && card.id) {
+      return `${DATA_ROOT}/${state.thumbnailCachePath}/${encodeURIComponent(card.id)}.jpg`;
+    }
+    return remoteSmallImageUrl(card);
+  }
+
+  function remoteSmallImageUrl(card) {
+    return card.imageSmallUrl || card.imageUrl || card.imageNormalUrl || "";
+  }
+
+  function remoteNormalImageUrl(card) {
+    return card.imageNormalUrl || card.imageUrl || card.imageSmallUrl || "";
+  }
+
+  function scheduleCurrentImageUpgrade(card, imageToken, displayedUrl) {
+    const normalUrl = remoteNormalImageUrl(card);
+    if (!normalUrl || normalUrl === displayedUrl) return;
+
+    runIdle(() => {
+      if (!isCurrentCard(card, imageToken)) return;
+      preloadImage(normalUrl)
+        .then(() => {
+          if (isCurrentCard(card, imageToken)) {
+            showCardImage(normalUrl, card.name);
+          }
+        })
+        .catch(() => {});
+    }, 700);
+  }
+
+  function preloadNearbyImages() {
+    if (!state.filteredCards.length) return;
+    const offsets = [0, 1, -1, 2, -2, 3, -3];
+    let queued = 0;
+    for (const offset of offsets) {
+      if (queued >= NEARBY_IMAGE_LIMIT + 1) break;
+      const index = state.index + offset;
+      if (index < 0 || index >= state.filteredCards.length) continue;
+      const card = state.filteredCards[index];
+      queued += 1;
+      loadCardSmallImage(card).catch(() => {});
+    }
+  }
+
+  function preloadImage(url) {
+    if (!url || failedImageUrls.has(url)) {
+      return Promise.reject(new Error("Image unavailable"));
+    }
+
+    if (imageCache.has(url)) {
+      const entry = imageCache.get(url);
+      imageCache.delete(url);
+      imageCache.set(url, entry);
+      return entry.promise;
+    }
+
+    const img = new Image();
+    img.decoding = "async";
+    const entry = {
+      img,
+      promise: new Promise((resolve, reject) => {
+        img.onload = () => resolve(img);
+        img.onerror = () => {
+          failedImageUrls.add(url);
+          imageCache.delete(url);
+          reject(new Error(`Could not load image ${url}`));
+        };
+      })
+    };
+
+    imageCache.set(url, entry);
+    trimImageCache();
+    img.src = url;
+    return entry.promise;
+  }
+
+  function trimImageCache() {
+    while (imageCache.size > IMAGE_CACHE_LIMIT) {
+      const oldestUrl = imageCache.keys().next().value;
+      imageCache.delete(oldestUrl);
+    }
+  }
+
+  function isCurrentCard(card, imageToken) {
+    const currentCard = state.filteredCards[state.index];
+    return imageToken === state.imageLoadToken && currentCard && currentCard.id === card.id;
+  }
+
+  function runIdle(callback, timeout) {
+    if ("requestIdleCallback" in window) {
+      window.requestIdleCallback(callback, { timeout });
+    } else {
+      window.setTimeout(callback, Math.min(timeout, 300));
+    }
   }
 
   function renderStatus(message) {
+    state.imageLoadToken += 1;
     cardName.textContent = message;
     metaName.textContent = "";
     metaNumber.textContent = "";
@@ -349,9 +590,7 @@
     position.textContent = "0 / 0";
     currentCount.textContent = "0";
     setCountInput.value = "";
-    cardImage.removeAttribute("src");
-    cardImage.style.display = "none";
-    noImage.style.display = "block";
+    hideCardImage();
     setInventoryEnabled(false);
     prevCard.disabled = true;
     nextCard.disabled = true;

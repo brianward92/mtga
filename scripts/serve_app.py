@@ -2,6 +2,7 @@
 import argparse
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from http import HTTPStatus
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -9,10 +10,48 @@ from urllib.parse import urlparse
 NO_CACHE_SUFFIXES = {".html", ".js", ".css"}
 
 
+def accepts_gzip(value):
+    for item in value.split(","):
+        parts = [part.strip() for part in item.split(";")]
+        if not parts or parts[0].lower() != "gzip":
+            continue
+        for param in parts[1:]:
+            if param.lower().replace(" ", "") == "q=0":
+                return False
+        return True
+    return False
+
+
 class RegistryHandler(SimpleHTTPRequestHandler):
+    def send_head(self):
+        parsed = urlparse(self.path)
+        suffix = Path(parsed.path).suffix.lower()
+        if suffix == ".json" and accepts_gzip(self.headers.get("Accept-Encoding", "")):
+            raw_path = Path(self.translate_path(parsed.path))
+            gz_path = raw_path.with_suffix(raw_path.suffix + ".gz")
+            if gz_path.is_file():
+                try:
+                    f = gz_path.open("rb")
+                except OSError:
+                    self.send_error(HTTPStatus.NOT_FOUND, "File not found")
+                    return None
+
+                stat = gz_path.stat()
+                self.send_response(HTTPStatus.OK)
+                self.send_header("Content-type", self.guess_type(str(raw_path)))
+                self.send_header("Content-Encoding", "gzip")
+                self.send_header("Content-Length", str(stat.st_size))
+                self.send_header("Last-Modified", self.date_time_string(stat.st_mtime))
+                self.end_headers()
+                return f
+
+        return super().send_head()
+
     def end_headers(self):
         parsed = urlparse(self.path)
         suffix = Path(parsed.path).suffix.lower()
+        if suffix == ".json":
+            self.send_header("Vary", "Accept-Encoding")
         if parsed.path.startswith("/data/sets/") and suffix == ".json":
             self.send_header(
                 "Cache-Control",

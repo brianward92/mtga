@@ -1,5 +1,6 @@
 import argparse
 from datetime import date
+import gzip
 import json
 import os
 from pathlib import Path
@@ -34,7 +35,23 @@ BASE_SET_CODES = [
     "TMT",
 ]
 AUTO_SET_TYPES = {"expansion"}
-DATA_SCHEMA_VERSION = 3
+DATA_SCHEMA_VERSION = 4
+SET_FIELDS = [
+    "id",
+    "name",
+    "collectorNumber",
+    "colors",
+    "manaCost",
+    "typeLine",
+    "rarity",
+    "priceUsd",
+    "priceUsdFoil",
+    "priceUsdEtched",
+    "valueHint",
+    "imageSmallUrl",
+    "imageNormalUrl",
+]
+IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".avif"}
 
 
 def create_parser():
@@ -135,6 +152,53 @@ def resolve_build_id(paths):
     return f"v{DATA_SCHEMA_VERSION}-{int(latest_mtime)}"
 
 
+def write_json(path, payload, *, indent=None):
+    with path.open("w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=indent, separators=(",", ":"), ensure_ascii=False)
+        f.write("\n")
+    write_gzip_copy(path)
+
+
+def write_gzip_copy(path):
+    gz_path = path.with_suffix(path.suffix + ".gz")
+    gz_path.write_bytes(gzip.compress(path.read_bytes(), compresslevel=9, mtime=0))
+
+
+def compact_card_row(card, colors, value_hint):
+    image_normal_url = clean_value(card.get("image_normal_url"))
+    legacy_image_url = clean_value(card.get("image_url"))
+    image_normal_url = image_normal_url or legacy_image_url
+    image_small_url = clean_value(card.get("image_small_url")) or image_normal_url
+
+    values = {
+        "id": card["id"],
+        "name": card["name"],
+        "collectorNumber": card["collector_number"],
+        "colors": colors,
+        "manaCost": clean_text(card["mana_cost"]),
+        "typeLine": clean_text(card["type_line"]),
+        "rarity": clean_text(card["rarity"]),
+        "priceUsd": clean_price(card["price_usd"]),
+        "priceUsdFoil": clean_price(card["price_usd_foil"]),
+        "priceUsdEtched": clean_price(card["price_usd_etched"]),
+        "valueHint": value_hint,
+        "imageSmallUrl": image_small_url,
+        "imageNormalUrl": image_normal_url,
+    }
+    return [values[field] for field in SET_FIELDS]
+
+
+def resolve_thumbnail_cache_path(output_dir):
+    images_dir = output_dir / "images"
+    if not images_dir.is_dir():
+        return None
+    has_images = any(
+        child.is_file() and child.suffix.lower() in IMAGE_SUFFIXES
+        for child in images_dir.iterdir()
+    )
+    return "images" if has_images else None
+
+
 if __name__ == "__main__":
 
     # Parser -> args -> unpack args
@@ -149,6 +213,7 @@ if __name__ == "__main__":
     output_dir = repo_root / "app" / "data"
     manifest_path = output_dir / "manifest.json"
     sets_dir = output_dir / "sets"
+    thumbnail_cache_path = resolve_thumbnail_cache_path(output_dir)
 
     # Read Cards
     cards_path = processed_prefix / "cards.parquet"
@@ -187,27 +252,12 @@ if __name__ == "__main__":
         if pd.notna(card.get("price_best")) and card["price_best"] > 0:
             value_hint = f"${card['price_best']:.2f}"
 
-        app_card = {
-            "id": card["id"],
-            "name": card["name"],
-            "setCode": card["set"],
-            "setName": card["set_name"],
-            "collectorNumber": card["collector_number"],
-            "colors": colors,
-            "manaCost": clean_text(card["mana_cost"]),
-            "typeLine": clean_text(card["type_line"]),
-            "rarity": clean_text(card["rarity"]),
-            "priceUsd": clean_price(card["price_usd"]),
-            "priceUsdFoil": clean_price(card["price_usd_foil"]),
-            "priceUsdEtched": clean_price(card["price_usd_etched"]),
-            "valueHint": value_hint,
-            "imageUrl": clean_value(card["image_url"]),
-        }
-        app_sets[card["set"]].append(app_card)
+        app_sets[card["set"]].append(compact_card_row(card, colors, value_hint))
 
-    # Write as JSON for Web App
+    # Write compact JSON for the web app.
+    output_dir.mkdir(parents=True, exist_ok=True)
     sets_dir.mkdir(parents=True, exist_ok=True)
-    for stale_path in sets_dir.glob("*.json"):
+    for stale_path in list(sets_dir.glob("*.json")) + list(sets_dir.glob("*.json.gz")):
         stale_path.unlink()
 
     old_cards_path = output_dir / "cards.js"
@@ -219,9 +269,13 @@ if __name__ == "__main__":
     for set_code in set_codes:
         set_cards = app_sets[set_code]
         set_path = sets_dir / f"{set_code}.json"
-        with set_path.open("w", encoding="utf-8") as f:
-            json.dump(set_cards, f, separators=(",", ":"), ensure_ascii=False)
-            f.write("\n")
+        set_payload = {
+            "schemaVersion": DATA_SCHEMA_VERSION,
+            "setCode": set_code,
+            "fields": SET_FIELDS,
+            "cards": set_cards,
+        }
+        write_json(set_path, set_payload)
 
         set_rows = sets_df[sets_df["set"] == set_code]
         set_name = set_rows.iloc[0]["set_name"] if not set_rows.empty else set_code
@@ -237,14 +291,15 @@ if __name__ == "__main__":
         print(f"Wrote {len(set_cards):,} cards to {set_path}")
 
     manifest = {
+        "schemaVersion": DATA_SCHEMA_VERSION,
         "buildId": resolve_build_id([cards_path, sets_path]),
         "defaultSetCode": resolve_default_set_code(set_codes, sets_df),
         "sets": manifest_sets,
     }
-    output_dir.mkdir(parents=True, exist_ok=True)
-    with manifest_path.open("w", encoding="utf-8") as f:
-        json.dump(manifest, f, indent=2, ensure_ascii=False)
-        f.write("\n")
+    if thumbnail_cache_path:
+        manifest["thumbnailCachePath"] = thumbnail_cache_path
+    write_json(manifest_path, manifest, indent=2)
 
     print(f"Wrote manifest for {len(manifest_sets):,} sets to {manifest_path}")
+    print(f"Wrote gzip copies for manifest and set files.")
     print(f"Wrote {total_cards:,} cards across split set files.")
