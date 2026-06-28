@@ -1,15 +1,19 @@
 (() => {
   const DATA_ROOT = "data";
   const STORAGE_PREFIX = "mtg_registry_v1";
+  const PREFETCH_CONCURRENCY = 3;
 
   const state = {
     sets: [],
     setMap: new Map(),
     loadedSets: new Map(),
+    loadingSets: new Map(),
     currentSet: null,
     filteredCards: [],
     index: 0,
-    loadToken: 0
+    loadToken: 0,
+    buildId: "",
+    prefetchStarted: false
   };
 
   const setSelect = document.getElementById("setSelect");
@@ -48,6 +52,7 @@
   const clearRegistry = document.getElementById("clearRegistry");
 
   function init() {
+    setSelect.disabled = true;
     setInventoryEnabled(false);
     bindEvents();
     loadManifest();
@@ -92,6 +97,7 @@
     renderStatus("Loading card database...");
     try {
       const manifest = await fetchJson(`${DATA_ROOT}/manifest.json`);
+      state.buildId = manifest.buildId || "dev";
       state.sets = normalizeSets(manifest);
       state.setMap = new Map(state.sets.map((set) => [set.setCode, set]));
 
@@ -107,6 +113,7 @@
           : state.sets[state.sets.length - 1].setCode;
       setSelect.value = defaultSetCode;
       await onSetChange();
+      scheduleBackgroundPrefetch(defaultSetCode);
     } catch (error) {
       console.error(error);
       renderStatus("Card database unavailable");
@@ -170,22 +177,72 @@
     if (state.loadedSets.has(setMeta.setCode)) {
       return state.loadedSets.get(setMeta.setCode);
     }
-
-    const cards = await fetchJson(`${DATA_ROOT}/${setMeta.cardsPath}`);
-    if (!Array.isArray(cards)) {
-      throw new Error(`Expected array for ${setMeta.setCode}`);
+    if (state.loadingSets.has(setMeta.setCode)) {
+      return state.loadingSets.get(setMeta.setCode);
     }
 
-    const loadedSet = {
-      ...setMeta,
-      cards
-    };
-    state.loadedSets.set(setMeta.setCode, loadedSet);
-    return loadedSet;
+    const loadPromise = fetchJson(setDataUrl(setMeta), "force-cache")
+      .then((cards) => {
+        if (!Array.isArray(cards)) {
+          throw new Error(`Expected array for ${setMeta.setCode}`);
+        }
+        const loadedSet = {
+          ...setMeta,
+          cards
+        };
+        state.loadedSets.set(setMeta.setCode, loadedSet);
+        return loadedSet;
+      })
+      .finally(() => {
+        state.loadingSets.delete(setMeta.setCode);
+      });
+
+    state.loadingSets.set(setMeta.setCode, loadPromise);
+    return loadPromise;
   }
 
-  async function fetchJson(url) {
-    const response = await fetch(url, { cache: "no-store" });
+  function setDataUrl(setMeta) {
+    const separator = setMeta.cardsPath.includes("?") ? "&" : "?";
+    return `${DATA_ROOT}/${setMeta.cardsPath}${separator}v=${encodeURIComponent(state.buildId)}`;
+  }
+
+  function scheduleBackgroundPrefetch(currentSetCode) {
+    if (state.prefetchStarted) return;
+    state.prefetchStarted = true;
+    const startPrefetch = () => {
+      prefetchSets(currentSetCode);
+    };
+    if ("requestIdleCallback" in window) {
+      window.requestIdleCallback(startPrefetch, { timeout: 1500 });
+    } else {
+      window.setTimeout(startPrefetch, 500);
+    }
+  }
+
+  async function prefetchSets(currentSetCode) {
+    const queue = [...state.sets]
+      .reverse()
+      .filter((set) => set.setCode !== currentSetCode);
+    let nextIndex = 0;
+    const workerCount = Math.min(PREFETCH_CONCURRENCY, queue.length);
+
+    async function worker() {
+      while (nextIndex < queue.length) {
+        const setMeta = queue[nextIndex];
+        nextIndex += 1;
+        try {
+          await loadSet(setMeta);
+        } catch (error) {
+          console.warn(`Could not prefetch ${setMeta.setCode}`, error);
+        }
+      }
+    }
+
+    await Promise.all(Array.from({ length: workerCount }, worker));
+  }
+
+  async function fetchJson(url, cacheMode = "no-store") {
+    const response = await fetch(url, { cache: cacheMode });
     if (!response.ok) {
       throw new Error(`${response.status} ${response.statusText}: ${url}`);
     }

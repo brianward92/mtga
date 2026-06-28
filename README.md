@@ -54,8 +54,9 @@ The app runtime is:
 - bind address: `0.0.0.0`
 - port: `8000`
 
-The server adds no-store cache headers for HTML, JS, CSS, and JSON so browsers
-do not mix stale app code with freshly generated card data.
+The server sends no-store headers for the app shell and manifest. Generated set
+JSON is versioned by manifest `buildId` and cacheable, so set switching stays
+fast after first load or background prefetch.
 
 Health checks:
 

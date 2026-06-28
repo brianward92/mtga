@@ -6,14 +6,23 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 
-NO_CACHE_SUFFIXES = {".html", ".js", ".css", ".json"}
+NO_CACHE_SUFFIXES = {".html", ".js", ".css"}
 
 
 class RegistryHandler(SimpleHTTPRequestHandler):
     def end_headers(self):
         parsed = urlparse(self.path)
         suffix = Path(parsed.path).suffix.lower()
-        if parsed.path in {"", "/"} or suffix in NO_CACHE_SUFFIXES:
+        if parsed.path.startswith("/data/sets/") and suffix == ".json":
+            self.send_header(
+                "Cache-Control",
+                "public, max-age=31536000, immutable",
+            )
+        elif (
+            parsed.path in {"", "/"}
+            or parsed.path == "/data/manifest.json"
+            or suffix in NO_CACHE_SUFFIXES
+        ):
             self.send_header("Cache-Control", "no-store, max-age=0")
             self.send_header("Pragma", "no-cache")
             self.send_header("Expires", "0")

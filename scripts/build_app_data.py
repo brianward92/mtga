@@ -34,6 +34,7 @@ BASE_SET_CODES = [
     "TMT",
 ]
 AUTO_SET_TYPES = {"expansion"}
+DATA_SCHEMA_VERSION = 3
 
 
 def create_parser():
@@ -127,6 +128,11 @@ def resolve_default_set_code(set_codes, sets_df):
     if sets_with_dates.empty:
         return set_codes[-1]
     return sets_with_dates.iloc[-1]["set"]
+
+
+def resolve_build_id(paths):
+    latest_mtime = max(path.stat().st_mtime for path in paths)
+    return f"v{DATA_SCHEMA_VERSION}-{int(latest_mtime)}"
 
 
 if __name__ == "__main__":
@@ -231,6 +237,7 @@ if __name__ == "__main__":
         print(f"Wrote {len(set_cards):,} cards to {set_path}")
 
     manifest = {
+        "buildId": resolve_build_id([cards_path, sets_path]),
         "defaultSetCode": resolve_default_set_code(set_codes, sets_df),
         "sets": manifest_sets,
     }

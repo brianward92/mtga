@@ -25,8 +25,9 @@ That script:
 2. starts a detached `screen` session named `mtga`
 3. serves this directory with `scripts/serve_app.py` on port `8000`
 
-The static server sends no-store cache headers for HTML, JS, CSS, and JSON so a
-browser cannot keep an old app shell while the generated card data changes.
+The static server sends no-store cache headers for the app shell and manifest.
+Generated set JSON is loaded with a manifest `buildId` query string and can be
+cached for fast set switching.
 
 Health checks:
 
@@ -63,6 +64,8 @@ app/data/
 `manifest.json` contains the default set and set metadata. Each
 `sets/<SETCODE>.json` file contains only that set's cards, so the browser loads
 the latest set first and fetches other sets only when selected.
+After the latest set renders, the app prefetches the other set files in the
+background.
 
 The default generator includes a strict union of the historical inventory
 baseline and released Scryfall `expansion` sets discovered from processed set
