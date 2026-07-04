@@ -179,7 +179,7 @@ def parity_check(config, shards, batch_size=512, trajectory_steps=20):
             if p.grad is not None)).item()
 
         model.zero_grad(set_to_none=True)
-        optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
+        optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
         final = loss.item()
         for _ in range(trajectory_steps):
             table, summary = model.encode_set(features, rarities)
@@ -188,6 +188,7 @@ def parity_check(config, shards, batch_size=512, trajectory_steps=20):
                 config.label_smoothing)
             optimizer.zero_grad(set_to_none=True)
             step_loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optimizer.step()
             final = step_loss.item()
         report[device] = {"loss": loss.item(), "grad_norm": grad_norm,
@@ -202,10 +203,11 @@ def parity_check(config, shards, batch_size=512, trajectory_steps=20):
                        / max(abs(cpu["trajectory_loss"]), 1e-9), 5e-2),
     }
     report["checks"] = {k: {"rel": rel, "tol": tol} for k, (rel, tol) in checks.items()}
-    failed = {k: v for k, (rel, tol) in checks.items() if rel > tol
-              for v in [checks[k]]}
+    # A NaN rel must FAIL, not silently pass a > comparison.
+    failed = {k for k, (rel, tol) in checks.items()
+              if not math.isfinite(rel) or rel > tol}
     if failed:
-        raise RuntimeError(f"CPU/{config.device} parity FAILED: {report}")
+        raise RuntimeError(f"CPU/{config.device} parity FAILED ({failed}): {report}")
     return report
 
 
