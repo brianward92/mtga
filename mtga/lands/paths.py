@@ -81,6 +81,11 @@ def model_dir(set_code, limited_type, version):
     return MODELS_DIR / set_code / limited_type / version
 
 
+def set_assets_path(set_code):
+    """Per-set DraftFM serving assets (built by scripts/build_set_assets.py)."""
+    return DATA_ROOT / "foundation" / "set_assets" / f"{set_code}.npz"
+
+
 def repoint_latest(dated_path, prefix=""):
     """Atomically repoint the sibling `latest` symlink at a dated file."""
     link = latest_symlink(dated_path, prefix)

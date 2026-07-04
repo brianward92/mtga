@@ -46,14 +46,18 @@ class TrainConfig:
     patience: int = 3
     device: str = "mps"
     parity_check: bool = True
+    no_text: bool = False  # ablation: drop the 384-d text embedding block
 
 
-def load_shards(pairs):
+def load_shards(pairs, no_text=False):
     shards = []
     for set_code, limited_type in pairs:
         d = shard_dir(set_code, limited_type)
         assets = np.load(d / "features.npz")
-        features = torch.from_numpy(assets["features"].astype(np.float32))
+        matrix = assets["features"].astype(np.float32)
+        if no_text:
+            matrix = matrix[:, :391]  # structured block only
+        features = torch.from_numpy(matrix)
         shard = Shard(set_code, limited_type, features)
         shard.rarity_ids = torch.from_numpy(assets["rarity_ids"].astype(np.int64))
         shard.set_scalars = torch.tensor([
@@ -234,7 +238,7 @@ def train(config):
     if device == "mps" and not torch.backends.mps.is_available():
         raise RuntimeError("MPS not available")
 
-    shards = load_shards(config.sets)
+    shards = load_shards(config.sets, no_text=config.no_text)
     total_train = sum(len(s.train_idx) for s in shards)
     steps = config.max_steps or int(config.epochs * total_train / config.batch_size)
     run_id = runlog.new_run_id(config.name)

@@ -27,6 +27,8 @@ def create_parser():
     parser.add_argument("--d-model", type=int, default=256)
     parser.add_argument("--dropout", type=float, default=0.1)
     parser.add_argument("--no-set-ctx", dest="set_ctx", action="store_false")
+    parser.add_argument("--no-text", action="store_true",
+                        help="ablation: structured features only (391-d)")
     parser.add_argument("--sampling-alpha", type=float, default=0.5)
     parser.add_argument("--val-every", type=int, default=2000)
     parser.add_argument("--patience", type=int, default=3)
@@ -52,7 +54,7 @@ def main():
         d_model=args.d_model, dropout=args.dropout, set_ctx=args.set_ctx,
         sampling_alpha=args.sampling_alpha, val_every=args.val_every,
         patience=args.patience, device=args.device,
-        parity_check=args.parity_check,
+        parity_check=args.parity_check, no_text=args.no_text,
     )
     record = train(config)
     print(f"run {record['run_id']}: best val top1 {record['best_val_top1']:.4f} "

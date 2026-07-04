@@ -51,7 +51,12 @@ def foundation_predictions(model, set_code, limited_type, device="cpu",
 
     d = shard_dir(set_code, limited_type)
     assets = np.load(d / "features.npz")
-    features = torch.from_numpy(assets["features"].astype(np.float32))
+    matrix = assets["features"].astype(np.float32)
+    # Match the model's expected feature width (no-text ablations use 391).
+    expected = model.card_encoder.net[0].normalized_shape[0]
+    if matrix.shape[1] != expected:
+        matrix = matrix[:, :expected]
+    features = torch.from_numpy(matrix)
     shard = Shard(set_code, limited_type, features)
     shard.rarity_ids = torch.from_numpy(assets["rarity_ids"].astype(np.int64))
     shard.set_scalars = torch.tensor([
