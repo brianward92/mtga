@@ -20,6 +20,37 @@
       <button class="minimize-btn" id="minimizeBtn" title="Minimize">−</button>
     </header>
 
+    <!-- Detailed-logs warning banner -->
+    <div class="log-warning" id="logWarning" style="display: none;">
+      Detailed Logs are disabled in MTGA — enable "Detailed Logs (Plugin Support)" in
+      Options &gt; Account and restart Arena.
+    </div>
+
+    <!-- Draft view (shown between draft-start and draft-end) -->
+    <section class="draft-view" id="draftView" style="display: none;">
+      <div class="draft-header">
+        <span class="draft-chip" id="draftEventChip">—</span>
+        <span class="draft-pickpos" id="draftPickPos"></span>
+        <span class="draft-chip model" id="draftModelChip" style="display: none;"></span>
+        <span class="server-dot red" id="serverDot" title="Server offline"></span>
+      </div>
+      <div class="draft-body" id="draftBody">
+        <div class="draft-note" id="draftNote" style="display: none;"></div>
+        <div class="pack-table" id="packTable">
+          <div class="draft-empty">Waiting for pack…</div>
+        </div>
+        <div class="pool-strip" id="poolStrip"></div>
+        <div class="pick-history">
+          <button class="history-toggle" id="historyToggle" aria-expanded="false">
+            <span>Pick history</span>
+            <span class="history-count" id="historyCount">0</span>
+          </button>
+          <div class="history-list" id="historyList" style="display: none;"></div>
+        </div>
+      </div>
+      <footer class="draft-footer">Card stats: 17Lands.com</footer>
+    </section>
+
     <!-- Deck tracker content -->
     <main class="overlay-content" id="overlayContent">
       <!-- Deck name -->

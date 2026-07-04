@@ -2,6 +2,7 @@ import { EventEmitter } from 'events'
 import { parseInventory, InventoryData, CollectionData } from './inventory'
 import { parseMatchEvent, MatchStartData, MatchEndData } from './match-parser'
 import { parseGameState, GameStateData, DeckSubmissionData } from './game-state'
+import { DraftParser, DraftSessionSnapshot, DraftPickRecord } from './draft-parser'
 
 export interface ParserState {
   inMatch: boolean
@@ -21,6 +22,11 @@ export interface ParserEvents {
   'game-state': (data: GameStateData) => void
   'deck-submission': (data: DeckSubmissionData) => void
   'deck-selected': (data: { deckId: string; deckName: string }) => void
+  'draft-start': (snapshot: DraftSessionSnapshot) => void
+  'draft-pack': (snapshot: DraftSessionSnapshot) => void
+  'draft-pick': (snapshot: DraftSessionSnapshot, pick: DraftPickRecord) => void
+  'draft-end': (snapshot: DraftSessionSnapshot) => void
+  'detailed-logs': (data: { enabled: boolean }) => void
 }
 
 export class LogParser extends EventEmitter {
@@ -34,11 +40,32 @@ export class LogParser extends EventEmitter {
     deckSummaries: new Map()
   }
 
+  // Draft events are line-oriented (they need the message name preceding the
+  // JSON); the multi-line JSON buffer below is unrelated and untouched.
+  private draftParser = new DraftParser()
+
   // Buffer for multi-line JSON objects
   private jsonBuffer: string = ''
   private inJsonBlock: boolean = false
 
+  constructor() {
+    super()
+    // Re-emit draft events so main keeps its single-subscription pattern
+    this.draftParser.on('draft-start', (snapshot) => this.emit('draft-start', snapshot))
+    this.draftParser.on('draft-pack', (snapshot) => this.emit('draft-pack', snapshot))
+    this.draftParser.on('draft-pick', (snapshot, pick) => this.emit('draft-pick', snapshot, pick))
+    this.draftParser.on('draft-end', (snapshot) => this.emit('draft-end', snapshot))
+    this.draftParser.on('detailed-logs', (data) => this.emit('detailed-logs', data))
+  }
+
+  getDraftSnapshot(): DraftSessionSnapshot | null {
+    return this.draftParser.getSnapshot()
+  }
+
   parseLine(line: string): void {
+    // Draft handling first: it needs the raw line, not the extracted JSON
+    this.draftParser.handleLine(line)
+
     // Try to extract JSON from the line
     const jsonData = this.extractJson(line)
 

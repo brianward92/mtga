@@ -1095,7 +1095,7 @@ async function saveNotes(): Promise<void> {
  * Render win rate trend chart
  */
 function renderWinRateTrend(matches: Match[]): void {
-  const trendChart = document.getElementById('trendChartSvg') as SVGSVGElement
+  const trendChart = document.getElementById('trendChartSvg') as unknown as SVGSVGElement
   const trendEmpty = document.getElementById('trendChartEmpty')!
 
   // Filter matches from last 30 days

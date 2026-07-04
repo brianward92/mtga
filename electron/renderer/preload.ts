@@ -27,6 +27,9 @@ contextBridge.exposeInMainWorld('mtgaTracker', {
   // Match updates
   updateMatchNotes: (matchId: string, notes: string) => ipcRenderer.invoke('update-match-notes', matchId, notes),
 
+  // Draft state
+  getDraftState: () => ipcRenderer.invoke('get-draft-state'),
+
   // Event listeners
   onInventoryUpdate: (callback: (data: unknown) => void) => {
     ipcRenderer.on('inventory-update', (_event, data) => callback(data))
@@ -50,6 +53,29 @@ contextBridge.exposeInMainWorld('mtgaTracker', {
     ipcRenderer.on('deck-selected', (_event, data) => callback(data))
   },
 
+  // Draft event listeners
+  onDraftStart: (callback: (data: unknown) => void) => {
+    ipcRenderer.on('draft-start', (_event, data) => callback(data))
+  },
+  onDraftPack: (callback: (data: unknown) => void) => {
+    ipcRenderer.on('draft-pack', (_event, data) => callback(data))
+  },
+  onDraftPick: (callback: (data: unknown) => void) => {
+    ipcRenderer.on('draft-pick', (_event, data) => callback(data))
+  },
+  onDraftEnd: (callback: (data: unknown) => void) => {
+    ipcRenderer.on('draft-end', (_event, data) => callback(data))
+  },
+  onDraftScores: (callback: (data: unknown) => void) => {
+    ipcRenderer.on('draft-scores', (_event, data) => callback(data))
+  },
+  onServerStatus: (callback: (data: unknown) => void) => {
+    ipcRenderer.on('server-status', (_event, data) => callback(data))
+  },
+  onDetailedLogs: (callback: (data: unknown) => void) => {
+    ipcRenderer.on('detailed-logs', (_event, data) => callback(data))
+  },
+
   // Cleanup
   removeAllListeners: () => {
     ipcRenderer.removeAllListeners('inventory-update')
@@ -59,6 +85,13 @@ contextBridge.exposeInMainWorld('mtgaTracker', {
     ipcRenderer.removeAllListeners('game-state')
     ipcRenderer.removeAllListeners('deck-submission')
     ipcRenderer.removeAllListeners('deck-selected')
+    ipcRenderer.removeAllListeners('draft-start')
+    ipcRenderer.removeAllListeners('draft-pack')
+    ipcRenderer.removeAllListeners('draft-pick')
+    ipcRenderer.removeAllListeners('draft-end')
+    ipcRenderer.removeAllListeners('draft-scores')
+    ipcRenderer.removeAllListeners('server-status')
+    ipcRenderer.removeAllListeners('detailed-logs')
   }
 })
 
@@ -79,6 +112,7 @@ declare global {
       getCard: (grpId: number) => Promise<{ name: string; manaCost: string; type: string } | null>
       getCardName: (grpId: number) => Promise<string | null>
       updateMatchNotes: (matchId: string, notes: string) => Promise<boolean>
+      getDraftState: () => Promise<unknown>
       onInventoryUpdate: (callback: (data: unknown) => void) => void
       onCollectionUpdate: (callback: (data: unknown) => void) => void
       onMatchStart: (callback: (data: unknown) => void) => void
@@ -86,6 +120,13 @@ declare global {
       onGameState: (callback: (data: unknown) => void) => void
       onDeckSubmission: (callback: (data: unknown) => void) => void
       onDeckSelected: (callback: (data: unknown) => void) => void
+      onDraftStart: (callback: (data: unknown) => void) => void
+      onDraftPack: (callback: (data: unknown) => void) => void
+      onDraftPick: (callback: (data: unknown) => void) => void
+      onDraftEnd: (callback: (data: unknown) => void) => void
+      onDraftScores: (callback: (data: unknown) => void) => void
+      onServerStatus: (callback: (data: unknown) => void) => void
+      onDetailedLogs: (callback: (data: unknown) => void) => void
       removeAllListeners: () => void
     }
   }

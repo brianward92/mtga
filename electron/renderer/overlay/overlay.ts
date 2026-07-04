@@ -3,6 +3,9 @@
  * Displays deck tracking information during matches
  */
 
+import { escapeHtml, renderManaCost } from './shared'
+import { initDraftView, isDraftActive, cycleDraftMini } from './draft-view'
+
 // Export to make this a proper ES module (avoids duplicate function errors in TS)
 export {}
 
@@ -96,6 +99,7 @@ const tooltipCost = document.getElementById('tooltipCost')!
 function init(): void {
   setupEventListeners()
   setupTrackerEvents()
+  initDraftView()
   loadCardData()
   loadWinRate()
 }
@@ -236,9 +240,15 @@ function hideTooltip(): void {
 }
 
 /**
- * Toggle minimized state
+ * Toggle minimized state.
+ * In draft mode this cycles the draft mini states instead
+ * (full -> top-3 mini -> header-only).
  */
 function toggleMinimize(): void {
+  if (isDraftActive()) {
+    cycleDraftMini()
+    return
+  }
   isMinimized = !isMinimized
   overlay.classList.toggle('minimized', isMinimized)
   minimizeBtn.textContent = isMinimized ? '+' : '−'
@@ -719,39 +729,6 @@ function renderCard(card: CardInDeck): string {
 }
 
 /**
- * Render mana cost symbols
- */
-function renderManaCost(manaCost: string): string {
-  if (!manaCost) return ''
-
-  // Parse mana cost like "{2}{W}{W}" or "{3}{G}{G}"
-  const symbols: string[] = []
-  const regex = /\{([^}]+)\}/g
-  let match
-
-  while ((match = regex.exec(manaCost)) !== null) {
-    symbols.push(match[1])
-  }
-
-  return symbols.map(symbol => {
-    const upper = symbol.toUpperCase()
-
-    // Check for color symbols
-    if (['W', 'U', 'B', 'R', 'G', 'C'].includes(upper)) {
-      return `<span class="mana-symbol ${upper}"></span>`
-    }
-
-    // Check for generic mana (numbers)
-    if (/^\d+$/.test(upper)) {
-      return `<span class="mana-symbol generic">${upper}</span>`
-    }
-
-    // Hybrid or other
-    return `<span class="mana-symbol generic">${upper}</span>`
-  }).join('')
-}
-
-/**
  * Format card type name
  */
 function formatTypeName(type: CardType): string {
@@ -766,15 +743,6 @@ function formatTypeName(type: CardType): string {
     other: 'Other'
   }
   return names[type]
-}
-
-/**
- * Escape HTML to prevent XSS
- */
-function escapeHtml(text: string): string {
-  const div = document.createElement('div')
-  div.textContent = text
-  return div.innerHTML
 }
 
 // Start the overlay

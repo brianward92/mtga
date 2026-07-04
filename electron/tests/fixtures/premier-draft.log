@@ -1,0 +1,8 @@
+[UnityCrossThreadLogger]==> EventJoin {"id":"a1","request":"{\"EventName\":\"PremierDraft_SOS_20260421\",\"EntryCurrencyType\":\"Gem\"}"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"a2","request":"{\"DraftId\":\"c7d1a9e0-1111-2222-3333-444455556666\",\"GrpIds\":[90210],\"Pack\":1,\"Pick\":1}"}
+[UnityCrossThreadLogger]==> LogBusinessEvents {"id":"a3","request":"{\"PageName\":\"Draft\",\"Payload\":\"{\\\"DraftId\\\":\\\"c7d1a9e0-1111-2222-3333-444455556666\\\",\\\"EventId\\\":\\\"PremierDraft_SOS_20260421\\\",\\\"PackNumber\\\":1,\\\"PickNumber\\\":1,\\\"CardsInPack\\\":[90210,90355,90114],\\\"PickGrpId\\\":90210,\\\"AutoPick\\\":false,\\\"TimeRemainingOnPick\\\":42.7}\"}"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"c7d1a9e0-1111-2222-3333-444455556666","SelfPick":2,"SelfPack":1,"PackCards":"90355,90114,90500"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"a4","request":"{\"DraftId\":\"c7d1a9e0-1111-2222-3333-444455556666\",\"GrpIds\":[90355],\"Pack\":1,\"Pick\":2}"}
+[UnityCrossThreadLogger]==> LogBusinessEvents {"id":"a5","request":"{\"DraftId\":\"c7d1a9e0-1111-2222-3333-444455556666\",\"EventId\":\"PremierDraft_SOS_20260421\",\"PackNumber\":1,\"PickNumber\":2,\"CardsInPack\":[90355,90114,90500],\"PickGrpId\":90355,\"AutoPick\":false,\"TimeRemainingOnPick\":31.2}"}
+[UnityCrossThreadLogger]==> DraftCompleteDraft {"id":"a6","request":"{\"DraftId\":\"c7d1a9e0-1111-2222-3333-444455556666\"}"}
+[UnityCrossThreadLogger]<== DraftCompleteDraft {"CourseId":"course-0001","InternalEventName":"PremierDraft_SOS_20260421","CardPool":[90210,90355],"DraftId":"c7d1a9e0-1111-2222-3333-444455556666"}

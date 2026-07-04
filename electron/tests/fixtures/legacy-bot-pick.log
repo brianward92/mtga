@@ -1,0 +1,2 @@
+[UnityCrossThreadLogger]<== BotDraft_DraftStatus {"CurrentModule":"BotDraft","Payload":"{\"Result\":\"Success\",\"EventName\":\"QuickDraft_ECL_20260223\",\"DraftStatus\":\"PickNext\",\"PackNumber\":0,\"PickNumber\":0,\"DraftPack\":[\"98361\",\"98498\"],\"PickedCards\":[]}"}
+[UnityCrossThreadLogger]==> BotDraft_DraftPick {"id":"lb1","request":"{\"EventName\":\"QuickDraft_ECL_20260223\",\"PickInfo\":{\"EventName\":\"QuickDraft_ECL_20260223\",\"CardId\":98361,\"PackNumber\":0,\"PickNumber\":0}}"}

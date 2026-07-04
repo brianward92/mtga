@@ -32,12 +32,12 @@ cd electron
 npm install
 ```
 
-### 3. Build Card Data (optional, included in repo)
+### 3. Card Data
 
-```bash
-cd ..
-python3 scripts/build_arena_mapping.py
-```
+Card data is read directly from Arena's own card database
+(`~/Library/Application Support/com.wizards.mtga/Downloads/Raw/Raw_CardDatabase_*.mtga`)
+at startup and snapshotted to the app cache — no build step required.
+`scripts/build_arena_mapping.py` remains available as an optional offline seed.
 
 ### 4. Run in Development Mode
 
@@ -70,14 +70,18 @@ The packaged app will be in `electron/release/`.
 ## Data Storage
 
 - **Database**: `~/Library/Application Support/mtga-tracker/data/mtga-tracker.db`
-- **Card Data**: `data/arena_mapping.json` (16,000+ cards)
+- **Card Data**: Arena's `Raw_CardDatabase_*.mtga` (snapshot cached under the app's `cache/` dir)
+- **Config**: `~/.mtga-tracker/config.json` (draft server URLs, timeouts)
 
 ## Log File Location
 
-MTGA logs are read from:
+MTGA logs are read from the canonical detailed log:
 ```
-~/Library/Application Support/com.wizards.mtga/Logs/Logs/UTC_Log - *.log
+~/Library/Logs/Wizards Of The Coast/MTGA/Player.log   (+ Player-prev.log at startup)
 ```
+Set the `MTGA_LOG_PATH` env var to point at a different file for replay testing.
+The legacy `~/Library/Application Support/com.wizards.mtga/Logs/Logs/UTC_Log - *.log`
+directory is still tailed as a secondary source (config: `watchLegacyLogs`).
 
 ## Architecture
 

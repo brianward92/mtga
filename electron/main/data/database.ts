@@ -153,11 +153,41 @@ function createTables(db: Database.Database): void {
     )
   `)
 
+  // Drafts (one row per draft session)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS drafts (
+      id TEXT PRIMARY KEY,
+      event_name TEXT,
+      set_code TEXT,
+      format TEXT,
+      started_at TEXT NOT NULL,
+      completed_at TEXT,
+      pool_grpids TEXT
+    )
+  `)
+
+  // Draft picks ("my picks vs my model" review data)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS draft_picks (
+      draft_id TEXT NOT NULL,
+      pack INTEGER NOT NULL,
+      pick INTEGER NOT NULL,
+      pack_grpids TEXT,
+      picked_grpids TEXT,
+      model_top_grpid INTEGER,
+      model_ev REAL,
+      picked_ev REAL,
+      ts TEXT NOT NULL,
+      PRIMARY KEY (draft_id, pack, pick)
+    )
+  `)
+
   // Create indexes
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_matches_started ON matches(started_at);
     CREATE INDEX IF NOT EXISTS idx_matches_deck ON matches(deck_id);
     CREATE INDEX IF NOT EXISTS idx_decks_name ON decks(name);
+    CREATE INDEX IF NOT EXISTS idx_draft_picks_draft ON draft_picks(draft_id);
   `)
 }
 
@@ -602,6 +632,86 @@ export function getCollectionStats(): {
     uniqueCards: result.unique || 0,
     byRarity: {}
   }
+}
+
+// ============================================================================
+// Draft Operations
+// ============================================================================
+
+/**
+ * Insert or update a draft session row. Idempotent so log replay converges.
+ */
+export function upsertDraft(draft: {
+  id: string
+  eventName: string | null
+  setCode: string | null
+  format: string | null
+}): void {
+  const db = initDatabase()
+  const stmt = db.prepare(`
+    INSERT INTO drafts (id, event_name, set_code, format, started_at)
+    VALUES (@id, @eventName, @setCode, @format, @startedAt)
+    ON CONFLICT(id) DO UPDATE SET
+      event_name = COALESCE(@eventName, event_name),
+      set_code = COALESCE(@setCode, set_code),
+      format = COALESCE(@format, format)
+  `)
+
+  stmt.run({
+    id: draft.id,
+    eventName: draft.eventName,
+    setCode: draft.setCode,
+    format: draft.format,
+    startedAt: new Date().toISOString()
+  })
+}
+
+/** Mark a draft complete with its final pool. */
+export function completeDraft(draftId: string, poolGrpIds: number[]): void {
+  const db = initDatabase()
+  const stmt = db.prepare(`
+    UPDATE drafts SET completed_at = @completedAt, pool_grpids = @pool WHERE id = @draftId
+  `)
+  stmt.run({
+    draftId,
+    completedAt: new Date().toISOString(),
+    pool: JSON.stringify(poolGrpIds)
+  })
+}
+
+/**
+ * Record one pick (pack contents, actual pick, and the model's verdict).
+ * Keyed on (draft_id, pack, pick) so replays overwrite instead of duplicating.
+ */
+export function recordDraftPick(pickData: {
+  draftId: string
+  pack: number
+  pick: number
+  packGrpIds: number[]
+  pickedGrpIds: number[]
+  modelTopGrpId: number | null
+  modelEv: number | null
+  pickedEv: number | null
+}): void {
+  const db = initDatabase()
+  const stmt = db.prepare(`
+    INSERT OR REPLACE INTO draft_picks
+      (draft_id, pack, pick, pack_grpids, picked_grpids, model_top_grpid, model_ev, picked_ev, ts)
+    VALUES
+      (@draftId, @pack, @pick, @packGrpIds, @pickedGrpIds, @modelTopGrpId, @modelEv, @pickedEv, @ts)
+  `)
+
+  stmt.run({
+    draftId: pickData.draftId,
+    pack: pickData.pack,
+    pick: pickData.pick,
+    packGrpIds: JSON.stringify(pickData.packGrpIds),
+    pickedGrpIds: JSON.stringify(pickData.pickedGrpIds),
+    modelTopGrpId: pickData.modelTopGrpId,
+    modelEv: pickData.modelEv,
+    pickedEv: pickData.pickedEv,
+    ts: new Date().toISOString()
+  })
 }
 
 // ============================================================================

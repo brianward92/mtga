@@ -1,0 +1,5 @@
+[UnityCrossThreadLogger]==> Event_Join {"id":"l1","request":"{\"EventName\":\"PremierDraft_MSH_20260623\"}"}
+[UnityCrossThreadLogger]==> Event_PlayerDraftMakePick {"id":"l2","request":"{\"DraftId\":\"deadbeef-aaaa-bbbb-cccc-000011112222\",\"GrpIds\":[91001],\"Pack\":1,\"Pick\":1}"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"deadbeef-aaaa-bbbb-cccc-000011112222","SelfPick":2,"SelfPack":1,"PackCards":"91002,91003"}
+[UnityCrossThreadLogger]==> Event_PlayerDraftMakePick {"id":"l3","request":"{\"DraftId\":\"deadbeef-aaaa-bbbb-cccc-000011112222\",\"GrpIds\":[91002],\"Pack\":1,\"Pick\":2}"}
+[UnityCrossThreadLogger]<== Draft_CompleteDraft {"CourseId":"course-0002","InternalEventName":"PremierDraft_MSH_20260623","CardPool":[91001,91002],"DraftId":"deadbeef-aaaa-bbbb-cccc-000011112222"}
