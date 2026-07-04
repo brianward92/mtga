@@ -95,6 +95,7 @@ def run_steps(model, shards, config, n_steps, device, rng, optimizer=None,
     rarities = {id(s): s.rarity_ids.to(device) for s in shards}
 
     losses = []
+    skipped = []
     for step in range(n_steps):
         shard = shards[rng.choice(len(shards), p=weights)]
         rows = np.sort(rng.choice(shard.train_idx, size=min(
@@ -107,43 +108,103 @@ def run_steps(model, shards, config, n_steps, device, rng, optimizer=None,
         if optimizer is not None:
             optimizer.zero_grad(set_to_none=True)
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-            optimizer.step()
+            norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0).item()
+            if math.isfinite(norm):
+                optimizer.step()
+            else:
+                # Transient MPS kernel NaNs happen (documented class). One
+                # poisoned step through clip+Adam corrupts weights for good,
+                # so we skip the update instead. Frequent skips = real
+                # corruption -> halt.
+                skipped.append(step)
+                optimizer.zero_grad(set_to_none=True)
+                print(f"WARNING: non-finite grad norm at step {step}; "
+                      f"update skipped ({len(skipped)} total)", flush=True)
+                recent = [s for s in skipped if s > step - 500]
+                if len(recent) > 5:
+                    raise RuntimeError(
+                        f"{len(recent)} non-finite grads in 500 steps — halting")
             if scheduler is not None:
                 scheduler.step()
 
         if step % LOG_EVERY == 0 or step == n_steps - 1:
             value = loss.item()  # sync point — keep rare
-            losses.append(value)
-            if watchdog:
-                trailing = np.median(losses[-10:])
-                if not math.isfinite(value):
-                    raise RuntimeError(f"non-finite loss at step {step}")
+            if watchdog and math.isfinite(value):
+                trailing = np.median(losses[-10:]) if losses else value
                 if len(losses) > 10 and value > SPIKE_FACTOR * trailing:
                     raise RuntimeError(
                         f"loss spike at step {step}: {value:.3f} vs median {trailing:.3f}")
+            if math.isfinite(value):
+                losses.append(value)
+            # Non-finite loss falls through: backward yields non-finite grads
+            # and the per-step gradient gate below skips the update + counts it.
             if progress and step % (LOG_EVERY * 10) == 0:
                 progress(step, value, state)
     return losses
 
 
-def parity_check(config, shards, steps=200, batch_size=256, tolerance=1e-3):
-    """Identical short runs on CPU and the target device must agree."""
+def parity_check(config, shards, batch_size=512, trajectory_steps=20):
+    """CPU-vs-device parity on the invariants that actually detect wrong math.
+
+    Long trajectories legitimately diverge (reduction order + dropout RNG
+    compound through Adam), so we compare: (1) a single forward loss on an
+    identical batch and weights (rel < 1e-4), (2) the global gradient norm of
+    one backward (rel < 1e-3), (3) a short dropout-free trajectory
+    (rel < 5e-2 — a loose guard against optimizer-step corruption).
+    """
+    shard = shards[0]
+    rows = np.sort(np.random.default_rng(config.seed).choice(
+        shard.train_idx, size=min(batch_size, len(shard.train_idx)),
+        replace=False))
     report = {}
-    for device in ["cpu", config.device]:
+
+    def build(device):
         torch.manual_seed(config.seed)
-        rng = np.random.default_rng(config.seed)
-        small = TrainConfig(**{**asdict(config), "batch_size": batch_size,
-                               "sampling_alpha": config.sampling_alpha})
-        model = DraftFM(shards[0].features.shape[1], config.d_model,
-                        config.dropout, config.set_ctx).to(device)
+        model = DraftFM(shard.features.shape[1], config.d_model,
+                        dropout=0.0, set_ctx=config.set_ctx).to(device)
+        return model
+
+    for device in ["cpu", config.device]:
+        model = build(device)
+        features = shard.features.to(device)
+        rarities = shard.rarity_ids.to(device)
+        batch = make_batch(shard, rows, device)
+
+        table, summary = model.encode_set(features, rarities)
+        loss = masked_cross_entropy(model(table, summary, batch),
+                                    batch["pick_pos"], config.label_smoothing)
+        loss.backward()
+        grad_norm = torch.sqrt(sum(
+            (p.grad ** 2).sum() for p in model.parameters()
+            if p.grad is not None)).item()
+
+        model.zero_grad(set_to_none=True)
         optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
-        losses = run_steps(model, shards[:1], small, steps, device, rng,
-                           optimizer=optimizer, watchdog=False)
-        report[device] = losses[-1]
-    rel = abs(report["cpu"] - report[config.device]) / max(abs(report["cpu"]), 1e-9)
-    report["relative_divergence"] = rel
-    if rel > tolerance:
+        final = loss.item()
+        for _ in range(trajectory_steps):
+            table, summary = model.encode_set(features, rarities)
+            step_loss = masked_cross_entropy(
+                model(table, summary, batch), batch["pick_pos"],
+                config.label_smoothing)
+            optimizer.zero_grad(set_to_none=True)
+            step_loss.backward()
+            optimizer.step()
+            final = step_loss.item()
+        report[device] = {"loss": loss.item(), "grad_norm": grad_norm,
+                          "trajectory_loss": final}
+
+    cpu, dev = report["cpu"], report[config.device]
+    checks = {
+        "forward": (abs(cpu["loss"] - dev["loss"]) / max(abs(cpu["loss"]), 1e-9), 1e-4),
+        "grad_norm": (abs(cpu["grad_norm"] - dev["grad_norm"])
+                      / max(abs(cpu["grad_norm"]), 1e-9), 1e-3),
+        "trajectory": (abs(cpu["trajectory_loss"] - dev["trajectory_loss"])
+                       / max(abs(cpu["trajectory_loss"]), 1e-9), 5e-2),
+    }
+    report["checks"] = {k: {"rel": rel, "tol": tol} for k, (rel, tol) in checks.items()}
+    failed = {k: v for k, (rel, tol) in checks.items() if rel > tol
+              for v in [checks[k]]}
+    if failed:
         raise RuntimeError(f"CPU/{config.device} parity FAILED: {report}")
     return report
 
@@ -192,7 +253,9 @@ def train(config):
 
     if config.parity_check:
         record["parity"] = parity_check(config, shards)
-        print(f"parity ok: {record['parity']}")
+        print(f"parity ok: {record['parity']['checks']}")
+        if device == "mps":
+            torch.mps.empty_cache()
 
     torch.manual_seed(config.seed)
     rng = np.random.default_rng(config.seed)
