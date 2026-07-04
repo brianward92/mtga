@@ -170,6 +170,15 @@ def position_features(context_ints, picks_per_pack):
 
 
 def masked_cross_entropy(logits, pick_pos, label_smoothing=0.05):
-    return nn.functional.cross_entropy(
-        logits, pick_pos, label_smoothing=label_smoothing
-    )
+    """Cross-entropy with label smoothing over VALID pack slots only.
+
+    Standard label smoothing would place mass on the -inf padded slots and
+    make the loss infinite; smoothing is renormalized over real candidates.
+    """
+    logp = torch.log_softmax(logits, dim=1)
+    valid = torch.isfinite(logits)
+    n_valid = valid.sum(dim=1).clamp(min=1)
+    target_lp = logp.gather(1, pick_pos.unsqueeze(1)).squeeze(1)
+    smooth_lp = logp.masked_fill(~valid, 0).sum(dim=1) / n_valid
+    loss = -(1 - label_smoothing) * target_lp - label_smoothing * smooth_lp
+    return loss.mean()

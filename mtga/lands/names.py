@@ -16,7 +16,13 @@ def norm(name):
 
 
 # 17Lands ASCII-mangles non-ASCII; irreducible aliases live here (keys already norm()ed).
-ALIASES_17L = {"bespoke b?": norm("Bespoke Bō")}  # TMT
+ALIASES_17L = {
+    "bespoke b?": norm("Bespoke Bō"),  # TMT
+    # HBG Alchemy rebalances Scryfall never minted as separate "A-" cards;
+    # the base card's features are the best available proxy (2 of 8,850).
+    "a-baba lysaga, night witch": norm("Baba Lysaga, Night Witch"),
+    "a-monster manual": norm("Monster Manual // Zoological Study"),
+}
 
 
 def norm_17lands(name):
