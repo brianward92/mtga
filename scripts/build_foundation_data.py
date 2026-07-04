@@ -33,8 +33,8 @@ def load_feature_lookup():
     row_of = {n: i for i, n in enumerate(feats["name_norm"])}
 
     emb = np.load(paths.TEXT_EMB_CACHE, allow_pickle=True)
-    emb_names = list(emb["names"])
-    emb_matrix = emb["embeddings"].astype(np.float32)
+    emb_names = [str(n) for n in emb["names"]]
+    emb_matrix = emb["vectors"].astype(np.float32)
     emb_of = {n: i for i, n in enumerate(emb_names)}
 
     rarity_block = next(b for b in manifest["blocks"] if b["name"] == "rarity")
