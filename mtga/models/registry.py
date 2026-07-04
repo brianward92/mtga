@@ -94,6 +94,10 @@ def _cache_key(set_code, limited_type):
         parts.append(os.path.realpath(link) if link.exists() else "-")
     for link in _foundation_links(limited_type):
         parts.append(os.path.realpath(link) if link.exists() else "-")
+    # DraftFM needs per-set assets; their appearance (day-1 set bring-up)
+    # must invalidate a cached heuristic resolution without a restart.
+    assets = paths.DATA_ROOT / "foundation" / "set_assets" / f"{set_code}.npz"
+    parts.append(str(assets.stat().st_mtime) if assets.exists() else "-")
     for prefix, pathfn in [("cards_", paths.metrics_cards_path)]:
         metric_link = paths.latest_symlink(pathfn(set_code, limited_type, "x"), prefix)
         parts.append(str(metric_link.stat().st_mtime) if metric_link.exists() else "-")
