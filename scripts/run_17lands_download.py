@@ -3,7 +3,7 @@
 
 import argparse
 
-from mtga.lands import config, download
+from mtga.lands import config, corpus, download
 
 
 def create_parser():
@@ -14,6 +14,10 @@ def create_parser():
                         help="comma-separated limited formats")
     parser.add_argument("--types", default=",".join(config.DATA_TYPES),
                         help="comma-separated data types (draft,game)")
+    parser.add_argument("--corpus", action="store_true",
+                        help="sync the DraftFM training corpus: corpus.TRAINING_SETS "
+                             "with per-set draft formats, draft data only, no site "
+                             "ratings (--sets may narrow it; eval-only sets refused)")
     parser.add_argument("--include-sealed", action="store_true",
                         help="also sync Sealed game data (metrics only, no picks)")
     parser.add_argument("--no-ratings", dest="ratings", action="store_false",
@@ -24,14 +28,25 @@ def create_parser():
 
 
 def main():
-    args = create_parser().parse_args()
+    parser = create_parser()
+    args = parser.parse_args()
     sets = [s.strip().upper() for s in args.sets.split(",") if s.strip()]
     formats = [f.strip() for f in args.formats.split(",") if f.strip()]
     data_types = [t.strip() for t in args.types.split(",") if t.strip()]
 
-    jobs = [(s, f, t) for s in sets for f in formats for t in data_types]
-    if args.include_sealed:
-        jobs += [(s, "Sealed", "game") for s in sets]
+    ratings = args.ratings
+    if args.corpus:
+        explicit = sets if args.sets != parser.get_default("sets") else None
+        try:
+            pairs = corpus.corpus_jobs(explicit)
+        except ValueError as error:
+            parser.error(str(error))
+        jobs = [(s, f, "draft") for s, f in pairs]
+        ratings = False  # bulk S3 only — never site JSON for historical sets
+    else:
+        jobs = [(s, f, t) for s in sets for f in formats for t in data_types]
+        if args.include_sealed:
+            jobs += [(s, "Sealed", "game") for s in sets]
 
     results = []
     if args.dry_run:
@@ -44,7 +59,7 @@ def main():
     for set_code, fmt, dtype in jobs:
         status = download.sync_dataset(set_code, fmt, dtype, force=args.force)
         results.append((f"{dtype}_data {set_code}", fmt, status))
-    if args.ratings:
+    if ratings:
         for set_code in sets:
             for fmt in formats:
                 results.append((f"card_ratings {set_code}", fmt,

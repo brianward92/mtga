@@ -76,6 +76,58 @@ def write_draft_csv(dest, rows, vocab=None, pool_order=None, etag="etag-draft-1"
             json.dump({"etag": etag}, fh)
 
 
+OLD_DRAFT_META_COLS = [
+    "user_n_matches_bucket", "user_match_win_rate_bucket",
+    "expansion", "event_type", "draft_id", "draft_time",
+    "event_match_wins", "event_match_losses",
+    "pack_number", "pick_number", "pick",
+    "mystery_meta",
+]
+
+
+def write_old_draft_csv(dest, rows, era="match_buckets", vocab=None,
+                        etag="etag-old-1"):
+    """2021-era draft CSV: match buckets first, no rank/pick_2/*_rate columns.
+
+    era="match_buckets_rank" adds the MID/VOW `user_rank` column. rows use
+    the same dict shape as write_draft_csv (plus optional user_rank).
+    """
+    vocab = VOCAB if vocab is None else vocab
+    meta_cols = list(OLD_DRAFT_META_COLS)
+    if era == "match_buckets_rank":
+        meta_cols.insert(2, "user_rank")
+    header = (
+        meta_cols
+        + [f"pack_card_{n}" for n in vocab]
+        + [f"pool_{n}" for n in vocab]
+    )
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    with gzip.open(dest, "wt", newline="") as fh:
+        writer = csv.writer(fh)
+        writer.writerow(header)
+        for row in rows:
+            values = {
+                "user_n_matches_bucket": row.get("games_bucket", 100),
+                "user_match_win_rate_bucket": row.get("wr_bucket", 0.54),
+                "user_rank": row.get("user_rank", "platinum"),
+                "expansion": SET, "event_type": FMT,
+                "draft_id": row["draft_id"],
+                "draft_time": "2021-04-20 12:00:00",
+                "event_match_wins": 3, "event_match_losses": 1,
+                "pack_number": row["pack_number"],
+                "pick_number": row["pick_number"],
+                "pick": row["pick"],
+                "mystery_meta": "arbitrary",
+            }
+            meta = [values[c] for c in meta_cols]
+            pack = [row.get("pack", {}).get(n, 0) for n in vocab]
+            pool = [row.get("pool", {}).get(n, 0) for n in vocab]
+            writer.writerow(meta + pack + pool)
+    if etag is not None:
+        with open(paths.meta_path(dest), "w") as fh:
+            json.dump({"etag": etag}, fh)
+
+
 def hand_draft_rows(pick_base=0):
     """Two clean 4-pick drafts plus one unknown-pick row.
 

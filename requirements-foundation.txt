@@ -1,0 +1,8 @@
+# DraftFM training deps for Apple Silicon (n42 / MacBook). arm64 only.
+torch==2.12.1
+numpy
+pandas
+duckdb
+pyarrow
+requests
+pytest
