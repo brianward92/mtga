@@ -30,14 +30,38 @@ N_HEADS = 4
 CTX_DIM = 64
 
 
+class ManualLayerNorm(nn.Module):
+    """LayerNorm composed from primitive ops.
+
+    torch's fused native_layer_norm_backward on MPS returns wrong gradients
+    on some chip/OS combinations (measured 3500x off on M4 Max/macOS 26.3,
+    correct on M3 Ultra/26.5 — caught by the parity rail). Composing the
+    math lets autograd derive the backward from elementwise/reduction
+    primitives that are correct everywhere. State-dict compatible with
+    nn.LayerNorm (weight/bias).
+    """
+
+    def __init__(self, dim, eps=1e-5):
+        super().__init__()
+        self.weight = nn.Parameter(torch.ones(dim))
+        self.bias = nn.Parameter(torch.zeros(dim))
+        self.eps = eps
+
+    def forward(self, x):
+        mean = x.mean(dim=-1, keepdim=True)
+        centered = x - mean
+        var = (centered * centered).mean(dim=-1, keepdim=True)
+        return centered / torch.sqrt(var + self.eps) * self.weight + self.bias
+
+
 class CardEncoder(nn.Module):
     def __init__(self, feat_dim, d=D_MODEL):
         super().__init__()
         self.net = nn.Sequential(
-            nn.LayerNorm(feat_dim),
+            ManualLayerNorm(feat_dim),
             nn.Linear(feat_dim, 512), nn.GELU(),
             nn.Linear(512, d), nn.GELU(),
-            nn.LayerNorm(d),
+            ManualLayerNorm(d),
         )
 
     def forward(self, features):  # [N, feat] -> [N, d]

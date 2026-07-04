@@ -1,0 +1,19 @@
+{
+  "protocol_tag": "eval-protocol-v1",
+  "_comment": "Pre-registered battery (docs/eval_protocol.md section 4). Freeze artifact-backed members with their file sha256 (path points at the artifact FILE, e.g. runs/<id>/best.pt) BEFORE the T0 snapshot download; frozen_snapshot is filled at T0 with the raw MSH csv.gz path, sha256, and S3 ETag. run_frozen_eval.py refuses real mode while any of these are null.",
+  "frozen_snapshot": {
+    "path": null,
+    "sha256": null,
+    "etag": null
+  },
+  "models": [
+    {
+      "name": "baseline-random",
+      "kind": "baseline-random"
+    },
+    {
+      "name": "baseline-rarity",
+      "kind": "baseline-rarity"
+    }
+  ]
+}

@@ -4,12 +4,17 @@ Resolution order:
   1. trained `latest` model for the exact format
   2. trained `latest` for each alias in FORMAT_FALLBACKS (Quick/Trad borrow
      the Premier model — flagged `fallback` so the UI can label it)
-  3. HeuristicRatingsModel (own metrics, else cached site ratings) — cold start
-  4. RarityColorHeuristic — absolute floor
+  3. DraftFM zero-shot (models/_foundation/<format>/latest, else the
+     format-agnostic models/_foundation/latest) — a real model for any set
+     with built assets, so a brand-new set is served the moment its assets
+     exist; once the nightly per-set model lands it outranks this tier
+  4. HeuristicRatingsModel (own metrics, else cached site ratings) — cold start
+  5. RarityColorHeuristic — absolute floor
 
 Resolved models are cached in-process; the cache key includes the `latest`
-symlink target and ratings-cache mtimes, so a nightly retrain or ratings
-refresh hot-swaps without a server restart.
+symlink targets (per-set and foundation) and ratings-cache mtimes, so a
+nightly retrain, foundation export, or ratings refresh hot-swaps without a
+server restart.
 """
 
 import json
@@ -19,6 +24,7 @@ import numpy as np
 
 from mtga.lands import config, paths
 from mtga.models.base import rank_scores
+from mtga.models.draftfm import OnnxDraftFMModel
 from mtga.models.heuristic import HeuristicRatingsModel, RarityColorHeuristic
 
 _cache = {}
@@ -68,10 +74,25 @@ def _latest_dir(set_code, limited_type):
     return None
 
 
+def _foundation_links(limited_type):
+    """Candidate DraftFM `latest` links: format-specific, then shared."""
+    base = paths.MODELS_DIR / "_foundation"
+    return [base / limited_type / "latest", base / "latest"]
+
+
+def _foundation_latest(limited_type):
+    for link in _foundation_links(limited_type):
+        if (link / "scorer.onnx").exists() and (link / "meta.json").exists():
+            return link
+    return None
+
+
 def _cache_key(set_code, limited_type):
     parts = [set_code, limited_type]
     for fmt in [limited_type] + config.FORMAT_FALLBACKS.get(limited_type, []):
         link = paths.MODELS_DIR / set_code / fmt / "latest"
+        parts.append(os.path.realpath(link) if link.exists() else "-")
+    for link in _foundation_links(limited_type):
         parts.append(os.path.realpath(link) if link.exists() else "-")
     for prefix, pathfn in [("cards_", paths.metrics_cards_path)]:
         metric_link = paths.latest_symlink(pathfn(set_code, limited_type, "x"), prefix)
@@ -98,6 +119,15 @@ def resolve(set_code, limited_type):
             if alias_latest is not None:
                 model = OnnxEVModel(alias_latest, serving_format=limited_type)
                 break
+
+    if model is None:
+        foundation = _foundation_latest(limited_type)
+        if foundation is not None:
+            try:
+                model = OnnxDraftFMModel(foundation, set_code, limited_type)
+            except Exception as err:  # noqa: BLE001 — degrade, never 500
+                print(f"draftfm unavailable for {set_code} {limited_type}: "
+                      f"{type(err).__name__}: {err}")
 
     if model is None:
         for fmt in [limited_type, "PremierDraft"]:

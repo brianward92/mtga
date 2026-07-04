@@ -119,6 +119,93 @@ def _softmax(logits):
     return exps / exps.sum(axis=-1, keepdims=True)
 
 
+BASELINE_SEED = 20260707
+
+
+def baseline_predictions(set_code, limited_type, kind, seed=BASELINE_SEED):
+    """Predictions parquet rows for the zero-parameter battery baselines.
+
+    kind="random": per-row uniform target rank over pack_size (deterministic
+    under the frozen seed); pick/top probability = 1/pack_size.
+    kind="rarity": RarityColorHeuristic scored over grpIds — vocab slots map
+    to grpIds through cardstore.name_resolution; a slot with no grpId gets a
+    unique sentinel the heuristic cannot know (ev None, ranked last).
+
+    Rows come from the (set, format) shard, so ordering matches every other
+    predictions parquet for the same snapshot.
+    """
+    import json
+
+    from mtga.foundation.dataset import PAD, Shard, shard_dir
+
+    d = shard_dir(set_code, limited_type)
+    features = np.load(d / "features.npz")["features"]
+    shard = Shard(set_code, limited_type, features)
+    meta = _pick_meta(set_code, limited_type)
+    n = shard.meta["rows"]
+    if len(meta) != n:
+        raise RuntimeError(
+            f"shard/parquet row mismatch: {n} vs {len(meta)}")
+
+    pack_slots = np.asarray(shard.pack_slots)
+    sizes = (pack_slots != PAD).sum(axis=1).astype(np.int32)
+
+    if kind == "random":
+        rng = np.random.default_rng(seed)
+        ranks = (rng.random(n) * sizes).astype(np.int32) + 1
+        pick_probs = (1.0 / sizes).astype(np.float32)
+        top_probs = pick_probs.copy()
+    elif kind == "rarity":
+        from mtga.lands import cardstore
+        from mtga.models.heuristic import RarityColorHeuristic
+
+        with open(paths.vocab_path(set_code, limited_type)) as fh:
+            vocab = json.load(fh)["names"]
+        canonical, _, _ = cardstore.name_resolution(set_code)
+        # Unique negative sentinel per unmapped slot: never in the heuristic's
+        # card table, so it scores ev None deterministically.
+        grp_of = np.array([canonical.get(name, -(i + 1))
+                           for i, name in enumerate(vocab)], dtype=np.int64)
+        model = RarityColorHeuristic(set_code)
+
+        pool_slots = np.asarray(shard.pool_slots)
+        pool_counts = np.asarray(shard.pool_counts)
+        context = np.asarray(shard.context)
+        pick_pos = np.asarray(shard.pick_pos)
+        ranks = np.empty(n, dtype=np.int32)
+        pick_probs = np.empty(n, dtype=np.float32)
+        top_probs = np.empty(n, dtype=np.float32)
+        for i in range(n):
+            real = pack_slots[i, :sizes[i]]
+            pack_grps = [int(grp_of[s]) for s in real]
+            pool_grps = []
+            for slot, count in zip(pool_slots[i], pool_counts[i]):
+                if slot == PAD:
+                    break
+                pool_grps.extend([int(grp_of[slot])] * int(count))
+            scores = model.score_pack(pack_grps, pool_grps,
+                                      int(context[i, 0]), int(context[i, 1]))
+            target = int(grp_of[pack_slots[i, pick_pos[i]]])
+            by_grp = {s.grp_id: s for s in scores}
+            ranks[i] = by_grp[target].rank
+            pick_probs[i] = by_grp[target].prob or 0.0
+            top_probs[i] = max((s.prob or 0.0) for s in scores)
+    else:
+        raise ValueError(f"unknown baseline kind: {kind!r}")
+
+    return pd.DataFrame({
+        "draft_id": meta["draft_id"],
+        "pack_number": meta["pack_number"].astype(int),
+        "pick_number": meta["pick_number"].astype(int),
+        "pack_size": sizes,
+        "wr_bucket": meta["user_game_win_rate_bucket"].astype(float),
+        "n_games_bucket": meta["user_n_games_bucket"].astype(int),
+        "target_rank": ranks,
+        "pick_prob": pick_probs,
+        "top_prob": top_probs,
+    })
+
+
 def per_set_model_predictions(set_code, limited_type, version="latest",
                               split="val", min_wr_bucket=0.55,
                               min_games_bucket=100):
