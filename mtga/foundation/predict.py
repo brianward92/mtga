@@ -14,6 +14,100 @@ from mtga.models.draftnet import POOL_CAP, load_pick_arrays, split_by_draft
 BATCH = 8192
 
 
+def _pick_meta(set_code, limited_type):
+    """Per-pick metadata from the curated parquet, in shard row order.
+
+    Shards are built from the same parquet with the same filter and
+    insertion-order-preserving scan, so row i here is row i of the shard.
+    """
+    import duckdb
+
+    parquet = paths.curated_path("draft", set_code, limited_type)
+    con = duckdb.connect()
+    frame = con.execute(
+        f"""
+        SELECT draft_id, pack_number, pick_number,
+               user_game_win_rate_bucket, user_n_games_bucket
+        FROM '{parquet}' WHERE pick_index >= 0
+        """
+    ).df()
+    con.close()
+    return frame
+
+
+def foundation_predictions(model, set_code, limited_type, device="cpu",
+                           condition_wr_id=None, condition_games_id=None,
+                           batch_size=BATCH):
+    """Predictions parquet rows for a DraftFM model on one (set, format).
+
+    Zero-shot evaluation: the shard may cover a set the model never trained
+    on. condition_wr_id/games_id override the skill conditioning
+    ("deployment mode"); None uses each drafter's true bucket ("human mode").
+    """
+    import torch
+
+    from mtga.foundation.dataset import PAD, Shard, shard_dir
+    from mtga.foundation.train import make_batch
+
+    d = shard_dir(set_code, limited_type)
+    assets = np.load(d / "features.npz")
+    features = torch.from_numpy(assets["features"].astype(np.float32))
+    shard = Shard(set_code, limited_type, features)
+    shard.rarity_ids = torch.from_numpy(assets["rarity_ids"].astype(np.int64))
+    shard.set_scalars = torch.tensor([
+        shard.meta["vocab_size"] / 400.0,
+        float(shard.meta.get("picks_per_pack") == 13),
+        float(shard.meta.get("picks_per_pack") == 14),
+        float(shard.meta.get("picks_per_pack") == 15),
+    ])
+    meta = _pick_meta(set_code, limited_type)
+    if len(meta) != shard.meta["rows"]:
+        raise RuntimeError(
+            f"shard/parquet row mismatch: {shard.meta['rows']} vs {len(meta)}")
+
+    model = model.to(device).eval()
+    feats = shard.features.to(device)
+    rars = shard.rarity_ids.to(device)
+    n = shard.meta["rows"]
+    ranks = np.empty(n, dtype=np.int32)
+    pick_probs = np.empty(n, dtype=np.float32)
+    top_probs = np.empty(n, dtype=np.float32)
+    sizes = np.empty(n, dtype=np.int32)
+
+    with torch.no_grad():
+        table, summary = model.encode_set(feats, rars)
+        for start in range(0, n, batch_size):
+            rows = np.arange(start, min(start + batch_size, n))
+            batch = make_batch(shard, rows, device)
+            if condition_wr_id is not None:
+                batch["wr_id"] = torch.full_like(batch["wr_id"], condition_wr_id)
+            if condition_games_id is not None:
+                batch["games_id"] = torch.full_like(batch["games_id"],
+                                                    condition_games_id)
+            logits = model(table, summary, batch)
+            valid = torch.isfinite(logits)
+            probs = torch.softmax(logits, dim=1)
+            target = batch["pick_pos"]
+            target_logit = logits.gather(1, target.unsqueeze(1))
+            rank = (logits > target_logit).sum(dim=1) + 1
+            ranks[rows] = rank.cpu().numpy()
+            pick_probs[rows] = probs.gather(1, target.unsqueeze(1)).squeeze(1).cpu().numpy()
+            top_probs[rows] = probs.max(dim=1).values.cpu().numpy()
+            sizes[rows] = valid.sum(dim=1).cpu().numpy()
+
+    return pd.DataFrame({
+        "draft_id": meta["draft_id"],
+        "pack_number": meta["pack_number"].astype(int),
+        "pick_number": meta["pick_number"].astype(int),
+        "pack_size": sizes,
+        "wr_bucket": meta["user_game_win_rate_bucket"].astype(float),
+        "n_games_bucket": meta["user_n_games_bucket"].astype(int),
+        "target_rank": ranks,
+        "pick_prob": pick_probs,
+        "top_prob": top_probs,
+    })
+
+
 def _softmax(logits):
     peak = logits.max(axis=-1, keepdims=True)
     exps = np.exp(logits - peak)
