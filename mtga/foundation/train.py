@@ -48,6 +48,7 @@ class TrainConfig:
     parity_check: bool = True
     no_text: bool = False  # ablation: drop the 384-d text embedding block
     skill_filter: bool = False  # ablation: expert picks only (old v1 recipe)
+    init_from: str = ""  # checkpoint path: fine-tune mode (loads weights first)
 
 
 EXPERT_WR_ID = 28    # round(0.55 * 50)
@@ -271,6 +272,12 @@ def train(config):
     rng = np.random.default_rng(config.seed)
     model = DraftFM(shards[0].features.shape[1], config.d_model,
                     config.dropout, config.set_ctx).to(device)
+    if config.init_from:
+        checkpoint = torch.load(config.init_from, map_location=device,
+                                weights_only=False)
+        model.load_state_dict(checkpoint["model"])
+        record["init_from"] = {"path": config.init_from,
+                               "sha256": runlog.file_sha256(config.init_from)}
     record["n_params"] = sum(p.numel() for p in model.parameters())
     optimizer = torch.optim.AdamW(
         model.parameters(), lr=config.lr, betas=(0.9, 0.98), weight_decay=0.01)

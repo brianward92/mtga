@@ -31,6 +31,8 @@ def create_parser():
                         help="ablation: structured features only (391-d)")
     parser.add_argument("--skill-filter", action="store_true",
                         help="ablation: train on expert picks only")
+    parser.add_argument("--init-from", default="",
+                        help="checkpoint path: fine-tune from these weights")
     parser.add_argument("--sampling-alpha", type=float, default=0.5)
     parser.add_argument("--val-every", type=int, default=2000)
     parser.add_argument("--patience", type=int, default=3)
@@ -57,7 +59,7 @@ def main():
         sampling_alpha=args.sampling_alpha, val_every=args.val_every,
         patience=args.patience, device=args.device,
         parity_check=args.parity_check, no_text=args.no_text,
-        skill_filter=args.skill_filter,
+        skill_filter=args.skill_filter, init_from=args.init_from,
     )
     record = train(config)
     print(f"run {record['run_id']}: best val top1 {record['best_val_top1']:.4f} "
