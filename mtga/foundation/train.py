@@ -236,6 +236,13 @@ def evaluate_val(model, shards, config, device, rng):
 
 
 def train(config):
+    # 50+ shards x 6 memmaps each blows through macOS's default 256-fd limit.
+    import resource
+
+    soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+    if soft < 8192:
+        resource.setrlimit(resource.RLIMIT_NOFILE, (min(8192, hard), hard))
+
     torch.manual_seed(config.seed)
     rng = np.random.default_rng(config.seed)
     device = config.device
