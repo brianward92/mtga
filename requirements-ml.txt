@@ -1,0 +1,17 @@
+# ML/data deps for the draft assistant (.venv-ml only — never the prod web path).
+# Intel-Mac (x86_64) wheel constraints, verified against PyPI 2026-07-03:
+#   - torch stopped shipping macOS x86_64 wheels after 2.2.2
+#   - torch 2.2.2 was built against numpy 1.x -> pin numpy<2
+#   - onnxruntime kept x86_64 wheels through 1.23.x
+#   - mainline polars has no x86_64 wheels; duckdb does
+torch==2.2.2
+numpy==1.26.4
+pandas==2.2.3
+scipy~=1.13
+scikit-learn~=1.5
+pyarrow
+duckdb
+requests
+onnx
+onnxruntime==1.23.*
+pytest
