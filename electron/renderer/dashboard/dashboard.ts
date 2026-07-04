@@ -155,9 +155,50 @@ async function init(): Promise<void> {
   setupNavigation()
   setupFilters()
   setupEventListeners()
+  void setupOverlayControls()
   await loadData()
   await loadCollectionData()
   await loadOpponentStats()
+}
+
+/**
+ * "Draft Overlay" toggle + auto-hide setting.
+ * The toggle reflects the overlay window's real visibility (main pushes
+ * 'overlay-visibility' on every show/hide, including draft auto-show).
+ */
+async function setupOverlayControls(): Promise<void> {
+  const toggle = document.getElementById('overlayToggle')
+  const stateEl = document.getElementById('overlayToggleState')
+  const autoHide = document.getElementById('autoHideDashboard') as HTMLInputElement | null
+  if (!toggle || !window.mtgaTracker?.toggleOverlay) return
+
+  const render = (visible: boolean) => {
+    toggle.classList.toggle('on', visible)
+    toggle.setAttribute('aria-pressed', String(visible))
+    if (stateEl) stateEl.textContent = visible ? 'On' : 'Off'
+  }
+
+  toggle.addEventListener('click', async () => {
+    render(await window.mtgaTracker.toggleOverlay())
+  })
+
+  window.mtgaTracker.onOverlayVisibility((data: unknown) => {
+    render((data as { visible: boolean }).visible)
+  })
+
+  render(await window.mtgaTracker.getOverlayVisible())
+
+  if (autoHide) {
+    try {
+      const prefs = await window.mtgaTracker.getOverlayPrefs()
+      autoHide.checked = prefs.autoHideDashboard
+    } catch {
+      // keep the default (checked)
+    }
+    autoHide.addEventListener('change', () => {
+      window.mtgaTracker.setOverlayPrefs({ autoHideDashboard: autoHide.checked })
+    })
+  }
 }
 
 /**

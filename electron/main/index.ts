@@ -13,8 +13,22 @@ import { join } from 'path'
 import { LogWatcher } from './parser/watcher'
 import { LogParser } from './parser/index'
 import { DraftSessionSnapshot, DraftPickRecord } from './parser/draft-parser'
-import { createOverlayWindow, setOverlayMode, showOverlay } from './windows/overlay'
+import {
+  createOverlayWindow,
+  setOverlayMode,
+  showOverlay,
+  hideOverlay,
+  moveOverlay,
+  resizeOverlay,
+  saveOverlayBounds,
+  applyDraftDensity,
+  getOverlayUiPrefs,
+  setOverlayUiPrefs,
+  unregisterOverlayShortcuts,
+  DraftDensity
+} from './windows/overlay'
 import { createRegistryWindow } from './windows/registry'
+import { installApplicationMenu } from './windows/menu'
 import {
   initDatabase,
   closeDatabase,
@@ -84,6 +98,10 @@ interface DraftCardRow {
   alsa: number | null
   evP1p1: number | null
   ev: number | null
+  /** Model pick probability within this pack (0..1) — drives the flame rating. */
+  prob: number | null
+  /** ev_p1p1 percentile within the set (0..100), tier-list rows only. */
+  tierPct: number | null
   rank: number | null
   imageUrl: string | null
 }
@@ -130,12 +148,79 @@ const draftRuntime = {
   endTimer: null as NodeJS.Timeout | null
 }
 
+// True while the dashboard was auto-minimized for a draft (restore on draft-end)
+let dashboardMinimizedForDraft = false
+
+/** Push the overlay's visibility to the dashboard so its toggle stays truthful. */
+function sendOverlayVisibility(): void {
+  const visible = !!overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.isVisible()
+  if (registryWindow && !registryWindow.isDestroyed()) {
+    registryWindow.webContents.send('overlay-visibility', { visible })
+  }
+}
+
+/**
+ * Plain-app quit semantics: the app stays alive only while the dashboard is
+ * open or the overlay is showing. Hiding the overlay with the dashboard
+ * already closed quits.
+ */
+function quitIfNothingShowing(): void {
+  const dashboardOpen = !!registryWindow && !registryWindow.isDestroyed()
+  const overlayShowing = !!overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.isVisible()
+  if (!dashboardOpen && !overlayShowing) {
+    app.quit()
+  }
+}
+
+/** Create (or re-create) the dashboard window and wire its lifecycle. */
+function ensureRegistryWindow(): BrowserWindow {
+  if (registryWindow && !registryWindow.isDestroyed()) {
+    registryWindow.show()
+    return registryWindow
+  }
+
+  registryWindow = createRegistryWindow()
+  registryWindow.on('closed', () => {
+    registryWindow = null
+    quitIfNothingShowing()
+  })
+  registryWindow.webContents.on('did-finish-load', () => {
+    sendOverlayVisibility()
+  })
+  return registryWindow
+}
+
+/**
+ * The Untapped flow: on draft-start, clear the desk — minimize the dashboard
+ * (if the setting is on) so the user is left with only the overlay over Arena.
+ */
+function hideDashboardForDraft(): void {
+  if (!getOverlayUiPrefs().autoHideDashboard) return
+  if (
+    registryWindow &&
+    !registryWindow.isDestroyed() &&
+    registryWindow.isVisible() &&
+    !registryWindow.isMinimized()
+  ) {
+    dashboardMinimizedForDraft = true
+    registryWindow.minimize()
+  }
+}
+
+function restoreDashboardAfterDraft(): void {
+  if (!dashboardMinimizedForDraft) return
+  dashboardMinimizedForDraft = false
+  if (registryWindow && !registryWindow.isDestroyed() && registryWindow.isMinimized()) {
+    registryWindow.restore()
+  }
+}
+
 /**
  * Create all application windows
  */
 async function createWindows(): Promise<void> {
   overlayWindow = createOverlayWindow()
-  registryWindow = createRegistryWindow()
+  ensureRegistryWindow()
 
   // The startup replay usually finishes before the overlay page loads, so a
   // 'detailed-logs' send during replay is dropped. Re-send once loaded.
@@ -144,6 +229,9 @@ async function createWindows(): Promise<void> {
       overlayWindow?.webContents.send('detailed-logs', { enabled: false })
     }
   })
+
+  overlayWindow.on('show', sendOverlayVisibility)
+  overlayWindow.on('hide', sendOverlayVisibility)
 
   // The startup log replay races window creation: if it already finished and
   // left us inside an active draft, surface it now that the window exists.
@@ -402,6 +490,8 @@ function buildCardRows(grpIds: number[]): DraftCardRow[] {
       alsa: rating?.alsa ?? null,
       evP1p1: rating?.ev_p1p1 ?? null,
       ev: null,
+      prob: null,
+      tierPct: null,
       rank: null,
       imageUrl: reg?.imageUrl ?? rating?.image_normal ?? rating?.image_small ?? null
     }
@@ -513,17 +603,30 @@ async function ensureRatings(snapshot: DraftSessionSnapshot): Promise<void> {
 function sendTierList(snapshot: DraftSessionSnapshot): void {
   if (!draftRuntime.ratings || draftRuntime.ratings.size === 0) return
 
+  const allEv = Array.from(draftRuntime.ratings.values())
+    .map(card => card.ev_p1p1)
+    .filter((v): v is number => v !== null && v !== undefined && Number.isFinite(v))
+
   const ranked = Array.from(draftRuntime.ratings.values())
     .filter(card => card.ev_p1p1 !== null && card.ev_p1p1 !== undefined)
     .sort((a, b) => (b.ev_p1p1 ?? 0) - (a.ev_p1p1 ?? 0))
     .slice(0, 20)
+
+  // Percentile within the whole set — the renderer turns this into flames
+  const pctByGrp = new Map<number, number>(ranked.map(card => {
+    const below = allEv.filter(v => v < (card.ev_p1p1 as number)).length
+    return [card.grp_id, allEv.length > 0 ? (below / allEv.length) * 100 : 0]
+  }))
 
   const payload: DraftPackPayload = {
     pack: 1,
     pick: 1,
     isTierList: true,
     note: 'P1P1 pack is not logged before you pick — showing the set tier list',
-    cards: buildCardRows(ranked.map(card => card.grp_id))
+    cards: buildCardRows(ranked.map(card => card.grp_id)).map(row => ({
+      ...row,
+      tierPct: pctByGrp.get(row.grpId) ?? null
+    }))
   }
   draftRuntime.lastPack = payload
   if (!isReplaying) overlayWindow?.webContents.send('draft-pack', payload)
@@ -556,7 +659,9 @@ function handleDraftStart(snapshot: DraftSessionSnapshot): void {
     if (overlayWindow) {
       showOverlay(overlayWindow)
       setOverlayMode(overlayWindow, 'draft')
+      sendOverlayVisibility()
     }
+    hideDashboardForDraft()
     overlayWindow?.webContents.send('draft-start', draftStartPayload(snapshot))
     void ensureRatings(snapshot)
   }
@@ -616,6 +721,7 @@ async function requestScores(snapshot: DraftSessionSnapshot): Promise<void> {
       ...rowsByGrp.get(card.grp_id)!,
       name: rowsByGrp.get(card.grp_id)!.name ?? card.name,
       ev: card.ev ?? null,
+      prob: card.prob ?? null,
       rank: card.rank ?? null
     }))
 
@@ -682,12 +788,15 @@ function handleDraftEnd(snapshot: DraftSessionSnapshot): void {
 
   if (!isReplaying) {
     overlayWindow?.webContents.send('draft-end', draftEndPayload(snapshot))
-    // Renderer shows the final pool for 10s, then we restore match layout
+    restoreDashboardAfterDraft()
+    // The renderer shows a dismissible "draft complete" card and sends
+    // 'draft-dismiss' (button or its own 10s timeout). This is only a
+    // safety net in case the renderer never does.
     if (draftRuntime.endTimer) clearTimeout(draftRuntime.endTimer)
     draftRuntime.endTimer = setTimeout(() => {
       if (overlayWindow) setOverlayMode(overlayWindow, 'match')
       draftRuntime.endTimer = null
-    }, 10_000)
+    }, 15_000)
   }
 }
 
@@ -705,7 +814,9 @@ function surfaceActiveDraft(): void {
   if (overlayWindow) {
     showOverlay(overlayWindow)
     setOverlayMode(overlayWindow, 'draft')
+    sendOverlayVisibility()
   }
+  hideDashboardForDraft()
   overlayWindow?.webContents.send('draft-start', draftStartPayload(snapshot))
   overlayWindow?.webContents.send('draft-pick', draftPickPayload(snapshot, null))
 
@@ -964,6 +1075,96 @@ ipcMain.handle('get-draft-state', () => {
 })
 
 // ============================================================================
+// IPC Handlers - Overlay window controls (manual drag/resize/density)
+// ============================================================================
+// The overlay is focusable:false (it must never steal focus or keystrokes
+// from Arena), which on macOS also kills native window dragging — so the
+// renderer drives moves and resizes explicitly through these channels.
+
+ipcMain.handle('overlay-drag-start', () => {
+  if (!overlayWindow || overlayWindow.isDestroyed()) return null
+  return overlayWindow.getBounds()
+})
+
+ipcMain.on('overlay-move', (_, pos: { x: number; y: number }) => {
+  if (overlayWindow && typeof pos?.x === 'number' && typeof pos?.y === 'number') {
+    moveOverlay(overlayWindow, pos.x, pos.y)
+  }
+})
+
+ipcMain.on('overlay-move-end', () => {
+  if (overlayWindow) saveOverlayBounds(overlayWindow)
+})
+
+ipcMain.handle('overlay-resize-start', () => {
+  if (!overlayWindow || overlayWindow.isDestroyed()) return null
+  return overlayWindow.getBounds()
+})
+
+ipcMain.on('overlay-resize', (_, size: { width?: number; height?: number }) => {
+  if (overlayWindow && size) resizeOverlay(overlayWindow, size, false)
+})
+
+ipcMain.on('overlay-resize-end', () => {
+  if (overlayWindow) saveOverlayBounds(overlayWindow)
+})
+
+// Content-height sync: in verdict/mini densities the renderer measures the
+// panel and asks the window to match (anchored top-left).
+ipcMain.on('overlay-set-size', (_, size: { width?: number | null; height?: number | null; animate?: boolean }) => {
+  if (overlayWindow && size) {
+    resizeOverlay(overlayWindow, { width: size.width, height: size.height }, !!size.animate)
+  }
+})
+
+ipcMain.on('overlay-density', (_, data: { density?: string }) => {
+  const density: DraftDensity =
+    data?.density === 'full' || data?.density === 'mini' ? data.density : 'verdict'
+  applyDraftDensity(overlayWindow, density)
+})
+
+ipcMain.handle('overlay-get-prefs', () => getOverlayUiPrefs())
+
+ipcMain.on('overlay-set-prefs', (_, patch: { autoHideDashboard?: boolean }) => {
+  if (patch && typeof patch.autoHideDashboard === 'boolean') {
+    setOverlayUiPrefs({ autoHideDashboard: patch.autoHideDashboard })
+  }
+})
+
+// The ✕ on the grip: hide the overlay (not quit) — unless the dashboard is
+// gone too, in which case hiding the last surface quits like a plain app.
+ipcMain.on('overlay-hide', () => {
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    hideOverlay(overlayWindow)
+  }
+  quitIfNothingShowing()
+})
+
+// Dashboard's "Draft Overlay" toggle
+ipcMain.handle('overlay-toggle', () => {
+  if (!overlayWindow || overlayWindow.isDestroyed()) return false
+  if (overlayWindow.isVisible()) {
+    hideOverlay(overlayWindow)
+    return false
+  }
+  showOverlay(overlayWindow)
+  return true
+})
+
+ipcMain.handle('overlay-visible', () => {
+  return !!overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.isVisible()
+})
+
+// Renderer dismissed the end-of-draft card (button click or its 10s timeout)
+ipcMain.on('draft-dismiss', () => {
+  if (draftRuntime.endTimer) {
+    clearTimeout(draftRuntime.endTimer)
+    draftRuntime.endTimer = null
+  }
+  if (overlayWindow) setOverlayMode(overlayWindow, 'match')
+})
+
+// ============================================================================
 // Application Lifecycle
 // ============================================================================
 
@@ -984,33 +1185,43 @@ app.whenReady().then(async () => {
     console.error('[App] Failed to load card registry:', error)
   }
 
+  // Standard menu bar: About/Quit (Cmd+Q), Edit roles for copy/paste,
+  // Window roles — plain Mac app behavior.
+  installApplicationMenu()
+
   // Start services
   setupServerClient()
   setupLogParser()
   setupLogWatcher()
   await createWindows()
 
-  // macOS: Re-create windows when dock icon is clicked
+  // macOS: Dock icon click re-opens (or re-focuses) the dashboard —
+  // the app's face — even if it was closed while the overlay kept running.
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindows()
-    }
+    const win = ensureRegistryWindow()
+    win.focus()
   })
 })
 
+// Plain quit semantics on every platform: no windows -> quit. (The overlay
+// window only ever *hides*, so the dashboard 'closed' handler and the
+// 'overlay-hide' channel call quitIfNothingShowing() for the hidden case.)
 app.on('window-all-closed', () => {
-  cleanup()
-  if (process.platform !== 'darwin') {
-    app.quit()
-  }
+  app.quit()
 })
 
 app.on('before-quit', () => {
   cleanup()
 })
 
+app.on('will-quit', () => {
+  unregisterOverlayShortcuts()
+})
+
 /**
- * Clean up resources before quitting
+ * Clean up resources before quitting: chokidar watchers + poll timers
+ * (logWatcher.stop), server retry loop (serverClient.stop), pending draft
+ * timer, sqlite handle. Windows are torn down by app.quit() itself.
  */
 function cleanup(): void {
   logWatcher?.stop()

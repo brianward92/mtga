@@ -1,14 +1,23 @@
 /**
  * Draft overlay view.
  *
- * Takes over the overlay panel between draft-start and draft-end:
- * header (set/format chip, PxPy, model chip, server status dot), pack table
- * sorted by model EV with the top pick highlighted, pool strip (color bars,
- * mana curve, pick count), collapsible pick history, and a persistent
- * 17Lands attribution footer.
+ * Takes over the panel between draft-start and draft-end. Three densities
+ * (see density.ts), cycled by the grip button and Cmd+M (global shortcut —
+ * the window is focusable:false so local key events can never arrive):
+ *
+ *   verdict — THE PICK: name + flame rating (model conviction) + EV bar,
+ *             two runner-ups, 12px pool color strip (doubles as progress)
+ *   full    — verdict + ranked pack table (EV/GIH/ALSA) + pool curve +
+ *             collapsible pick history
+ *   mini    — grip + one line: top pick name only
+ *
+ * A persistent 17Lands attribution footer stays visible in every density
+ * (license requirement).
  */
 
 import { escapeHtml, renderManaCost, formatWinRate } from './shared'
+import { Density, nextDensity, normalizeDensity, densityClass, densityTitle, DENSITY_CYCLE } from './density'
+import { FlameRating, flamesFromProb, flamesFromPercentile } from './flames'
 
 // ---------------------------------------------------------------------------
 // Payload types (mirror main/index.ts)
@@ -26,6 +35,8 @@ interface DraftCardRow {
   alsa: number | null
   evP1p1: number | null
   ev: number | null
+  prob: number | null
+  tierPct: number | null
   rank: number | null
   imageUrl: string | null
 }
@@ -103,6 +114,9 @@ interface DraftStatePayload {
   detailedLogsEnabled: boolean | null
 }
 
+// Arena drafts: 3 packs x 14 picks
+const TOTAL_PICKS = 42
+
 // ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
@@ -116,27 +130,32 @@ let history: HistoryEntry[] = []
 let picksCount = 0
 let serverStatus: ServerStatusPayload = { status: 'red', model: null, stale: false, fetchedAt: null }
 let historyExpanded = false
-/** 0 = full, 1 = mini (top-3), 2 = header-only */
-let miniState = 0
+const expandedHistoryKeys = new Set<string>()
+let density: Density = 'verdict'
 let endTimer: number | null = null
+/** Set when scores land so the flame row staggers in exactly once. */
+let animateFlames = false
+let agreeGlowTimer: number | null = null
+let heightSyncRaf = 0
 
 // DOM elements
 const overlay = document.getElementById('overlay')!
-const overlayContent = document.getElementById('overlayContent')!
-const overlayFooter = document.querySelector('.overlay-footer') as HTMLElement
 const draftView = document.getElementById('draftView')!
+const draftGrip = document.getElementById('draftGrip')!
 const draftEventChip = document.getElementById('draftEventChip')!
 const draftPickPos = document.getElementById('draftPickPos')!
-const draftModelChip = document.getElementById('draftModelChip')!
 const serverDot = document.getElementById('serverDot')!
+const densityBtn = document.getElementById('densityBtn')!
 const draftNote = document.getElementById('draftNote')!
+const verdictView = document.getElementById('verdictView')!
+const miniLine = document.getElementById('miniLine')!
 const packTable = document.getElementById('packTable')!
 const poolStrip = document.getElementById('poolStrip')!
 const historyToggle = document.getElementById('historyToggle')!
 const historyCount = document.getElementById('historyCount')!
 const historyList = document.getElementById('historyList')!
+const footerModel = document.getElementById('footerModel')!
 const logWarning = document.getElementById('logWarning')!
-const matchStatus = document.getElementById('matchStatus')!
 
 // ---------------------------------------------------------------------------
 // Public API (used by overlay.ts)
@@ -146,10 +165,10 @@ export function isDraftActive(): boolean {
   return draftActive
 }
 
-/** Cycle the minimize states in draft mode: full -> top-3 mini -> header-only. */
-export function cycleDraftMini(): void {
-  miniState = (miniState + 1) % 3
-  applyMiniState()
+/** Cycle the density: verdict -> full -> mini -> verdict. */
+export function cycleDraftDensity(): void {
+  if (!draftActive) return
+  applyDensity(nextDensity(density))
 }
 
 export function initDraftView(): void {
@@ -160,6 +179,33 @@ export function initDraftView(): void {
     historyToggle.setAttribute('aria-expanded', String(historyExpanded))
     renderHistory()
   })
+
+  // Expand/collapse a history entry's pack context (delegated: survives re-render)
+  historyList.addEventListener('click', e => {
+    const entry = (e.target as HTMLElement).closest('.history-entry') as HTMLElement | null
+    if (!entry || !entry.dataset.key) return
+    if (expandedHistoryKeys.has(entry.dataset.key)) {
+      expandedHistoryKeys.delete(entry.dataset.key)
+    } else {
+      expandedHistoryKeys.add(entry.dataset.key)
+    }
+    entry.classList.toggle('expanded')
+  })
+
+  densityBtn.addEventListener('click', cycleDraftDensity)
+
+  // Cmd+M arrives as a global shortcut from the main process (the window is
+  // focusable:false, so document-level key events can never fire here).
+  window.mtgaTracker.onDensityCycle(() => cycleDraftDensity())
+
+  // Restore the last chosen density (defaults to verdict)
+  void window.mtgaTracker.getOverlayPrefs().then(prefs => {
+    density = normalizeDensity(prefs?.draftDensity)
+    if (draftActive) applyDensity(density, { notify: false })
+  })
+
+  // If main resizes the window (density switch), verify our content fits
+  window.addEventListener('resize', () => scheduleHeightSync())
 
   window.mtgaTracker.onDraftStart((data: unknown) => {
     handleDraftStart(data as DraftStartPayload)
@@ -222,7 +268,7 @@ function handleDraftStart(data: DraftStartPayload): void {
   pool = []
   history = []
   picksCount = data.picksCount ?? 0
-  miniState = 0
+  expandedHistoryKeys.clear()
   if (endTimer !== null) {
     window.clearTimeout(endTimer)
     endTimer = null
@@ -231,8 +277,7 @@ function handleDraftStart(data: DraftStartPayload): void {
   enterDraftMode()
   renderHeader()
   renderServerStatus()
-  packTable.innerHTML = '<div class="draft-empty">Waiting for pack…</div>'
-  draftNote.style.display = 'none'
+  renderWaiting()
   renderPool()
   renderHistory()
 }
@@ -244,32 +289,45 @@ function handleDraftPack(data: DraftPackPayload): void {
     currentScores = null
   }
   renderHeader()
-  renderPack()
+  renderPickViews()
 }
 
 function handleDraftScores(data: DraftScoresPayload): void {
   if (!currentPack || currentPack.isTierList) return
   if (data.pack !== currentPack.pack || data.pick !== currentPack.pick) return
   currentScores = data
+  animateFlames = true
   renderHeader()
-  renderPack()
+  renderPickViews()
 }
 
 function handleDraftPick(data: DraftPickPayload): void {
-  applyPickPayload(data)
-
-  // Flash the row the human actually took (agreement feedback)
-  if (
-    currentPack &&
+  const forCurrentPack =
+    currentPack !== null &&
     !currentPack.isTierList &&
     data.pack === currentPack.pack &&
     data.pick === currentPack.pick
-  ) {
+
+  // Did the human take the model's top choice? Quiet ✨ on the grip.
+  if (forCurrentPack && currentScores) {
+    const top = sortRows(currentScores.cards)[0]
+    if (top && data.grpIds.includes(top.grpId)) {
+      showAgreementGlow()
+    }
+  }
+
+  applyPickPayload(data)
+
+  // Gentle highlight decay on the row the human actually took
+  if (forCurrentPack) {
     for (const grpId of data.grpIds) {
       const row = packTable.querySelector(`[data-grpid="${grpId}"]`)
       if (row) {
-        row.classList.add('picked-flash')
-        window.setTimeout(() => row.classList.remove('picked-flash'), 1600)
+        row.classList.remove('picked-glow')
+        // restart the animation if the class was already applied
+        void (row as HTMLElement).offsetWidth
+        row.classList.add('picked-glow')
+        window.setTimeout(() => row.classList.remove('picked-glow'), 450)
       }
     }
   }
@@ -293,89 +351,98 @@ function handleDraftEnd(data: DraftEndPayload): void {
   renderPool()
   renderHistory()
   draftNote.style.display = 'none'
-  packTable.innerHTML = `
+
+  const completeHtml = `
     <div class="draft-complete">
       <div class="draft-complete-title">Draft complete</div>
       <div class="draft-complete-sub">${pool.length} cards drafted</div>
+      <button class="draft-complete-dismiss" id="draftDismissBtn">Done</button>
     </div>
   `
+  verdictView.innerHTML = completeHtml
+  packTable.innerHTML = completeHtml.replace('draftDismissBtn', 'draftDismissBtn2')
+  miniLine.innerHTML = '<span class="mini-name">Draft complete</span>'
 
-  // Show the final pool for 10s, then hand the panel back to the match view
+  const dismiss = () => dismissDraft()
+  document.getElementById('draftDismissBtn')?.addEventListener('click', dismiss)
+  document.getElementById('draftDismissBtn2')?.addEventListener('click', dismiss)
+  scheduleHeightSync()
+
+  // Auto-dismiss after 10s if the button isn't used
   if (endTimer !== null) window.clearTimeout(endTimer)
-  endTimer = window.setTimeout(() => {
-    exitDraftMode()
+  endTimer = window.setTimeout(dismiss, 10_000)
+}
+
+/** Hand the panel back to the match view (button, or the 10s timeout). */
+function dismissDraft(): void {
+  if (endTimer !== null) {
+    window.clearTimeout(endTimer)
     endTimer = null
-  }, 10_000)
+  }
+  exitDraftMode()
+  window.mtgaTracker.dismissDraft()
 }
 
 // ---------------------------------------------------------------------------
-// Mode / layout
+// Mode / density
 // ---------------------------------------------------------------------------
 
 function enterDraftMode(): void {
   draftActive = true
   overlay.classList.add('draft-mode')
   draftView.style.display = 'flex'
-  overlayContent.style.display = 'none'
-  if (overlayFooter) overlayFooter.style.display = 'none'
-  matchStatus.textContent = 'Drafting'
-  matchStatus.className = 'status in-match'
-  applyMiniState()
+  applyDensity(density, { notify: false })
 }
 
 function exitDraftMode(): void {
   draftActive = false
-  miniState = 0
-  overlay.classList.remove('draft-mode', 'draft-mini', 'draft-header-only')
+  overlay.classList.remove('draft-mode')
+  for (const d of DENSITY_CYCLE) overlay.classList.remove(densityClass(d))
   draftView.style.display = 'none'
-  overlayContent.style.display = ''
-  if (overlayFooter) overlayFooter.style.display = ''
-  matchStatus.textContent = 'Waiting for match...'
-  matchStatus.className = 'status'
 }
 
-function applyMiniState(): void {
-  overlay.classList.toggle('draft-mini', miniState === 1)
-  overlay.classList.toggle('draft-header-only', miniState === 2)
+function applyDensity(next: Density, opts: { notify?: boolean } = {}): void {
+  density = next
+  for (const d of DENSITY_CYCLE) overlay.classList.remove(densityClass(d))
+  overlay.classList.add(densityClass(density))
+  densityBtn.setAttribute('title', densityTitle(density))
+  if (opts.notify !== false) {
+    window.mtgaTracker.setOverlayDensity(density)
+  }
+  scheduleHeightSync()
+}
+
+/**
+ * Verdict/mini densities size the window to the content (the window is
+ * transparent but still swallows clicks wherever it extends — it must hug
+ * the panel). Measured after layout; main clamps and applies.
+ */
+function scheduleHeightSync(): void {
+  if (heightSyncRaf) cancelAnimationFrame(heightSyncRaf)
+  heightSyncRaf = requestAnimationFrame(() => {
+    heightSyncRaf = requestAnimationFrame(() => {
+      heightSyncRaf = 0
+      if (!draftActive || density === 'full') return
+      const target = Math.ceil(overlay.getBoundingClientRect().height)
+      if (target > 0 && Math.abs(target - window.innerHeight) > 2) {
+        window.mtgaTracker.overlaySetSize(null, target, false)
+      }
+    })
+  })
+}
+
+function showAgreementGlow(): void {
+  if (agreeGlowTimer !== null) window.clearTimeout(agreeGlowTimer)
+  draftGrip.classList.add('grip-agree')
+  agreeGlowTimer = window.setTimeout(() => {
+    draftGrip.classList.remove('grip-agree')
+    agreeGlowTimer = null
+  }, 1400)
 }
 
 // ---------------------------------------------------------------------------
-// Rendering
+// Ranking helpers
 // ---------------------------------------------------------------------------
-
-function renderHeader(): void {
-  const set = session?.set ?? '?'
-  const format = session?.format ? session.format.replace(/Draft$/, ' Draft').trim() : 'Draft'
-  draftEventChip.textContent = `${set} · ${format}`
-
-  if (currentPack && !currentPack.isTierList) {
-    draftPickPos.textContent = `P${currentPack.pack}P${currentPack.pick}`
-  } else if (currentPack?.isTierList) {
-    draftPickPos.textContent = 'P1P1'
-  } else {
-    draftPickPos.textContent = ''
-  }
-
-  const model = currentScores?.model ?? serverStatus.model
-  if (model) {
-    const fallback = model.fallback ? ' · fallback' : ''
-    draftModelChip.textContent = `${model.id}${fallback}`
-    draftModelChip.style.display = 'inline-flex'
-  } else {
-    draftModelChip.style.display = 'none'
-  }
-}
-
-function renderServerStatus(): void {
-  serverDot.className = `server-dot ${serverStatus.status}`
-  const titles: Record<string, string> = {
-    green: 'Server online — live model scores',
-    amber: `Stats from cache${serverStatus.fetchedAt ? ` (fetched ${serverStatus.fetchedAt.slice(0, 10)})` : ''}`,
-    red: 'Server offline — card names only'
-  }
-  serverDot.setAttribute('title', titles[serverStatus.status] ?? '')
-  renderHeader()
-}
 
 /** Pick the metric used for ranking this pack (ev > evP1p1 > gihWr). */
 function sortMetric(row: DraftCardRow, rows: DraftCardRow[]): number | null {
@@ -400,6 +467,13 @@ function sortRows(rows: DraftCardRow[]): DraftCardRow[] {
   })
 }
 
+/** The rows currently on screen, ranked. */
+function rankedRows(): DraftCardRow[] {
+  if (!currentPack) return []
+  const scored = currentScores?.cards ?? null
+  return sortRows(scored && scored.length > 0 ? scored : currentPack.cards)
+}
+
 function rarityClass(rarity: string | null): string {
   switch ((rarity ?? '').toLowerCase()) {
     case 'mythic': return 'rarity-mythic'
@@ -414,31 +488,220 @@ function formatEv(value: number | null): string {
   return Math.abs(value) < 10 ? value.toFixed(2) : value.toFixed(1)
 }
 
-function renderPack(): void {
-  if (!currentPack) return
+/** Flame rating for a row: live model prob, or tier percentile on P1P1. */
+function flamesFor(row: DraftCardRow): FlameRating | null {
+  if (currentPack?.isTierList) return flamesFromPercentile(row.tierPct)
+  return flamesFromProb(row.prob)
+}
 
-  const scored = currentScores?.cards ?? null
-  const rows = sortRows(scored && scored.length > 0 ? scored : currentPack.cards)
+/** True when flames should carry an honesty tag (not real model conviction). */
+function isHeuristic(): boolean {
+  const model = currentScores?.model ?? serverStatus.model
+  return !!model?.fallback || serverStatus.status !== 'green'
+}
 
-  if (currentPack.isTierList && currentPack.note) {
-    draftNote.textContent = currentPack.note
+function flameRowHtml(rating: FlameRating, opts: { small?: boolean; animate?: boolean } = {}): string {
+  const size = opts.small ? 'flames-small' : ''
+  const slots = Array.from({ length: 5 }, (_, i) => {
+    const filled = i < rating.flames
+    const delay = opts.animate && filled ? ` style="animation-delay: ${i * 120}ms"` : ''
+    return `<span class="flame ${filled ? 'lit' : 'unlit'}${opts.animate && filled ? ' flame-in' : ''}"${delay}>🔥</span>`
+  }).join('')
+  return `<span class="flames ${size}" aria-label="${rating.flames} of 5">${slots}</span>`
+}
+
+// ---------------------------------------------------------------------------
+// Rendering
+// ---------------------------------------------------------------------------
+
+function renderHeader(): void {
+  const set = session?.set ?? '?'
+  const format = session?.format ? session.format.replace(/Draft$/, ' Draft').trim() : 'Draft'
+  draftEventChip.textContent = `${set} · ${format}`
+
+  if (currentPack && !currentPack.isTierList) {
+    draftPickPos.textContent = `P${currentPack.pack}P${currentPack.pick}`
+  } else if (currentPack?.isTierList) {
+    draftPickPos.textContent = 'P1P1'
+  } else {
+    draftPickPos.textContent = ''
+  }
+
+  const model = currentScores?.model ?? serverStatus.model
+  footerModel.textContent = model ? `${model.id}${model.fallback ? ' · fallback' : ''}` : ''
+}
+
+function renderServerStatus(): void {
+  serverDot.className = `server-dot ${serverStatus.status}`
+  const titles: Record<string, string> = {
+    green: 'Server online — live model scores',
+    amber: `Stats from cache${serverStatus.fetchedAt ? ` (fetched ${serverStatus.fetchedAt.slice(0, 10)})` : ''}`,
+    red: 'Server offline — card names only'
+  }
+  serverDot.setAttribute('title', titles[serverStatus.status] ?? '')
+  renderHeader()
+}
+
+/** Quiet single-line empty state — never a skeleton wall. */
+function renderWaiting(): void {
+  const waiting = '<div class="draft-empty">waiting for pack…</div>'
+  verdictView.innerHTML = waiting
+  packTable.innerHTML = waiting
+  miniLine.innerHTML = '<span class="mini-name muted">waiting for pack…</span>'
+  draftNote.style.display = 'none'
+  scheduleHeightSync()
+}
+
+/** Re-render everything that depends on the current pack/scores. */
+function renderPickViews(): void {
+  if (!currentPack) {
+    renderWaiting()
+    return
+  }
+
+  if (currentPack.isTierList) {
+    draftNote.textContent = 'Pack hidden by Arena — showing set tier list'
     draftNote.style.display = 'block'
   } else {
     draftNote.style.display = 'none'
   }
 
+  const rows = rankedRows()
+  renderVerdict(rows)
+  renderPackTable(rows)
+  renderMiniLine(rows)
+  animateFlames = false
+  scheduleHeightSync()
+}
+
+function verdictWhyHtml(row: DraftCardRow): string {
+  const parts: string[] = []
+  const ev = row.ev ?? row.evP1p1
+  if (ev !== null && Number.isFinite(ev)) parts.push(`EV ${formatEv(ev)}`)
+  if (row.gihWr !== null) parts.push(`GIH ${formatWinRate(row.gihWr)}`)
+  if (row.alsa !== null && Number.isFinite(row.alsa)) parts.push(`ALSA ${row.alsa.toFixed(1)}`)
+  return parts.length > 0 ? parts.join(' · ') : ''
+}
+
+/** Normalized 0..100 EV bar width for a row within this pack. */
+function evBarPct(row: DraftCardRow, rows: DraftCardRow[]): number {
+  const metrics = rows
+    .map(r => sortMetric(r, rows))
+    .filter((v): v is number => v !== null && Number.isFinite(v))
+  if (metrics.length === 0) return 0
+  const metric = sortMetric(row, rows)
+  if (metric === null || !Number.isFinite(metric)) return 0
+  const min = Math.min(...metrics)
+  const max = Math.max(...metrics)
+  return max > min ? ((metric - min) / (max - min)) * 100 : 100
+}
+
+/** One runner-up line: rank, name, flames (or EV when no flames exist). */
+function runnerHtml(row: DraftCardRow, rank: number): string {
+  const rating = flamesFor(row)
+  const name = row.name ?? 'Unknown card'
+  const right = rating
+    ? flameRowHtml(rating, { small: true })
+    : `<span class="runner-ev">${formatEv(row.ev ?? row.evP1p1 ?? row.gihWr)}</span>`
+  return `
+    <div class="runner ${row.name ? '' : 'unknown-card'}">
+      <span class="runner-rank">${rank}</span>
+      <span class="runner-name ${rarityClass(row.rarity)}">${escapeHtml(name)}</span>
+      ${right}
+    </div>
+  `
+}
+
+/** THE PICK: name large, flames, EV bar, tiny why-line, two runner-ups. */
+function renderVerdict(rows: DraftCardRow[]): void {
+  if (rows.length === 0) {
+    verdictView.innerHTML = '<div class="draft-empty">No cards in pack</div>'
+    return
+  }
+
+  const top = rows[0]
+  const rating = flamesFor(top)
+  const heuristicTag = rating && isHeuristic()
+    ? '<span class="heuristic-tag">heuristic</span>'
+    : ''
+
+  // Flame area: real conviction, or an honest quiet placeholder
+  let flameArea: string
+  if (rating) {
+    const label = rating.label ? `<span class="flame-label">${rating.label}</span>` : ''
+    flameArea = `<div class="verdict-flames">${flameRowHtml(rating, { animate: animateFlames })}${label}${heuristicTag}</div>`
+  } else if (serverStatus.status === 'red') {
+    flameArea = '<div class="verdict-flames"><span class="flame-pending">stats only</span></div>'
+  } else {
+    flameArea = '<div class="verdict-flames"><span class="flame-pending">scoring…</span></div>'
+  }
+
+  // "close call" (1 flame): show the top two side by side
+  const closeCall = rating?.flames === 1 && rows.length > 1
+  let topHtml: string
+  if (closeCall) {
+    topHtml = `
+      <div class="verdict-duo">
+        ${[rows[0], rows[1]].map(row => `
+          <div class="verdict-duo-card">
+            <div class="verdict-name small ${rarityClass(row.rarity)}">${escapeHtml(row.name ?? 'Unknown card')}</div>
+            <div class="verdict-bar"><span style="width: ${evBarPct(row, rows).toFixed(0)}%"></span></div>
+          </div>
+        `).join('')}
+      </div>
+      ${flameArea}
+    `
+  } else {
+    topHtml = `
+      <div class="verdict-top">
+        <div class="verdict-name ${rarityClass(top.rarity)}">${escapeHtml(top.name ?? 'Unknown card')}</div>
+        <span class="verdict-mana">${renderManaCost(top.manaCost)}</span>
+      </div>
+      ${flameArea}
+      <div class="verdict-bar"><span style="width: ${evBarPct(top, rows).toFixed(0)}%"></span></div>
+      <div class="verdict-why">${verdictWhyHtml(top)}</div>
+    `
+  }
+
+  const runners = closeCall
+    ? (rows.length > 2 ? runnerHtml(rows[2], 3) : '')
+    : rows.slice(1, 3).map((row, i) => runnerHtml(row, i + 2)).join('')
+
+  verdictView.innerHTML = `
+    ${topHtml}
+    ${runners ? `<div class="verdict-runners">${runners}</div>` : ''}
+    <div class="verdict-pool" id="verdictPool">${poolStripHtml()}</div>
+  `
+}
+
+function renderMiniLine(rows: DraftCardRow[]): void {
+  if (rows.length === 0) {
+    miniLine.innerHTML = '<span class="mini-name muted">no cards</span>'
+    return
+  }
+  const top = rows[0]
+  miniLine.innerHTML = `
+    <span class="mini-name ${rarityClass(top.rarity)}">${escapeHtml(top.name ?? 'Unknown card')}</span>
+    <span class="mini-attr">17Lands.com</span>
+  `
+}
+
+/**
+ * Full ranked table with FLIP re-sorts: rows keyed by grpId animate to
+ * their new position (140ms ease-out) instead of flashing a wholesale
+ * re-render when scores land.
+ */
+function renderPackTable(rows: DraftCardRow[]): void {
   if (rows.length === 0) {
     packTable.innerHTML = '<div class="draft-empty">No cards in pack</div>'
     return
   }
 
-  // Normalize the metric to a 0-100 bar within this pack
-  const metrics = rows
-    .map(row => sortMetric(row, rows))
-    .filter((v): v is number => v !== null && Number.isFinite(v))
-  const min = metrics.length > 0 ? Math.min(...metrics) : 0
-  const max = metrics.length > 0 ? Math.max(...metrics) : 1
-  const span = max - min
+  // FLIP: record where each row was
+  const before = new Map<string, number>()
+  packTable.querySelectorAll<HTMLElement>('[data-grpid]').forEach(el => {
+    before.set(el.dataset.grpid!, el.getBoundingClientRect().top)
+  })
 
   const header = `
     <div class="pick-row pick-row-header">
@@ -451,8 +714,7 @@ function renderPack(): void {
   `
 
   const body = rows.map((row, index) => {
-    const metric = sortMetric(row, rows)
-    const barPct = metric === null ? 0 : span > 0 ? ((metric - min) / span) * 100 : 100
+    const barPct = evBarPct(row, rows)
     const evShown = row.ev ?? row.evP1p1
     const name = row.name ?? 'Unknown card'
     const classes = ['pick-row', index === 0 ? 'top-pick' : '', row.name ? '' : 'unknown-card']
@@ -467,8 +729,8 @@ function renderPack(): void {
           <span class="pick-name ${rarityClass(row.rarity)}">${escapeHtml(name)}</span>
         </span>
         <span class="pick-ev">
-          <span class="ev-bar" style="width: ${barPct.toFixed(0)}%"></span>
           <span class="ev-val">${formatEv(evShown)}</span>
+          <span class="ev-track"><span class="ev-fill" style="width: ${barPct.toFixed(0)}%"></span></span>
         </span>
         <span class="pick-gih">${formatWinRate(row.gihWr)}</span>
         <span class="pick-alsa">${row.alsa !== null && Number.isFinite(row.alsa) ? row.alsa.toFixed(1) : '—'}</span>
@@ -477,21 +739,75 @@ function renderPack(): void {
   }).join('')
 
   packTable.innerHTML = header + body
+
+  // FLIP: play each surviving row from its old position to its new one
+  if (before.size > 0) {
+    packTable.querySelectorAll<HTMLElement>('[data-grpid]').forEach(el => {
+      const old = before.get(el.dataset.grpid!)
+      if (old === undefined) {
+        el.classList.add('row-enter')
+        return
+      }
+      const delta = old - el.getBoundingClientRect().top
+      if (delta !== 0) {
+        el.style.transition = 'none'
+        el.style.transform = `translateY(${delta}px)`
+        void el.offsetWidth // reflow so the transform lands before animating
+        el.style.transition = 'transform 140ms ease-out'
+        el.style.transform = ''
+        window.setTimeout(() => {
+          el.style.transition = ''
+        }, 180)
+      }
+    })
+  }
 }
 
 const POOL_COLORS = ['W', 'U', 'B', 'R', 'G'] as const
 
-function renderPool(): void {
+function poolColorCounts(): { counts: Record<string, number>; nonLands: DraftCardRow[] } {
   const nonLands = pool.filter(row => !(row.type || '').toLowerCase().includes('land'))
-
-  // Color commitment (multicolor cards count once per color)
-  const colorCounts: Record<string, number> = { W: 0, U: 0, B: 0, R: 0, G: 0 }
+  const counts: Record<string, number> = { W: 0, U: 0, B: 0, R: 0, G: 0 }
   for (const row of nonLands) {
     for (const c of row.colors || '') {
-      if (c in colorCounts) colorCounts[c]++
+      if (c in counts) counts[c]++
     }
   }
-  const maxColor = Math.max(1, ...Object.values(colorCounts))
+  return { counts, nonLands }
+}
+
+/**
+ * Verdict-density pool strip: a 12px bar whose colored region grows with
+ * draft progress (picks/42) and splits by color commitment. Doubles as a
+ * progress bar without a second element.
+ */
+function poolStripHtml(): string {
+  const { counts } = poolColorCounts()
+  const totalColored = Object.values(counts).reduce((a, b) => a + b, 0)
+  const progress = Math.min(1, picksCount / TOTAL_PICKS)
+
+  const segments = totalColored > 0
+    ? POOL_COLORS.filter(c => counts[c] > 0).map(c =>
+        `<span class="strip-seg strip-${c}" style="flex-grow: ${counts[c]}"></span>`
+      ).join('')
+    : ''
+
+  const title = POOL_COLORS.filter(c => counts[c] > 0)
+    .map(c => `${c} ${counts[c]}`)
+    .join(' · ')
+
+  return `
+    <div class="pool-strip-bar" title="${title || 'No picks yet'}">
+      <div class="strip-filled" style="width: ${(progress * 100).toFixed(1)}%">${segments}</div>
+    </div>
+    <div class="pool-strip-meta"><span>${picksCount}/${TOTAL_PICKS}</span></div>
+  `
+}
+
+/** Full-density pool block: color rows (pip + neutral bar + count) and curve. */
+function renderPool(): void {
+  const { counts, nonLands } = poolColorCounts()
+  const maxColor = Math.max(1, ...Object.values(counts))
 
   // Mana curve 1-7+
   const curve = [0, 0, 0, 0, 0, 0, 0] // bins for 1..6, 7+
@@ -506,9 +822,9 @@ function renderPool(): void {
     <div class="pool-color">
       <span class="mana-symbol ${color}"></span>
       <div class="pool-color-track">
-        <div class="pool-color-fill mana-fill-${color}" style="width: ${(colorCounts[color] / maxColor) * 100}%"></div>
+        <div class="pool-color-fill" style="width: ${(counts[color] / maxColor) * 100}%"></div>
       </div>
-      <span class="pool-color-count">${colorCounts[color]}</span>
+      <span class="pool-color-count">${counts[color]}</span>
     </div>
   `).join('')
 
@@ -522,13 +838,18 @@ function renderPool(): void {
   poolStrip.innerHTML = `
     <div class="pool-header">
       <span class="pool-title">Pool</span>
-      <span class="pool-count">${picksCount || pool.length} picks</span>
+      <span class="pool-count">${picksCount || pool.length}/${TOTAL_PICKS} picks</span>
     </div>
     <div class="pool-body">
       <div class="pool-colors">${colorBars}</div>
       <div class="pool-curve">${curveBars}</div>
     </div>
   `
+
+  // Keep the verdict strip in step (pool changes arrive on pick events)
+  const verdictPool = document.getElementById('verdictPool')
+  if (verdictPool) verdictPool.innerHTML = poolStripHtml()
+  scheduleHeightSync()
 }
 
 function renderHistory(): void {
@@ -548,21 +869,19 @@ function renderHistory(): void {
 
   historyList.innerHTML = [...history]
     .sort((a, b) => b.pack - a.pack || b.pick - a.pick)
-    .map((entry, index) => `
-      <div class="history-entry" data-index="${index}">
-        <div class="history-line">
-          <span class="history-pos">P${entry.pack}P${entry.pick}</span>
-          <span class="history-name">${entry.names.map(escapeHtml).join(', ')}</span>
+    .map(entry => {
+      const key = `${entry.pack}-${entry.pick}`
+      return `
+        <div class="history-entry ${expandedHistoryKeys.has(key) ? 'expanded' : ''}" data-key="${key}">
+          <div class="history-line">
+            <span class="history-pos">P${entry.pack}P${entry.pick}</span>
+            <span class="history-name">${entry.names.map(escapeHtml).join(', ')}</span>
+          </div>
+          ${entry.packNames.length > 0
+            ? `<div class="history-pack">${entry.packNames.map(escapeHtml).join(' · ')}</div>`
+            : ''}
         </div>
-        ${entry.packNames.length > 0
-          ? `<div class="history-pack">${entry.packNames.map(escapeHtml).join(' · ')}</div>`
-          : ''}
-      </div>
-    `)
+      `
+    })
     .join('')
-
-  // Tap a pick to expand its pack context
-  historyList.querySelectorAll('.history-entry').forEach(el => {
-    el.addEventListener('click', () => el.classList.toggle('expanded'))
-  })
 }

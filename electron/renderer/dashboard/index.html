@@ -70,6 +70,21 @@
         </a>
       </nav>
 
+      <div class="overlay-controls">
+        <button class="overlay-toggle" id="overlayToggle" aria-pressed="false" title="Show or hide the in-game overlay">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="4" width="20" height="14" rx="3"/>
+            <path d="M8 21h8"/>
+          </svg>
+          <span>Draft Overlay</span>
+          <span class="toggle-state" id="overlayToggleState">Off</span>
+        </button>
+        <label class="overlay-setting" title="Minimize this window when a draft starts so only the overlay is on screen (restored when the draft ends)">
+          <input type="checkbox" id="autoHideDashboard" checked>
+          <span>Hide dashboard during drafts</span>
+        </label>
+      </div>
+
       <div class="sidebar-footer">
         <button class="help-btn" id="helpBtn" title="Keyboard shortcuts">?</button>
         <span class="version">v0.1.0</span>

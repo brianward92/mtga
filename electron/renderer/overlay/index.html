@@ -8,8 +8,8 @@
 </head>
 <body>
   <div id="overlay" class="overlay">
-    <!-- Header with match info -->
-    <header class="overlay-header">
+    <!-- Match grip bar (draggable; hosts status + minimize + hide) -->
+    <header class="overlay-header grip" id="matchGrip" data-grip>
       <div class="match-info" id="matchInfo">
         <span class="status" id="matchStatus">Waiting for match...</span>
         <span class="turn-counter" id="turnCounter"></span>
@@ -17,7 +17,8 @@
           <span id="winRateValue">0%</span>
         </span>
       </div>
-      <button class="minimize-btn" id="minimizeBtn" title="Minimize">−</button>
+      <button class="grip-btn minimize-btn" id="minimizeBtn" title="Minimize">−</button>
+      <button class="grip-btn hide-btn" title="Hide overlay (reopen from dashboard)">✕</button>
     </header>
 
     <!-- Detailed-logs warning banner -->
@@ -28,16 +29,34 @@
 
     <!-- Draft view (shown between draft-start and draft-end) -->
     <section class="draft-view" id="draftView" style="display: none;">
-      <div class="draft-header">
-        <span class="draft-chip" id="draftEventChip">—</span>
-        <span class="draft-pickpos" id="draftPickPos"></span>
-        <span class="draft-chip model" id="draftModelChip" style="display: none;"></span>
+      <!-- Draft grip bar: drag anywhere that isn't a button -->
+      <div class="draft-grip grip" id="draftGrip" data-grip>
+        <span class="grip-dots" aria-hidden="true"></span>
+        <span class="grip-chip" id="draftEventChip">—</span>
+        <span class="grip-pickpos" id="draftPickPos"></span>
         <span class="server-dot red" id="serverDot" title="Server offline"></span>
+        <button class="grip-btn" id="densityBtn" title="Cycle view (⌘M)">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <path d="M4 7h16M4 12h10M4 17h5"/>
+          </svg>
+        </button>
+        <button class="grip-btn hide-btn" title="Hide overlay (reopen from dashboard)">✕</button>
       </div>
+
+      <div class="draft-note" id="draftNote" style="display: none;"></div>
+
+      <!-- Verdict: THE PICK (shown in verdict + full densities) -->
+      <div class="verdict" id="verdictView">
+        <div class="draft-empty">waiting for pack…</div>
+      </div>
+
+      <!-- Mini: one line, top pick name only -->
+      <div class="mini-line" id="miniLine"></div>
+
+      <!-- Full density: ranked pack table, pool curve, pick history -->
       <div class="draft-body" id="draftBody">
-        <div class="draft-note" id="draftNote" style="display: none;"></div>
         <div class="pack-table" id="packTable">
-          <div class="draft-empty">Waiting for pack…</div>
+          <div class="draft-empty">waiting for pack…</div>
         </div>
         <div class="pool-strip" id="poolStrip"></div>
         <div class="pick-history">
@@ -48,7 +67,12 @@
           <div class="history-list" id="historyList" style="display: none;"></div>
         </div>
       </div>
-      <footer class="draft-footer">Card stats: 17Lands.com</footer>
+
+      <!-- 17Lands attribution: must remain visible (license requirement) -->
+      <footer class="draft-footer">
+        <span class="footer-model" id="footerModel"></span>
+        <span class="footer-attr">17Lands.com</span>
+      </footer>
     </section>
 
     <!-- Deck tracker content -->
@@ -103,6 +127,9 @@
         <span class="stat-value" id="graveyardCount">-</span>
       </div>
     </footer>
+
+    <!-- Manual resize grip (bottom-right; match mode + draft full density) -->
+    <div class="resize-handle" id="resizeHandle" title="Resize"></div>
   </div>
 
   <!-- Match result overlay -->

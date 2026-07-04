@@ -29,6 +29,23 @@ contextBridge.exposeInMainWorld('mtgaTracker', {
 
   // Draft state
   getDraftState: () => ipcRenderer.invoke('get-draft-state'),
+  dismissDraft: () => ipcRenderer.send('draft-dismiss'),
+
+  // Overlay window controls (manual drag/resize — the window is focusable:false)
+  overlayDragStart: () => ipcRenderer.invoke('overlay-drag-start'),
+  overlayMove: (x: number, y: number) => ipcRenderer.send('overlay-move', { x, y }),
+  overlayMoveEnd: () => ipcRenderer.send('overlay-move-end'),
+  overlayResizeStart: () => ipcRenderer.invoke('overlay-resize-start'),
+  overlayResize: (width: number, height: number) => ipcRenderer.send('overlay-resize', { width, height }),
+  overlayResizeEnd: () => ipcRenderer.send('overlay-resize-end'),
+  overlaySetSize: (width: number | null, height: number | null, animate?: boolean) =>
+    ipcRenderer.send('overlay-set-size', { width, height, animate: animate ?? false }),
+  setOverlayDensity: (density: string) => ipcRenderer.send('overlay-density', { density }),
+  getOverlayPrefs: () => ipcRenderer.invoke('overlay-get-prefs'),
+  setOverlayPrefs: (patch: { autoHideDashboard?: boolean }) => ipcRenderer.send('overlay-set-prefs', patch),
+  hideOverlay: () => ipcRenderer.send('overlay-hide'),
+  toggleOverlay: () => ipcRenderer.invoke('overlay-toggle'),
+  getOverlayVisible: () => ipcRenderer.invoke('overlay-visible'),
 
   // Event listeners
   onInventoryUpdate: (callback: (data: unknown) => void) => {
@@ -75,6 +92,12 @@ contextBridge.exposeInMainWorld('mtgaTracker', {
   onDetailedLogs: (callback: (data: unknown) => void) => {
     ipcRenderer.on('detailed-logs', (_event, data) => callback(data))
   },
+  onDensityCycle: (callback: () => void) => {
+    ipcRenderer.on('density-cycle', () => callback())
+  },
+  onOverlayVisibility: (callback: (data: unknown) => void) => {
+    ipcRenderer.on('overlay-visibility', (_event, data) => callback(data))
+  },
 
   // Cleanup
   removeAllListeners: () => {
@@ -92,6 +115,8 @@ contextBridge.exposeInMainWorld('mtgaTracker', {
     ipcRenderer.removeAllListeners('draft-scores')
     ipcRenderer.removeAllListeners('server-status')
     ipcRenderer.removeAllListeners('detailed-logs')
+    ipcRenderer.removeAllListeners('density-cycle')
+    ipcRenderer.removeAllListeners('overlay-visibility')
   }
 })
 
@@ -113,6 +138,20 @@ declare global {
       getCardName: (grpId: number) => Promise<string | null>
       updateMatchNotes: (matchId: string, notes: string) => Promise<boolean>
       getDraftState: () => Promise<unknown>
+      dismissDraft: () => void
+      overlayDragStart: () => Promise<{ x: number; y: number; width: number; height: number } | null>
+      overlayMove: (x: number, y: number) => void
+      overlayMoveEnd: () => void
+      overlayResizeStart: () => Promise<{ x: number; y: number; width: number; height: number } | null>
+      overlayResize: (width: number, height: number) => void
+      overlayResizeEnd: () => void
+      overlaySetSize: (width: number | null, height: number | null, animate?: boolean) => void
+      setOverlayDensity: (density: string) => void
+      getOverlayPrefs: () => Promise<{ draftDensity: string; autoHideDashboard: boolean }>
+      setOverlayPrefs: (patch: { autoHideDashboard?: boolean }) => void
+      hideOverlay: () => void
+      toggleOverlay: () => Promise<boolean>
+      getOverlayVisible: () => Promise<boolean>
       onInventoryUpdate: (callback: (data: unknown) => void) => void
       onCollectionUpdate: (callback: (data: unknown) => void) => void
       onMatchStart: (callback: (data: unknown) => void) => void
@@ -127,6 +166,8 @@ declare global {
       onDraftScores: (callback: (data: unknown) => void) => void
       onServerStatus: (callback: (data: unknown) => void) => void
       onDetailedLogs: (callback: (data: unknown) => void) => void
+      onDensityCycle: (callback: () => void) => void
+      onOverlayVisibility: (callback: (data: unknown) => void) => void
       removeAllListeners: () => void
     }
   }

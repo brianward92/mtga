@@ -4,7 +4,8 @@
  */
 
 import { escapeHtml, renderManaCost } from './shared'
-import { initDraftView, isDraftActive, cycleDraftMini } from './draft-view'
+import { initDraftView, isDraftActive, cycleDraftDensity } from './draft-view'
+import { initWindowControls } from './window-controls'
 
 // Export to make this a proper ES module (avoids duplicate function errors in TS)
 export {}
@@ -100,6 +101,7 @@ function init(): void {
   setupEventListeners()
   setupTrackerEvents()
   initDraftView()
+  initWindowControls()
   loadCardData()
   loadWinRate()
 }
@@ -155,26 +157,19 @@ async function loadCardData(): Promise<void> {
 function setupEventListeners(): void {
   minimizeBtn.addEventListener('click', toggleMinimize)
   sideboardToggle.addEventListener('click', toggleSideboard)
-  setupTooltips()
-  setupKeyboardShortcuts()
-}
 
-/**
- * Setup keyboard shortcuts for overlay
- */
-function setupKeyboardShortcuts(): void {
-  document.addEventListener('keydown', (e) => {
-    // Ctrl/Cmd + M: Toggle minimize
-    if ((e.ctrlKey || e.metaKey) && e.key === 'm') {
-      e.preventDefault()
-      toggleMinimize()
-    }
-    // Ctrl/Cmd + B: Toggle sideboard
-    if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
-      e.preventDefault()
-      toggleSideboard()
-    }
+  // ✕ on the grip bars: hide the overlay (reopen from the dashboard).
+  // Main process quits if the dashboard is closed too (plain-app semantics).
+  document.querySelectorAll<HTMLElement>('.hide-btn').forEach(btn => {
+    btn.addEventListener('click', () => window.mtgaTracker?.hideOverlay())
   })
+
+  setupTooltips()
+
+  // NOTE: no document-level keyboard shortcuts here — the overlay window is
+  // focusable:false (it must never steal keystrokes from Arena), so local
+  // keydown events can never fire. Cmd+M arrives via a main-process global
+  // shortcut ('density-cycle'), registered only while a draft is live.
 }
 
 /**
@@ -212,20 +207,21 @@ function showTooltip(cardRow: HTMLElement, card: CardInDeck): void {
   tooltipType.textContent = formatTypeName(card.type)
   tooltipCost.innerHTML = renderManaCost(card.manaCost)
 
-  // Position tooltip
+  // Position INSIDE the panel: the window is exactly the panel's size, so
+  // anything placed outside it (the old "to the left of the row" position)
+  // is clipped and never visible. Prefer just below the row; flip above
+  // when there's no room.
   const rect = cardRow.getBoundingClientRect()
   const overlayRect = overlay.getBoundingClientRect()
 
-  // Position to the left of the card row
-  let left = -cardTooltip.offsetWidth - 8
-  let top = rect.top - overlayRect.top
+  const left = 8
+  let top = rect.bottom - overlayRect.top + 4
 
-  // Make sure tooltip doesn't go above the overlay
+  const maxTop = overlayRect.height - cardTooltip.offsetHeight - 8
+  if (top > maxTop) {
+    top = rect.top - overlayRect.top - cardTooltip.offsetHeight - 4
+  }
   if (top < 0) top = 0
-
-  // Make sure tooltip doesn't go below the overlay
-  const maxTop = overlayRect.height - cardTooltip.offsetHeight
-  if (top > maxTop) top = maxTop
 
   cardTooltip.style.left = `${left}px`
   cardTooltip.style.top = `${top}px`
@@ -241,12 +237,12 @@ function hideTooltip(): void {
 
 /**
  * Toggle minimized state.
- * In draft mode this cycles the draft mini states instead
- * (full -> top-3 mini -> header-only).
+ * In draft mode this cycles the draft densities instead
+ * (verdict -> full -> mini).
  */
 function toggleMinimize(): void {
   if (isDraftActive()) {
-    cycleDraftMini()
+    cycleDraftDensity()
     return
   }
   isMinimized = !isMinimized
@@ -447,6 +443,7 @@ function setupTrackerEvents(): void {
  */
 function showMatchResult(result: 'win' | 'loss' | 'draw'): void {
   if (result === 'draw') return // Don't show for draws
+  if (isDraftActive()) return   // Never splash over the draft panel
 
   matchResultText.textContent = result === 'win' ? 'Victory' : 'Defeat'
   matchResultText.className = `match-result-text ${result}`
