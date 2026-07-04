@@ -86,6 +86,9 @@ contextBridge.exposeInMainWorld('mtgaTracker', {
   onDraftScores: (callback: (data: unknown) => void) => {
     ipcRenderer.on('draft-scores', (_event, data) => callback(data))
   },
+  onDraftRatings: (callback: (data: unknown) => void) => {
+    ipcRenderer.on('draft-ratings', (_event, data) => callback(data))
+  },
   onServerStatus: (callback: (data: unknown) => void) => {
     ipcRenderer.on('server-status', (_event, data) => callback(data))
   },
@@ -113,6 +116,7 @@ contextBridge.exposeInMainWorld('mtgaTracker', {
     ipcRenderer.removeAllListeners('draft-pick')
     ipcRenderer.removeAllListeners('draft-end')
     ipcRenderer.removeAllListeners('draft-scores')
+    ipcRenderer.removeAllListeners('draft-ratings')
     ipcRenderer.removeAllListeners('server-status')
     ipcRenderer.removeAllListeners('detailed-logs')
     ipcRenderer.removeAllListeners('density-cycle')
@@ -164,6 +168,7 @@ declare global {
       onDraftPick: (callback: (data: unknown) => void) => void
       onDraftEnd: (callback: (data: unknown) => void) => void
       onDraftScores: (callback: (data: unknown) => void) => void
+      onDraftRatings: (callback: (data: unknown) => void) => void
       onServerStatus: (callback: (data: unknown) => void) => void
       onDetailedLogs: (callback: (data: unknown) => void) => void
       onDensityCycle: (callback: () => void) => void

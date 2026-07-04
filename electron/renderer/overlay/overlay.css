@@ -956,6 +956,7 @@ body {
 .verdict-flames {
   display: flex;
   align-items: center;
+  flex-wrap: wrap; /* long band labels ("OBVIOUS BOMB — just take it") */
   gap: var(--sp-2);
   min-height: 18px;
 }
@@ -995,6 +996,14 @@ body {
   font-size: var(--fs-11);
   color: var(--text-muted);
   font-style: italic;
+}
+
+/* Headline conviction %: head-to-head vs the next-best card, never softmax */
+.conviction-pct {
+  font-size: var(--fs-11);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
 }
 
 .heuristic-tag {
@@ -1054,6 +1063,14 @@ body {
   text-overflow: ellipsis;
 }
 
+/* Pairwise split on each duo card (e.g. 52% / 48%) */
+.verdict-duo-pct {
+  font-size: var(--fs-11);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
 /* Runner-ups */
 .verdict-runners {
   display: flex;
@@ -1087,6 +1104,13 @@ body {
 
 .runner-ev {
   font-size: var(--fs-11);
+  color: var(--text-secondary);
+}
+
+/* Runner-up head-to-head % vs the card ranked above it */
+.runner-pct {
+  font-size: var(--fs-11);
+  font-variant-numeric: tabular-nums;
   color: var(--text-secondary);
 }
 

@@ -551,6 +551,24 @@ function updateServerStatus(status?: ServerStatus): void {
 }
 
 /**
+ * ev_p1p1 for every rated card in the set, sorted ascending. The renderer
+ * caches this and computes set percentiles (conviction bands) client-side.
+ */
+function setEvP1p1Sorted(): number[] | null {
+  if (!draftRuntime.ratings || draftRuntime.ratings.size === 0) return null
+  const evs = Array.from(draftRuntime.ratings.values())
+    .map(card => card.ev_p1p1)
+    .filter((v): v is number => v !== null && v !== undefined && Number.isFinite(v))
+    .sort((a, b) => a - b)
+  return evs.length > 0 ? evs : null
+}
+
+function sendSetRatings(): void {
+  if (isReplaying) return
+  overlayWindow?.webContents.send('draft-ratings', { setEvP1p1Sorted: setEvP1p1Sorted() })
+}
+
+/**
  * Prefetch the ratings table for the drafted set/format (once per draft).
  * Disk cache is the offline fallback; ev_p1p1 doubles as the human-P1P1
  * tier list.
@@ -559,7 +577,12 @@ async function ensureRatings(snapshot: DraftSessionSnapshot): Promise<void> {
   if (!serverClient || !snapshot.set) return
   const format = snapshot.format ?? 'PremierDraft'
   const meta = draftRuntime.ratingsMeta
-  if (meta && meta.set === snapshot.set && meta.format === format && !meta.stale) return
+  if (meta && meta.set === snapshot.set && meta.format === format && !meta.stale) {
+    // Already fetched (e.g. a second draft of the same set) — the renderer
+    // resets its set-percentile cache at draft-start, so re-send it.
+    sendSetRatings()
+    return
+  }
 
   const result = await serverClient.getRatings(snapshot.set, format)
   if (!result) {
@@ -577,6 +600,7 @@ async function ensureRatings(snapshot: DraftSessionSnapshot): Promise<void> {
   }
   mergeServerCards(result.cards)
   updateServerStatus()
+  sendSetRatings()
 
   // Human P1P1 pending (packs aren't logged before pick time): show tier list
   const current = draftRuntime.session
@@ -1058,7 +1082,8 @@ ipcMain.handle('get-draft-state', () => {
       pick: null,
       end: null,
       serverStatus: draftRuntime.serverStatus,
-      detailedLogsEnabled
+      detailedLogsEnabled,
+      setEvP1p1Sorted: null
     }
   }
 
@@ -1070,7 +1095,8 @@ ipcMain.handle('get-draft-state', () => {
     pick: draftPickPayload(snapshot, null),
     end: snapshot.state === 'complete' ? draftEndPayload(snapshot) : null,
     serverStatus: draftRuntime.serverStatus,
-    detailedLogsEnabled
+    detailedLogsEnabled,
+    setEvP1p1Sorted: setEvP1p1Sorted()
   }
 })
 

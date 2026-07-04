@@ -17,7 +17,16 @@
 
 import { escapeHtml, renderManaCost, formatWinRate } from './shared'
 import { Density, nextDensity, normalizeDensity, densityClass, densityTitle, DENSITY_CYCLE } from './density'
-import { FlameRating, flamesFromProb, flamesFromPercentile } from './flames'
+import { FlameRating, flamesFromPercentile } from './flames'
+import {
+  Conviction,
+  bandConviction,
+  dominanceFromEvs,
+  runnerDominance,
+  percentileOfSortedAsc,
+  formatDominancePct,
+  formatSplit
+} from './conviction'
 
 // ---------------------------------------------------------------------------
 // Payload types (mirror main/index.ts)
@@ -112,6 +121,12 @@ interface DraftStatePayload {
   end: DraftEndPayload | null
   serverStatus: ServerStatusPayload | null
   detailedLogsEnabled: boolean | null
+  /** ev_p1p1 for every rated card in the set, sorted ascending. */
+  setEvP1p1Sorted: number[] | null
+}
+
+interface DraftRatingsPayload {
+  setEvP1p1Sorted: number[] | null
 }
 
 // Arena drafts: 3 packs x 14 picks
@@ -125,6 +140,8 @@ let draftActive = false
 let session: DraftStartPayload | null = null
 let currentPack: DraftPackPayload | null = null
 let currentScores: DraftScoresPayload | null = null
+/** Set-wide ev_p1p1 distribution (sorted asc), cached for set percentiles. */
+let setEvSorted: number[] | null = null
 let pool: DraftCardRow[] = []
 let history: HistoryEntry[] = []
 let picksCount = 0
@@ -219,6 +236,12 @@ export function initDraftView(): void {
     handleDraftScores(data as DraftScoresPayload)
   })
 
+  // Set-wide ev_p1p1 distribution (ratings prefetch) — powers setPct bands
+  window.mtgaTracker.onDraftRatings((data: unknown) => {
+    setEvSorted = (data as DraftRatingsPayload)?.setEvP1p1Sorted ?? null
+    if (draftActive && currentPack) renderPickViews()
+  })
+
   window.mtgaTracker.onDraftPick((data: unknown) => {
     handleDraftPick(data as DraftPickPayload)
   })
@@ -251,6 +274,7 @@ export function initDraftView(): void {
     if (!state.active || !state.start) return
 
     handleDraftStart(state.start)
+    setEvSorted = state.setEvP1p1Sorted ?? null
     if (state.pick) applyPickPayload(state.pick)
     if (state.pack) handleDraftPack(state.pack)
     if (state.scores) handleDraftScores(state.scores)
@@ -265,6 +289,7 @@ function handleDraftStart(data: DraftStartPayload): void {
   session = data
   currentPack = null
   currentScores = null
+  setEvSorted = null
   pool = []
   history = []
   picksCount = data.picksCount ?? 0
@@ -488,15 +513,44 @@ function formatEv(value: number | null): string {
   return Math.abs(value) < 10 ? value.toFixed(2) : value.toFixed(1)
 }
 
-/** Flame rating for a row: live model prob, or tier percentile on P1P1. */
-function flamesFor(row: DraftCardRow): FlameRating | null {
-  if (currentPack?.isTierList) return flamesFromPercentile(row.tierPct)
-  return flamesFromProb(row.prob)
+/** setPct: the row's ev_p1p1 percentile (0..1) within the whole set. */
+function setPctFor(row: DraftCardRow): number | null {
+  if (row.evP1p1 === null || !Number.isFinite(row.evP1p1) || !setEvSorted) return null
+  return percentileOfSortedAsc(row.evP1p1, setEvSorted)
 }
 
-/** True when flames should carry an honesty tag (not real model conviction). */
+/**
+ * Conviction for a live scored pack: head-to-head dominance of the top card
+ * over the runner-up (sigmoid of the EV gap), banded with the set percentile.
+ * Null when not applicable (tier list, scores pending, <2 scored cards).
+ */
+function packConviction(rows: DraftCardRow[]): Conviction | null {
+  if (!currentPack || currentPack.isTierList || !currentScores) return null
+  const dominance = dominanceFromEvs(rows.map(r => r.ev))
+  if (dominance === null) return null
+  return bandConviction(dominance, setPctFor(rows[0]), { heuristic: isHeuristic() })
+}
+
+/**
+ * Percentile-based flame rating: tier percentile on P1P1, or the set
+ * percentile when a scored pack has <2 EVs to compare head-to-head.
+ */
+function percentileFlamesFor(row: DraftCardRow): FlameRating | null {
+  const heuristic = isHeuristic()
+  if (currentPack?.isTierList) return flamesFromPercentile(row.tierPct, { heuristic })
+  if (!currentScores) return null
+  const setPct = setPctFor(row)
+  return setPct !== null ? flamesFromPercentile(setPct * 100, { heuristic }) : null
+}
+
+/**
+ * True when ratings are not real trained-model conviction (honesty guard:
+ * tags the flames and caps labels at SLAM — heuristic EVs are z-scores,
+ * not trained logits).
+ */
 function isHeuristic(): boolean {
   const model = currentScores?.model ?? serverStatus.model
+  if ((model?.kind ?? '').toLowerCase().includes('heuristic')) return true
   return !!model?.fallback || serverStatus.status !== 'green'
 }
 
@@ -596,23 +650,37 @@ function evBarPct(row: DraftCardRow, rows: DraftCardRow[]): number {
   return max > min ? ((metric - min) / (max - min)) * 100 : 100
 }
 
-/** One runner-up line: rank, name, flames (or EV when no flames exist). */
-function runnerHtml(row: DraftCardRow, rank: number): string {
-  const rating = flamesFor(row)
+/**
+ * One runner-up line: rank, name, and its own head-to-head vs the card
+ * ranked directly above it (sigmoid of the adjacent EV gap). Tier-list rows
+ * keep percentile flames; rows without EVs fall back to the raw metric.
+ */
+function runnerHtml(rows: DraftCardRow[], index: number): string {
+  const row = rows[index]
   const name = row.name ?? 'Unknown card'
-  const right = rating
-    ? flameRowHtml(rating, { small: true })
-    : `<span class="runner-ev">${formatEv(row.ev ?? row.evP1p1 ?? row.gihWr)}</span>`
+  const evFallback = `<span class="runner-ev">${formatEv(row.ev ?? row.evP1p1 ?? row.gihWr)}</span>`
+
+  let right: string
+  if (currentPack?.isTierList) {
+    const rating = percentileFlamesFor(row)
+    right = rating ? flameRowHtml(rating, { small: true }) : evFallback
+  } else {
+    const headToHead = runnerDominance(row.ev, rows[index - 1]?.ev)
+    right = headToHead !== null
+      ? `<span class="runner-pct" title="head-to-head vs. the card above">${formatDominancePct(headToHead)}</span>`
+      : evFallback
+  }
+
   return `
     <div class="runner ${row.name ? '' : 'unknown-card'}">
-      <span class="runner-rank">${rank}</span>
+      <span class="runner-rank">${index + 1}</span>
       <span class="runner-name ${rarityClass(row.rarity)}">${escapeHtml(name)}</span>
       ${right}
     </div>
   `
 }
 
-/** THE PICK: name large, flames, EV bar, tiny why-line, two runner-ups. */
+/** THE PICK: name large, flames + dominance %, EV bar, why-line, runner-ups. */
 function renderVerdict(rows: DraftCardRow[]): void {
   if (rows.length === 0) {
     verdictView.innerHTML = '<div class="draft-empty">No cards in pack</div>'
@@ -620,32 +688,41 @@ function renderVerdict(rows: DraftCardRow[]): void {
   }
 
   const top = rows[0]
-  const rating = flamesFor(top)
+  const conviction = packConviction(rows)
+  const rating: FlameRating | null = conviction
+    ? { flames: conviction.flames, label: conviction.label }
+    : percentileFlamesFor(top)
   const heuristicTag = rating && isHeuristic()
     ? '<span class="heuristic-tag">heuristic</span>'
     : ''
 
-  // Flame area: real conviction, or an honest quiet placeholder
+  // Flame area: real conviction, or an honest quiet placeholder. The shown
+  // percentage is always head-to-head dominance, never raw softmax.
   let flameArea: string
   if (rating) {
     const label = rating.label ? `<span class="flame-label">${rating.label}</span>` : ''
-    flameArea = `<div class="verdict-flames">${flameRowHtml(rating, { animate: animateFlames })}${label}${heuristicTag}</div>`
+    const pct = conviction?.showPct
+      ? `<span class="conviction-pct" title="vs. next-best card">${formatDominancePct(conviction.dominance)}</span>`
+      : ''
+    flameArea = `<div class="verdict-flames">${flameRowHtml(rating, { animate: animateFlames })}${label}${pct}${heuristicTag}</div>`
   } else if (serverStatus.status === 'red') {
     flameArea = '<div class="verdict-flames"><span class="flame-pending">stats only</span></div>'
   } else {
     flameArea = '<div class="verdict-flames"><span class="flame-pending">scoring…</span></div>'
   }
 
-  // "close call" (1 flame): show the top two side by side
-  const closeCall = rating?.flames === 1 && rows.length > 1
+  // "close call": top two side by side with their pairwise split (e.g. 52/48)
+  const closeCall = conviction !== null && conviction.closeCall && rows.length > 1
   let topHtml: string
-  if (closeCall) {
+  if (closeCall && conviction) {
+    const split = formatSplit(conviction.dominance)
     topHtml = `
       <div class="verdict-duo">
-        ${[rows[0], rows[1]].map(row => `
+        ${[rows[0], rows[1]].map((row, i) => `
           <div class="verdict-duo-card">
             <div class="verdict-name small ${rarityClass(row.rarity)}">${escapeHtml(row.name ?? 'Unknown card')}</div>
             <div class="verdict-bar"><span style="width: ${evBarPct(row, rows).toFixed(0)}%"></span></div>
+            <div class="verdict-duo-pct" title="head-to-head vs. the other card">${split[i]}%</div>
           </div>
         `).join('')}
       </div>
@@ -664,8 +741,8 @@ function renderVerdict(rows: DraftCardRow[]): void {
   }
 
   const runners = closeCall
-    ? (rows.length > 2 ? runnerHtml(rows[2], 3) : '')
-    : rows.slice(1, 3).map((row, i) => runnerHtml(row, i + 2)).join('')
+    ? (rows.length > 2 ? runnerHtml(rows, 2) : '')
+    : rows.slice(1, 3).map((_, i) => runnerHtml(rows, i + 1)).join('')
 
   verdictView.innerHTML = `
     ${topHtml}
