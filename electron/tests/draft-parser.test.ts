@@ -205,6 +205,14 @@ describe('DraftParser — edge cases', () => {
     expect(events.detailedLogs).toEqual([{ enabled: false }])
   })
 
+  it('emits detailed-logs enabled for the ENABLED sentinel (clears the warning)', () => {
+    const parser = new DraftParser()
+    const events = capture(parser)
+    parser.handleLine('DETAILED LOGS: ENABLED')
+
+    expect(events.detailedLogs).toEqual([{ enabled: true }])
+  })
+
   it('normalizes a 0-indexed LogBusinessEvents variant to 1-indexed', () => {
     const parser = new DraftParser()
     const line =

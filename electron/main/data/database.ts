@@ -666,6 +666,31 @@ export function upsertDraft(draft: {
   })
 }
 
+/** Look up a drafts row by id (used to allocate non-colliding session ids). */
+export function findDraft(draftId: string): { id: string; completedAt: string | null } | null {
+  const db = initDatabase()
+  const row = db.prepare('SELECT id, completed_at FROM drafts WHERE id = ?').get(draftId) as
+    | { id: string; completed_at: string | null }
+    | undefined
+  if (!row) return null
+  return { id: row.id, completedAt: row.completed_at }
+}
+
+/**
+ * Rename a draft's id (and its picks) — used when a session that started
+ * under a provisional event-name id learns its real draftId. UPDATE OR
+ * REPLACE merges into any rows already recorded under the real id.
+ */
+export function migrateDraftId(oldId: string, newId: string): void {
+  if (oldId === newId) return
+  const db = initDatabase()
+  const migrate = db.transaction(() => {
+    db.prepare('UPDATE OR REPLACE drafts SET id = @newId WHERE id = @oldId').run({ oldId, newId })
+    db.prepare('UPDATE OR REPLACE draft_picks SET draft_id = @newId WHERE draft_id = @oldId').run({ oldId, newId })
+  })
+  migrate()
+}
+
 /** Mark a draft complete with its final pool. */
 export function completeDraft(draftId: string, poolGrpIds: number[]): void {
   const db = initDatabase()
@@ -681,7 +706,9 @@ export function completeDraft(draftId: string, poolGrpIds: number[]): void {
 
 /**
  * Record one pick (pack contents, actual pick, and the model's verdict).
- * Keyed on (draft_id, pack, pick) so replays overwrite instead of duplicating.
+ * Keyed on (draft_id, pack, pick); replays upsert. The model columns COALESCE
+ * so a startup replay (which has no live scores) never wipes the model
+ * verdict captured live at pick time.
  */
 export function recordDraftPick(pickData: {
   draftId: string
@@ -695,10 +722,17 @@ export function recordDraftPick(pickData: {
 }): void {
   const db = initDatabase()
   const stmt = db.prepare(`
-    INSERT OR REPLACE INTO draft_picks
+    INSERT INTO draft_picks
       (draft_id, pack, pick, pack_grpids, picked_grpids, model_top_grpid, model_ev, picked_ev, ts)
     VALUES
       (@draftId, @pack, @pick, @packGrpIds, @pickedGrpIds, @modelTopGrpId, @modelEv, @pickedEv, @ts)
+    ON CONFLICT(draft_id, pack, pick) DO UPDATE SET
+      pack_grpids = excluded.pack_grpids,
+      picked_grpids = excluded.picked_grpids,
+      model_top_grpid = COALESCE(excluded.model_top_grpid, draft_picks.model_top_grpid),
+      model_ev = COALESCE(excluded.model_ev, draft_picks.model_ev),
+      picked_ev = COALESCE(excluded.picked_ev, draft_picks.picked_ev),
+      ts = COALESCE(draft_picks.ts, excluded.ts)
   `)
 
   stmt.run({

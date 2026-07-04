@@ -48,9 +48,15 @@ class DataHub:
             if paths.CARD_STORE_PARQUET.exists()
             else 0
         )
-        key = (set_code, store_mtime)
-        if key in self._cards:
-            return self._cards[key]
+        ratings_mtimes = tuple(
+            link.stat().st_mtime if (link := self._ratings_link(set_code, fmt)).exists()
+            else 0
+            for fmt in config.FORMATS
+        )
+        key = (set_code, store_mtime, ratings_mtimes)
+        cached = self._cards.get(key)
+        if cached is not None:
+            return cached
 
         cards = {}
         if paths.CARD_STORE_PARQUET.exists():
@@ -111,18 +117,29 @@ class DataHub:
     # -- stats ------------------------------------------------------------
 
     def stats(self, set_code, limited_type):
-        """name -> stat dict from own metrics, else the ratings cache."""
+        """name -> stat dict from own metrics, else the ratings cache.
+
+        Formats with no data of their own (QuickDraft — 17Lands has none)
+        borrow PremierDraft's stats, mirroring the model fallback.
+        """
         metrics_link = paths.latest_symlink(
             paths.metrics_cards_path(set_code, limited_type, "x"), prefix="cards_"
         )
         ratings_link = self._ratings_link(set_code, limited_type)
+        if (
+            limited_type != "PremierDraft"
+            and not metrics_link.exists()
+            and not ratings_link.exists()
+        ):
+            return self.stats(set_code, "PremierDraft")
         mtimes = tuple(
             p.stat().st_mtime if p.exists() else 0
             for p in [metrics_link, ratings_link]
         )
         key = (set_code, limited_type, mtimes)
-        if key in self._ratings:
-            return self._ratings[key]
+        cached = self._ratings.get(key)
+        if cached is not None:
+            return cached
 
         stats, source = {}, None
         if metrics_link.exists():
@@ -162,9 +179,12 @@ class DataHub:
     # -- scoring ----------------------------------------------------------
 
     def p1p1(self, set_code, limited_type, model):
-        key = (set_code, limited_type, model.model_id)
-        if key in self._p1p1:
-            return self._p1p1[key]
+        # cache_token carries the underlying data mtimes (set by the registry)
+        # so nightly refreshes invalidate this even for unversioned heuristics.
+        key = (set_code, limited_type, getattr(model, "cache_token", model.model_id))
+        cached = self._p1p1.get(key)
+        if cached is not None:
+            return cached
         cards = self.cards(set_code)
         scores = model.score_pack(list(cards), [])
         table = {s.grp_id: s.ev for s in scores}

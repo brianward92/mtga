@@ -33,7 +33,9 @@ import {
   recordInventorySnapshot,
   upsertDraft,
   completeDraft,
-  recordDraftPick
+  recordDraftPick,
+  findDraft,
+  migrateDraftId
 } from './data/database'
 import {
   loadCardRegistry,
@@ -116,6 +118,8 @@ let detailedLogsEnabled: boolean | null = null
 
 const draftRuntime = {
   session: null as DraftSessionSnapshot | null,
+  /** DB id for the current session (resolved once at draft-start) */
+  dbId: null as string | null,
   ratings: null as Map<number, ServerCardRow> | null,
   ratingsMeta: null as { set: string; format: string; model: ModelInfo | null; stale: boolean; fetchedAt: string | null } | null,
   lastPack: null as DraftPackPayload | null,
@@ -132,6 +136,14 @@ const draftRuntime = {
 async function createWindows(): Promise<void> {
   overlayWindow = createOverlayWindow()
   registryWindow = createRegistryWindow()
+
+  // The startup replay usually finishes before the overlay page loads, so a
+  // 'detailed-logs' send during replay is dropped. Re-send once loaded.
+  overlayWindow.webContents.on('did-finish-load', () => {
+    if (detailedLogsEnabled === false) {
+      overlayWindow?.webContents.send('detailed-logs', { enabled: false })
+    }
+  })
 
   // The startup log replay races window creation: if it already finished and
   // left us inside an active draft, surface it now that the window exists.
@@ -298,6 +310,64 @@ function draftDbId(snapshot: DraftSessionSnapshot): string {
   return snapshot.draftId ?? snapshot.eventName ?? 'unknown-draft'
 }
 
+/**
+ * Resolve the DB id for a session ONCE at draft-start. Human drafts get their
+ * real draftId; bot drafts only have an event name, which repeats across
+ * drafts of the same queue — a provisional id gets a #2/#3... suffix rather
+ * than silently overwriting a previously completed draft's rows. During the
+ * startup replay we instead converge onto the newest recorded id so replaying
+ * an already-recorded draft never duplicates rows.
+ */
+function resolveDraftDbId(snapshot: DraftSessionSnapshot): string {
+  const base = draftDbId(snapshot)
+  if (snapshot.draftId) return base
+
+  let candidate = base
+  let lastExisting: string | null = null
+  for (let n = 2; ; n++) {
+    let row: { id: string; completedAt: string | null } | null = null
+    try {
+      row = findDraft(candidate)
+    } catch (error) {
+      console.error('[DB] Failed to look up draft id:', error)
+      return base
+    }
+    if (!row) break
+    lastExisting = candidate
+    if (!row.completedAt) break // active/stub row: reuse it
+    candidate = `${base}#${n}`
+  }
+
+  if (isReplaying && lastExisting) return lastExisting
+  return candidate
+}
+
+/**
+ * DB id for pick/end writes. When a session that started under a provisional
+ * event-name id learns its real draftId (human drafts learn it at the first
+ * pack/pick event), migrate the already-written rows to the real id.
+ */
+function ensureDraftDbId(snapshot: DraftSessionSnapshot): string {
+  const real = snapshot.draftId
+  const current = draftRuntime.dbId
+
+  if (real) {
+    if (current && current !== real) {
+      try {
+        migrateDraftId(current, real)
+      } catch (error) {
+        console.error('[DB] Failed to migrate draft id:', error)
+      }
+    }
+    draftRuntime.dbId = real
+    return real
+  }
+
+  if (current) return current
+  draftRuntime.dbId = resolveDraftDbId(snapshot)
+  return draftRuntime.dbId
+}
+
 function manaValueFromCost(manaCost: string): number | null {
   if (!manaCost) return null
   let total = 0
@@ -462,6 +532,7 @@ function sendTierList(snapshot: DraftSessionSnapshot): void {
 function handleDraftStart(snapshot: DraftSessionSnapshot): void {
   console.log('[Draft] Started:', snapshot.eventName ?? snapshot.draftId ?? 'unknown', snapshot.set, snapshot.format)
   draftRuntime.session = snapshot
+  draftRuntime.dbId = null
   draftRuntime.lastPack = null
   draftRuntime.lastScores = null
   draftRuntime.scoresByPick.clear()
@@ -472,7 +543,7 @@ function handleDraftStart(snapshot: DraftSessionSnapshot): void {
 
   try {
     upsertDraft({
-      id: draftDbId(snapshot),
+      id: ensureDraftDbId(snapshot),
       eventName: snapshot.eventName,
       setCode: snapshot.set,
       format: snapshot.format
@@ -563,11 +634,12 @@ function handleDraftPick(snapshot: DraftSessionSnapshot, pick: DraftPickRecord):
   draftRuntime.session = snapshot
 
   // "My picks vs my model" review data. Human drafts only learn their
-  // draftId at the first pick/pack event, so re-upsert the drafts row here
-  // to guarantee the id the picks reference exists.
+  // draftId at the first pick/pack event: ensureDraftDbId migrates any rows
+  // written under the provisional id and guarantees the drafts row exists.
   try {
+    const dbId = ensureDraftDbId(snapshot)
     upsertDraft({
-      id: draftDbId(snapshot),
+      id: dbId,
       eventName: snapshot.eventName,
       setCode: snapshot.set,
       format: snapshot.format
@@ -580,7 +652,7 @@ function handleDraftPick(snapshot: DraftSessionSnapshot, pick: DraftPickRecord):
     const pickedEv = scores?.cards.find(card => pick.grpIds.includes(card.grpId))?.ev ?? null
 
     recordDraftPick({
-      draftId: draftDbId(snapshot),
+      draftId: dbId,
       pack: pick.pack,
       pick: pick.pick,
       packGrpIds: pick.packGrpIds,
@@ -603,7 +675,7 @@ function handleDraftEnd(snapshot: DraftSessionSnapshot): void {
   draftRuntime.session = snapshot
 
   try {
-    completeDraft(draftDbId(snapshot), snapshot.pool)
+    completeDraft(ensureDraftDbId(snapshot), snapshot.pool)
   } catch (error) {
     console.error('[DB] Failed to complete draft:', error)
   }
@@ -863,7 +935,21 @@ ipcMain.handle('format-event-id', (_, eventId: string) => {
 
 ipcMain.handle('get-draft-state', () => {
   const snapshot = logParser?.getDraftSnapshot() ?? draftRuntime.session
-  if (!snapshot) return null
+  if (!snapshot) {
+    // No draft yet: still expose server status and the detailed-logs flag so
+    // a late-attaching renderer can show the warning banner (a live
+    // 'detailed-logs' send is dropped if it fires before the page loads).
+    return {
+      active: false,
+      start: null,
+      pack: null,
+      scores: null,
+      pick: null,
+      end: null,
+      serverStatus: draftRuntime.serverStatus,
+      detailedLogsEnabled
+    }
+  }
 
   return {
     active: snapshot.state === 'active',

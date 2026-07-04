@@ -20,13 +20,22 @@ export USER="${USER:-$(id -un)}"
 
 PYTHON="${MTGA_DRAFT_PYTHON:-$REPO_ROOT/.venv-ml/bin/python}"
 
-# Prevent overlapping runs (a slow download + the next night's cron).
+# Prevent overlapping runs (a slow download + the next night's cron). The
+# lock records its holder's PID so a crash/SIGKILL can't wedge the pipeline:
+# a lock whose holder is dead gets stolen instead of blocking forever.
 LOCK="/tmp/mtga_17lands.lock"
 if ! mkdir "$LOCK" 2>/dev/null; then
-    echo "$(date '+%F %T') another run holds $LOCK; exiting"
-    exit 0
+    OTHER_PID="$(cat "$LOCK/pid" 2>/dev/null)"
+    if [ -n "$OTHER_PID" ] && kill -0 "$OTHER_PID" 2>/dev/null; then
+        echo "$(date '+%F %T') another run (pid $OTHER_PID) holds $LOCK; exiting"
+        exit 0
+    fi
+    echo "$(date '+%F %T') removing stale $LOCK (holder ${OTHER_PID:-unknown} not running)"
+    rm -rf "$LOCK"
+    mkdir "$LOCK" || exit 1
 fi
-trap 'rmdir "$LOCK"' EXIT INT TERM
+echo $$ > "$LOCK/pid"
+trap 'rm -rf "$LOCK"' EXIT INT TERM
 
 echo "$(date '+%F %T') 17lands daily: download"
 "$PYTHON" "$REPO_ROOT/scripts/run_17lands_download.py"

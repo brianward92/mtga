@@ -178,6 +178,8 @@ def train(set_code, limited_type, epochs=20, batch_size=1024, lr=1e-3, hidden=No
     for epoch in range(1, epochs + 1):
         model.train()
         for idx in _batches(len(tr_idx), batch_size, rng):
+            if len(idx) < 2:
+                continue  # BatchNorm1d can't train on a 1-row batch
             rows = tr_idx[idx]
             pool_t = torch.from_numpy(np.minimum(pool[rows], POOL_CAP).astype(np.float32))
             pack_t = torch.from_numpy(pack[rows].astype(np.float32))

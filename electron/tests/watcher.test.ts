@@ -96,6 +96,24 @@ describe('LogWatcher', () => {
     expect(lines[lines.length - 1]).toEqual({ line: 'fresh', replay: false })
   })
 
+  it('reopens from byte 0 when the inode changes without shrinking (replace-without-shrink)', async () => {
+    dir = mkdtempSync(join(tmpdir(), 'mtga-watch-'))
+    const logPath = join(dir, 'Player.log')
+    writeFileSync(logPath, 'old-content-here\n') // 17 bytes
+
+    const { lines, events } = await startWatcher(logPath)
+    expect(lines).toEqual([{ line: 'old-content-here', replay: true }])
+
+    // Replace with a NEW file of the SAME size: the size-vs-offset check
+    // cannot fire; only the st_ino change can catch this.
+    rmSync(logPath)
+    writeFileSync(logPath, 'new-content-yes!\n') // also 17 bytes
+
+    await waitFor(() => lines.some(l => l.line === 'new-content-yes!'))
+    expect(events).toContain('rotated')
+    expect(lines[lines.length - 1]).toEqual({ line: 'new-content-yes!', replay: false })
+  })
+
   it('holds partial lines until the newline arrives', async () => {
     dir = mkdtempSync(join(tmpdir(), 'mtga-watch-'))
     const logPath = join(dir, 'Player.log')

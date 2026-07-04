@@ -110,6 +110,10 @@ def resolve(set_code, limited_type):
     if model is None:
         model = RarityColorHeuristic(set_code)
 
+    # Data-version stamp: consumers caching derived results (e.g. the API's
+    # P1P1 table) key on this so a hot-swap invalidates them too.
+    model.cache_token = key
+
     _cache.clear()  # single-entry cache is plenty for one box
     _cache[key] = model
     return model

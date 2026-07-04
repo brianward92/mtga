@@ -19,7 +19,7 @@ import Database from 'better-sqlite3'
 import { app } from 'electron'
 import { join } from 'path'
 import { homedir } from 'os'
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
 
 export interface ArenaCard {
   name: string
@@ -35,14 +35,20 @@ export interface ArenaCard {
 const ARENA_RAW_DIR = join(homedir(), 'Library/Application Support/com.wizards.mtga/Downloads/Raw')
 
 const COLOR_MAP: Record<number, string> = { 1: 'W', 2: 'U', 3: 'B', 4: 'R', 5: 'G' }
+// Arena's Rarity enum: 0=token, 1=basic land, 2=common, 3=uncommon, 4=rare, 5=mythic
 const RARITY_MAP: Record<number, string> = {
   0: 'token',
-  1: 'common',
-  2: 'uncommon',
-  3: 'rare',
-  4: 'mythic',
-  5: 'land'
+  1: 'land',
+  2: 'common',
+  3: 'uncommon',
+  4: 'rare',
+  5: 'mythic'
 }
+
+// Bump when snapshot contents change meaning (e.g. the rarity enum fix): a
+// version mismatch discards the stale cache, which is rewritten on the next
+// successful Arena DB read.
+const SNAPSHOT_VERSION = 2
 
 function snapshotPath(): string {
   return join(app.getPath('userData'), 'cache', 'arena-cards.json')
@@ -170,7 +176,10 @@ function writeSnapshot(cards: Map<number, ArenaCard>): void {
     const path = snapshotPath()
     const dir = join(app.getPath('userData'), 'cache')
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-    writeFileSync(path, JSON.stringify(Object.fromEntries(cards)))
+    writeFileSync(
+      path,
+      JSON.stringify({ version: SNAPSHOT_VERSION, cards: Object.fromEntries(cards) })
+    )
   } catch (error) {
     console.error('[ArenaDB] Failed to write snapshot:', error)
   }
@@ -180,9 +189,19 @@ function loadSnapshot(): Map<number, ArenaCard> {
   try {
     const path = snapshotPath()
     if (!existsSync(path)) return new Map()
-    const data = JSON.parse(readFileSync(path, 'utf-8')) as Record<string, ArenaCard>
+    const parsed = JSON.parse(readFileSync(path, 'utf-8')) as {
+      version?: number
+      cards?: Record<string, ArenaCard>
+    }
+    if (parsed.version !== SNAPSHOT_VERSION || !parsed.cards) {
+      // Stale schema (or the legacy unversioned flat format): discard. A
+      // fresh snapshot is written on the next successful Arena DB read.
+      console.log('[ArenaDB] Discarding outdated snapshot (schema version change)')
+      rmSync(path, { force: true })
+      return new Map()
+    }
     const cards = new Map<number, ArenaCard>()
-    for (const [grpId, card] of Object.entries(data)) {
+    for (const [grpId, card] of Object.entries(parsed.cards)) {
       cards.set(parseInt(grpId, 10), card)
     }
     console.log(`[ArenaDB] Loaded ${cards.size} cards from snapshot`)

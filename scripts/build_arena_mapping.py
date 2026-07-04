@@ -33,7 +33,9 @@ OUTPUT_DIR = Path(__file__).parent.parent / "data"
 OUTPUT_FILE = OUTPUT_DIR / "arena_mapping.json"
 
 COLOR_MAP = {1: "W", 2: "U", 3: "B", 4: "R", 5: "G"}
-RARITY_MAP = {0: "token", 1: "common", 2: "uncommon", 3: "rare", 4: "mythic", 5: "land"}
+# Arena's Rarity enum (per the 17Lands/Draftmancer reference extractors):
+# 1=land, 2=common, 3=uncommon, 4=rare, 5=mythic.
+RARITY_MAP = {0: "token", 1: "land", 2: "common", 3: "uncommon", 4: "rare", 5: "mythic"}
 
 
 def find_arena_db() -> Path | None:

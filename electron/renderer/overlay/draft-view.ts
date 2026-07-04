@@ -94,7 +94,7 @@ interface ServerStatusPayload {
 
 interface DraftStatePayload {
   active: boolean
-  start: DraftStartPayload
+  start: DraftStartPayload | null
   pack: DraftPackPayload | null
   scores: DraftScoresPayload | null
   pick: DraftPickPayload | null
@@ -202,7 +202,7 @@ export function initDraftView(): void {
     if (state.detailedLogsEnabled === false) {
       logWarning.style.display = 'block'
     }
-    if (!state.active) return
+    if (!state.active || !state.start) return
 
     handleDraftStart(state.start)
     if (state.pick) applyPickPayload(state.pick)

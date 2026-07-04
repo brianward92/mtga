@@ -83,7 +83,9 @@ def main():
         total += 1
         mark = "=" if hit else " "
         top_str = ", ".join(
-            f"{seen_names.get(s.grp_id, '?')} ({s.ev:+.1f})" for s in top
+            f"{seen_names.get(s.grp_id, '?')} "
+            f"({f'{s.ev:+.1f}' if s.ev is not None else '?'})"
+            for s in top
         )
         print(f"P{int(pack_number) + 1}P{int(pick_number) + 1:>2} {mark} "
               f"human: {vocab[pick_index] if pick_index >= 0 else '?':<30} "

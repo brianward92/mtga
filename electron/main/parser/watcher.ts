@@ -14,8 +14,8 @@
  * Tailing: byte-offset incremental reads via fs.createReadStream({ start }).
  * Byte offsets are never mixed with JS string indices; complete lines are
  * decoded by LineSplitter. On stat.size < lastOffset the file was recreated:
- * reopen from 0 (fresh session, live). A 60s mtime-vs-offset force-refresh
- * catches replace-without-shrink (re-read from 0, flagged replay).
+ * reopen from 0 (fresh session, live). Replace-without-shrink is caught by
+ * inode tracking: a changed st_ino means a new file, reopen from 0.
  *
  * MTGA_LOG_PATH env var overrides the target file (its directory is watched)
  * for replay testing.
@@ -47,7 +47,6 @@ export interface LogWatcherOptions {
   watchLegacyLogs?: boolean
 }
 
-const FORCE_REFRESH_MS = 60_000
 // Polling backstop (one stat/s when idle): fsevents can miss writes that land
 // right after watch setup, and the reference 17Lands follower polls anyway.
 const POLL_INTERVAL_MS = 1_000
@@ -58,8 +57,8 @@ class FileTail {
   private splitter = new LineSplitter()
   private reading = false
   private pendingPoll: boolean | null = null
-  /** Wall-clock time of the last successful stat+read cycle. */
-  lastConsumeMs = 0
+  /** Inode at the last stat — a changed st_ino means the file was replaced. */
+  private lastIno: number | null = null
 
   constructor(
     readonly filePath: string,
@@ -75,11 +74,13 @@ class FileTail {
   reset(): void {
     this.offset = 0
     this.splitter.reset()
+    this.lastIno = null
   }
 
   seekToEnd(size: number): void {
     this.offset = size
     this.splitter.reset()
+    this.lastIno = null
   }
 
   /**
@@ -112,22 +113,29 @@ class FileTail {
 
   private async readNewBytes(replay: boolean): Promise<void> {
     let size: number
+    let ino: number
     try {
       const stats = await stat(this.filePath)
       size = stats.size
+      ino = stats.ino
     } catch {
       return // file missing (Arena not started / mid-rotation): keep waiting
     }
 
-    if (size < this.offset) {
+    if (this.lastIno !== null && ino !== this.lastIno) {
+      // Same path, new inode: the file was replaced — possibly without
+      // shrinking, which the size check below would miss. Re-read from 0.
+      this.reset()
+      this.onTruncated?.()
+    } else if (size < this.offset) {
       // File was recreated (Arena restart): re-read from 0. Content is a
       // brand-new session, so it is live, not replay.
       this.reset()
       this.onTruncated?.()
     }
+    this.lastIno = ino
 
     if (size === this.offset) {
-      this.lastConsumeMs = Date.now()
       return
     }
 
@@ -147,8 +155,6 @@ class FileTail {
       stream.on('end', () => resolve())
       stream.on('close', () => resolve())
     })
-
-    this.lastConsumeMs = Date.now()
   }
 }
 
@@ -160,7 +166,6 @@ export class LogWatcher extends EventEmitter {
 
   private playerTail: FileTail
   private watcher: FSWatcher | null = null
-  private refreshTimer: NodeJS.Timeout | null = null
   private pollTimer: NodeJS.Timeout | null = null
   private stopped = false
 
@@ -236,40 +241,15 @@ export class LogWatcher extends EventEmitter {
     this.watcher.on('add', onFsEvent)
     this.watcher.on('error', (error) => this.emit('error', error as Error))
 
-    // ---- Polling backstop for events chokidar misses
+    // ---- Polling backstop for events chokidar misses (also drives the
+    // inode-change replace-without-shrink detection in FileTail)
     this.pollTimer = setInterval(() => {
       void this.playerTail.poll(false)
     }, POLL_INTERVAL_MS)
 
-    // ---- 60s mtime-vs-offset force refresh (replace-without-shrink)
-    this.refreshTimer = setInterval(() => {
-      void this.forceRefreshCheck()
-    }, FORCE_REFRESH_MS)
-
     // ---- Optional legacy UTC_Log secondary watch
     if (this.watchLegacy) {
       this.startLegacyWatch()
-    }
-  }
-
-  private async forceRefreshCheck(): Promise<void> {
-    try {
-      const stats = await stat(this.logPath)
-      if (stats.mtimeMs <= this.playerTail.lastConsumeMs + FORCE_REFRESH_MS) return
-
-      if (stats.size !== this.playerTail.byteOffset) {
-        // chokidar missed events: catch up incrementally
-        await this.playerTail.poll(false)
-      } else {
-        // Same size but stale offset: file was replaced without shrinking.
-        // Re-read from 0; content largely seen before, so flag as replay.
-        this.emit('replay-start')
-        this.playerTail.reset()
-        await this.playerTail.poll(true)
-        this.emit('replay-complete')
-      }
-    } catch {
-      // file missing: nothing to refresh
     }
   }
 
@@ -365,10 +345,6 @@ export class LogWatcher extends EventEmitter {
     this.watcher = null
     this.legacyWatcher?.close()
     this.legacyWatcher = null
-    if (this.refreshTimer) {
-      clearInterval(this.refreshTimer)
-      this.refreshTimer = null
-    }
     if (this.pollTimer) {
       clearInterval(this.pollTimer)
       this.pollTimer = null
