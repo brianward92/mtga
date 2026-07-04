@@ -223,8 +223,11 @@ def curate_draft(set_code, limited_type, force=False):
     if missing:
         raise ValueError(f"required draft columns missing from {source}: {missing}")
     vocab = cards[PACK_PREFIX]
-    if cards[POOL_PREFIX] != vocab:
-        raise ValueError(f"pack/pool column order mismatch in {source}")
+    # Some dumps (e.g. DMU) order the pool_ block differently from the
+    # pack_card_ block. Harmless — every consumer selects these columns by
+    # name — so only a genuine card-set difference is an error.
+    if set(cards[POOL_PREFIX]) != set(vocab):
+        raise ValueError(f"pack/pool card-name mismatch in {source}")
 
     out.parent.mkdir(parents=True, exist_ok=True)
     con = _connect()

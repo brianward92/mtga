@@ -24,6 +24,13 @@ MODELS_DIR = DATA_ROOT / "models"
 SCRYFALL_PROCESSED_DIR = DATA_ROOT / "processed"
 SCRYFALL_CARDS_PARQUET = SCRYFALL_PROCESSED_DIR / "cards.parquet"
 SCRYFALL_SETS_PARQUET = SCRYFALL_PROCESSED_DIR / "sets.parquet"
+SCRYFALL_FACES_PARQUET = SCRYFALL_PROCESSED_DIR / "card_faces.parquet"
+
+# DraftFM cross-set card feature store (mtga/foundation/featurize.py).
+FEATURES_DIR = LANDS_DIR / "features"
+FEATURIZER_MANIFEST = FEATURES_DIR / "featurizer_manifest.json"
+CARDFEATS_PARQUET = FEATURES_DIR / "cardfeats_v1.parquet"
+TEXT_EMB_CACHE = FEATURES_DIR / "text_emb" / "bge-small-en-v1.5.npz"
 
 CARD_STORE_PARQUET = CARDS_DIR / "card_store.parquet"
 CARDS_CSV = CARDS_DIR / "cards.csv"

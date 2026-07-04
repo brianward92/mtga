@@ -45,6 +45,11 @@ def data_root(tmp_path, monkeypatch):
         "SCRYFALL_PROCESSED_DIR": root / "processed",
         "SCRYFALL_CARDS_PARQUET": root / "processed" / "cards.parquet",
         "SCRYFALL_SETS_PARQUET": root / "processed" / "sets.parquet",
+        "SCRYFALL_FACES_PARQUET": root / "processed" / "card_faces.parquet",
+        "FEATURES_DIR": lands / "features",
+        "FEATURIZER_MANIFEST": lands / "features" / "featurizer_manifest.json",
+        "CARDFEATS_PARQUET": lands / "features" / "cardfeats_v1.parquet",
+        "TEXT_EMB_CACHE": lands / "features" / "text_emb" / "bge-small-en-v1.5.npz",
         "CARD_STORE_PARQUET": lands / "cards" / "card_store.parquet",
         "CARDS_CSV": lands / "cards" / "cards.csv",
         "ABILITIES_CSV": lands / "cards" / "abilities.csv",
@@ -53,7 +58,7 @@ def data_root(tmp_path, monkeypatch):
         monkeypatch.setattr(paths, name, value)
     for name in ["RAW_DIR", "CARDS_DIR", "CARD_RATINGS_DIR", "COLOR_RATINGS_DIR",
                  "CURATED_DIR", "METRICS_DIR", "MODELS_DIR",
-                 "SCRYFALL_PROCESSED_DIR"]:
+                 "SCRYFALL_PROCESSED_DIR", "FEATURES_DIR"]:
         layout[name].mkdir(parents=True, exist_ok=True)
 
     # The registry cache key omits the data root itself (it hashes symlink

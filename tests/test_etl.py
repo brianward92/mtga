@@ -102,12 +102,32 @@ def test_curate_draft_missing_raw(data_root):
     assert result["status"] == "MISSING_RAW"
 
 
-def test_curate_draft_pack_pool_order_mismatch_raises(data_root):
+def test_curate_draft_pool_column_order_is_irrelevant(data_root):
+    # Real dumps (e.g. DMU) order the pool_ block differently from
+    # pack_card_. Consumers select by name, so curation must succeed and
+    # values must stay keyed to the right cards.
+    import pandas as pd
+
     dest = paths.raw_dataset_path("draft", SET, FMT)
     _synth.write_draft_csv(
         dest, _synth.hand_draft_rows(), pool_order=list(reversed(VOCAB))
     )
-    with pytest.raises(ValueError, match="pack/pool column order mismatch"):
+    result = etl.curate_draft(SET, FMT)
+    assert result["status"] == "CURATED"
+    frame = pd.read_parquet(result["path"])
+    # Second pick of draft d1 has the first pick (A) in pool per the hand
+    # rows; reversed column order must not shuffle that onto another card.
+    a = VOCAB[0]
+    d1p2 = frame[(frame["draft_id"] == "d1") & (frame["pick_number"] == 1)]
+    assert int(d1p2[f"pool_{a}"].iloc[0]) == 1
+
+
+def test_curate_draft_pack_pool_name_set_mismatch_raises(data_root):
+    dest = paths.raw_dataset_path("draft", SET, FMT)
+    _synth.write_draft_csv(
+        dest, _synth.hand_draft_rows(), pool_order=VOCAB[:-1] + ["Imposter Card"]
+    )
+    with pytest.raises(ValueError, match="pack/pool card-name mismatch"):
         etl.curate_draft(SET, FMT)
 
 
