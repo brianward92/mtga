@@ -108,7 +108,11 @@ Predictions cached at
 Frozen (sha256s in `experiments/frozen_battery.json`, committed pre-T0):
 
 1. **F-full** — final recipe, all 31 sets (headline; its dev numbers are
-   meaningless and never quoted).
+   meaningless and never quoted). *Pre-registered flexibility:* the optional
+   extras {Cube-Powered (2.6M picks, 545-card paper pool), VOW-QuickDraft
+   (0.4M human picks in bot pods)} join F-full's training data if and only
+   if the A-extras dev ablation improves the dev-trio mean; the decision is
+   frozen with the battery and reported either way.
 2. **F-dev** — universe minus dev trio (the model whose dev numbers appear
    in the paper; doubles as the top scaling rung).
 3. **Scaling rungs** S1={NEO}, S2=+DSK, S4=+DMU,FIN, S8=+STX,MOM,BLB,TLA,
