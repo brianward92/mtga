@@ -47,9 +47,14 @@ class TrainConfig:
     device: str = "mps"
     parity_check: bool = True
     no_text: bool = False  # ablation: drop the 384-d text embedding block
+    skill_filter: bool = False  # ablation: expert picks only (old v1 recipe)
 
 
-def load_shards(pairs, no_text=False):
+EXPERT_WR_ID = 28    # round(0.55 * 50)
+EXPERT_GAMES_ID = 4  # index of 100 in GAMES_BUCKETS
+
+
+def load_shards(pairs, no_text=False, skill_filter=False):
     shards = []
     for set_code, limited_type in pairs:
         d = shard_dir(set_code, limited_type)
@@ -59,6 +64,12 @@ def load_shards(pairs, no_text=False):
             matrix = matrix[:, :391]  # structured block only
         features = torch.from_numpy(matrix)
         shard = Shard(set_code, limited_type, features)
+        if skill_filter:
+            ctx = shard.context[:]
+            expert = ((ctx[:, 2] >= EXPERT_WR_ID) & (ctx[:, 2] != 255)
+                      & (ctx[:, 3] >= EXPERT_GAMES_ID))
+            shard.train_idx = shard.train_idx[expert[shard.train_idx]]
+            shard.val_idx = shard.val_idx[expert[shard.val_idx]]
         shard.rarity_ids = torch.from_numpy(assets["rarity_ids"].astype(np.int64))
         shard.set_scalars = torch.tensor([
             shard.meta["vocab_size"] / 400.0,
@@ -238,7 +249,8 @@ def train(config):
     if device == "mps" and not torch.backends.mps.is_available():
         raise RuntimeError("MPS not available")
 
-    shards = load_shards(config.sets, no_text=config.no_text)
+    shards = load_shards(config.sets, no_text=config.no_text,
+                         skill_filter=config.skill_filter)
     total_train = sum(len(s.train_idx) for s in shards)
     steps = config.max_steps or int(config.epochs * total_train / config.batch_size)
     run_id = runlog.new_run_id(config.name)
