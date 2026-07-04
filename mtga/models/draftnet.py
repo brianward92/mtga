@@ -69,7 +69,7 @@ def load_pick_arrays(set_code, limited_type, min_wr_bucket=DEFAULT_MIN_WR_BUCKET
     meta = con.execute(
         f"""
         SELECT pick_index, draft_id, pack_number, pick_number,
-               user_game_win_rate_bucket
+               user_game_win_rate_bucket, user_n_games_bucket
         FROM '{parquet}' WHERE {where}
         """
     ).df()

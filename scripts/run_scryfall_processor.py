@@ -105,8 +105,10 @@ def process_cards(cards_iter):
     faces_data = []
 
     for card in cards_iter:
-        # Skip non-English and digital-only cards
-        if card.get("lang") != "en" or card.get("digital"):
+        # Skip non-English cards. Digital-only cards are KEPT (with a flag):
+        # Arena-only printings (Alchemy sets like HBG, digital reprints) are
+        # drafted on Arena and must be joinable by name for the draft models.
+        if card.get("lang") != "en":
             continue
 
         # Extract prices
@@ -132,6 +134,7 @@ def process_cards(cards_iter):
             "loyalty": card.get("loyalty"),
             "keywords": ",".join(card.get("keywords") or []),
             "layout": card.get("layout"),
+            "digital": bool(card.get("digital")),
             **image_urls,
             **prices,
         }
@@ -145,6 +148,7 @@ def process_cards(cards_iter):
                 "set_name": card.get("set_name"),
                 "set_type": card.get("set_type"),
                 "released_at": card.get("released_at"),
+                "digital": bool(card.get("digital")),
             }
 
         # Handle multi-faced cards

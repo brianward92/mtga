@@ -117,6 +117,10 @@ def resolve_default_set_codes(cards_df, sets_df):
             & sets_with_dates["released_at"].notna()
             & (sets_with_dates["released_at"] <= today)
         )
+        # Digital-only (Arena/Alchemy) sets exist in the parquet for the
+        # draft models but never belong in the paper-inventory dropdown.
+        if "digital" in sets_with_dates.columns:
+            auto_mask &= ~sets_with_dates["digital"].fillna(False)
         if min_release_date is not None:
             auto_mask &= sets_with_dates["released_at"] >= min_release_date
         auto_sets = sets_with_dates[auto_mask]["set"].tolist()

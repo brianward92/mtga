@@ -31,7 +31,12 @@ def build_card_store(verbose=True):
         "id", "name", "set", "collector_number", "colors", "mana_cost",
         "type_line", "image_small_url", "image_normal_url",
     ]
-    scry = pd.read_parquet(paths.SCRYFALL_CARDS_PARQUET, columns=scry_cols)
+    try:
+        scry = pd.read_parquet(
+            paths.SCRYFALL_CARDS_PARQUET, columns=scry_cols + ["digital"]
+        )
+    except Exception:  # pre-digital-column parquet
+        scry = pd.read_parquet(paths.SCRYFALL_CARDS_PARQUET, columns=scry_cols)
     scry = scry.rename(columns={"id": "scryfall_id"})
     sets = pd.read_parquet(paths.SCRYFALL_SETS_PARQUET)
     scry = scry.merge(sets[["set", "released_at"]], on="set", how="left")
@@ -47,8 +52,14 @@ def build_card_store(verbose=True):
 
     def take(frame, on_left, on_right, label):
         candidates = scry.rename(columns={on_right: "_key"})
-        # Within a key, prefer the newest printing.
-        candidates = candidates.sort_values("released_at", ascending=False)
+        # Within a key, prefer paper printings (better images/collector
+        # numbers), then the newest.
+        if "digital" in candidates.columns:
+            candidates = candidates.sort_values(
+                ["digital", "released_at"], ascending=[True, False]
+            )
+        else:
+            candidates = candidates.sort_values("released_at", ascending=False)
         merged = frame.merge(
             candidates.drop_duplicates(subset=["_key", "set_norm"])[
                 ["_key", "set_norm"] + join_cols
@@ -77,9 +88,14 @@ def build_card_store(verbose=True):
     # Pass 3: name only, newest printing anywhere.
     missing = result["scryfall_id"].isna()
     if missing.any():
+        if "digital" in scry.columns:
+            ranked_by_name = scry.sort_values(
+                ["digital", "released_at"], ascending=[True, False]
+            )
+        else:
+            ranked_by_name = scry.sort_values("released_at", ascending=False)
         by_name = (
-            scry.sort_values("released_at", ascending=False)
-            .drop_duplicates(subset=["name_norm"])
+            ranked_by_name.drop_duplicates(subset=["name_norm"])
             .set_index("name_norm")[join_cols]
         )
         fallback = lands.loc[missing.values, "name_norm"].map(by_name.to_dict("index"))
