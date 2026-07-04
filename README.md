@@ -115,3 +115,53 @@ Restart:
 `electron/` contains a separate Electron desktop app named MTGA Tracker. It is
 for MTG Arena log parsing, overlay display, match history, and Arena inventory
 snapshots. It is not the web inventory app served on port `8000`.
+
+## Draft Assistant
+
+A self-hosted draft advisor (free untapped.gg replacement): this box holds the
+data, trains the models, and serves an EV-per-card API; the MTGA Tracker
+overlay on the gaming machine tails `Player.log` locally and calls the API.
+Card stats come from 17Lands public data (CC BY 4.0) — anything user-facing
+must display "Data from 17Lands.com".
+
+Server pieces (all in `mtga/lands/`, `mtga/models/`, `mtga/draft_api.py`):
+
+1. `scripts/run_17lands_download.py` — ETag-conditional S3 sync of
+   `draft_data`/`game_data` per tracked set/format (see
+   `mtga/lands/config.py`), plus a strictly once-per-day cache of the site's
+   `card_ratings`/`color_ratings` JSON (the new-set cold-start feed).
+2. `scripts/build_card_store.py` — canonical grpId table joining 17Lands
+   `cards.csv` with the nightly Scryfall parquet.
+3. `scripts/run_17lands_etl.py` — duckdb: raw gz CSV -> typed zstd parquet +
+   the per-set card vocabulary sidecar.
+4. `scripts/run_17lands_metrics.py` — own GIH/OH/GD/GNS win rates, IWD, ALSA,
+   ATA with empirical-Bayes shrinkage (`--report` prints a top-20 table).
+5. `scripts/train_pick_model.py` — DraftNet-style MLP (pool vector -> per-card
+   EV, torch 2.2.2 -> ONNX). Promotion to `latest` is gated on beating the
+   incumbent's top-quartile pick agreement on held-out drafts.
+   `scripts/replay_draft.py` replays a held-out draft, model vs human.
+6. `scripts/serve_draft_api.py` — stdlib JSON API on `0.0.0.0:8100`
+   (`/api/v1/{health,sets,cards,ratings,models,score}`), screen session
+   `mtga-draft` via `scripts/run_draft_api.sh`.
+
+Environments: `.venv` (web/pipeline) and `.venv-ml` (torch pins; disposable)
+— both Python 3.12 built by `scripts/setup.sh` / `scripts/setup_ml.sh`
+(Homebrew python if available, else a uv-managed CPython).
+
+Nightly automation (add to crontab; offset from the midnight Scryfall jobs):
+
+- `30 2 * * * /Users/bward/src/mtga/scripts/daily_17lands.sh >> /tmp/cron_17lands.log 2>&1`
+- `15 4 * * * /Users/bward/src/mtga/scripts/run_draft_api.sh >> /tmp/cron_draft_api.log 2>&1`
+
+Health checks:
+
+```bash
+screen -ls                                  # detached mtga-draft session
+curl -fsS http://127.0.0.1:8100/api/v1/health
+```
+
+Data lives under `/opt/$USER/dat/mtga/17lands/` and models under
+`/opt/$USER/dat/mtga/models/<SET>/<FORMAT>/<version>/` with a `latest`
+symlink. New sets: site ratings serve a heuristic model from day 1; the bulk
+draft dump appears ~2 weeks after release and the nightly job trains and
+promotes the real model automatically.

@@ -33,13 +33,30 @@ pick_base_python() {
             return 0
         fi
     fi
-    # Fallback: Apple's system python3 (older, but always present and not sbwco).
+    # Fallback: a uv-managed standalone CPython (user-space, no sudo/brew).
+    # On this box brew's python@3.12 install is blocked by admin-owned dirs
+    # under /usr/local (fix: sudo chown -R $(whoami):admin $(brew --prefix)/*).
+    local uv_bin="$HOME/.local/bin/uv"
+    if [ ! -x "$uv_bin" ] && command -v uv >/dev/null 2>&1; then
+        uv_bin="$(command -v uv)"
+    fi
+    if [ -x "$uv_bin" ]; then
+        echo "==> brew python unavailable; using uv-managed CPython ${PY_VERSION}" >&2
+        "$uv_bin" python install "$PY_VERSION" >&2
+        local uv_python
+        uv_python="$("$uv_bin" python find "$PY_VERSION" 2>/dev/null)"
+        if [ -x "$uv_python" ]; then
+            echo "$uv_python"
+            return 0
+        fi
+    fi
+    # Last resort: Apple's system python3 (3.9 — too old for the ML stack).
     if [ -x /usr/bin/python3 ]; then
-        echo "==> Homebrew python@${PY_VERSION} unavailable; falling back to /usr/bin/python3" >&2
+        echo "==> WARNING: falling back to /usr/bin/python3 (3.9)" >&2
         echo /usr/bin/python3
         return 0
     fi
-    echo "ERROR: no suitable base Python found (need brew python@${PY_VERSION} or /usr/bin/python3)" >&2
+    echo "ERROR: no suitable base Python found (brew python@${PY_VERSION}, uv, or /usr/bin/python3)" >&2
     return 1
 }
 

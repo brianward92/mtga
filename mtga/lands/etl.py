@@ -92,6 +92,16 @@ def _quote(identifier):
     return '"' + identifier.replace('"', '""') + '"'
 
 
+def _columns_struct(columns):
+    """read_csv columns= struct literal with identifier-quoted keys.
+
+    json.dumps would backslash-escape embedded double quotes (e.g.
+    `pack_card_Henzie "Toolbox" Torre`), which DuckDB identifier syntax
+    rejects — identifiers escape quotes by doubling them.
+    """
+    return "{" + ", ".join(f"{_quote(n)}: '{t}'" for n, t in columns.items()) + "}"
+
+
 def _source_etag(raw_path):
     meta = paths.meta_path(raw_path)
     if meta.exists():
@@ -143,7 +153,7 @@ def curate_draft(set_code, limited_type, force=False):
     )
     con.executemany("INSERT INTO vocab VALUES (?, ?)", list(zip(vocab, range(len(vocab)))))
 
-    columns_arg = json.dumps(columns)
+    columns_arg = _columns_struct(columns)
     select_cols = ", ".join(f"d.{_quote(c)}" for c in header)
     tmp = out.parent / f".{out.name}.part"
     con.execute(
@@ -190,7 +200,7 @@ def curate_game(set_code, limited_type, force=False):
             raise ValueError(f"card column mismatch across prefixes in {raw}")
 
     out.parent.mkdir(parents=True, exist_ok=True)
-    columns_arg = json.dumps(columns)
+    columns_arg = _columns_struct(columns)
     tmp = out.parent / f".{out.name}.part"
     con = _connect()
     con.execute(
