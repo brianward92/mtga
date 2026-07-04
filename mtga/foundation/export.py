@@ -130,7 +130,7 @@ def export_graphs(model, out_dir):
         dynamic_shapes=({0: n_cards},), dynamo=True, opset_version=OPSET,
     )
     torch.onnx.export(
-        _SetEncoderGraph(model),
+        _SetEncoderGraph(model).eval(),
         (torch.randn(8, d), torch.randint(0, 6, (8,))),
         str(out_dir / "set_encoder.onnx"),
         input_names=["card_emb", "rarity_ids"], output_names=["set_summary"],
@@ -152,7 +152,7 @@ def export_graphs(model, out_dir):
         torch.randn(d),                             # set_summary
     )
     torch.onnx.export(
-        _ScorerGraph(model), scorer_args, str(out_dir / "scorer.onnx"),
+        _ScorerGraph(model).eval(), scorer_args, str(out_dir / "scorer.onnx"),
         input_names=["pool_emb", "pool_counts", "pool_mask", "pack_emb",
                      "pack_mask", "wr_id", "games_id", "format_id",
                      "position", "set_scalars", "set_summary"],

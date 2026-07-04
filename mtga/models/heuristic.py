@@ -25,6 +25,13 @@ RARITY_PRIOR = {"mythic": 0.5, "rare": 0.35, "uncommon": 0.1, "common": 0.0}
 COMMITMENT_PICKS = 18  # pool size at which color commitment saturates
 
 
+def _text(value):
+    """Parquet string field with nulls flattened to '' (NaN is truthy, so
+    `value or ""` silently keeps the float and crashes color parsing —
+    colorless cards carry NaN color_identity in the card store)."""
+    return value if isinstance(value, str) else ""
+
+
 def _load_from_metrics(set_code, limited_type):
     dated = paths.metrics_cards_path(set_code, limited_type, "x")
     link = paths.latest_symlink(dated, prefix="cards_")
@@ -43,8 +50,8 @@ def _load_from_metrics(set_code, limited_type):
     for row in frame.itertuples():
         record = {
             "name": row.name,
-            "colors": row.color_identity or "",
-            "rarity": row.rarity or "common",
+            "colors": _text(row.color_identity),
+            "rarity": _text(row.rarity) or "common",
             "wr": row.gih_wr_shrunk,
             "n": int(row.gih_games) if row.gih_games == row.gih_games else 0,
         }
@@ -168,8 +175,8 @@ class RarityColorHeuristic:
         in_set = store[store["expansion"] == set_code]
         self.cards = {
             int(row.grp_id): {
-                "colors": row.color_identity or "",
-                "rarity": (row.rarity or "common").lower(),
+                "colors": _text(row.color_identity),
+                "rarity": (_text(row.rarity) or "common").lower(),
             }
             for row in in_set.itertuples()
         }

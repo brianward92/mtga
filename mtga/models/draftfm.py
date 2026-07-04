@@ -85,6 +85,11 @@ class OnnxDraftFMModel:
                 f"{expected[:12]} vs assets {assets['manifest_hash'][:12]} "
                 f"(rebuild the set assets)")
 
+        # Match the model's expected feature width (no-text exports use 391).
+        feat_dim = self.meta.get("feat_dim")
+        if feat_dim and assets["features"].shape[1] > feat_dim:
+            assets["features"] = assets["features"][:, :feat_dim]
+
         providers = ["CPUExecutionProvider"]
         card_encoder = onnxruntime.InferenceSession(
             str(version_dir / "card_encoder.onnx"), providers=providers)

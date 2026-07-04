@@ -106,8 +106,10 @@ def file_sha256(path):
 
 def check_artifact_sha(path, expected, label):
     path = Path(path)
-    if not path.exists():
-        raise RefusalError(f"{label}: artifact missing at {path}")
+    if not path.is_file():
+        raise RefusalError(
+            f"{label}: no artifact FILE at {path} (freeze the file itself, "
+            f"e.g. runs/<id>/best.pt, not its directory)")
     actual = file_sha256(path)
     if actual != expected:
         raise RefusalError(
@@ -430,6 +432,9 @@ def run(args):
     members = battery.get("models", [])
     if not members:
         raise RefusalError("battery lists no models")
+    if not rehearse:
+        # Pre-registration must be complete before any data is touched.
+        check_battery_hashes(battery)
 
     raw_snapshot = paths.raw_dataset_path("draft", set_code, fmt)
     if not raw_snapshot.exists():
@@ -448,7 +453,6 @@ def run(args):
                 check_artifact_sha(member.get("path") or member.get("run"),
                                    member["sha256"], member.get("name", "?"))
     else:
-        check_battery_hashes(battery)
         frozen = battery["frozen_snapshot"]
         if Path(frozen["path"]).name != raw_snapshot.name:
             raise RefusalError(

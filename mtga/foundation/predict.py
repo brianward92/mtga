@@ -53,7 +53,9 @@ def foundation_predictions(model, set_code, limited_type, device="cpu",
     assets = np.load(d / "features.npz")
     matrix = assets["features"].astype(np.float32)
     # Match the model's expected feature width (no-text ablations use 391).
-    expected = model.card_encoder.net[0].normalized_shape[0]
+    # Sized from the input-LayerNorm weight: ManualLayerNorm (post-M4-Max
+    # fix) has no normalized_shape attribute.
+    expected = model.card_encoder.net[0].weight.shape[0]
     if matrix.shape[1] != expected:
         matrix = matrix[:, :expected]
     features = torch.from_numpy(matrix)

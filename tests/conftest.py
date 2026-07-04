@@ -119,6 +119,31 @@ def curated_game(game_raw):
 
 
 @pytest.fixture
+def stub_ort(monkeypatch):
+    """Route onnxruntime.InferenceSession to the deterministic DraftFM stub
+    (_synth.StubOrtSession). Tests that also need REAL per-set ONNX models
+    must not request this fixture."""
+    import onnxruntime
+
+    _synth.StubOrtSession.last_scorer_feeds = None
+    monkeypatch.setattr(onnxruntime, "InferenceSession",
+                        _synth.StubOrtSession)
+    return _synth.StubOrtSession
+
+
+@pytest.fixture
+def make_foundation_version(data_root):
+    """Factory: write a DraftFM foundation version dir + latest symlink."""
+    return _synth.write_foundation_version
+
+
+@pytest.fixture
+def draftfm_assets(data_root):
+    """Per-set DraftFM assets npz for the synthetic TST set."""
+    return _synth.write_draftfm_assets()
+
+
+@pytest.fixture
 def make_onnx_version(data_root):
     """Factory: write a deterministic ONNX model version dir + latest symlink.
 

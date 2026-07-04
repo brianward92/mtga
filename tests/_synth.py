@@ -297,3 +297,96 @@ def write_ratings_cache(set_code=SET, limited_type=FMT, date_str="2026-01-01",
     with open(dated, "w") as fh:
         json.dump(ratings_rows() if rows is None else rows, fh)
     return paths.repoint_latest(dated)
+
+
+# ---------------------------------------------------------------------------
+# DraftFM foundation serving fixtures (registry tier + OnnxDraftFMModel).
+
+FOUNDATION_MANIFEST_HASH = "synth-manifest-hash"
+DRAFTFM_D = 4          # stub embedding dim == feature dim (identity encoder)
+DRAFTFM_NULL = 7.0     # constants.npz pool_null_input fill value
+
+
+class StubOrtSession:
+    """Deterministic stand-in for onnxruntime.InferenceSession over the three
+    DraftFM graphs. card_encoder is the identity (feat dim == d), set_encoder
+    is the mean card embedding, and the scorer scores each pack candidate by
+    the sum of its embedding — so with diag features the ranking is exact.
+    The scorer's feeds are captured for input-wiring assertions."""
+
+    last_scorer_feeds = None
+
+    def __init__(self, path, providers=None):
+        self.path = str(path)
+
+    def run(self, outputs, feeds):
+        import numpy as np
+
+        if self.path.endswith("card_encoder.onnx"):
+            return [feeds["features"].astype(np.float32)]
+        if self.path.endswith("set_encoder.onnx"):
+            return [feeds["card_emb"].mean(axis=0)]
+        StubOrtSession.last_scorer_feeds = {
+            k: np.array(v) for k, v in feeds.items()
+        }
+        logits = feeds["pack_emb"].sum(axis=-1).astype(np.float32)
+        logits[feeds["pack_mask"]] = float("-inf")
+        return [logits]
+
+
+def write_foundation_version(tag="v1", fmt=None, wr_id=33, games_id=6,
+                             manifest_hash=FOUNDATION_MANIFEST_HASH,
+                             point_latest=True):
+    """Foundation version dir (3 stub graphs + constants + meta) + latest."""
+    import numpy as np
+
+    base = paths.MODELS_DIR / "_foundation"
+    out = (base / fmt / tag) if fmt else (base / tag)
+    out.mkdir(parents=True, exist_ok=True)
+    for graph in ["card_encoder.onnx", "set_encoder.onnx", "scorer.onnx"]:
+        (out / graph).write_bytes(b"stub-onnx")
+    np.savez(out / "constants.npz",
+             pool_null_input=np.full(DRAFTFM_D, DRAFTFM_NULL,
+                                     dtype=np.float32))
+    meta = {
+        "model_id": f"_foundation/{tag}",
+        "kind": "draftfm-zeroshot",
+        "manifest_hash": manifest_hash,
+        "serving": {"wr_id": wr_id, "games_id": games_id},
+        "config": {"d_model": DRAFTFM_D},
+    }
+    with open(out / "meta.json", "w") as fh:
+        json.dump(meta, fh)
+    if point_latest:
+        latest = out.parent / "latest"
+        if latest.is_symlink():
+            latest.unlink()
+        latest.symlink_to(out.name)
+    return out
+
+
+def write_draftfm_assets(set_code=SET,
+                         manifest_hash=FOUNDATION_MANIFEST_HASH,
+                         picks_per_pack=14):
+    """Per-set assets npz: diag features so stub scores are A>B>C>D (3,2,1,0);
+    Lightning Bolt carries its alias grpIds (alt art + out-of-set)."""
+    import numpy as np
+
+    features = np.diag([3.0, 2.0, 1.0, 0.0]).astype(np.float16)
+    grp_lists = {
+        CARD_A: ALIASES_A,
+        CARD_B: [GRP[CARD_B]],
+        CARD_C: [GRP[CARD_C]],
+        CARD_D: [GRP[CARD_D]],
+    }
+    path = paths.set_assets_path(set_code)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    np.savez(path,
+             features=features,
+             rarity_ids=np.array([0, 1, 2, 0], dtype=np.uint8),
+             names=np.array(VOCAB),
+             grp_ids=json.dumps(grp_lists),
+             manifest_hash=manifest_hash,
+             picks_per_pack=picks_per_pack,
+             set=set_code)
+    return path

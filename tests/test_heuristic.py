@@ -144,3 +144,22 @@ def test_rarity_color_heuristic_floor(card_store):
 
     # Unknown grpId degrades to ev None, never a KeyError.
     assert model.score_pack([999], [])[0].ev is None
+
+
+def test_rarity_heuristic_survives_null_store_fields(card_store):
+    """Colorless cards carry NaN color_identity in the real card store
+    (2,961 of ~25k rows); NaN is truthy so `x or ''` must not be trusted."""
+    import numpy as np
+    import pandas as pd
+
+    from mtga.lands import paths
+
+    store = pd.read_parquet(paths.CARD_STORE_PARQUET)
+    store.loc[store["grp_id"] == 104, ["color_identity", "rarity"]] = np.nan
+    store.to_parquet(paths.CARD_STORE_PARQUET, index=False)
+
+    model = RarityColorHeuristic(SET)
+    assert model.cards[104] == {"colors": "", "rarity": "common"}
+    # Scores both as pack candidate and as pool context without crashing.
+    scores = model.score_pack([103, 104], [104, 104], 0, 2)
+    assert all(s.ev is not None for s in scores)

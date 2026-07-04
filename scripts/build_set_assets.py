@@ -52,6 +52,8 @@ def universe(set_code):
     """Ordered {name: [grp_ids]} for one set's draftable card universe."""
     grp_lists = {}
 
+    # Names: curated vocab, then card store expansion rows, then the cached
+    # 17Lands card_ratings (the only source that knows a brand-new set).
     for vocab_file in sorted(
             (paths.CURATED_DIR / "draft").glob(f"{set_code}.*.vocab.json")):
         for name in json.loads(vocab_file.read_text())["names"]:
@@ -63,12 +65,8 @@ def universe(set_code):
         store = cardstore.load_card_store()
         for name in store.loc[store["expansion"] == set_code, "name"]:
             grp_lists.setdefault(name, [])
-        _, aliases, _ = cardstore.name_resolution(set_code)
-        for name, grps in grp_lists.items():
-            for grp_id in aliases.get(name, []):
-                if int(grp_id) not in grps:
-                    grps.append(int(grp_id))
 
+    rated = []
     for fmt in config.FORMATS:
         link = paths.latest_symlink(
             paths.card_ratings_path(set_code, fmt, "x"))
@@ -79,10 +77,23 @@ def universe(set_code):
                 grp_id, name = row.get("mtga_id"), row.get("name")
                 if not grp_id or not name:
                     continue
-                grps = grp_lists.setdefault(name, [])
+                grp_lists.setdefault(name, [])
+                rated.append((name, int(grp_id)))
+        break
+
+    # grpIds: every store printing sharing the name (alt arts, bonus sheets
+    # under other expansion codes), plus the ratings-cache mtga_id fallback.
+    if paths.CARD_STORE_PARQUET.exists():
+        from mtga.lands import cardstore
+
+        _, aliases, _ = cardstore.name_resolution(set_code)
+        for name, grps in grp_lists.items():
+            for grp_id in aliases.get(name, []):
                 if int(grp_id) not in grps:
                     grps.append(int(grp_id))
-        break
+    for name, grp_id in rated:
+        if grp_id not in grp_lists[name]:
+            grp_lists[name].append(grp_id)
 
     return grp_lists
 
