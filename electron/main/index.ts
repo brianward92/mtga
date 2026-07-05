@@ -10,6 +10,7 @@
 
 import { app, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
+import { existsSync, mkdirSync, readdirSync, renameSync } from 'fs'
 import { LogWatcher } from './parser/watcher'
 import { LogParser } from './parser/index'
 import { DraftSessionSnapshot, DraftPickRecord } from './parser/draft-parser'
@@ -78,6 +79,14 @@ import {
 import { formatEventId } from './utils/format-utils'
 import { loadConfig } from './config'
 import { ServerClient, ServerCardRow, ModelInfo, ServerStatus } from './api/server-client'
+
+// E2E testability hook (tests/e2e/drive.mjs): relocate userData (DB, caches)
+// into the harness sandbox — macOS resolves appData from directory services,
+// not $HOME, so the env-var HOME sandbox alone cannot isolate it. Guarded by
+// MTGA_E2E_USER_DATA; a plain launch never takes this branch.
+if (process.env.MTGA_E2E_USER_DATA) {
+  app.setPath('userData', process.env.MTGA_E2E_USER_DATA)
+}
 
 // Window references
 let overlayWindow: BrowserWindow | null = null
@@ -189,10 +198,45 @@ function badgesEnabled(): boolean {
   return getOverlayUiPrefs().badgesEnabled
 }
 
-/** Draft/calibration events go to the panel AND the badge window. */
+/**
+ * Draft/calibration events go to the panel AND the badge window — but a
+ * hidden badge window (badges off, or no Arena located) skips the traffic
+ * entirely so it does no render work while invisible. It is re-synced with
+ * the current pack state by resyncBadgeWindow() whenever it appears.
+ */
 function sendDraftEvent(channel: string, payload: unknown): void {
   overlayWindow?.webContents.send(channel, payload)
-  badgeWindow?.webContents.send(channel, payload)
+  if (
+    badgeWindow &&
+    !badgeWindow.isDestroyed() &&
+    (badgeWindow.isVisible() || badgeRuntime.calibrating)
+  ) {
+    badgeWindow.webContents.send(channel, payload)
+  }
+}
+
+/**
+ * Push the live draft state to the badge window after it becomes visible
+ * (it received no draft events while hidden). The current pack is skipped
+ * when its pick was already made — badges for a stale pack are worse than
+ * no badges (badges.ts clears on draft-pick for the same reason).
+ */
+function resyncBadgeWindow(): void {
+  if (!badgeWindow || badgeWindow.isDestroyed()) return
+  const contents = badgeWindow.webContents
+  contents.send('server-status', draftRuntime.serverStatus)
+  contents.send('draft-ratings', { setEvP1p1Sorted: setEvP1p1Sorted() })
+  const pack = draftRuntime.lastPack
+  if (!pack) return
+  const picked = draftRuntime.session?.picks.some(
+    p => p.pack === pack.pack && p.pick === pack.pick
+  )
+  if (picked) return
+  contents.send('draft-pack', pack)
+  const scores = draftRuntime.lastScores
+  if (scores && scores.pack === pack.pack && scores.pick === pack.pick) {
+    contents.send('draft-scores', scores)
+  }
 }
 
 /**
@@ -256,7 +300,10 @@ function sendCalibrateState(): void {
     arenaFound: arenaPoller.isFound(),
     accessibilityIssue: badgeRuntime.accessibilityIssue
   }
-  sendDraftEvent('calibrate-mode', payload)
+  // Control-plane: always delivered, even to a hidden badge window — the
+  // teardown (active:false) must never be dropped by the idle-badges guard.
+  overlayWindow?.webContents.send('calibrate-mode', payload)
+  badgeWindow?.webContents.send('calibrate-mode', payload)
 }
 
 function startBadgeCalibration(): void {
@@ -326,7 +373,11 @@ function setupArenaGeometry(): void {
     if (badgeWindow && !badgeWindow.isDestroyed()) {
       setBadgeWindowRect(badgeWindow, rect)
       pushBadgeView()
-      if (badgesWantedNow()) showBadgeWindow(badgeWindow)
+      if (badgesWantedNow()) {
+        const wasVisible = badgeWindow.isVisible()
+        showBadgeWindow(badgeWindow)
+        if (!wasVisible) resyncBadgeWindow() // it saw no events while hidden
+      }
     }
     if (badgeRuntime.calibrating) sendCalibrateState()
   })
@@ -1100,7 +1151,25 @@ function setupLogWatcher(): void {
  */
 function setupServerClient(): void {
   const config = loadConfig()
-  const cacheDir = join(app.getPath('userData'), 'cache')
+  // NOT userData/cache: on macOS's case-insensitive filesystem that collides
+  // with Chromium's own disk cache directory (userData/Cache), and Chromium
+  // deletes foreign files there during startup — silently destroying the
+  // offline ratings fallback. Keep ratings snapshots in a directory Chromium
+  // never touches, migrating any files that survived the old location.
+  const cacheDir = join(app.getPath('userData'), 'ratings-cache')
+  const legacyDir = join(app.getPath('userData'), 'cache')
+  try {
+    if (existsSync(legacyDir)) {
+      for (const file of readdirSync(legacyDir)) {
+        if (file.startsWith('ratings-') && file.endsWith('.json')) {
+          mkdirSync(cacheDir, { recursive: true })
+          renameSync(join(legacyDir, file), join(cacheDir, file))
+        }
+      }
+    }
+  } catch {
+    // best-effort migration — worst case is one re-fetch from the server
+  }
   serverClient = new ServerClient(config, cacheDir)
 
   serverClient.on('status', () => updateServerStatus())
@@ -1410,6 +1479,7 @@ ipcMain.handle('badges-toggle', () => {
       setBadgeWindowRect(badgeWindow, arenaPoller.lastKnown)
       pushBadgeView()
       showBadgeWindow(badgeWindow)
+      resyncBadgeWindow() // it saw no events while hidden
     }
   } else if (!enabled) {
     stopBadgesAfterDraft() // no-op while calibrating

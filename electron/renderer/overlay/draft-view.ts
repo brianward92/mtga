@@ -15,9 +15,10 @@
  * (license requirement).
  */
 
-import { escapeHtml, renderManaCost, formatWinRate } from './shared'
+import { escapeHtml, renderManaCost, formatWinRate, formatRelativeAge } from './shared'
 import { Density, nextDensity, normalizeDensity, densityClass, densityTitle, DENSITY_CYCLE } from './density'
 import { FlameRating, flamesFromPercentile } from './flames'
+import { convictionCapped, modelTag, modelVersionTag } from './model-tag'
 import {
   Conviction,
   bandConviction,
@@ -372,6 +373,13 @@ function handleDraftEnd(data: DraftEndPayload): void {
   currentPack = null
   currentScores = null
 
+  // The ✨ agree-glow (1.4s) must not linger onto the "Draft complete" card
+  if (agreeGlowTimer !== null) {
+    window.clearTimeout(agreeGlowTimer)
+    agreeGlowTimer = null
+  }
+  draftGrip.classList.remove('grip-agree')
+
   renderHeader()
   renderPool()
   renderHistory()
@@ -544,14 +552,13 @@ function percentileFlamesFor(row: DraftCardRow): FlameRating | null {
 }
 
 /**
- * True when ratings are not real trained-model conviction (honesty guard:
- * tags the flames and caps labels at SLAM — heuristic EVs are z-scores,
- * not trained logits).
+ * True when conviction bands must be capped at SLAM (honesty guard): a true
+ * heuristic model (z-scores, not logits) or a degraded server status. A
+ * trained model borrowed across formats (fallback=true) is NOT capped — its
+ * logits are real; it gets a provenance tag instead (see model-tag.ts).
  */
 function isHeuristic(): boolean {
-  const model = currentScores?.model ?? serverStatus.model
-  if ((model?.kind ?? '').toLowerCase().includes('heuristic')) return true
-  return !!model?.fallback || serverStatus.status !== 'green'
+  return convictionCapped(currentScores?.model ?? serverStatus.model, serverStatus.status)
 }
 
 function flameRowHtml(rating: FlameRating, opts: { small?: boolean; animate?: boolean } = {}): string {
@@ -581,8 +588,17 @@ function renderHeader(): void {
     draftPickPos.textContent = ''
   }
 
+  // 300px verdict width truncates full model ids: show just the version
+  // segment ("v20260703"), full id + provenance in the tooltip.
   const model = currentScores?.model ?? serverStatus.model
-  footerModel.textContent = model ? `${model.id}${model.fallback ? ' · fallback' : ''}` : ''
+  if (model) {
+    footerModel.textContent = modelVersionTag(model.id)
+    const tag = modelTag(model)
+    footerModel.setAttribute('title', tag ? `${model.id} · ${tag.title}` : model.id)
+  } else {
+    footerModel.textContent = ''
+    footerModel.removeAttribute('title')
+  }
 }
 
 function renderServerStatus(): void {
@@ -692,8 +708,11 @@ function renderVerdict(rows: DraftCardRow[]): void {
   const rating: FlameRating | null = conviction
     ? { flames: conviction.flames, label: conviction.label }
     : percentileFlamesFor(top)
-  const heuristicTag = rating && isHeuristic()
-    ? '<span class="heuristic-tag">heuristic</span>'
+  // Provenance tag (HEURISTIC / PREMIER MODEL / ZERO-SHOT) — model identity,
+  // independent of the amber/red degradation indicators below.
+  const tag = modelTag(currentScores?.model ?? serverStatus.model)
+  const tagHtml = rating && tag
+    ? `<span class="heuristic-tag" title="${escapeHtml(tag.title)}">${tag.text}</span>`
     : ''
 
   // Flame area: real conviction, or an honest quiet placeholder. The shown
@@ -704,9 +723,14 @@ function renderVerdict(rows: DraftCardRow[]): void {
     const pct = conviction?.showPct
       ? `<span class="conviction-pct" title="vs. next-best card">${formatDominancePct(conviction.dominance)}</span>`
       : ''
-    flameArea = `<div class="verdict-flames">${flameRowHtml(rating, { animate: animateFlames })}${label}${pct}${heuristicTag}</div>`
+    flameArea = `<div class="verdict-flames">${flameRowHtml(rating, { animate: animateFlames })}${label}${pct}${tagHtml}</div>`
   } else if (serverStatus.status === 'red') {
     flameArea = '<div class="verdict-flames"><span class="flame-pending">stats only</span></div>'
+  } else if (serverStatus.status === 'amber') {
+    // Serving the stale disk cache: scores will NOT arrive, so never claim
+    // "scoring…" — say what the numbers are and how old they are.
+    const age = formatRelativeAge(serverStatus.fetchedAt)
+    flameArea = `<div class="verdict-flames"><span class="flame-pending">stats only (cached${age ? ` ${age}` : ''})</span></div>`
   } else {
     flameArea = '<div class="verdict-flames"><span class="flame-pending">scoring…</span></div>'
   }

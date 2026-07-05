@@ -52,3 +52,18 @@ export function formatWinRate(value: number | null | undefined): string {
   const pct = value <= 1 ? value * 100 : value
   return `${pct.toFixed(1)}%`
 }
+
+/**
+ * Coarse relative age of an ISO timestamp ("3m ago" / "5h ago" / "2d ago").
+ * Unparseable, missing, or future timestamps return ''.
+ */
+export function formatRelativeAge(iso: string | null | undefined): string {
+  if (!iso) return ''
+  const ms = Date.now() - Date.parse(iso)
+  if (!Number.isFinite(ms) || ms < 0) return ''
+  const minutes = Math.floor(ms / 60_000)
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 48) return `${hours}h ago`
+  return `${Math.floor(hours / 24)}d ago`
+}

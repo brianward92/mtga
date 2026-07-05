@@ -35,6 +35,7 @@ import {
   formatDominancePct
 } from '../overlay/conviction'
 import { flamesFromPercentile } from '../overlay/flames'
+import { convictionCapped } from '../overlay/model-tag'
 
 // ---------------------------------------------------------------------------
 // Payload types (mirror main/index.ts)
@@ -102,10 +103,13 @@ const root = document.getElementById('badgeRoot')!
 // Conviction plumbing (same rules as the panel)
 // ---------------------------------------------------------------------------
 
+/**
+ * Same cap semantics as the panel (model-tag.ts): the ≈ marker and the SLAM
+ * cap apply to true heuristics or degraded status — not to a trained model
+ * borrowed across formats (fallback), whose logits are real.
+ */
 function isHeuristic(): boolean {
-  const model = currentScores?.model ?? serverStatus.model
-  if ((model?.kind ?? '').toLowerCase().includes('heuristic')) return true
-  return !!model?.fallback || serverStatus.status !== 'green'
+  return convictionCapped(currentScores?.model ?? serverStatus.model, serverStatus.status)
 }
 
 function setPctFor(row: DraftCardRow): number | null {
@@ -241,6 +245,11 @@ function renderGhosts(view: { width: number; height: number }): void {
 }
 
 function render(): void {
+  // Hidden window: skip all DOM work. Main also stops sending draft events
+  // while hidden (belt and braces) and re-syncs state when the window shows;
+  // the visibilitychange hook below repaints from whatever state we hold.
+  if (document.visibilityState === 'hidden') return
+
   const view = { width: window.innerWidth, height: window.innerHeight }
   if (view.width <= 0 || view.height <= 0) return
 
@@ -273,6 +282,11 @@ function init(): void {
 
   // Main re-bounds this window whenever Arena moves/resizes
   window.addEventListener('resize', render)
+
+  // Renders skipped while hidden happen here instead, once visible
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') render()
+  })
 
   window.mtgaTracker.onBadgeView((data: unknown) => {
     const view = data as { config?: unknown }

@@ -154,7 +154,9 @@ function defaultBounds(mode: OverlayMode): OverlayPosition {
   const { width } = primaryDisplay.workAreaSize
 
   if (mode === 'draft') {
-    return { x: width - 400, y: 80, width: 380, height: 560 }
+    // 620: tall enough that full density fits the verdict + pack table +
+    // pool block + the Pick-history toggle row without clipping the latter.
+    return { x: width - 400, y: 80, width: 380, height: 620 }
   }
   return { x: width - 300, y: 100, width: 280, height: 500 }
 }

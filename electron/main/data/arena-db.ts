@@ -51,6 +51,11 @@ const RARITY_MAP: Record<number, string> = {
 const SNAPSHOT_VERSION = 2
 
 function snapshotPath(): string {
+  // TODO: userData/cache collides with Chromium's disk cache (userData/Cache)
+  // on macOS's case-insensitive filesystem, and Chromium deletes foreign
+  // files there at startup (the ratings cache moved to ratings-cache/ for
+  // this reason). Tolerable here only because the snapshot is rewritten on
+  // every successful Arena DB read; move it when convenient.
   return join(app.getPath('userData'), 'cache', 'arena-cards.json')
 }
 

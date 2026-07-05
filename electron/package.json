@@ -9,7 +9,8 @@
     "preview": "electron-vite preview",
     "package": "electron-builder",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "e2e": "node tests/e2e/drive.mjs"
   },
   "dependencies": {
     "better-sqlite3": "^11.6.0",
@@ -22,12 +23,16 @@
     "electron-builder": "^25.1.8",
     "electron-rebuild": "^3.2.9",
     "electron-vite": "^2.3.0",
+    "puppeteer-core": "^25.3.0",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
   },
   "build": {
     "appId": "com.mtga.tracker",
     "productName": "MTGA Tracker",
+    "files": [
+      "dist/**/*"
+    ],
     "mac": {
       "category": "public.app-category.games",
       "target": [

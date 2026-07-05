@@ -59,7 +59,9 @@ body {
   min-height: 100vh;
 }
 
-/* Sidebar */
+/* Sidebar — pinned to the viewport: the page body scrolls with the main
+   content, and without this the sidebar stretches to the full document
+   height, pushing the overlay controls + footer below the fold. */
 .sidebar {
   width: 220px;
   background: var(--bg-secondary);
@@ -67,6 +69,10 @@ body {
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
 }
 
 .logo {

@@ -29,8 +29,12 @@ export function createRegistryWindow(): BrowserWindow {
     dashboardWindow.loadURL('http://localhost:5173/dashboard/index.html')
     dashboardWindow.webContents.openDevTools()
   } else {
-    // In production, load from dist
-    const dashboardPath = join(__dirname, '../../renderer/dashboard/index.html')
+    // In production, load the BUILT bundle from dist (one level up from
+    // dist/main — same as the overlay/badge windows). '../../renderer/...'
+    // used to escape dist/ entirely and load the raw source HTML out of the
+    // asar, whose <script src="dashboard.ts"> never executes: the packaged
+    // dashboard shipped with no working JavaScript at all.
+    const dashboardPath = join(__dirname, '../renderer/dashboard/index.html')
     dashboardWindow.loadFile(dashboardPath)
   }
 
