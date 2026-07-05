@@ -53,10 +53,16 @@ def main():
                  if paths.raw_dataset_path("replay", code, fmt).exists()]
 
     for set_code, fmt in pairs:
-        result = etl.curate_mulligans(set_code, fmt, force=args.force)
-        print(f"replay_mull  {set_code} {fmt}: {result}")
-        result = etl.curate_turn_states(set_code, fmt, force=args.force)
-        print(f"replay_turns {set_code} {fmt}: {result}")
+        # Old-era (2021) replay files lack some column families (e.g. STX has
+        # no candidate_hand_*/num_mulligans). Each curation degrades
+        # independently: a set contributes what its era recorded.
+        for label, curate in [("replay_mull ", etl.curate_mulligans),
+                              ("replay_turns", etl.curate_turn_states)]:
+            try:
+                result = curate(set_code, fmt, force=args.force)
+            except ValueError as error:
+                result = {"status": "SKIPPED_SCHEMA", "reason": str(error)[:120]}
+            print(f"{label} {set_code} {fmt}: {result}", flush=True)
 
 
 if __name__ == "__main__":
