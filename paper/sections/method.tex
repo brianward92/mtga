@@ -31,7 +31,7 @@ The card's type line and rules text, embedded with a frozen
 \texttt{bge-small-en-v1.5} sentence encoder~\citep{xiao2023bge}
 ($L_2$-normalised). The card's own name (and, for legendary cards, its
 short name) is masked to a placeholder token before embedding, so the
-encoder cannot key on names it may know from pretraining---a deliberate
+encoder cannot key on names it may know from pretraining, a deliberate
 handicap that matters for licensed-IP sets (\S\ref{sec:analysis}).
 Parenthetical reminder text is kept: for a brand-new mechanic it is the
 only definition the model will ever see. Back faces are appended for
@@ -41,16 +41,15 @@ double-faced cards.
 \label{sec:arch}
 
 DraftFM is a two-tower scorer with \FdevParams M parameters (Figure~\ref{fig:arch}). Its two design
-invariants are the zero-shot contract:
+invariants operationalize the zero-shot contract (\S\ref{sec:data}):
 
 \begin{enumerate}
   \item \textbf{No set identity.} There is no set embedding and no
   per-card parameter anywhere. The only way the model can know what set it
   is drafting is a \emph{set-context tower} that reads the set's full card
   list, plus the drafter's accumulating pool. ``Blue is the aggressive
-  color in this set'' must be inferred from the card list; an inference of
-  that form transfers to a set released tomorrow, a memorized set
-  identifier cannot.
+  color in this set'' must be inferred from the card list, not memorized
+  as a set identifier.
   \item \textbf{Skill conditions the scorer, not the cards.} Card
   semantics are skill-invariant; the pick policy is not. Skill-bucket
   embeddings enter only the context pathway. Serving conditions on a fixed
@@ -62,9 +61,9 @@ invariants are the zero-shot contract:
 \centering
 \input{figures/architecture}
 \caption{The two-tower scorer (\S\ref{sec:arch}). A shared card encoder
-embeds every card once per (set, format) step; a set-context tower
-summarises the full card list, a pool tower summarises the drafter's
-held cards, and a per-candidate scorer combines the candidate embedding
+embeds every card once per (set, format) step; a pool tower summarises
+the drafter's held cards, a set-context tower summarises the full card
+list, and a per-candidate scorer combines the candidate embedding
 $c$, the pool summary $p$, their elementwise product, and the context
 vector into a softmax over the pack.}
 \label{fig:arch}
@@ -92,21 +91,22 @@ real slots gives the pick distribution.
 \label{sec:training}
 
 One recipe for every run in the paper (fixed before the scaling and
-ablation studies; the protocol forbids per-rung tuning). Batches of 8{,}192
-picks are drawn from one (set, format) shard at a time, shards sampled
-proportionally to $n_{\text{picks}}^{0.5}$---an interpolation between
-pick-uniform (which lets the largest sets dominate) and set-uniform (which
-oversamples tiny sets). AdamW ($\beta_1{=}0.9$, $\beta_2{=}0.98$, weight
-decay 0.01), peak learning rate $10^{-3}$, 2{,}000-step linear warmup,
-cosine decay; cross-entropy with label smoothing 0.05 renormalised over
-real pack slots. The presentation budget is four epochs; within-training
-validation (never the dev sets) is evaluated every 2{,}000 steps and
-training stops after three non-improving evaluations. Seed 17 throughout;
-seed variance is measured at two scaling rungs (\S\ref{sec:protocol}).
+ablation studies, since the protocol forbids per-rung tuning). Batches of
+8{,}192 picks are drawn from one (set, format) shard at a time, shards
+sampled proportionally to $n_{\text{picks}}^{0.5}$, an interpolation
+between pick-uniform (which lets the largest sets dominate) and
+set-uniform (which oversamples tiny sets). AdamW ($\beta_1{=}0.9$,
+$\beta_2{=}0.98$, weight decay 0.01), peak learning rate $10^{-3}$,
+2{,}000-step linear warmup, cosine decay; cross-entropy with label
+smoothing 0.05 renormalised over real pack slots. The presentation budget
+is four epochs. Within-training validation (never the dev sets) is
+evaluated every 2{,}000 steps and training stops after three
+non-improving evaluations. Seed 17 throughout. Seed variance is measured
+at two scaling rungs (\S\ref{sec:protocol}).
 
 Training runs on a single Apple M3 Ultra workstation (96\,GB unified
 memory) in PyTorch 2.12 eager mode on the MPS backend, at
-$\sim$\FdevExamplesPerSec{} picks/s; the full \FdevPicks M-pick run takes
+$\sim$\FdevExamplesPerSec{} picks/s. The full \FdevPicks M-pick run takes
 about \FdevWallHours{} hours, stopping at step 34{,}000. Correctness on
 this backend is not assumed: a CPU-vs-accelerator parity check on losses
 and gradient norms gates every launch, LayerNorm is composed from

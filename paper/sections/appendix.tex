@@ -4,7 +4,7 @@
 \paragraph{The target is agreement, not optimality.}
 Top-1 agreement with expert humans measures imitation. Experts disagree
 with each other (the within-set ceiling is ${\sim}70\%$, not 100\%), and
-agreeing with them is not the same as maximising win rate; a model could
+agreeing with them is not the same as maximising win rate. A model could
 in principle draft better than its agreement suggests, or worse. Win-rate
 evaluation of zero-shot drafters is future work.
 
@@ -23,7 +23,7 @@ set-to-set variance in what the headline number would be on the
 \emph{next} set.
 
 \paragraph{Text and language.}
-The text encoder is English-only and frozen; rules text is embedded as
+The text encoder is English-only and frozen. Rules text is embedded as
 prose, so mechanics whose meaning is mostly numeric or positional may be
 under-represented. Name masking removes the most direct pretraining
 leak for licensed sets, but flavor vocabulary in the remaining text still
@@ -80,15 +80,15 @@ from Scryfall's own hosted image URLs by
 with the cached images and their source manifest). Scryfall's stated
 policy on card images (``Use of Scryfall Data and Images,''
 \url{https://scryfall.com/docs/api}) permits this use, subject to rules we
-follow throughout: every image is shown full and unmodified---no
+follow throughout: every image is shown full and unmodified, with no
 cropping, distorting, blurring, sharpening, desaturating, color-shifting,
-or watermarking of the card art itself---and any score or label in a
+or watermarking of the card art itself. Any score or label in a
 figure sits beside the image, never on top of it. Because the full card
 image is always used (never an art crop), the copyright and artist line
 Scryfall prints at the bottom of the card remains visible in every
 figure, and nothing here implies that Wizards of the Coast produced or
-endorses this work. The cards illustrated are drawn from BRO and
-SOS---public, released development sets (\S\ref{sec:data})---never from
+endorses this work. The cards illustrated are drawn from BRO and SOS,
+both public, released development sets (\S\ref{sec:data}), never from
 MSH, which remains untouched until the frozen evaluation of
 \S\ref{sec:protocol}.
 
@@ -101,7 +101,7 @@ approved or endorsed by Wizards of the Coast. \mtg{} and its card names
 and text are trademarks and copyrights of Wizards of the Coast.
 Licensed-IP card names and imagery appear only as printed on the official
 card or as data strings in sourced fields of the released artifacts, and
-are the property of their respective rights holders---Marvel's for MSH,
-the Teenage Mutant Ninja Turtles franchise's for TMT---distinct
+are the property of their respective rights holders (Marvel's for MSH,
+the Teenage Mutant Ninja Turtles franchise's for TMT): distinct
 properties, both used by Wizards of the Coast under license and neither
 affiliated with this paper.

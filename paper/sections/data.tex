@@ -3,7 +3,8 @@
 
 \paragraph{Corpus.}
 Training data is the complete \seventeenlands{} public draft-data
-corpus~\citep{seventeenlands}: 31 expansions from STX (April 2021) through
+corpus~\citep{seventeenlands}, spanning every set the model has to
+generalise across: 31 expansions from STX (April 2021) through
 SOS (June 2026), Premier (best-of-one) and Traditional (best-of-three) draft
 where published, 59 (set, format) files, roughly 160M pick rows. Each row is
 one human pick: the pack contents, the drafter's pool, the card taken, and
@@ -24,22 +25,22 @@ including digital-only and remaster sets.
 \paragraph{Normalization.}
 The corpus spans three schema eras and several quirks, all normalised at
 ETL time: the 2021 files are gzipped tarballs rather than plain gzipped
-CSVs; the oldest era reports match-based rather than game-based skill
-buckets (harmonised; identical in best-of-one); six sets are missing the
+CSVs, and the oldest era reports match-based rather than game-based skill
+buckets (harmonised; identical in best-of-one). Six sets are missing the
 first pick of each draft in the source logs (an annotation, not an
-exclusion); packs are 13, 14, or 15 picks depending on the set (a model
+exclusion), and packs are 13, 14, or 15 picks depending on the set (a model
 input, \S\ref{sec:method}). Card names are joined to Scryfall by
 normalised name with an explicit alias table; unresolved names fail the
 build rather than featurizing as zeros. Per set we retain every valid pick
-and tag it with the drafter's skill covariates---training filters no one
-out; skill is a conditioning input (``decision + tag by venue'').
+and tag it with the drafter's skill covariates: training filters no one
+out. Skill is a conditioning input (``decision + tag by venue'').
 
 \paragraph{Splits.}
 Within each (set, format) shard, drafts are split by a hash of the draft
 identifier (\texttt{crc32 \% 1000 < 50}, ${\sim}5\%$ validation). Early
 stopping uses only this within-training-set validation split. The \emph{expert slice} used for all headline evaluation
 is picks by drafters with win-rate bucket $\geq 0.55$ and game-count bucket
-$\geq 100$---the same filter the per-set ceiling models train and evaluate
+$\geq 100$, the same filter the per-set ceiling models train and evaluate
 on, so ceiling comparisons are population-matched.
 
 \paragraph{The held-out sets.}
@@ -49,5 +50,6 @@ zero-shot accuracy over these three. MSH, the test set, is stricter: a
 registry-level gate (\texttt{EVAL\_ONLY}) makes every training and
 feature-fitting code path refuse MSH pick data outright, and at the
 protocol freeze its public data did not yet exist. MSH \emph{card} features
-from Scryfall are permitted---that is the zero-shot contract: public card
-information only, no human behavioral data of any kind.
+from Scryfall are permitted. That is the zero-shot
+contract: public card information only, no human behavioral data of any
+kind.

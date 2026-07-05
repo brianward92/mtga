@@ -90,8 +90,8 @@ Gathering} Sets from Public Card Features}
 Draft assistants for \mtg{} require weeks of post-release human pick data
 before they can model a new set; on release day they have nothing. We train
 DraftFM, a \FdevParams M-parameter pick model that represents every card as a
-frozen vector of public information---structured Scryfall features plus a
-sentence embedding of rules text---and carries no set-identity parameters, so
+frozen vector of public information (structured Scryfall features plus a
+sentence embedding of rules text) and carries no set-identity parameters, so
 it can score a set the moment its card list is public. Trained on
 \FdevPicks M human picks from \FdevSets{} sets of \seventeenlands{} public
 data, the model reaches \FdevDevMean\% expert-pick agreement zero-shot on

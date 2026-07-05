@@ -12,21 +12,21 @@ tag and disclosure of the total number of rounds.
 
 \subsection{Test set: MSH, exactly once}
 
-MSH is the first \mtg{} set drafted on Arena after the protocol freeze---a
+MSH is the first \mtg{} set drafted on Arena after the protocol freeze: a
 licensed-IP (\emph{Universes Beyond}) set, which makes the test
 deliberately harder (\S\ref{sec:analysis}). The test snapshot is the first
 public \seventeenlands{} MSH Premier file successfully downloaded on or
 after its publication, frozen immediately by sha256 and ETag and never
 re-downloaded. Until the frozen evaluation has run, no training, tuning,
-metric-peeking, or feature-vocabulary fitting may read MSH pick data;
-MSH \emph{card} features are legal (the zero-shot contract,
+metric-peeking, or feature-vocabulary fitting may read MSH pick data.
+MSH \emph{card} features alone are legal (the zero-shot contract,
 \S\ref{sec:data}). Quality gates at snapshot time: modern schema, Premier
 rows present, at least 2{,}500 expert-slice drafts, $\geq 99\%$ of pack
 card names joining to card features. On a volume failure the single
 pre-declared contingency is to wait exactly one snapshot cycle. The
 evaluation executes within 72 hours of the gates passing: one inference
 pass per battery member over the frozen snapshot, cached as per-pick
-prediction files from which every statistic is computed---models are never
+prediction files from which every statistic is computed. Models are never
 re-run during analysis.
 
 Two populations are scored. The \emph{expert slice} (\S\ref{sec:data}) is
@@ -45,9 +45,9 @@ keys on one number: the unweighted mean over \{BRO, TMT, SOS\} of
 expert-slice deployment-mode top-1, computed zero-shot from a single
 development run (\emph{F-dev}) trained on the universe minus those three
 sets and MSH. The trio is chosen for external validity: BRO is the same
-holdout as the only published zero-shot number~\citep{bertram2024cards};
-SOS carries our most mature per-set ceiling; TMT is a licensed-IP set---the
-rehearsal for MSH's distribution shift. Early stopping never sees dev
+holdout as the only published zero-shot number~\citep{bertram2024cards},
+SOS carries our most mature per-set ceiling, and TMT is a licensed-IP set:
+the rehearsal for MSH's distribution shift. Early stopping never sees dev
 metrics (\S\ref{sec:training}), so the scaling curve is not selected on its
 own y-axis.
 
@@ -76,7 +76,7 @@ set-composition variance with two probe rungs (\S\ref{sec:results}).
 \subsection{The battery}
 
 Frozen by artifact hash before the test snapshot:
-(1)~\textbf{F-full}, the final recipe trained on all 31 sets---the headline
+(1)~\textbf{F-full}, the final recipe trained on all 31 sets, the headline
 model; its dev-set numbers are meaningless (it trains on them) and are
 never quoted. A pre-registered flexibility clause lets two optional extras
 (the Powered Cube file and VOW QuickDraft) join F-full's training data if
@@ -90,20 +90,20 @@ recipe and a shared step cap.
 (4)~\textbf{Ablations}: A-notext (structured features only, no text
 embedding) and A-noUB (the three licensed-IP training sets removed), for
 the shift analysis of \S\ref{sec:analysis}.
-(5)~\textbf{Baselines}: random; an hour-zero rarity--color heuristic; and
+(5)~\textbf{Baselines}: random; an hour-zero rarity-color heuristic; and
 three asterisked post-release baselines (community site ratings at
 day~$\sim$2, and two \seventeenlands{}-statistics pickers) that bound what
 cheap post-release information buys.
 (6)~\textbf{Post-day-one rows}, frozen now and executed only after the
 zero-shot evaluation: a per-set ceiling trained on the frozen MSH snapshot
 with the stock per-set recipe, and F-full fine-tuned on the MSH training
-split with hyperparameters pinned from dev-trio rehearsals.
+split with hyperparameters pinned from dev-trio trial runs.
 
 \subsection{Claims bands}
 
 To keep interpretation out of our own hands, three mutually exclusive
-claims paragraphs---for headline results below 45\%, between 45 and 55\%,
-and above 55\%---were drafted before any test number existed and are
+claims paragraphs (for headline results below 45\%, between 45 and 55\%,
+and above 55\%) were drafted before any test number existed and are
 carried in the paper source; the matching one is selected verbatim when
 the frozen evaluation reports (\S\ref{sec:results}). In all bands the
 secondary claims are the same: the normalized-vs-ceiling score, the shape

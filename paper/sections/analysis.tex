@@ -7,7 +7,7 @@
   \caption{Pre-registered ablations: zero-shot expert top-1 (\%), point
   estimates (per-cell 95\% CI half-widths are ${\sim}\pm0.1$--$0.2$pp on
   the dev sets, Table~\ref{tab:main}; paired-difference CIs accompany the
-  deltas in the text). A-notext drops the 384-d text embedding; A-noUB
+  deltas in the text). A-notext drops the 384-d text embedding. A-noUB
   removes the three licensed-IP training sets. The (variant $\times$ set)
   grid quantifies the licensed-IP text penalty with dev evidence before
   MSH is seen.}
@@ -17,10 +17,10 @@
 \end{table}
 
 \paragraph{The licensed-IP shift.}
-MSH's names and flavor come from a comic universe, not from \mtg{}; its
+MSH's names and flavor come from a comic universe, not from \mtg{}. Its
 text lives in the sentence encoder's pretraining as a different genre.
 This is the distribution shift most likely to break a text-dependent
-model on exactly the day it matters, and it is why the protocol makes a
+model on the day it matters, and it is why the protocol makes a
 licensed-IP set (TMT) a development set: the rehearsal happens where it
 can still inform design. Two mitigations are built in: card names are
 masked out of the text before embedding (\S\ref{sec:features}), so the
@@ -32,7 +32,7 @@ reaches \FdevTmt\% against SOS's \FdevSos\%
 (and \RatioTmt\% vs \RatioSos\% of the respective ceilings), suggesting
 the masking plus structured features carry the load. Whether that holds
 because text adds little on licensed sets or because TMT is simply an
-easier format is exactly what the grid decides:
+easier format is what the grid decides:
 \pending{A-notext/A-noUB deltas per set and the UB-penalty estimate}.
 If the test set is harder than the trio average, the pre-registered
 framing stands: a licensed-IP test makes the zero-shot claim more
@@ -50,13 +50,13 @@ bonus-sheet-slice accuracy}
 
 \paragraph{Skill conditioning.}
 Conditioning is a scorer-side input (\S\ref{sec:arch}), so one model
-serves any audience. In human-model mode (each drafter's true bucket, all
-users) the model scores \FdevBroAllUsers\% / \FdevTmtAllUsers\% /
-\FdevSosAllUsers\% on BRO / TMT / SOS---within a point of the expert-slice
+serves any audience. In human-model mode (\S\ref{sec:protocol}) the model
+scores \FdevBroAllUsers\% / \FdevTmtAllUsers\% /
+\FdevSosAllUsers\% on BRO / TMT / SOS: within a point of the expert-slice
 deployment numbers, consistent with skill moving picks less than card
-quality does. The pre-registered effect size---deployment-mode accuracy as
+quality does. The pre-registered effect size (deployment-mode accuracy as
 a function of the conditioning bucket, and the gap between conditioning on
-the top bucket versus the drafter's own---is \pending{skill-conditioning
+the top bucket versus the drafter's own) is \pending{skill-conditioning
 effect on MSH}.
 
 \begin{figure}[t]
@@ -90,23 +90,24 @@ effect on MSH}.
 SOS pack (empty pool) where the model's top two EVs are (\VCCEvA{} vs.\
 \VCCEvB) a near-exact tie, so the panel switches to a head-to-head duo
 view (\S\ref{sec:arch}) instead of naming a single pick. Dominance this
-close (\VCCSplitA/\VCCSplitB) is exactly the regime top-label ECE below
+close (\VCCSplitA/\VCCSplitB) is the regime top-label ECE below
 is measuring: the model's stated confidence and its actual reliability at
 low conviction. Computed by the deployed per-set model, never MSH.}
 \label{fig:closecall}
 \end{figure}
 
 \paragraph{Calibration.}
-Zero-shot confidence is imperfectly calibrated: top-label ECE is
-\FdevBroEce{} / \FdevTmtEce{} / \FdevSosEce{} on the dev trio, against
-\CeilSosEce{} for the within-set SOS ceiling. The protocol permits one
-calibration decision---a temperature fitted on dev only and frozen into
-the battery, never fitted on MSH; the frozen choice and MSH ECE are
+Zero-shot confidence falls well short of within-set calibration: top-label
+ECE is \FdevBroEce{} / \FdevTmtEce{} / \FdevSosEce{} on the dev trio,
+against \CeilSosEce{} for the within-set SOS ceiling, roughly a five- to
+seven-fold gap. The protocol permits one calibration decision: a
+temperature fitted on dev only and frozen into the battery, never fitted
+on MSH. The frozen choice and MSH ECE are
 \pending{temperature decision + MSH ECE}.
 
 \paragraph{Late-draft retention.}
-Later picks are where pool context dominates and where a set-agnostic
-model could plausibly collapse to rate-the-card. The pre-registered
-statistic (model/ceiling top-1 on picks 8+) is \pending{late-draft
-retention, dev trio and MSH}, alongside the per-(pack, pick) curves
-against the per-cell random floor.
+Later picks are where a set-agnostic model could plausibly collapse to
+rate-the-card, since pool signal has taken over from the card alone. The
+pre-registered statistic, late-draft retention (\S\ref{sec:protocol}), is
+\pending{late-draft retention, dev trio and MSH}, alongside the
+per-(pack, pick) curves against the per-cell random floor.
