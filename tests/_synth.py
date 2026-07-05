@@ -670,6 +670,64 @@ def mulligan_training_games(n=40):
     return games
 
 
+WINPROB_TURN_COLS = 12  # up to 11 user turns in the win-prob training fixture
+
+
+def winprob_training_games(n=60):
+    """n multi-turn replay games for the win-probability v1 smoke test.
+
+    draft_id wp00..wp{n-1} (the crc32 split at permille 500 leaves both
+    outcomes in train and val). game i wins iff i is even; num_turns ramps
+    3..11 so all four turn buckets (1-3/4-6/7-9/10+) are populated. Life
+    trajectories:
+      i % 3 in (0, 1): the winner pulls ahead on life (life_diff sign tracks
+                       `won`, so the models have real signal), and
+      i % 3 == 2:      both players stay at life parity (life_diff == 0),
+                       seeding the economics parity-curve/exchange states.
+    Every turn from 2 on draws one card, so user_drawn_cum increments.
+    """
+    hand = [RID_A, RID_B, RID_C]
+    games = []
+    for i in range(n):
+        won = i % 2 == 0
+        on_play = i % 2 == 0
+        num_turns = 3 + (i % 9)         # 3..11
+        parity = i % 3 == 2
+        turns = {}
+        for t in range(1, num_turns + 1):
+            decay = min(2 * t, 19)
+            if parity:
+                user_life = oppo_life = 20 - min(t, 19)
+            elif won:
+                user_life, oppo_life = 20, 20 - decay
+            else:
+                user_life, oppo_life = 20 - decay, 20
+            spec = {
+                "eot_user_cards_in_hand": hand,
+                "eot_oppo_cards_in_hand": f"{max(7 - t, 0)}.0",
+                "eot_user_lands_in_play": [RID_L1] * min(t, 6),
+                "eot_oppo_lands_in_play": [RID_L2] * min(t, 6),
+                "eot_user_creatures_in_play": [RID_B] * min(t, 3),
+                "eot_oppo_creatures_in_play": [RID_OPP] * min(max(t - 1, 0), 3),
+                "eot_user_life": f"{user_life}.0",
+                "eot_oppo_life": f"{oppo_life}.0",
+                "user_mana_spent": f"{min(t, 6)}.0",
+                "oppo_mana_spent": f"{min(t, 6)}.0",
+            }
+            if t >= 2 or not on_play:
+                spec["cards_drawn"] = [RID_A]
+            if t <= 6:
+                spec["lands_played"] = [RID_L1]
+            turns[t] = spec
+        games.append(dict(
+            draft_id=f"wp{i:02d}", on_play=on_play, won=won,
+            num_mulligans=i % 3, opp_num_mulligans=(i + 1) % 3,
+            num_turns=num_turns, deck={CARD_A: 17, CARD_B: 12, CARD_C: 11},
+            turns=turns,
+        ))
+    return games
+
+
 # ---------------------------------------------------------------------------
 # DraftFM foundation serving fixtures (registry tier + OnnxDraftFMModel).
 

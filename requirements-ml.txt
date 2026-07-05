@@ -14,4 +14,5 @@ duckdb
 requests
 onnx
 onnxruntime==1.23.*
+matplotlib~=3.9   # win-prob economics figure (mtga/winprob/economics.py, Agg)
 pytest
