@@ -24,6 +24,7 @@ def create_parser():
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--epochs", type=float, default=4.0)
     parser.add_argument("--max-steps", type=int, default=0)
+    parser.add_argument("--warmup-steps", type=int, default=2000)
     parser.add_argument("--d-model", type=int, default=256)
     parser.add_argument("--dropout", type=float, default=0.1)
     parser.add_argument("--no-set-ctx", dest="set_ctx", action="store_false")
@@ -55,6 +56,7 @@ def main():
     config = TrainConfig(
         name=args.name, sets=pairs, seed=args.seed, batch_size=args.batch_size,
         lr=args.lr, epochs=args.epochs, max_steps=args.max_steps,
+        warmup_steps=args.warmup_steps,
         d_model=args.d_model, dropout=args.dropout, set_ctx=args.set_ctx,
         sampling_alpha=args.sampling_alpha, val_every=args.val_every,
         patience=args.patience, device=args.device,
