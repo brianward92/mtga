@@ -130,6 +130,74 @@
 
     <!-- Manual resize grip (bottom-right; match mode + draft full density) -->
     <div class="resize-handle" id="resizeHandle" title="Resize"></div>
+
+    <!-- Badge calibration helper: the always-interactive control surface for
+         the (always click-through) badge window. Ghosts render over Arena;
+         these buttons nudge/scale the grid live. -->
+    <div class="calibrate-panel" id="calibratePanel" style="display: none;">
+      <div class="cal-title" data-grip>Badge calibration</div>
+      <div class="cal-status" id="calStatus">Looking for the Arena window…</div>
+
+      <div class="cal-row">
+        <span class="cal-label">Cards</span>
+        <div class="cal-btns" id="calCounts">
+          <button class="cal-btn" data-count="13">13</button>
+          <button class="cal-btn active" data-count="14">14</button>
+          <button class="cal-btn" data-count="15">15</button>
+        </div>
+      </div>
+      <div class="cal-row">
+        <span class="cal-label">Position</span>
+        <div class="cal-btns">
+          <button class="cal-btn" data-op='{"type":"nudge","dx":-1,"dy":0}' title="Nudge left">←</button>
+          <button class="cal-btn" data-op='{"type":"nudge","dx":1,"dy":0}' title="Nudge right">→</button>
+          <button class="cal-btn" data-op='{"type":"nudge","dx":0,"dy":-1}' title="Nudge up">↑</button>
+          <button class="cal-btn" data-op='{"type":"nudge","dx":0,"dy":1}' title="Nudge down">↓</button>
+        </div>
+      </div>
+      <div class="cal-row">
+        <span class="cal-label">Scale</span>
+        <div class="cal-btns">
+          <button class="cal-btn" data-op='{"type":"scale","dir":-1}' title="Shrink the grid">−</button>
+          <button class="cal-btn" data-op='{"type":"scale","dir":1}' title="Grow the grid">+</button>
+        </div>
+      </div>
+      <div class="cal-row">
+        <span class="cal-label">Width</span>
+        <div class="cal-btns">
+          <button class="cal-btn" data-op='{"type":"scale-width","dir":-1}'>−</button>
+          <button class="cal-btn" data-op='{"type":"scale-width","dir":1}'>+</button>
+        </div>
+        <span class="cal-label">Height</span>
+        <div class="cal-btns">
+          <button class="cal-btn" data-op='{"type":"scale-height","dir":-1}'>−</button>
+          <button class="cal-btn" data-op='{"type":"scale-height","dir":1}'>+</button>
+        </div>
+      </div>
+      <div class="cal-row">
+        <span class="cal-label">Columns</span>
+        <div class="cal-btns">
+          <button class="cal-btn" data-op='{"type":"cols","dir":-1}'>−</button>
+          <button class="cal-btn" data-op='{"type":"cols","dir":1}'>+</button>
+        </div>
+        <span class="cal-label">Badge ↕</span>
+        <div class="cal-btns">
+          <button class="cal-btn" data-op='{"type":"badge-y","dir":-1}'>−</button>
+          <button class="cal-btn" data-op='{"type":"badge-y","dir":1}'>+</button>
+        </div>
+      </div>
+
+      <div class="cal-actions">
+        <button class="cal-btn" data-op='{"type":"reset"}' title="Back to defaults">Reset</button>
+        <button class="cal-btn" id="calCancel">Cancel</button>
+        <button class="cal-btn cal-save" id="calSave">Save</button>
+      </div>
+      <div class="cal-hint">
+        Line the numbered ghosts up with the pack cards (1 = top-left, counting
+        left→right). If the numbers don't match the pack order in the overlay
+        panel, note it — the grid order may need flipping.
+      </div>
+    </div>
   </div>
 
   <!-- Match result overlay -->

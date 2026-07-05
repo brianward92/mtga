@@ -47,6 +47,16 @@ contextBridge.exposeInMainWorld('mtgaTracker', {
   toggleOverlay: () => ipcRenderer.invoke('overlay-toggle'),
   getOverlayVisible: () => ipcRenderer.invoke('overlay-visible'),
 
+  // Badge overlay (Arena-anchored flame badges) + calibration mode
+  getBadgesState: () => ipcRenderer.invoke('badges-state'),
+  toggleBadges: () => ipcRenderer.invoke('badges-toggle'),
+  startBadgeCalibration: () => ipcRenderer.invoke('badges-calibrate-start'),
+  testArenaAccess: () => ipcRenderer.invoke('badges-test-access'),
+  calibrateAdjust: (op: unknown) => ipcRenderer.send('calibrate-adjust', op),
+  calibrateSetCount: (count: number) => ipcRenderer.send('calibrate-count', { count }),
+  calibrateSave: () => ipcRenderer.send('calibrate-save'),
+  calibrateCancel: () => ipcRenderer.send('calibrate-cancel'),
+
   // Event listeners
   onInventoryUpdate: (callback: (data: unknown) => void) => {
     ipcRenderer.on('inventory-update', (_event, data) => callback(data))
@@ -102,6 +112,20 @@ contextBridge.exposeInMainWorld('mtgaTracker', {
     ipcRenderer.on('overlay-visibility', (_event, data) => callback(data))
   },
 
+  // Badge overlay event listeners
+  onBadgesEnabled: (callback: (data: unknown) => void) => {
+    ipcRenderer.on('badges-enabled', (_event, data) => callback(data))
+  },
+  onBadgesAccessibility: (callback: (data: unknown) => void) => {
+    ipcRenderer.on('badges-accessibility', (_event, data) => callback(data))
+  },
+  onBadgeView: (callback: (data: unknown) => void) => {
+    ipcRenderer.on('badge-view', (_event, data) => callback(data))
+  },
+  onCalibrateMode: (callback: (data: unknown) => void) => {
+    ipcRenderer.on('calibrate-mode', (_event, data) => callback(data))
+  },
+
   // Cleanup
   removeAllListeners: () => {
     ipcRenderer.removeAllListeners('inventory-update')
@@ -121,6 +145,10 @@ contextBridge.exposeInMainWorld('mtgaTracker', {
     ipcRenderer.removeAllListeners('detailed-logs')
     ipcRenderer.removeAllListeners('density-cycle')
     ipcRenderer.removeAllListeners('overlay-visibility')
+    ipcRenderer.removeAllListeners('badges-enabled')
+    ipcRenderer.removeAllListeners('badges-accessibility')
+    ipcRenderer.removeAllListeners('badge-view')
+    ipcRenderer.removeAllListeners('calibrate-mode')
   }
 })
 
@@ -156,6 +184,14 @@ declare global {
       hideOverlay: () => void
       toggleOverlay: () => Promise<boolean>
       getOverlayVisible: () => Promise<boolean>
+      getBadgesState: () => Promise<{ enabled: boolean; accessibilityIssue: boolean }>
+      toggleBadges: () => Promise<boolean>
+      startBadgeCalibration: () => Promise<boolean>
+      testArenaAccess: () => Promise<{ ok: boolean; arenaFound: boolean }>
+      calibrateAdjust: (op: unknown) => void
+      calibrateSetCount: (count: number) => void
+      calibrateSave: () => void
+      calibrateCancel: () => void
       onInventoryUpdate: (callback: (data: unknown) => void) => void
       onCollectionUpdate: (callback: (data: unknown) => void) => void
       onMatchStart: (callback: (data: unknown) => void) => void
@@ -173,6 +209,10 @@ declare global {
       onDetailedLogs: (callback: (data: unknown) => void) => void
       onDensityCycle: (callback: () => void) => void
       onOverlayVisibility: (callback: (data: unknown) => void) => void
+      onBadgesEnabled: (callback: (data: unknown) => void) => void
+      onBadgesAccessibility: (callback: (data: unknown) => void) => void
+      onBadgeView: (callback: (data: unknown) => void) => void
+      onCalibrateMode: (callback: (data: unknown) => void) => void
       removeAllListeners: () => void
     }
   }

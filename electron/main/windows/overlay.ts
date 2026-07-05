@@ -23,16 +23,20 @@ export type DraftDensity = 'verdict' | 'full' | 'mini'
 export interface OverlayUiPrefs {
   draftDensity: DraftDensity
   autoHideDashboard: boolean
+  /** Arena-anchored badge overlay (flame chips drawn on the pack cards). */
+  badgesEnabled: boolean
 }
 
 /**
- * Per-mode saved bounds ({match, draft}) plus UI prefs; legacy flat files
+ * Per-mode saved bounds ({match, draft}) plus UI prefs and badge overlay
+ * calibrations (keyed by Arena-window aspect bucket); legacy flat files
  * migrate to match.
  */
 interface StoredPositions {
   match?: OverlayPosition
   draft?: OverlayPosition
   ui?: Partial<OverlayUiPrefs>
+  badgeCalibrations?: Record<string, Record<string, unknown>>
 }
 
 // Manual drag/resize limits (the window is focusable:false, so the renderer
@@ -83,6 +87,9 @@ function loadStoredPositions(): StoredPositions {
       if (data.match) stored.match = data.match as OverlayPosition
       if (data.draft) stored.draft = data.draft as OverlayPosition
       if (data.ui && typeof data.ui === 'object') stored.ui = data.ui as Partial<OverlayUiPrefs>
+      if (data.badgeCalibrations && typeof data.badgeCalibrations === 'object') {
+        stored.badgeCalibrations = data.badgeCalibrations as Record<string, Record<string, unknown>>
+      }
       return stored
     }
   } catch {
@@ -116,7 +123,8 @@ export function getOverlayUiPrefs(): OverlayUiPrefs {
   const ui = loadStoredPositions().ui ?? {}
   return {
     draftDensity: normalizeDensity(ui.draftDensity),
-    autoHideDashboard: ui.autoHideDashboard !== false
+    autoHideDashboard: ui.autoHideDashboard !== false,
+    badgesEnabled: ui.badgesEnabled === true
   }
 }
 
@@ -125,6 +133,20 @@ export function setOverlayUiPrefs(patch: Partial<OverlayUiPrefs>): void {
   stored.ui = { ...stored.ui, ...patch }
   writeStored(stored)
   if (patch.draftDensity) draftDensity = normalizeDensity(patch.draftDensity)
+}
+
+/**
+ * Badge overlay calibrations, keyed by Arena-window aspect bucket
+ * (renderer/badges/layout.ts owns the shape; this is just the storage).
+ */
+export function getBadgeCalibrations(): Record<string, Record<string, unknown>> {
+  return loadStoredPositions().badgeCalibrations ?? {}
+}
+
+export function saveBadgeCalibration(bucket: string, config: Record<string, unknown>): void {
+  const stored = loadStoredPositions()
+  stored.badgeCalibrations = { ...stored.badgeCalibrations, [bucket]: config }
+  writeStored(stored)
 }
 
 function defaultBounds(mode: OverlayMode): OverlayPosition {

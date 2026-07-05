@@ -6,6 +6,7 @@
 import { escapeHtml, renderManaCost } from './shared'
 import { initDraftView, isDraftActive, cycleDraftDensity } from './draft-view'
 import { initWindowControls } from './window-controls'
+import { initCalibratePanel } from './calibrate'
 
 // Export to make this a proper ES module (avoids duplicate function errors in TS)
 export {}
@@ -102,6 +103,7 @@ function init(): void {
   setupTrackerEvents()
   initDraftView()
   initWindowControls()
+  initCalibratePanel()
   loadCardData()
   loadWinRate()
 }

@@ -79,10 +79,18 @@
           <span>Draft Overlay</span>
           <span class="toggle-state" id="overlayToggleState">Off</span>
         </button>
+        <button class="overlay-toggle" id="badgeToggle" aria-pressed="false" title="Draw flame badges directly on the Arena pack cards (the panel drops to Mini)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2c1.5 3-.3 4.7-1.5 6C9.2 9.5 8 11.2 8 13.5a4 4 0 0 0 8 0c0-1.3-.6-2.4-1.4-3.4 2.2.6 4.4 2.9 4.4 6.4a7 7 0 0 1-14 0c0-3 1.6-5 3-6.7C9.5 8 10.8 5.7 12 2z"/>
+          </svg>
+          <span>Badge Overlay</span>
+          <span class="toggle-state" id="badgeToggleState">Off</span>
+        </button>
         <label class="overlay-setting" title="Minimize this window when a draft starts so only the overlay is on screen (restored when the draft ends)">
           <input type="checkbox" id="autoHideDashboard" checked>
           <span>Hide dashboard during drafts</span>
         </label>
+        <button class="calibrate-link" id="calibrateBadgesBtn" title="Show numbered ghost rectangles over Arena and nudge them onto the pack cards">Calibrate badges…</button>
       </div>
 
       <div class="sidebar-footer">
@@ -99,6 +107,17 @@
           <h1>Overview</h1>
           <p class="subtitle">Your MTGA statistics at a glance</p>
         </header>
+
+        <!-- Badge overlay setup card (shown when Accessibility access is missing) -->
+        <div class="setup-card" id="badgeAccessCard" style="display: none;">
+          <div class="setup-card-text">
+            <strong>Badge overlay needs Accessibility access</strong>
+            <span>To anchor badges on the Arena window, allow MTGA Tracker in
+            System Settings → Privacy &amp; Security → Accessibility (in dev builds
+            the app appears as "Electron"), then test again.</span>
+          </div>
+          <button class="setup-card-btn" id="badgeAccessTest">Test again</button>
+        </div>
 
         <!-- Session Stats -->
         <div id="sessionStatsContainer" style="margin-bottom: 24px;"></div>

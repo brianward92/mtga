@@ -1580,3 +1580,106 @@ body {
 }
 
 .draft-complete-dismiss:hover { background: var(--bg-hover); }
+
+/* ==========================================================================
+   Badge calibration helper panel
+   (interactive controls for the click-through badge window)
+   ========================================================================== */
+
+/* Content-hugging densities: give the helper room when it takes over */
+.overlay.calibrating {
+  min-height: 420px;
+}
+
+.calibrate-panel {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  background: var(--panel-bg);
+  border-radius: var(--panel-radius);
+  overflow-y: auto;
+}
+
+.cal-title {
+  font-size: var(--fs-12);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-secondary);
+  cursor: grab;
+  padding-bottom: var(--sp-1);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.cal-status {
+  font-size: var(--fs-11);
+  color: var(--accent-ev);
+  min-height: 14px;
+}
+
+.cal-status.cal-error {
+  color: var(--accent-gold);
+}
+
+.cal-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+
+.cal-label {
+  font-size: var(--fs-11);
+  color: var(--text-muted);
+  min-width: 52px;
+}
+
+.cal-btns {
+  display: inline-flex;
+  gap: var(--sp-1);
+}
+
+.cal-btn {
+  min-width: 28px;
+  height: 24px;
+  padding: 0 8px;
+  background: var(--bg-glass-lighter);
+  border: 1px solid var(--border-glass);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: var(--fs-12);
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.cal-btn:hover { background: var(--bg-hover); }
+.cal-btn:active { background: var(--bg-active); }
+
+.cal-btn.active {
+  border-color: var(--accent-ev);
+  color: var(--accent-ev);
+}
+
+.cal-actions {
+  display: flex;
+  gap: var(--sp-2);
+  margin-top: var(--sp-1);
+}
+
+.cal-actions .cal-save {
+  margin-left: auto;
+  border-color: rgba(110, 231, 168, 0.5);
+  color: var(--accent-ev);
+  font-weight: 700;
+}
+
+.cal-hint {
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}

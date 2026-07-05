@@ -24,9 +24,25 @@ import {
   applyDraftDensity,
   getOverlayUiPrefs,
   setOverlayUiPrefs,
+  getBadgeCalibrations,
+  saveBadgeCalibration,
   unregisterOverlayShortcuts,
   DraftDensity
 } from './windows/overlay'
+import {
+  createBadgeWindow,
+  setBadgeWindowRect,
+  showBadgeWindow,
+  hideBadgeWindow
+} from './windows/badges'
+import { ArenaGeometryPoller, ArenaRect } from './arena-geometry'
+import {
+  normalizeCalibration,
+  applyCalibrationOp,
+  aspectBucketOf,
+  CalibrationConfig,
+  CalibrationOp
+} from '../renderer/badges/layout'
 import { createRegistryWindow } from './windows/registry'
 import { installApplicationMenu } from './windows/menu'
 import {
@@ -66,6 +82,7 @@ import { ServerClient, ServerCardRow, ModelInfo, ServerStatus } from './api/serv
 // Window references
 let overlayWindow: BrowserWindow | null = null
 let registryWindow: BrowserWindow | null = null
+let badgeWindow: BrowserWindow | null = null
 
 // Core services
 let logWatcher: LogWatcher | null = null
@@ -151,6 +168,182 @@ const draftRuntime = {
 // True while the dashboard was auto-minimized for a draft (restore on draft-end)
 let dashboardMinimizedForDraft = false
 
+// ============================================================================
+// Badge overlay state (Arena-anchored flame badges)
+// ============================================================================
+
+/** Polls the Arena window rect (osascript) while a draft/calibration is live. */
+const arenaPoller = new ArenaGeometryPoller()
+
+const badgeRuntime = {
+  calibrating: false,
+  calibrateCount: 14,
+  calibrateConfig: null as CalibrationConfig | null,
+  /** Overlay height before calibration temporarily grew it. */
+  preCalibrateHeight: null as number | null,
+  /** Set once when osascript reports missing Accessibility permission. */
+  accessibilityIssue: false
+}
+
+function badgesEnabled(): boolean {
+  return getOverlayUiPrefs().badgesEnabled
+}
+
+/** Draft/calibration events go to the panel AND the badge window. */
+function sendDraftEvent(channel: string, payload: unknown): void {
+  overlayWindow?.webContents.send(channel, payload)
+  badgeWindow?.webContents.send(channel, payload)
+}
+
+/**
+ * The calibration config for the current Arena window shape: the working
+ * calibration (while calibrating), else the persisted per-aspect-bucket one,
+ * else the "default" bucket, else the built-in defaults.
+ */
+function resolveBadgeConfig(rect: { width: number; height: number } | null): CalibrationConfig {
+  if (badgeRuntime.calibrating && badgeRuntime.calibrateConfig) {
+    return badgeRuntime.calibrateConfig
+  }
+  const configs = getBadgeCalibrations()
+  const bucket = rect ? aspectBucketOf(rect.width, rect.height) : 'default'
+  return normalizeCalibration(configs[bucket] ?? configs['default'] ?? {})
+}
+
+function pushBadgeView(): void {
+  badgeWindow?.webContents.send('badge-view', {
+    config: resolveBadgeConfig(arenaPoller.lastKnown)
+  })
+}
+
+function badgesWantedNow(): boolean {
+  if (badgeRuntime.calibrating) return true
+  if (isReplaying || !badgesEnabled()) return false
+  return draftRuntime.session?.state === 'active'
+}
+
+/**
+ * Badges are on: drop the panel to Mini so it stays out of Arena's way.
+ * Reuses the existing density IPC — 'density-cycle' steps the renderer's
+ * cycle (verdict → full → mini), and main knows the persisted density, so
+ * send exactly as many steps as it takes to land on mini.
+ */
+function autoMiniPanel(): void {
+  if (!overlayWindow || overlayWindow.isDestroyed()) return
+  const density = getOverlayUiPrefs().draftDensity
+  const cycles = density === 'verdict' ? 2 : density === 'full' ? 1 : 0
+  for (let i = 0; i < cycles; i++) {
+    overlayWindow.webContents.send('density-cycle')
+  }
+}
+
+function startBadgesForDraft(): void {
+  if (!badgesEnabled()) return
+  arenaPoller.start()
+  autoMiniPanel()
+}
+
+function stopBadgesAfterDraft(): void {
+  if (badgeRuntime.calibrating) return // calibration keeps the poller alive
+  arenaPoller.stop()
+  if (badgeWindow) hideBadgeWindow(badgeWindow)
+}
+
+function sendCalibrateState(): void {
+  const payload = {
+    active: badgeRuntime.calibrating,
+    count: badgeRuntime.calibrateCount,
+    config: badgeRuntime.calibrateConfig ?? resolveBadgeConfig(arenaPoller.lastKnown),
+    arenaFound: arenaPoller.isFound(),
+    accessibilityIssue: badgeRuntime.accessibilityIssue
+  }
+  sendDraftEvent('calibrate-mode', payload)
+}
+
+function startBadgeCalibration(): void {
+  if (badgeRuntime.calibrating) {
+    sendCalibrateState()
+    return
+  }
+  badgeRuntime.calibrating = true
+  badgeRuntime.calibrateConfig = resolveBadgeConfig(arenaPoller.lastKnown)
+  arenaPoller.start()
+
+  // The helper controls live in the (interactive) panel window: make sure it
+  // is visible and tall enough — Mini is 64px, the helper needs ~420.
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    showOverlay(overlayWindow)
+    sendOverlayVisibility()
+    badgeRuntime.preCalibrateHeight = overlayWindow.getBounds().height
+    if (badgeRuntime.preCalibrateHeight < 420) {
+      resizeOverlay(overlayWindow, { height: 420 }, true)
+    }
+  }
+
+  if (badgeWindow && arenaPoller.lastKnown) {
+    setBadgeWindowRect(badgeWindow, arenaPoller.lastKnown)
+    showBadgeWindow(badgeWindow)
+  }
+  sendCalibrateState()
+}
+
+function endBadgeCalibration(save: boolean): void {
+  if (!badgeRuntime.calibrating) return
+
+  if (save && badgeRuntime.calibrateConfig) {
+    const rect = arenaPoller.lastKnown
+    const bucket = rect ? aspectBucketOf(rect.width, rect.height) : 'default'
+    try {
+      saveBadgeCalibration(bucket, badgeRuntime.calibrateConfig as unknown as Record<string, unknown>)
+      console.log('[Badges] Calibration saved for bucket', bucket)
+    } catch (error) {
+      console.error('[Badges] Failed to save calibration:', error)
+    }
+  }
+
+  badgeRuntime.calibrating = false
+  badgeRuntime.calibrateConfig = null
+  sendCalibrateState() // active:false -> both renderers tear down
+
+  // Give the panel its pre-calibration height back (full density only; the
+  // content-hugging densities re-sync themselves after the helper hides).
+  if (overlayWindow && !overlayWindow.isDestroyed() && badgeRuntime.preCalibrateHeight !== null) {
+    resizeOverlay(overlayWindow, { height: badgeRuntime.preCalibrateHeight }, true)
+  }
+  badgeRuntime.preCalibrateHeight = null
+
+  const draftActive = draftRuntime.session?.state === 'active'
+  if (draftActive && badgesEnabled()) {
+    pushBadgeView() // back to the persisted config
+  } else {
+    arenaPoller.stop()
+    if (badgeWindow) hideBadgeWindow(badgeWindow)
+  }
+}
+
+/** Wire the geometry poller once: bounds-follow, hide-on-lost, setup card. */
+function setupArenaGeometry(): void {
+  arenaPoller.on('geometry', (rect: ArenaRect) => {
+    if (badgeWindow && !badgeWindow.isDestroyed()) {
+      setBadgeWindowRect(badgeWindow, rect)
+      pushBadgeView()
+      if (badgesWantedNow()) showBadgeWindow(badgeWindow)
+    }
+    if (badgeRuntime.calibrating) sendCalibrateState()
+  })
+
+  arenaPoller.on('lost', () => {
+    if (badgeWindow) hideBadgeWindow(badgeWindow)
+    if (badgeRuntime.calibrating) sendCalibrateState()
+  })
+
+  arenaPoller.on('accessibility-missing', () => {
+    badgeRuntime.accessibilityIssue = true
+    console.warn('[Badges] Accessibility permission missing — cannot locate the Arena window')
+    registryWindow?.webContents.send('badges-accessibility', { ok: false })
+    if (badgeRuntime.calibrating) sendCalibrateState()
+  })
+}
+
 /** Push the overlay's visibility to the dashboard so its toggle stays truthful. */
 function sendOverlayVisibility(): void {
   const visible = !!overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.isVisible()
@@ -221,6 +414,16 @@ function restoreDashboardAfterDraft(): void {
 async function createWindows(): Promise<void> {
   overlayWindow = createOverlayWindow()
   ensureRegistryWindow()
+
+  // Badge overlay: hidden until a draft is live AND the Arena window is found
+  badgeWindow = createBadgeWindow()
+  badgeWindow.on('closed', () => {
+    badgeWindow = null
+  })
+  badgeWindow.webContents.on('did-finish-load', () => {
+    pushBadgeView()
+    if (badgeRuntime.calibrating) sendCalibrateState()
+  })
 
   // The startup replay usually finishes before the overlay page loads, so a
   // 'detailed-logs' send during replay is dropped. Re-send once loaded.
@@ -537,7 +740,7 @@ function draftEndPayload(snapshot: DraftSessionSnapshot): Record<string, unknown
 }
 
 function sendServerStatus(): void {
-  overlayWindow?.webContents.send('server-status', draftRuntime.serverStatus)
+  sendDraftEvent('server-status', draftRuntime.serverStatus)
 }
 
 function updateServerStatus(status?: ServerStatus): void {
@@ -565,7 +768,7 @@ function setEvP1p1Sorted(): number[] | null {
 
 function sendSetRatings(): void {
   if (isReplaying) return
-  overlayWindow?.webContents.send('draft-ratings', { setEvP1p1Sorted: setEvP1p1Sorted() })
+  sendDraftEvent('draft-ratings', { setEvP1p1Sorted: setEvP1p1Sorted() })
 }
 
 /**
@@ -619,7 +822,7 @@ async function ensureRatings(snapshot: DraftSessionSnapshot): Promise<void> {
       cards: buildCardRows(draftRuntime.lastPack.cards.map(c => c.grpId))
     }
     draftRuntime.lastPack = refreshed
-    if (!isReplaying) overlayWindow?.webContents.send('draft-pack', refreshed)
+    if (!isReplaying) sendDraftEvent('draft-pack', refreshed)
   }
 }
 
@@ -653,7 +856,7 @@ function sendTierList(snapshot: DraftSessionSnapshot): void {
     }))
   }
   draftRuntime.lastPack = payload
-  if (!isReplaying) overlayWindow?.webContents.send('draft-pack', payload)
+  if (!isReplaying) sendDraftEvent('draft-pack', payload)
 }
 
 function handleDraftStart(snapshot: DraftSessionSnapshot): void {
@@ -686,7 +889,8 @@ function handleDraftStart(snapshot: DraftSessionSnapshot): void {
       sendOverlayVisibility()
     }
     hideDashboardForDraft()
-    overlayWindow?.webContents.send('draft-start', draftStartPayload(snapshot))
+    sendDraftEvent('draft-start', draftStartPayload(snapshot))
+    startBadgesForDraft()
     void ensureRatings(snapshot)
   }
 }
@@ -707,7 +911,7 @@ function handleDraftPack(snapshot: DraftSessionSnapshot): void {
   draftRuntime.lastPack = payload
 
   if (!isReplaying) {
-    overlayWindow?.webContents.send('draft-pack', payload)
+    sendDraftEvent('draft-pack', payload)
     void ensureRatings(snapshot)
     void requestScores(snapshot)
   }
@@ -756,7 +960,7 @@ async function requestScores(snapshot: DraftSessionSnapshot): Promise<void> {
   // Only surface if this is still the pack on screen
   const live = draftRuntime.session?.currentPack
   if (!isReplaying && live && live.pack === pack && live.pick === pick) {
-    overlayWindow?.webContents.send('draft-scores', payload)
+    sendDraftEvent('draft-scores', payload)
   }
 }
 
@@ -796,7 +1000,7 @@ function handleDraftPick(snapshot: DraftSessionSnapshot, pick: DraftPickRecord):
   }
 
   if (!isReplaying) {
-    overlayWindow?.webContents.send('draft-pick', draftPickPayload(snapshot, pick))
+    sendDraftEvent('draft-pick', draftPickPayload(snapshot, pick))
   }
 }
 
@@ -811,7 +1015,8 @@ function handleDraftEnd(snapshot: DraftSessionSnapshot): void {
   }
 
   if (!isReplaying) {
-    overlayWindow?.webContents.send('draft-end', draftEndPayload(snapshot))
+    sendDraftEvent('draft-end', draftEndPayload(snapshot))
+    stopBadgesAfterDraft()
     restoreDashboardAfterDraft()
     // The renderer shows a dismissible "draft complete" card and sends
     // 'draft-dismiss' (button or its own 10s timeout). This is only a
@@ -841,8 +1046,9 @@ function surfaceActiveDraft(): void {
     sendOverlayVisibility()
   }
   hideDashboardForDraft()
-  overlayWindow?.webContents.send('draft-start', draftStartPayload(snapshot))
-  overlayWindow?.webContents.send('draft-pick', draftPickPayload(snapshot, null))
+  sendDraftEvent('draft-start', draftStartPayload(snapshot))
+  sendDraftEvent('draft-pick', draftPickPayload(snapshot, null))
+  startBadgesForDraft()
 
   if (snapshot.currentPack) {
     handleDraftPack(snapshot)
@@ -1181,6 +1387,68 @@ ipcMain.handle('overlay-visible', () => {
   return !!overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.isVisible()
 })
 
+// ============================================================================
+// IPC Handlers - Badge overlay (Arena-anchored flame badges) + calibration
+// ============================================================================
+
+ipcMain.handle('badges-state', () => ({
+  enabled: badgesEnabled(),
+  accessibilityIssue: badgeRuntime.accessibilityIssue
+}))
+
+// Dashboard's "Badge Overlay" toggle (both overlays can be on together)
+ipcMain.handle('badges-toggle', () => {
+  const enabled = !badgesEnabled()
+  setOverlayUiPrefs({ badgesEnabled: enabled })
+  registryWindow?.webContents.send('badges-enabled', { enabled })
+
+  const draftActive = draftRuntime.session?.state === 'active'
+  if (enabled && draftActive && !isReplaying) {
+    arenaPoller.start()
+    autoMiniPanel()
+    if (badgeWindow && arenaPoller.lastKnown) {
+      setBadgeWindowRect(badgeWindow, arenaPoller.lastKnown)
+      pushBadgeView()
+      showBadgeWindow(badgeWindow)
+    }
+  } else if (!enabled) {
+    stopBadgesAfterDraft() // no-op while calibrating
+  }
+  return enabled
+})
+
+// Dashboard setup card's "Test again" button (Accessibility permission)
+ipcMain.handle('badges-test-access', async () => {
+  const probe = await arenaPoller.pollOnce()
+  const ok = probe !== null && probe.status !== 'no-accessibility'
+  if (ok) badgeRuntime.accessibilityIssue = false
+  return { ok, arenaFound: probe?.status === 'found' }
+})
+
+// Dashboard button + View menu entry
+ipcMain.handle('badges-calibrate-start', () => {
+  startBadgeCalibration()
+  return true
+})
+
+// Helper-panel nudge/scale buttons (live ghost updates)
+ipcMain.on('calibrate-adjust', (_, op: unknown) => {
+  if (!badgeRuntime.calibrating || !op || typeof op !== 'object') return
+  const base = badgeRuntime.calibrateConfig ?? resolveBadgeConfig(arenaPoller.lastKnown)
+  badgeRuntime.calibrateConfig = applyCalibrationOp(base, op as CalibrationOp)
+  sendCalibrateState()
+})
+
+ipcMain.on('calibrate-count', (_, data: { count?: number }) => {
+  if (!badgeRuntime.calibrating) return
+  const count = data?.count
+  badgeRuntime.calibrateCount = count === 13 || count === 15 ? count : 14
+  sendCalibrateState()
+})
+
+ipcMain.on('calibrate-save', () => endBadgeCalibration(true))
+ipcMain.on('calibrate-cancel', () => endBadgeCalibration(false))
+
 // Renderer dismissed the end-of-draft card (button click or its 10s timeout)
 ipcMain.on('draft-dismiss', () => {
   if (draftRuntime.endTimer) {
@@ -1212,13 +1480,14 @@ app.whenReady().then(async () => {
   }
 
   // Standard menu bar: About/Quit (Cmd+Q), Edit roles for copy/paste,
-  // Window roles — plain Mac app behavior.
-  installApplicationMenu()
+  // View → Calibrate Badges, Window roles — plain Mac app behavior.
+  installApplicationMenu({ onCalibrateBadges: startBadgeCalibration })
 
   // Start services
   setupServerClient()
   setupLogParser()
   setupLogWatcher()
+  setupArenaGeometry()
   await createWindows()
 
   // macOS: Dock icon click re-opens (or re-focuses) the dashboard —
@@ -1246,12 +1515,14 @@ app.on('will-quit', () => {
 
 /**
  * Clean up resources before quitting: chokidar watchers + poll timers
- * (logWatcher.stop), server retry loop (serverClient.stop), pending draft
- * timer, sqlite handle. Windows are torn down by app.quit() itself.
+ * (logWatcher.stop), server retry loop (serverClient.stop), Arena geometry
+ * poller, pending draft timer, sqlite handle. Windows are torn down by
+ * app.quit() itself.
  */
 function cleanup(): void {
   logWatcher?.stop()
   serverClient?.stop()
+  arenaPoller.stop()
   if (draftRuntime.endTimer) {
     clearTimeout(draftRuntime.endTimer)
     draftRuntime.endTimer = null

@@ -156,6 +156,7 @@ async function init(): Promise<void> {
   setupFilters()
   setupEventListeners()
   void setupOverlayControls()
+  void setupBadgeControls()
   await loadData()
   await loadCollectionData()
   await loadOpponentStats()
@@ -198,6 +199,60 @@ async function setupOverlayControls(): Promise<void> {
     autoHide.addEventListener('change', () => {
       window.mtgaTracker.setOverlayPrefs({ autoHideDashboard: autoHide.checked })
     })
+  }
+}
+
+/**
+ * "Badge Overlay" toggle (flame chips drawn on the Arena pack cards),
+ * "Calibrate badges" entry point, and the Accessibility setup card that
+ * appears when the Arena-window lookup is blocked by macOS permissions.
+ */
+async function setupBadgeControls(): Promise<void> {
+  const toggle = document.getElementById('badgeToggle')
+  const stateEl = document.getElementById('badgeToggleState')
+  const calibrateBtn = document.getElementById('calibrateBadgesBtn')
+  const accessCard = document.getElementById('badgeAccessCard')
+  const accessTest = document.getElementById('badgeAccessTest')
+  if (!toggle || !window.mtgaTracker?.toggleBadges) return
+
+  const render = (enabled: boolean) => {
+    toggle.classList.toggle('on', enabled)
+    toggle.setAttribute('aria-pressed', String(enabled))
+    if (stateEl) stateEl.textContent = enabled ? 'On' : 'Off'
+  }
+
+  toggle.addEventListener('click', async () => {
+    render(await window.mtgaTracker.toggleBadges())
+  })
+
+  window.mtgaTracker.onBadgesEnabled((data: unknown) => {
+    render((data as { enabled: boolean }).enabled)
+  })
+
+  calibrateBtn?.addEventListener('click', () => {
+    void window.mtgaTracker.startBadgeCalibration()
+  })
+
+  // One-time "Accessibility permission missing" setup card
+  window.mtgaTracker.onBadgesAccessibility(() => {
+    if (accessCard) accessCard.style.display = 'flex'
+  })
+
+  accessTest?.addEventListener('click', async () => {
+    const result = await window.mtgaTracker.testArenaAccess()
+    if (result.ok && accessCard) {
+      accessCard.style.display = 'none'
+    } else if (accessTest) {
+      accessTest.textContent = 'Still blocked — test again'
+    }
+  })
+
+  try {
+    const state = await window.mtgaTracker.getBadgesState()
+    render(state.enabled)
+    if (state.accessibilityIssue && accessCard) accessCard.style.display = 'flex'
+  } catch {
+    render(false)
   }
 }
 
