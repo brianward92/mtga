@@ -1,8 +1,16 @@
-"""Win-probability v1 (mtga/winprob): data assembly, metrics, train, economics.
+"""Win-probability v1/v2 (mtga/winprob): data assembly, metrics, train, economics.
 
 Hand-computed expectations follow _synth.hand_replay_games (12 turn rows over
 6 games; rg0 is a clean on-play win with a 3-turn trajectory) and the
 _synth.winprob_training_games fixture for the training/economics smoke.
+
+v2 (cross-set) coverage reuses the SAME winprob_training_games generator for
+a second synthetic set code (SET2) so multi-set loading has two curated
+files to concatenate; the two "sets" share a game generator (not a
+statistically distinct distribution) because these tests exercise the
+PLUMBING (concatenation, set tagging, row capping, split uniqueness,
+zero-shot scoring, persistence) rather than a real cross-set generalization
+result -- that comes from the actual training run over real 17Lands data.
 """
 
 import json
@@ -12,10 +20,13 @@ import pytest
 
 import _synth
 from mtga.lands import paths
+from mtga.models.draftnet import split_by_draft
 from mtga.winprob import data as wdata
 from mtga.winprob import economics
 from mtga.winprob import train as wtrain
 from mtga.winprob.model import WinProbNet, predict_proba
+
+SET2 = "TS2"  # second synthetic set code for v2 multi-set coverage
 
 
 @pytest.fixture
@@ -37,6 +48,26 @@ def winprob_training_data(data_root):
 
     assert etl.curate_turn_states(_synth.SET, _synth.FMT)["status"] == "CURATED"
     return dest
+
+
+@pytest.fixture
+def winprob_multiset_raw(data_root):
+    """Two curated sets (_synth.SET, SET2) for v2 multi-set loading tests.
+
+    Both curated from the same winprob_training_games() generator (60 games,
+    turn counts 3..11, draft_ids "wp00".."wp59" on BOTH sets) so load_many's
+    set-code draft_id prefixing is exercised against a real collision, not
+    just a hypothetical one. Returns the set-code list in a fixed order.
+    """
+    from mtga.replay import etl
+
+    sets = [_synth.SET, SET2]
+    for set_code in sets:
+        dest = paths.raw_dataset_path("replay", set_code, _synth.FMT)
+        _synth.write_replay_csv(dest, games=_synth.winprob_training_games(),
+                                turn_cols=_synth.WINPROB_TURN_COLS)
+        assert etl.curate_turn_states(set_code, _synth.FMT)["status"] == "CURATED"
+    return sets
 
 
 # ---------------------------------------------------------------------------
@@ -270,3 +301,161 @@ def test_gradient_sign_and_exchange():
     equiv, _, _ = economics._exchange(g_card, g_life)
     # ~0.4 up to sigmoid curvature of the central-difference secants.
     assert equiv == pytest.approx(0.2 / 0.5, abs=0.02)
+
+
+# ---------------------------------------------------------------------------
+# v2: multi-set loading, cross-set training, zero-shot eval, economics-by-set.
+
+
+def test_load_many_concatenates_and_tags_sets(winprob_multiset_raw):
+    sets = winprob_multiset_raw
+    single = {s: wdata.load_dataset(s, _synth.FMT) for s in sets}
+
+    combined, report, wr_fills = wdata.load_many(
+        sets, _synth.FMT, per_set_row_cap=None, progress=lambda *_: None)
+
+    assert combined.n_rows == sum(d.n_rows for d in single.values())
+    assert combined.n_games == sum(d.n_games for d in single.values())
+    assert set(combined.game_set.tolist()) == set(sets)
+    assert set(wr_fills) == set(sets)
+    for s in sets:
+        assert report[s]["rows_total"] == single[s].n_rows
+        assert report[s]["rows_kept"] == single[s].n_rows
+        assert report[s]["games"] == single[s].n_games
+
+    # Every row's source set (via game_pos) matches that set's own row count.
+    row_set = combined.game_set[combined.game_pos]
+    for s in sets:
+        assert int((row_set == s).sum()) == single[s].n_rows
+
+    # draft_id is prefixed with the set code -- both fixtures share the same
+    # "wp00".."wp59" ids, so this is a real collision, not a hypothetical one.
+    ids = combined.game_draft_id.tolist()
+    assert f"{sets[0]}:wp00" in ids and f"{sets[1]}:wp00" in ids
+    assert len(set(ids)) == len(ids)  # globally unique -> no split leakage
+
+    train_mask, val_mask = split_by_draft(combined.game_draft_id, 500)
+    assert train_mask.any() and val_mask.any()
+
+
+def test_load_many_row_cap_keeps_full_game_metadata(winprob_multiset_raw):
+    sets = winprob_multiset_raw
+    cap = 10
+    combined, report, _ = wdata.load_many(
+        sets, _synth.FMT, per_set_row_cap=cap, seed=5, progress=lambda *_: None)
+
+    for s in sets:
+        assert report[s]["rows_total"] > cap
+        assert report[s]["rows_kept"] == cap
+    assert combined.n_rows == cap * len(sets)
+
+    # Per-game metadata (draft_id/game_set) is NEVER capped, only the row
+    # matrix -- this is what state_anchors' rows-per-game ratio depends on,
+    # which is exactly why the anchor check must run on FULL data first.
+    full_games = sum(wdata.load_dataset(s, _synth.FMT).n_games for s in sets)
+    assert combined.n_games == full_games
+
+
+def test_load_many_anchor_check(winprob_multiset_raw):
+    sets = winprob_multiset_raw
+    single = wdata.load_dataset(sets[0], _synth.FMT)
+    anchors = wdata.state_anchors(single)
+    key = (sets[0], _synth.FMT)
+
+    ok = {key: {"mean_turns": anchors["mean_turns"],
+               "ahead": anchors["ahead"]["win_rate"],
+               "behind": anchors["behind"]["win_rate"]}}
+    combined, report, _ = wdata.load_many(
+        sets, _synth.FMT, anchor_checks=ok, progress=lambda *_: None)
+    assert combined.n_rows == sum(r["rows_kept"] for r in report.values())
+
+    bad = {key: {"mean_turns": anchors["mean_turns"] + 5.0}}
+    with pytest.raises(ValueError, match="anchor mismatch"):
+        wdata.load_many(sets, _synth.FMT, anchor_checks=bad,
+                        progress=lambda *_: None)
+
+
+def test_train_multiset_smoke_zero_shot(winprob_multiset_raw):
+    train_sets = [winprob_multiset_raw[0]]
+    holdout_sets = [winprob_multiset_raw[1]]
+
+    models, report, context = wtrain.train_multiset(
+        train_sets, holdout_sets, limited_type=_synth.FMT,
+        per_set_row_cap=None, epochs=2, batch_size=64, lr=1e-2, seed=3,
+        patience=3, val_permille=500, progress=lambda *_: None)
+
+    assert set(models) == {"life_diff", "full", "mlp"}
+    assert context["train_sets"] == train_sets
+    assert context["holdout_sets"] == holdout_sets
+    assert report["n_train"] + report["n_val"] == report["n_rows"]
+
+    # Within-training validation is broken out by (trained-on) set...
+    assert set(report["by_train_set"]) == set(train_sets)
+    # ...while the zero-shot set never appears there, only under zero_shot.
+    assert holdout_sets[0] not in report["by_train_set"]
+    assert set(report["zero_shot"]) == set(holdout_sets)
+
+    z = report["zero_shot"][holdout_sets[0]]
+    for name in ("life_diff", "full", "mlp"):
+        assert "pooled" in z["models"][name]
+        assert 0.0 <= z["models"][name]["pooled"]["auc"] <= 1.0
+    assert report["zero_shot_mlp_auc_mean"] == pytest.approx(
+        z["models"]["mlp"]["pooled"]["auc"])
+    assert "pooled" in z["nonlinearity_gap"]
+
+
+def test_save_version_multiset_and_economics_by_set(winprob_multiset_raw,
+                                                     tmp_path, monkeypatch):
+    import torch
+
+    from mtga.foundation import runlog
+
+    train_sets = list(winprob_multiset_raw)  # both sets train, no holdout
+    models, report, context = wtrain.train_multiset(
+        train_sets, [], limited_type=_synth.FMT, per_set_row_cap=None,
+        epochs=2, batch_size=64, lr=1e-2, seed=3, patience=3,
+        val_permille=500, progress=lambda *_: None)
+    assert report["zero_shot"] == {}
+    assert report["zero_shot_mlp_auc_mean"] is None
+
+    out_dir = wtrain.save_version_multiset(models, report, context, tag="v2-test")
+    assert out_dir == paths.MODELS_DIR / "_winprob" / "v2-test"
+    for artifact in ["checkpoint_life_diff.pt", "checkpoint_full.pt",
+                     "checkpoint_mlp.pt", "meta.json", "metrics.json"]:
+        assert (out_dir / artifact).exists()
+    with open(out_dir / "meta.json") as fh:
+        meta = json.load(fh)
+    assert meta["train_sets"] == train_sets
+    assert meta["holdout_sets"] == []
+    assert set(meta["data_etags"]) == set(train_sets)
+
+    # The MLP checkpoint round-trips into a fresh net, same as v1.
+    checkpoint = torch.load(out_dir / "checkpoint_mlp.pt", weights_only=False)
+    fresh = WinProbNet(checkpoint["config"]["input_dim"],
+                       hidden=tuple(checkpoint["config"]["hidden"]))
+    fresh.load_state_dict(checkpoint["model"])
+
+    mean, std = context["_scaler"]
+    data = context["_data"]
+    val_idx = context["_val_idx"]
+
+    econ = economics.compute(models["mlp"], mean, std, data, val_idx, seed=3)
+    by_set = economics.compute_by_set(
+        models["mlp"], mean, std, data, val_idx, train_sets, seed=3)
+    assert set(by_set) == set(train_sets)  # both sets have val rows at n=60/permille=500
+    table = economics.render_by_set_table(by_set)
+    assert isinstance(table, str)
+    for s in train_sets:
+        assert s in table
+
+    json_path, fig_path = economics.save(econ, out_dir)
+    assert json_path.exists() and fig_path.exists()
+
+    monkeypatch.setattr(runlog, "LEDGER", tmp_path / "ledger.jsonl")
+    record = wtrain.ledger_run_multiset(report, context, out_dir, economics=econ)
+    lines = (tmp_path / "ledger.jsonl").read_text().strip().splitlines()
+    assert len(lines) == 1
+    logged = json.loads(lines[0])
+    assert logged["run_id"] == record["run_id"]
+    assert logged["metrics"]["auc_mlp"] == report["models"]["mlp"]["pooled"]["auc"]
+    assert logged["metrics"]["zero_shot_mlp_auc_mean"] is None

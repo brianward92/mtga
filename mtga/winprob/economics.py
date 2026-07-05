@@ -123,6 +123,27 @@ def _select(X, turn, mask, want_turn, life_col, want_life=None, window=LIFE_WIND
     return np.flatnonzero(sel)
 
 
+def compute_by_set(model, mean, std, data, val_idx, set_codes, seed=17):
+    """Per-set compute() breakdown: is the card/life exchange rate stable
+    across sets, or a single-set artifact?
+
+    `data.game_set[data.game_pos]` (populated by mtga.winprob.data.load_many)
+    tags each row with its source set; this just restricts val_idx to one
+    set at a time and reuses compute() unchanged, so every curve (life_curve,
+    parity_curve, exchange_rate_table) is directly comparable set-to-set.
+    Sets with zero rows in val_idx (e.g. a holdout set not part of this
+    data object) are skipped -- call compute() directly for those instead.
+    """
+    row_set = data.game_set[data.game_pos]
+    out = {}
+    for set_code in set_codes:
+        sel = val_idx[row_set[val_idx] == set_code]
+        if len(sel) == 0:
+            continue
+        out[set_code] = compute(model, mean, std, data, sel, seed=seed)
+    return out
+
+
 def compute(model, mean, std, data, val_idx, seed=17):
     """All economics artifacts from the trained MLP over held-out states."""
     rng = np.random.default_rng(seed)
@@ -214,6 +235,24 @@ def render_table(econ):
             v = cells.get(L, {}).get("life_per_card")
             values.append(" n/a  " if v is None else f"{v:5.2f} ")
         lines.append(f"{t:>5} | " + " ".join(values))
+    return "\n".join(lines)
+
+
+def render_by_set_table(by_set):
+    """Per-set headline life-per-card comparison — the cross-set stability
+    check: a stable number across `by_set` says the card/life exchange rate
+    is not a single-set artifact (see compute_by_set)."""
+    header = f"{'set':>6} | {'n':>10} | {'life/card':>10} | {'life/creature':>14}"
+    lines = ["Card value in LIFE-EQUIVALENTS by source set (headline/median state)",
+             header, "-" * len(header)]
+    for set_code in sorted(by_set):
+        head = (by_set[set_code] or {}).get("headline") or {}
+        lpc = head.get("life_per_card")
+        lpcr = head.get("life_per_creature")
+        lines.append(
+            f"{set_code:>6} | {head.get('n', 0):>10,} | "
+            f"{'n/a' if lpc is None else f'{lpc:9.3f}'} | "
+            f"{'n/a' if lpcr is None else f'{lpcr:13.3f}'}")
     return "\n".join(lines)
 
 
