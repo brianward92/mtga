@@ -60,8 +60,11 @@ def main():
                               ("replay_turns", etl.curate_turn_states)]:
             try:
                 result = curate(set_code, fmt, force=args.force)
-            except ValueError as error:
-                result = {"status": "SKIPPED_SCHEMA", "reason": str(error)[:120]}
+            except Exception as error:  # noqa: BLE001 — era schema drift shows
+                # up as ValueError OR duckdb Binder errors (missing per-turn
+                # columns in older files); one bad set must not stop the corpus.
+                result = {"status": "SKIPPED_SCHEMA",
+                          "reason": f"{type(error).__name__}: {str(error)[:110]}"}
             print(f"{label} {set_code} {fmt}: {result}", flush=True)
 
 
