@@ -647,12 +647,15 @@ def write_cardfeats():
     return frame
 
 
-def mulligan_training_games(n=40):
+def mulligan_training_games(n=40, draft_prefix="mull"):
     """n replay games with a deterministic crc32 split behavior.
 
-    draft_id mull00..mull{n-1}: game i wins iff i is even, mulligans once
-    iff i % 5 == 0 (so both the crc32-val and train halves see kept wins,
-    kept losses, and mulled decisions for n >= 40 at val_permille=500).
+    draft_id {draft_prefix}00..{draft_prefix}{n-1}: game i wins iff i is
+    even, mulligans once iff i % 5 == 0 (so both the crc32-val and train
+    halves see kept wins, kept losses, and mulled decisions for n >= 40 at
+    val_permille=500). draft_prefix lets a second synthetic "set" reuse this
+    generator (mtga/mulligan's cross-set tests) without colliding draft_ids
+    against a first set built the same way.
     """
     keep7 = [RID_A, RID_B, RID_C, RID_D, RID_L1, RID_L1, RID_L2]
     mull7 = [RID_A, RID_A, RID_B, RID_C, RID_L1, RID_L1, RID_L2]
@@ -660,7 +663,7 @@ def mulligan_training_games(n=40):
     for i in range(n):
         mulls = 1 if i % 5 == 0 else 0
         games.append(dict(
-            draft_id=f"mull{i:02d}", on_play=i % 2 == 0, won=i % 2 == 0,
+            draft_id=f"{draft_prefix}{i:02d}", on_play=i % 2 == 0, won=i % 2 == 0,
             num_mulligans=mulls, num_turns=1,
             candidate_hands=[keep7] if mulls == 0 else [keep7, mull7],
             opening_hand=keep7 if mulls == 0
@@ -765,14 +768,19 @@ class StubOrtSession:
 
 def write_foundation_version(tag="v1", fmt=None, wr_id=33, games_id=6,
                              manifest_hash=FOUNDATION_MANIFEST_HASH,
-                             point_latest=True):
-    """Foundation version dir (3 stub graphs + constants + meta) + latest."""
+                             point_latest=True, set_ctx=True):
+    """Foundation version dir (stub graphs + constants + meta) + latest.
+    set_ctx=False omits set_encoder.onnx entirely, matching a real
+    set_ctx=False export (mtga/foundation/export.py)."""
     import numpy as np
 
     base = paths.MODELS_DIR / "_foundation"
     out = (base / fmt / tag) if fmt else (base / tag)
     out.mkdir(parents=True, exist_ok=True)
-    for graph in ["card_encoder.onnx", "set_encoder.onnx", "scorer.onnx"]:
+    graphs = ["card_encoder.onnx", "scorer.onnx"]
+    if set_ctx:
+        graphs.append("set_encoder.onnx")
+    for graph in graphs:
         (out / graph).write_bytes(b"stub-onnx")
     np.savez(out / "constants.npz",
              pool_null_input=np.full(DRAFTFM_D, DRAFTFM_NULL,
@@ -782,6 +790,7 @@ def write_foundation_version(tag="v1", fmt=None, wr_id=33, games_id=6,
         "kind": "draftfm-zeroshot",
         "manifest_hash": manifest_hash,
         "serving": {"wr_id": wr_id, "games_id": games_id},
+        "set_ctx": set_ctx,
         "config": {"d_model": DRAFTFM_D},
     }
     with open(out / "meta.json", "w") as fh:

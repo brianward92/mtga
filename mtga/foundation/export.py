@@ -1,18 +1,30 @@
-"""ONNX export for DraftFM: three graphs factoring model.DraftFM exactly.
+"""ONNX export for DraftFM: graphs factoring model.DraftFM exactly.
 
 Serving (Intel box, onnxruntime CPU) never imports torch, so the trained
-model is split into three graphs whose composition reproduces the training
+model is split into graphs whose composition reproduces the training
 forward (architecture doc §6). Export runs from CPU weights with
 `torch.onnx.export(dynamo=True, opset_version=18)` and is validated against
 the torch model on random inputs (max |diff| < 1e-4, hard fail) before
 meta.json is written — a version dir without meta.json is never served.
 
-  card_encoder.onnx  features [N, feat]                 -> card_emb [N, d]
-  set_encoder.onnx   card_emb [N, d], rarity_ids [N]    -> set_summary [d]
-  scorer.onnx        pre-gathered pool_emb [B, P, d], pool_counts [B, P],
-                     pool_mask [B, P], pack_emb [B, K, d], pack_mask [B, K],
-                     wr_id/games_id/format_id [B], position [B, 7],
-                     set_scalars [B, 4], set_summary [d] -> logits [B, K]
+Two export shapes, selected by the checkpoint's `set_ctx` config -- this is
+not a flag on one graph, because the model architecture itself differs
+(no set_tower/rarity_embedding exist when set_ctx=False, and the scorer's
+context_mlp input width differs by `d` accordingly; see model.py):
+
+  set_ctx=True (3 graphs):
+    card_encoder.onnx  features [N, feat]                 -> card_emb [N, d]
+    set_encoder.onnx   card_emb [N, d], rarity_ids [N]    -> set_summary [d]
+    scorer.onnx        ... set_summary [d] -> logits [B, K]
+
+  set_ctx=False (2 graphs, no set_encoder.onnx at all):
+    card_encoder.onnx  features [N, feat]                 -> card_emb [N, d]
+    scorer.onnx        ... (no set_summary input)         -> logits [B, K]
+
+  scorer.onnx inputs (both cases): pre-gathered pool_emb [B, P, d],
+  pool_counts [B, P], pool_mask [B, P], pack_emb [B, K, d], pack_mask [B, K],
+  wr_id/games_id/format_id [B], position [B, 7], set_scalars [B, 4]
+  [, set_summary [d] if set_ctx] -> logits [B, K]
 
 All of N, B, P (pool slots) and K (pack slots) are dynamic axes; training
 shapes are P=46/K=16 but serving may pass e.g. K=300 for a P1P1 table.
@@ -41,7 +53,6 @@ from mtga.foundation.model import DraftFM, position_features
 OPSET = 18
 VALIDATION_TOLERANCE = 1e-4
 VALIDATION_SEED = 20260707
-GRAPHS = ["card_encoder.onnx", "set_encoder.onnx", "scorer.onnx"]
 
 
 class _SetEncoderGraph(nn.Module):
@@ -59,7 +70,8 @@ class _SetEncoderGraph(nn.Module):
 
 class _ScorerGraph(nn.Module):
     """DraftFM.forward with the table gathers (and the empty-pool branch)
-    hoisted out: pool/pack rows arrive pre-gathered from the cached table."""
+    hoisted out: pool/pack rows arrive pre-gathered from the cached table.
+    set_ctx=True variant: context_mlp takes the set summary."""
 
     def __init__(self, model):
         super().__init__()
@@ -94,25 +106,58 @@ class _ScorerGraph(nn.Module):
         return logits.masked_fill(pack_mask, float("-inf"))
 
 
+class _ScorerGraphNoCtx(nn.Module):
+    """set_ctx=False variant: no set summary exists, so context_mlp's input
+    (and this graph's signature) genuinely has no set_summary term -- not a
+    zeroed-out input, an architecturally absent one (model.py: ctx_in omits
+    `d` entirely when set_ctx=False)."""
+
+    def __init__(self, model):
+        super().__init__()
+        self.count_embedding = model.count_embedding
+        self.pool_tower = model.pool_tower
+        self.wr_embedding = model.wr_embedding
+        self.games_embedding = model.games_embedding
+        self.format_embedding = model.format_embedding
+        self.context_mlp = model.context_mlp
+        self.scorer = model.scorer
+
+    def forward(self, pool_emb, pool_counts, pool_mask, pack_emb, pack_mask,
+                wr_id, games_id, format_id, position, set_scalars):
+        keys = pool_emb + self.count_embedding(pool_counts)
+        pool_summary = self.pool_tower(keys, key_padding_mask=pool_mask)
+
+        context = self.context_mlp(torch.cat([
+            self.wr_embedding(wr_id),
+            self.games_embedding(games_id),
+            self.format_embedding(format_id),
+            position,
+            set_scalars,
+        ], dim=1))
+
+        pool_b = pool_summary.unsqueeze(1).expand_as(pack_emb)
+        ctx_b = context.unsqueeze(1).expand(-1, pack_emb.shape[1], -1)
+        h = torch.cat([pack_emb, pool_b, pack_emb * pool_b, ctx_b], dim=2)
+        logits = self.scorer(h).squeeze(-1)
+        return logits.masked_fill(pack_mask, float("-inf"))
+
+
 def load_checkpoint(checkpoint_path):
     """(model.eval() on CPU, checkpoint dict) from a training best.pt."""
     checkpoint = torch.load(checkpoint_path, map_location="cpu",
                             weights_only=False)
     config = checkpoint["config"]
     feat_dim = checkpoint["model"]["card_encoder.net.0.weight"].shape[0]
-    if not config.get("set_ctx", True):
-        raise ValueError(
-            "export requires set_ctx=True (the scorer graph takes a set "
-            "summary; set_ctx=False models are ablation-only)")
     model = DraftFM(feat_dim, config["d_model"], config["dropout"],
-                    config["set_ctx"])
+                    config.get("set_ctx", True))
     model.load_state_dict(checkpoint["model"])
     model.eval()
     return model, checkpoint
 
 
 def export_graphs(model, out_dir):
-    """Write the three graphs + constants.npz. Returns (feat_dim, d)."""
+    """Write card_encoder.onnx + scorer.onnx (+ set_encoder.onnx when
+    model.set_ctx) + constants.npz. Returns (feat_dim, d)."""
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     feat_dim = model.card_encoder.net[1].in_features
@@ -129,14 +174,17 @@ def export_graphs(model, out_dir):
         input_names=["features"], output_names=["card_emb"],
         dynamic_shapes=({0: n_cards},), dynamo=True, opset_version=OPSET,
     )
-    torch.onnx.export(
-        _SetEncoderGraph(model).eval(),
-        (torch.randn(8, d), torch.randint(0, 6, (8,))),
-        str(out_dir / "set_encoder.onnx"),
-        input_names=["card_emb", "rarity_ids"], output_names=["set_summary"],
-        dynamic_shapes=({0: n_cards}, {0: n_cards}),
-        dynamo=True, opset_version=OPSET,
-    )
+
+    if model.set_ctx:
+        torch.onnx.export(
+            _SetEncoderGraph(model).eval(),
+            (torch.randn(8, d), torch.randint(0, 6, (8,))),
+            str(out_dir / "set_encoder.onnx"),
+            input_names=["card_emb", "rarity_ids"], output_names=["set_summary"],
+            dynamic_shapes=({0: n_cards}, {0: n_cards}),
+            dynamo=True, opset_version=OPSET,
+        )
+
     b, p, k = 3, 5, 4
     scorer_args = (
         torch.randn(b, p, d),                       # pool_emb
@@ -149,20 +197,29 @@ def export_graphs(model, out_dir):
         torch.randint(0, 3, (b,)),                  # format_id
         torch.randn(b, 7),                          # position
         torch.randn(b, 4),                          # set_scalars
-        torch.randn(d),                             # set_summary
     )
+    scorer_input_names = ["pool_emb", "pool_counts", "pool_mask", "pack_emb",
+                          "pack_mask", "wr_id", "games_id", "format_id",
+                          "position", "set_scalars"]
+    scorer_dynamic_shapes = (
+        {0: batch, 1: pool}, {0: batch, 1: pool}, {0: batch, 1: pool},
+        {0: batch, 1: pack}, {0: batch, 1: pack},
+        {0: batch}, {0: batch}, {0: batch},
+        {0: batch}, {0: batch},
+    )
+    if model.set_ctx:
+        scorer_args = scorer_args + (torch.randn(d),)
+        scorer_input_names = scorer_input_names + ["set_summary"]
+        scorer_dynamic_shapes = scorer_dynamic_shapes + (None,)
+        scorer_module = _ScorerGraph(model).eval()
+    else:
+        scorer_module = _ScorerGraphNoCtx(model).eval()
+
     torch.onnx.export(
-        _ScorerGraph(model).eval(), scorer_args, str(out_dir / "scorer.onnx"),
-        input_names=["pool_emb", "pool_counts", "pool_mask", "pack_emb",
-                     "pack_mask", "wr_id", "games_id", "format_id",
-                     "position", "set_scalars", "set_summary"],
+        scorer_module, scorer_args, str(out_dir / "scorer.onnx"),
+        input_names=scorer_input_names,
         output_names=["logits"],
-        dynamic_shapes=(
-            {0: batch, 1: pool}, {0: batch, 1: pool}, {0: batch, 1: pool},
-            {0: batch, 1: pack}, {0: batch, 1: pack},
-            {0: batch}, {0: batch}, {0: batch},
-            {0: batch}, {0: batch}, None,
-        ),
+        dynamic_shapes=scorer_dynamic_shapes,
         dynamo=True, opset_version=OPSET,
     )
 
@@ -217,11 +274,11 @@ def _torch_logits(model, features, rarity_ids, batch):
 
 def onnx_logits(sessions, pool_null_input, features, rarity_ids, batch):
     """The serving-side composition: gathers + null injection in numpy,
-    then the three graphs. Mirrors mtga.models.draftfm exactly."""
+    then the graphs. Mirrors mtga.models.draftfm exactly. `sessions` is
+    (card, set_enc, scorer); set_enc is None for set_ctx=False exports and
+    "set_summary" is then omitted from the scorer feed entirely (not zeroed)."""
     card, set_enc, scorer = sessions
     table = card.run(["card_emb"], {"features": features})[0]
-    summary = set_enc.run(["set_summary"], {
-        "card_emb": table, "rarity_ids": rarity_ids})[0]
 
     pool_mask = batch["pool_slots"] == int(PAD)
     pool_emb = table[np.where(pool_mask, 0, batch["pool_slots"])]
@@ -233,7 +290,7 @@ def onnx_logits(sessions, pool_null_input, features, rarity_ids, batch):
     pack_mask = batch["pack_slots"] == int(PAD)
     pack_emb = table[np.where(pack_mask, 0, batch["pack_slots"])]
 
-    logits = scorer.run(["logits"], {
+    feed = {
         "pool_emb": pool_emb.astype(np.float32),
         "pool_counts": batch["pool_counts"],
         "pool_mask": pool_mask,
@@ -242,8 +299,12 @@ def onnx_logits(sessions, pool_null_input, features, rarity_ids, batch):
         "wr_id": batch["wr_id"], "games_id": batch["games_id"],
         "format_id": batch["format_id"],
         "position": batch["position"], "set_scalars": batch["set_scalars"],
-        "set_summary": summary,
-    })[0]
+    }
+    if set_enc is not None:
+        feed["set_summary"] = set_enc.run(["set_summary"], {
+            "card_emb": table, "rarity_ids": rarity_ids})[0]
+
+    logits = scorer.run(["logits"], feed)[0]
     return logits, pack_mask
 
 
@@ -255,10 +316,15 @@ def validate_export(model, version_dir, n_cards=40,
     import onnxruntime
 
     version_dir = Path(version_dir)
-    sessions = tuple(
-        onnxruntime.InferenceSession(str(version_dir / g),
-                                     providers=["CPUExecutionProvider"])
-        for g in GRAPHS)
+    providers = ["CPUExecutionProvider"]
+    card = onnxruntime.InferenceSession(
+        str(version_dir / "card_encoder.onnx"), providers=providers)
+    set_enc_path = version_dir / "set_encoder.onnx"
+    set_enc = (onnxruntime.InferenceSession(str(set_enc_path), providers=providers)
+              if set_enc_path.exists() else None)
+    scorer = onnxruntime.InferenceSession(
+        str(version_dir / "scorer.onnx"), providers=providers)
+    sessions = (card, set_enc, scorer)
     pool_null_input = np.load(version_dir / "constants.npz")["pool_null_input"]
 
     rng = np.random.default_rng(seed)
@@ -308,6 +374,7 @@ def export_version(checkpoint_path, out_dir, wr_id, games_id, manifest_hash,
         "kind": "draftfm-zeroshot",
         "manifest_hash": manifest_hash,
         "serving": {"wr_id": int(wr_id), "games_id": int(games_id)},
+        "set_ctx": model.set_ctx,
         "config": checkpoint.get("config"),
         "checkpoint": str(checkpoint_path),
         "checkpoint_sha256": runlog.file_sha256(checkpoint_path),

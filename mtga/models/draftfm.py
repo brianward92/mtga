@@ -1,14 +1,20 @@
 """Serve a DraftFM ONNX export through the EVModel protocol.
 
 Zero-shot tier: one exported foundation model (models/_foundation/<tag>/,
-three graphs + constants.npz + meta.json from scripts/export_draftfm.py)
-scores ANY set for which per-set assets exist (scripts/build_set_assets.py).
-onnxruntime only — torch never loads in the serving process.
+card_encoder.onnx + scorer.onnx + optionally set_encoder.onnx +
+constants.npz + meta.json from scripts/export_draftfm.py) scores ANY set for
+which per-set assets exist (scripts/build_set_assets.py). onnxruntime only —
+torch never loads in the serving process.
 
-At construction the card table [N, d] and set summary [d] are computed once
-from the assets' feature matrix; score_pack is numpy gathers over that
-cached table plus a single scorer.onnx call. Empty pools use the learned
-null token via constants.npz's pool_null_input (see mtga/foundation/
+set_encoder.onnx and the set summary it produces only exist for set_ctx=True
+exports; set_ctx=False exports (the current winning recipe, see
+mtga/foundation/export.py) have no such file, and "set_summary" is simply
+absent from the scorer's inputs rather than zeroed.
+
+At construction the card table [N, d] and set summary [d] (if any) are
+computed once from the assets' feature matrix; score_pack is numpy gathers
+over that cached table plus a single scorer.onnx call. Empty pools use the
+learned null token via constants.npz's pool_null_input (see mtga/foundation/
 export.py for why it differs from the raw empty_pool parameter).
 """
 
@@ -93,18 +99,25 @@ class OnnxDraftFMModel:
         providers = ["CPUExecutionProvider"]
         card_encoder = onnxruntime.InferenceSession(
             str(version_dir / "card_encoder.onnx"), providers=providers)
-        set_encoder = onnxruntime.InferenceSession(
-            str(version_dir / "set_encoder.onnx"), providers=providers)
         self.scorer = onnxruntime.InferenceSession(
             str(version_dir / "scorer.onnx"), providers=providers)
 
         # One-time set encode: everything at request time gathers from these.
         self.table = card_encoder.run(
             ["card_emb"], {"features": assets["features"]})[0]
-        self.set_summary = set_encoder.run(
-            ["set_summary"],
-            {"card_emb": self.table, "rarity_ids": assets["rarity_ids"]},
-        )[0].astype(np.float32)
+
+        # set_ctx=False exports have no set_encoder graph at all -- not a
+        # zeroed summary, an absent one (see mtga/foundation/export.py).
+        set_encoder_path = version_dir / "set_encoder.onnx"
+        if set_encoder_path.exists():
+            set_encoder = onnxruntime.InferenceSession(
+                str(set_encoder_path), providers=providers)
+            self.set_summary = set_encoder.run(
+                ["set_summary"],
+                {"card_emb": self.table, "rarity_ids": assets["rarity_ids"]},
+            )[0].astype(np.float32)
+        else:
+            self.set_summary = None
         self.pool_null_input = np.load(version_dir / "constants.npz")[
             "pool_null_input"].astype(np.float32)
 
@@ -153,7 +166,7 @@ class OnnxDraftFMModel:
         position = position_features(int(pack_number), int(pick_number),
                                      self.picks_per_pack)
 
-        logits = self.scorer.run(["logits"], {
+        feed = {
             "pool_emb": pool_emb,
             "pool_counts": pool_counts,
             "pool_mask": pool_mask,
@@ -164,8 +177,10 @@ class OnnxDraftFMModel:
             "format_id": np.array([self.format_id], dtype=np.int64),
             "position": position,
             "set_scalars": self.set_scalars,
-            "set_summary": self.set_summary,
-        })[0][0]
+        }
+        if self.set_summary is not None:
+            feed["set_summary"] = self.set_summary
+        logits = self.scorer.run(["logits"], feed)[0][0]
 
         by_row = dict(zip(known, logits))
         evs = [None if r is None else float(by_row[r]) for r in rows]

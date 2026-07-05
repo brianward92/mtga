@@ -4,10 +4,11 @@
   export_draftfm.py --run <run_dir> --tag v20260706 [--wr-id 33] [--games-id 6]
                     [--out-root .../models/_foundation] [--promote]
 
-Writes card_encoder.onnx + set_encoder.onnx + scorer.onnx + constants.npz +
-meta.json under <out-root>/<tag>/ and validates the graphs against the torch
-model (max |diff| < 1e-4 — hard fail, no meta.json on failure). --promote
-repoints <out-root>/latest at the new version (the registry's DraftFM tier).
+Writes card_encoder.onnx + scorer.onnx (+ set_encoder.onnx if the checkpoint
+has set_ctx=True) + constants.npz + meta.json under <out-root>/<tag>/ and
+validates the graphs against the torch model (max |diff| < 1e-4 — hard fail,
+no meta.json on failure). --promote repoints <out-root>/latest at the new
+version (the registry's DraftFM tier).
 
 Run on n42 (torch 2.12, dynamo export); never on the torch-2.2 serving box.
 """

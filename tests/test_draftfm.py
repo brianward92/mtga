@@ -135,6 +135,18 @@ def test_missing_assets_raise_with_pointer(stub_ort, make_foundation_version,
         OnnxDraftFMModel(make_foundation_version(), SET, FMT)
 
 
+def test_set_ctx_false_export_has_no_summary(stub_ort, make_foundation_version,
+                                             draftfm_assets):
+    # set_ctx=False exports omit set_encoder.onnx entirely (not a zeroed
+    # summary) -- serving must not load it or feed set_summary to the scorer.
+    m = OnnxDraftFMModel(make_foundation_version(set_ctx=False), SET, FMT)
+    assert m.set_summary is None
+
+    m.score_pack([D, A_OUT], [])
+    feeds = StubOrtSession.last_scorer_feeds
+    assert "set_summary" not in feeds
+
+
 def test_position_features_match_torch_reference():
     torch = pytest.importorskip("torch")
 
