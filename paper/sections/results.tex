@@ -1,5 +1,6 @@
 \section{Results}
 \label{sec:results}
+\FloatBarrier
 
 \begin{table}[t]
   \centering
@@ -41,6 +42,38 @@ closes most of the distance toward the meta-inclusive number while using
 strictly release-day information. BRO is also the trio's hardest set for
 transfer---its packs mix in a 63-card retro-artifact bonus sheet---and the
 gap between the BRO and TMT/SOS rows is analysed in \S\ref{sec:analysis}.
+
+\begin{figure}[t]
+\centering
+\begin{minipage}[c]{0.32\linewidth}
+  \centering
+  \includegraphics[width=\linewidth]{figures/cards/steel-seraph.jpg}
+\end{minipage}%
+\hspace{0.04\linewidth}%
+\begin{minipage}[c]{0.50\linewidth}
+  \begin{tcolorbox}[verdictpanel]
+    \vheader{BRO $\cdot$ Premier Draft}{TIER LIST}
+    {\scriptsize\itshape\color{vtextmuted}Pack hidden by Arena --- showing set tier list}\par\vspace{2.0mm}
+    {\large\bfseries\color{vrarerare}Steel Seraph}\par\vspace{1.6mm}
+    \Flames{5}\par\vspace{1.2mm}
+    {\scriptsize\bfseries\color{vgreen}OBVIOUS BOMB}\par\vspace{1.8mm}
+    \vbar
+    {\scriptsize\color{vtextsecondary}EV \VBroEv}\par\vspace{2.0mm}
+    {\scriptsize\color{vtextsecondary}2\ \ \VBroRunnerOneName\hfill\FlamesSmall{5}}\par\vspace{1.0mm}
+    {\scriptsize\color{vtextsecondary}3\ \ \VBroRunnerTwoName\hfill\FlamesSmall{5}}\par
+    \vfooter{\VBroModelVersion}
+  \end{tcolorbox}
+\end{minipage}
+\caption{The same interface in \emph{tier-list} mode (no live pack; Arena
+hides the pack between picks), on BRO---the dev trio's hardest transfer
+set. Flames come from the card's percentile rank in the whole set's
+P1P1 expected value, not a head-to-head split, so no percentage is shown
+(\S\ref{sec:arch}). Steel Seraph's real EV (\VBroEv) sits at the
+\VBroPercentile{}th percentile of BRO's card pool; the two runners-up sit
+at the \VBroRunnerOnePercentile{}th and \VBroRunnerTwoPercentile{}th.
+Computed by the deployed per-set model, never MSH.}
+\label{fig:bro-tierlist}
+\end{figure}
 
 \begin{table}[t]
   \centering

@@ -1,0 +1,46 @@
+% Architecture diagram for the two-tower model (sections/method.tex, S4.2).
+% Pure TikZ, no external assets -- compiles standalone as part of main.tex.
+% \input from within a figure environment; see sections/method.tex.
+\definecolor{archbox}{HTML}{F2F3F5}
+\definecolor{archline}{HTML}{5B6472}
+\definecolor{archblue}{HTML}{2563B0}
+\definecolor{archmuted}{HTML}{6B7280}
+
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[
+  font=\small,
+  node distance=6mm and 8mm,
+  archbox/.style={draw=archline, thick, rounded corners=1.5pt, fill=archbox,
+              minimum height=8mm, align=center, inner sep=1.8mm},
+  archtower/.style={draw=archblue, thick, rounded corners=1.5pt, fill=archblue!8,
+              minimum height=9mm, align=center, inner sep=1.8mm},
+  archarr/.style={-{Latex[length=2mm]}, thick, draw=archline},
+]
+  \node[archbox] (feat) {card feature\\vector\\\scriptsize 775-d};
+  \node[archbox, right=of feat] (enc) {shared card\\encoder\\\scriptsize LayerNorm$\to$775--512--256, GELU};
+  \node[archbox, right=of enc] (emb) {card\\embeddings\\\scriptsize 256-d};
+
+  \node[archtower, above right=9mm and 9mm of emb] (ctx) {set-context tower\\\scriptsize cross-attn + rarity emb};
+  \node[archtower, below right=9mm and 9mm of emb] (pool) {pool tower\\\scriptsize cross-attn, 4 queries};
+
+  \node[archbox, above=7mm of ctx] (ctxin) {full set card list\\\scriptsize $\sim$400 rows};
+  \node[archbox, below=7mm of pool] (poolin) {drafter's pool\\\scriptsize distinct cards + count emb};
+
+  \node[archbox, right=15mm of ctx, yshift=-9mm] (cmlp) {context MLP\\\scriptsize +skill, format,\\pick-position feats};
+  \node[archbox, right=10mm of cmlp] (score) {scorer MLP\\\scriptsize $[c;\,p;\,c{\odot}p;\,\mathrm{ctx}]$};
+  \node[archbox, right=9mm of score] (softmax) {softmax\\\scriptsize over pack};
+
+  \draw[archarr] (feat) -- (enc);
+  \draw[archarr] (enc) -- (emb);
+  \draw[archarr] (emb.north) .. controls +(0.5,0.3) and +(-0.7,0.1) .. (ctx.west);
+  \draw[archarr] (emb.south) .. controls +(0.5,-0.3) and +(-0.7,-0.1) .. (pool.west);
+  \draw[archarr] (ctxin) -- (ctx);
+  \draw[archarr] (poolin) -- (pool);
+  \draw[archarr] (ctx.east) -- (cmlp.north -| ctx.east) -- (cmlp.north);
+  \draw[archarr] (cmlp) -- (score);
+  \draw[archarr] (pool.east) .. controls +(1.0,0) and +(-1.0,-0.6) .. (score.south);
+  \draw[archarr] (emb.south) .. controls +(0.4,-2.4) and +(-2.8,-1.7) .. (score.south)
+    node[pos=0.24, above, font=\scriptsize, text=archmuted] {candidate $c$};
+  \draw[archarr] (score) -- (softmax);
+\end{tikzpicture}%
+}

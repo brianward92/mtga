@@ -12,11 +12,22 @@
 \usepackage{booktabs}
 \usepackage{graphicx}
 \usepackage{amsmath}
-\usepackage{xcolor}
+\usepackage[table]{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,fit,backgrounds,shapes.geometric,calc}
+\usepackage{tcolorbox}
+\tcbuselibrary{skins}
+\usepackage{titling}
+\usepackage{placeins}
 \usepackage[numbers,sort&compress]{natbib}
 \usepackage[hidelinks]{hyperref}
 \usepackage{caption}
 \captionsetup{font=small,labelfont=bf}
+
+% Paper-wide accent (scaling curve, architecture diagram, stat callouts) and
+% a print-safe light table-header tint (colortbl, loaded by xcolor[table]).
+\definecolor{paperaccent}{HTML}{2563B0}
+\definecolor{tblhead}{gray}{0.90}
 
 % Visible placeholder for every number that does not exist yet. NEVER
 % replace a \pending by hand: re-run scripts/make_paper_tables.py after the
@@ -30,17 +41,47 @@
 % Auto-generated number macros (run scripts/make_paper_tables.py).
 \input{tables/numbers}
 
+% Verdict-panel mockup style + its own auto-generated numbers (run
+% figures/make_verdict_panels.py). Illustrative-interface figures only --
+% never used for a headline scientific claim.
+\input{figures/verdict-style}
+\input{figures/verdict_numbers}
+
 \newcommand{\seventeenlands}{17Lands}
 \newcommand{\mtg}{\emph{Magic: The Gathering}}
 
-\title{DraftFM: Zero-Shot Drafting of Unseen \emph{Magic: The Gathering}
-Sets from Public Card Features}
+% A highlighted headline number, for the callout row after the abstract and
+% for in-text emphasis. Never wraps a hand-typed value -- always a macro
+% from tables/numbers.tex.
+\newcommand{\statbox}[2]{%
+  \begin{minipage}[t]{0.31\linewidth}
+    \begin{tcolorbox}[enhanced, colback=paperaccent!5, colframe=paperaccent!55,
+        boxrule=0.5pt, arc=1.2mm, halign=center,
+        top=2mm, bottom=2mm, left=1mm, right=1mm]
+      \centering{\Large\bfseries\color{paperaccent}#1}\\[0.8mm]
+      {\footnotesize #2}
+    \end{tcolorbox}
+  \end{minipage}%
+}
+
+\title{\bfseries DraftFM: Zero-Shot Drafting of Unseen \emph{Magic: The
+Gathering} Sets from Public Card Features}
 
 \author{Brian Ward\\
 % TODO(affiliation): placeholder — fill before submission.
 \normalsize Independent Researcher}
 
 \date{}
+
+% Title-block treatment: a centered accent rule under the title, set with
+% core LaTeX title hooks (no extra package). Kept plain enough to survive
+% arXiv's style checks.
+\pretitle{\begin{center}\LARGE}
+\posttitle{\par\vspace{2mm}{\color{paperaccent}\rule{0.5\linewidth}{0.9pt}}\end{center}\vspace{-2mm}}
+\preauthor{\begin{center}\large}
+\postauthor{\end{center}}
+\predate{\begin{center}\small}
+\postdate{\end{center}}
 
 \begin{document}
 \maketitle
@@ -63,6 +104,15 @@ licensed-IP set whose pick data nothing in the pipeline has touched
 (\FfullMsh\% expert top-1). We release the code, the frozen protocol, model
 weights, and per-pick prediction files.
 \end{abstract}
+
+\begin{center}
+\statbox{\FdevDevMean\%}{zero-shot expert-pick agreement on three unseen sets (\S\ref{sec:results})}
+\hfill
+\statbox{\RatioDevMean\%}{of a per-set-trained ceiling's accuracy, with zero picks from the target set}
+\hfill
+\statbox{\FdevParams M params}{trains from scratch in \FdevWallHours{} h on one workstation (\S\ref{sec:training})}
+\end{center}
+\vspace{1mm}
 
 \input{sections/intro}
 \input{sections/related}

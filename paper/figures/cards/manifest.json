@@ -1,0 +1,46 @@
+{
+  "emeritus-of-ideation": {
+    "name": "Emeritus of Ideation // Ancestral Recall",
+    "set": "SOS",
+    "set_name": "Secrets of Strixhaven",
+    "collector_number": "45",
+    "rarity": "mythic",
+    "artist": "Evyn Fong",
+    "scryfall_uri": "https://scryfall.com/card/sos/45/emeritus-of-ideation-ancestral-recall?utm_source=api",
+    "image_source": "https://cards.scryfall.io/normal/front/7/5/75961d36-acf6-425f-9698-0bf52af74f31.jpg?1782682999",
+    "copyright": "\u00a9 Wizards of the Coast LLC. Art by Evyn Fong."
+  },
+  "steel-seraph": {
+    "name": "Steel Seraph",
+    "set": "BRO",
+    "set_name": "The Brothers' War",
+    "collector_number": "38",
+    "rarity": "rare",
+    "artist": "Denys Tsiperko",
+    "scryfall_uri": "https://scryfall.com/card/bro/38/steel-seraph?utm_source=api",
+    "image_source": "https://cards.scryfall.io/normal/front/1/b/1b6ef5f5-4058-4f89-a573-9e2da87a9f2e.jpg?1782699830",
+    "copyright": "\u00a9 Wizards of the Coast LLC. Art by Denys Tsiperko."
+  },
+  "sundering-archaic": {
+    "name": "Sundering Archaic",
+    "set": "SOS",
+    "set_name": "Secrets of Strixhaven",
+    "collector_number": "3",
+    "rarity": "uncommon",
+    "artist": "Quintin Gleim",
+    "scryfall_uri": "https://scryfall.com/card/sos/3/sundering-archaic?utm_source=api",
+    "image_source": "https://cards.scryfall.io/normal/front/c/3/c35b57e4-2358-46c0-8f09-cd27c10eaf2d.jpg?1782683032",
+    "copyright": "\u00a9 Wizards of the Coast LLC. Art by Quintin Gleim."
+  },
+  "flow-state": {
+    "name": "Flow State",
+    "set": "SOS",
+    "set_name": "Secrets of Strixhaven",
+    "collector_number": "49",
+    "rarity": "uncommon",
+    "artist": "Genel Jumalon",
+    "scryfall_uri": "https://scryfall.com/card/sos/49/flow-state?utm_source=api",
+    "image_source": "https://cards.scryfall.io/normal/front/4/7/47d6093b-b1b6-4956-8bfd-02cce899f832.jpg?1782682998",
+    "copyright": "\u00a9 Wizards of the Coast LLC. Art by Genel Jumalon."
+  }
+}

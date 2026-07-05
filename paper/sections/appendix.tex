@@ -63,18 +63,45 @@ re-derivable from public sources via the manifests.
 \section{Licensing and attribution}
 \label{sec:licensing}
 
+\paragraph{Draft data.}
 Draft data is from the \seventeenlands{} public datasets
 \citep{seventeenlands}, used under CC BY 4.0 and per the project's usage
-guidelines (bulk S3 downloads; no API scraping). Card metadata is from
-Scryfall \citep{scryfall}, used per its API guidelines; Scryfall neither
-produces nor endorses this work.
+guidelines (bulk S3 downloads; no API scraping).
 
-Portions of the materials used are property of Wizards of the Coast.
-\copyright{} Wizards of the Coast LLC. This work contains unofficial Fan
-Content permitted under the Wizards of the Coast Fan Content Policy; it
-is not approved or endorsed by Wizards. \mtg{} and its card names and
-text are trademarks and copyrights of Wizards of the Coast. Licensed-IP
-card names (including Marvel-universe names in MSH and TMT) appear only
-as data strings in sourced fields of the released artifacts and are the
-property of their respective owners. No card images are used or
-redistributed.
+\paragraph{Card metadata.}
+Card metadata is from Scryfall \citep{scryfall}, used per its API
+guidelines; Scryfall neither produces nor endorses this work.
+
+\paragraph{Card images.}
+Figures~\ref{fig:teaser}, \ref{fig:bro-tierlist}, and \ref{fig:closecall}
+reproduce official Scryfall card scans \citep{scryfall}, fetched directly
+from Scryfall's own hosted image URLs by
+\texttt{figures/fetch\_example\_cards.py} (released with the paper, along
+with the cached images and their source manifest). Scryfall's stated
+policy on card images (``Use of Scryfall Data and Images,''
+\url{https://scryfall.com/docs/api}) permits this use, subject to rules we
+follow throughout: every image is shown full and unmodified---no
+cropping, distorting, blurring, sharpening, desaturating, color-shifting,
+or watermarking of the card art itself---and any score or label in a
+figure sits beside the image, never on top of it. Because the full card
+image is always used (never an art crop), the copyright and artist line
+Scryfall prints at the bottom of the card remains visible in every
+figure, and nothing here implies that Wizards of the Coast produced or
+endorses this work. The cards illustrated are drawn from BRO and
+SOS---public, released development sets (\S\ref{sec:data})---never from
+MSH, which remains untouched until the frozen evaluation of
+\S\ref{sec:protocol}.
+
+\paragraph{Wizards of the Coast intellectual property.}
+Portions of the materials used, including all card names, text, and art
+shown in figures, are property of Wizards of the Coast. \copyright{}
+Wizards of the Coast LLC. This work contains unofficial Fan Content
+permitted under the Wizards of the Coast Fan Content Policy; it is not
+approved or endorsed by Wizards of the Coast. \mtg{} and its card names
+and text are trademarks and copyrights of Wizards of the Coast.
+Licensed-IP card names and imagery appear only as printed on the official
+card or as data strings in sourced fields of the released artifacts, and
+are the property of their respective rights holders---Marvel's for MSH,
+the Teenage Mutant Ninja Turtles franchise's for TMT---distinct
+properties, both used by Wizards of the Coast under license and neither
+affiliated with this paper.

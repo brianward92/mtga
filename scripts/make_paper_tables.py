@@ -263,6 +263,7 @@ def table_main(anchors, fdev, ffull, frozen, ledger):
     rows = [
         r"\begin{tabular}{lccccc}",
         r"\toprule",
+        r"\rowcolor{tblhead}",
         r"Model & BRO & TMT & SOS & Dev mean & MSH \\",
         r"\midrule",
     ]
@@ -333,6 +334,7 @@ def table_baselines(anchors, frozen):
     rows = [
         r"\begin{tabular}{llll}",
         r"\toprule",
+        r"\rowcolor{tblhead}",
         r"Method & Information used & Test set & Expert top-1 (\%) \\",
         r"\midrule",
     ]
@@ -400,6 +402,7 @@ def table_ablations(by_name, frozen):
     rows = [
         r"\begin{tabular}{lccccc}",
         r"\toprule",
+        r"\rowcolor{tblhead}",
         r"Variant & BRO & TMT & SOS & Dev mean & MSH \\",
         r"\midrule",
     ]
@@ -447,6 +450,7 @@ def table_scaling(by_name, frozen, ledger):
     rows = [
         r"\begin{tabular}{l p{4.8cm} rrrc}",
         r"\toprule",
+        r"\rowcolor{tblhead}",
         r"Rung & Sets & \#sets & Train picks (M) & Best step "
         r"& Dev-mean top-1 (\%) \\",
         r"\midrule",

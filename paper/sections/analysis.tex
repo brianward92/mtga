@@ -1,5 +1,6 @@
 \section{Analysis}
 \label{sec:analysis}
+\FloatBarrier
 
 \begin{table}[t]
   \centering
@@ -57,6 +58,43 @@ quality does. The pre-registered effect size---deployment-mode accuracy as
 a function of the conditioning bucket, and the gap between conditioning on
 the top bucket versus the drafter's own---is \pending{skill-conditioning
 effect on MSH}.
+
+\begin{figure}[t]
+\centering
+\begin{minipage}[c]{0.32\linewidth}
+  \centering
+  \includegraphics[width=0.48\linewidth]{figures/cards/sundering-archaic.jpg}%
+  \includegraphics[width=0.48\linewidth]{figures/cards/flow-state.jpg}
+\end{minipage}%
+\hspace{0.04\linewidth}%
+\begin{minipage}[c]{0.50\linewidth}
+  \begin{tcolorbox}[verdictpanel]
+    \vheader{SOS $\cdot$ Premier Draft}{P1P1}
+    \begin{minipage}[t]{0.47\linewidth}
+      {\scriptsize\bfseries\color{vraruncommon}\VCCNameA}\par\vspace{1.0mm}
+      \vbar
+      {\scriptsize\color{vtextsecondary}\VCCSplitA\%}
+    \end{minipage}\hfill
+    \begin{minipage}[t]{0.47\linewidth}
+      {\scriptsize\bfseries\color{vraruncommon}\VCCNameB}\par\vspace{1.0mm}
+      \vbar
+      {\scriptsize\color{vtextsecondary}\VCCSplitB\%}
+    \end{minipage}\par\vspace{1.6mm}
+    \Flames{1}\par\vspace{1.2mm}
+    {\scriptsize\bfseries\color{vgreen}CLOSE CALL}\par\vspace{1.8mm}
+    {\scriptsize\color{vtextsecondary}3\ \ \VCCRunnerName\hfill\VCCRunnerPct\%}\par
+    \vfooter{\VCCModelVersion}
+  \end{tcolorbox}
+\end{minipage}
+\caption{The low-conviction end of the same interface: a real thirteen-card
+SOS pack (empty pool) where the model's top two EVs are (\VCCEvA{} vs.\
+\VCCEvB) a near-exact tie, so the panel switches to a head-to-head duo
+view (\S\ref{sec:arch}) instead of naming a single pick. Dominance this
+close (\VCCSplitA/\VCCSplitB) is exactly the regime top-label ECE below
+is measuring: the model's stated confidence and its actual reliability at
+low conviction. Computed by the deployed per-set model, never MSH.}
+\label{fig:closecall}
+\end{figure}
 
 \paragraph{Calibration.}
 Zero-shot confidence is imperfectly calibrated: top-label ECE is

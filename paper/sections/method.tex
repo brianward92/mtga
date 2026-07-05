@@ -40,7 +40,7 @@ double-faced cards.
 \subsection{Architecture}
 \label{sec:arch}
 
-DraftFM is a two-tower scorer with \FdevParams M parameters. Its two design
+DraftFM is a two-tower scorer with \FdevParams M parameters (Figure~\ref{fig:arch}). Its two design
 invariants are the zero-shot contract:
 
 \begin{enumerate}
@@ -57,6 +57,18 @@ invariants are the zero-shot contract:
   high-skill bucket; training sees every pick tagged with its drafter's
   bucket.
 \end{enumerate}
+
+\begin{figure}[t]
+\centering
+\input{figures/architecture}
+\caption{The two-tower scorer (\S\ref{sec:arch}). A shared card encoder
+embeds every card once per (set, format) step; a set-context tower
+summarises the full card list, a pool tower summarises the drafter's
+held cards, and a per-candidate scorer combines the candidate embedding
+$c$, the pool summary $p$, their elementwise product, and the context
+vector into a softmax over the pack.}
+\label{fig:arch}
+\end{figure}
 
 A shared \emph{card encoder} (LayerNorm $\to$ 775--512--256 MLP, GELU)
 maps feature vectors to $d{=}256$ embeddings. Because training batches are
