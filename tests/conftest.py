@@ -73,6 +73,12 @@ def data_root(tmp_path, monkeypatch):
         hub = sys.modules["mtga.draft_api"].HUB
         hub._cards, hub._ratings, hub._p1p1, hub._global = {}, {}, {}, None
 
+    # Tests must never append to the real experiment ledger (24 smoke lines
+    # with a perfect synthetic-signal val_top1 once polluted it).
+    from mtga.foundation import runlog
+
+    monkeypatch.setattr(runlog, "LEDGER", root / "experiments" / "ledger.jsonl")
+
     return root
 
 
