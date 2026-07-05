@@ -379,14 +379,23 @@ def table_ablations(by_name, frozen):
     members = [
         ("Full (F-dev recipe)", "f_dev", "F-dev"),
         ("A-notext", None, "A-notext"),
+        ("A-noctx (winning)", None, "A-noctx"),
+        ("A-proportional", None, "A-proportional"),
+        ("A-topfilter", None, "A-topfilter"),
         ("A-noUB", None, "A-noUB"),
     ]
     # Ablation runs are discovered by config-name convention.
     for name, entry in by_name.items():
         if "notext" in name:
             members[1] = (members[1][0], name, members[1][2])
-        if "noub" in name:
+        if "noctx" in name and "seed" not in name:
             members[2] = (members[2][0], name, members[2][2])
+        if "proportional" in name:
+            members[3] = (members[3][0], name, members[3][2])
+        if "topfilter" in name:
+            members[4] = (members[4][0], name, members[4][2])
+        if "noub" in name:
+            members[5] = (members[5][0], name, members[5][2])
 
     rows = [
         r"\begin{tabular}{lccccc}",

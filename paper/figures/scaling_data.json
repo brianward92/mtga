@@ -6,8 +6,8 @@
       "run_id": "20260704_154741_s1",
       "n_sets": 1,
       "train_picks": 5412775,
-      "dev_mean_top1": null,
-      "in_ledger": false
+      "dev_mean_top1": 0.4891654482696995,
+      "in_ledger": true
     },
     {
       "rung": "S2",
@@ -15,8 +15,8 @@
       "run_id": "20260704_161450_s2",
       "n_sets": 2,
       "train_picks": 13261675,
-      "dev_mean_top1": null,
-      "in_ledger": false
+      "dev_mean_top1": 0.5094993099337723,
+      "in_ledger": true
     },
     {
       "rung": "S2b",
@@ -24,8 +24,8 @@
       "run_id": "20260704_171827_s2b",
       "n_sets": 2,
       "train_picks": 14521984,
-      "dev_mean_top1": null,
-      "in_ledger": false
+      "dev_mean_top1": 0.5019813503016172,
+      "in_ledger": true
     },
     {
       "rung": "S4",
@@ -33,35 +33,35 @@
       "run_id": "20260704_175554_s4",
       "n_sets": 4,
       "train_picks": 27792360,
-      "dev_mean_top1": null,
-      "in_ledger": false
+      "dev_mean_top1": 0.5166938911004826,
+      "in_ledger": true
     },
     {
       "rung": "S4b",
       "config_name": "s4b",
-      "run_id": null,
+      "run_id": "20260704_191659_s4b",
       "n_sets": 4,
-      "train_picks": null,
-      "dev_mean_top1": null,
-      "in_ledger": false
+      "train_picks": 23541335,
+      "dev_mean_top1": 0.5103808921363419,
+      "in_ledger": true
     },
     {
       "rung": "S8",
       "config_name": "s8",
-      "run_id": null,
+      "run_id": "20260704_202620_s8",
       "n_sets": 8,
-      "train_picks": null,
-      "dev_mean_top1": null,
-      "in_ledger": false
+      "train_picks": 52941428,
+      "dev_mean_top1": 0.5240477856773221,
+      "in_ledger": true
     },
     {
       "rung": "S16",
       "config_name": "s16",
-      "run_id": null,
+      "run_id": "20260704_213310_s16",
       "n_sets": 16,
-      "train_picks": null,
-      "dev_mean_top1": null,
-      "in_ledger": false
+      "train_picks": 99881401,
+      "dev_mean_top1": 0.5332860640423491,
+      "in_ledger": true
     },
     {
       "rung": "S27",
@@ -70,7 +70,7 @@
       "n_sets": 28,
       "train_picks": 149407128,
       "dev_mean_top1": 0.543032681830879,
-      "in_ledger": false
+      "in_ledger": true
     }
   ],
   "anchors": {

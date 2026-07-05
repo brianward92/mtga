@@ -23,3 +23,12 @@ electron/tests/e2e/shots/*
 .DS_Store
 .venv/
 .venv-ml/
+.venv-fm/
+.venv-embed/
+
+# Paper data mirror: local cache synced from remote training boxes for
+# scripts/make_paper_tables.py. Contains absolute paths with remote account
+# names (not a redaction concern for the paper itself -- the generated
+# tables/*.tex never leak these -- but shouldn't be committed). Reproducible
+# from experiments/ledger.jsonl + the training runs.
+paper/data/runs/
