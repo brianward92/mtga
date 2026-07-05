@@ -300,6 +300,292 @@ def write_ratings_cache(set_code=SET, limited_type=FMT, date_str="2026-01-01",
 
 
 # ---------------------------------------------------------------------------
+# Replay fixtures (mtga/replay/etl.py). Arena card ids are plain ints in a
+# namespace unrelated to the deck_*/sideboard_* card-NAME count columns.
+
+REPLAY_TURN_COLS = 4  # real files carry 30 user_turn blocks; synth carries 4
+
+# Arena ids used by the hand-computed replay games.
+RID_A, RID_B, RID_C, RID_D = 101, 102, 103, 104   # spells (match GRP values)
+RID_L1, RID_L2 = 111, 112                         # lands
+RID_OPP = 555                                     # an opponent creature
+RID_GHOST = 999                                   # never in any candidate hand
+
+REPLAY_META_COLS = [
+    "expansion", "event_type", "draft_id", "draft_time", "build_index",
+    "match_number", "game_number", "game_time", "rank", "opp_rank",
+    "main_colors", "splash_colors", "on_play", "num_mulligans",
+    "opp_num_mulligans", "opp_colors", "num_turns", "won",
+]
+
+# user_turn_N_* suffixes exactly as in the real DSK header (32 columns).
+USER_TURN_SUFFIXES = [
+    "cards_drawn", "cards_tutored", "cards_discarded", "lands_played",
+    "creatures_cast", "non_creatures_cast",
+    "user_instants_sorceries_cast", "oppo_instants_sorceries_cast",
+    "user_abilities", "oppo_abilities",
+    "creatures_attacked", "creatures_blocked", "creatures_unblocked",
+    "creatures_blocking",
+    "oppo_combat_damage_taken", "user_combat_damage_taken",
+    "user_creatures_killed_combat", "oppo_creatures_killed_combat",
+    "user_creatures_killed_non_combat", "oppo_creatures_killed_non_combat",
+    "user_mana_spent", "oppo_mana_spent",
+    "eot_user_cards_in_hand", "eot_oppo_cards_in_hand",
+    "eot_user_lands_in_play", "eot_oppo_lands_in_play",
+    "eot_user_creatures_in_play", "eot_oppo_creatures_in_play",
+    "eot_user_non_creatures_in_play", "eot_oppo_non_creatures_in_play",
+    "eot_user_life", "eot_oppo_life",
+]
+# oppo_turn_N_* blocks lack the user-only draw/tutor identity columns.
+OPPO_TURN_SUFFIXES = [s for s in USER_TURN_SUFFIXES
+                      if s not in ("cards_drawn", "cards_tutored")]
+
+
+def _replay_zero_fill(suffix):
+    """Column value past num_turns: the real files' padding footgun —
+    numerics zero-fill (life reads '0.0' through turn 30), lists go empty."""
+    if suffix.endswith("_life") or suffix.endswith("mana_spent") \
+            or suffix == "eot_oppo_cards_in_hand":
+        return "0.0"
+    if suffix.endswith("combat_damage_taken"):
+        return "0"
+    return ""
+
+
+def _replay_cell(value):
+    if isinstance(value, (list, tuple)):
+        return "|".join(str(v) for v in value)
+    return str(value)
+
+
+def write_replay_csv(dest, games=None, names=None, etag="etag-replay-1",
+                     turn_cols=REPLAY_TURN_COLS):
+    """Write a gzipped 17Lands-style replay CSV plus its .meta.json sidecar.
+
+    games: dicts with draft_id, on_play, won, num_mulligans, num_turns,
+    candidate_hands (list of id-lists), opening_hand (id list), turns
+    ({t: {user_turn suffix: value}}; lists are pipe-joined), deck/sideboard
+    ({name: count}), and optional meta overrides. Every turn column not
+    supplied gets the zero-fill padding value, exactly like the real files.
+    """
+    names = VOCAB if names is None else names
+    games = hand_replay_games() if games is None else games
+    header = (
+        REPLAY_META_COLS
+        + [f"candidate_hand_{k}" for k in range(1, 8)]
+        + ["opening_hand"]
+        + [f"{who}_turn_{t}_{s}"
+           for t in range(1, turn_cols + 1)
+           for who, suffixes in (("user", USER_TURN_SUFFIXES),
+                                 ("oppo", OPPO_TURN_SUFFIXES))
+           for s in suffixes]
+        + ["user_total_cards_drawn", "user_total_mana_spent"]
+        + [f"deck_{n}" for n in names]
+        + [f"sideboard_{n}" for n in names]
+        + ["user_n_games_bucket", "user_game_win_rate_bucket"]
+        + [f"oppo_turn_{t}_cards_drawn_or_tutored" for t in range(1, turn_cols + 1)]
+        + ["oppo_total_cards_drawn_or_tutored"]
+    )
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    with gzip.open(dest, "wt", newline="") as fh:
+        writer = csv.writer(fh)
+        writer.writerow(header)
+        for i, game in enumerate(games):
+            cands = game.get("candidate_hands", [])
+            row = [
+                SET, FMT, game["draft_id"], "2024-09-24 12:00:00", 0,
+                game.get("match_number", 1), 1, "2024-09-24 19:00:00",
+                game.get("rank", "gold"), "", game.get("main_colors", "WU"),
+                "", game["on_play"], game["num_mulligans"],
+                game.get("opp_num_mulligans", 0), "UB", game["num_turns"],
+                game["won"],
+            ]
+            row += [_replay_cell(cands[k]) if k < len(cands) else ""
+                    for k in range(7)]
+            row.append(_replay_cell(game.get("opening_hand", [])))
+            for t in range(1, turn_cols + 1):
+                overrides = game.get("turns", {}).get(t, {})
+                for who, suffixes in (("user", USER_TURN_SUFFIXES),
+                                      ("oppo", OPPO_TURN_SUFFIXES)):
+                    for s in suffixes:
+                        if who == "user" and s in overrides:
+                            row.append(_replay_cell(overrides[s]))
+                        else:
+                            row.append(_replay_zero_fill(s))
+            row += [7, 12]  # unconsumed totals passthrough
+            row += [game.get("deck", {}).get(n, 0) for n in names]
+            row += [game.get("sideboard", {}).get(n, 0) for n in names]
+            row += [game.get("games_bucket", 500), game.get("wr_bucket", 0.60)]
+            row += ["0"] * turn_cols + ["9"]
+            writer.writerow(row)
+    if etag is not None:
+        with open(paths.meta_path(dest), "w") as fh:
+            json.dump({"etag": etag}, fh)
+
+
+def hand_replay_games():
+    """Six replay games with hand-computable curation output.
+
+    Mulligan decisions (games are file rows 0..5 -> game_seq):
+      rg0 keep-at-7 (1 row), rg1 single mull (2), rg2 double mull (3),
+      rg3 subset anomaly (DROPPED, 0), rg4 keep (1), rg5 keep (1) -> 8 rows.
+    Turn rows: num_turns 3+2+2+1+2+2 = 12, never past num_turns (rg4's
+    turn-3/4 columns hold zero-fill padding that must not leak).
+    """
+    return [
+        # rg0: clean keep, on play; 3 turns; turn-1 draw is EMPTY (on play).
+        dict(
+            draft_id="rg0", on_play=True, won=True, num_mulligans=0,
+            opp_num_mulligans=1, num_turns=3,
+            candidate_hands=[[RID_A, RID_B, RID_C, RID_D, RID_L1, RID_L1, RID_L2]],
+            opening_hand=[RID_A, RID_B, RID_C, RID_D, RID_L1, RID_L1, RID_L2],
+            deck={CARD_A: 2, CARD_B: 1, CARD_C: 1, CARD_D: 1},
+            sideboard={CARD_D: 1},
+            turns={
+                1: {"lands_played": [RID_L1],
+                    "eot_user_cards_in_hand": [RID_A, RID_B, RID_C, RID_D, RID_L1, RID_L2],
+                    "eot_oppo_cards_in_hand": "7.0",
+                    "eot_user_lands_in_play": [RID_L1],
+                    "eot_user_life": "20.0", "eot_oppo_life": "20.0",
+                    "user_mana_spent": "0.0", "oppo_mana_spent": "1.0"},
+                2: {"cards_drawn": [RID_A], "lands_played": [RID_L2],
+                    "eot_user_cards_in_hand": [RID_A, RID_A, RID_C, RID_D],
+                    "eot_oppo_cards_in_hand": "5.0",
+                    "eot_user_lands_in_play": [RID_L1, RID_L2],
+                    "eot_oppo_lands_in_play": [RID_L1],
+                    "eot_user_creatures_in_play": [RID_B],
+                    "eot_oppo_creatures_in_play": [RID_OPP],
+                    "eot_user_life": "20.0", "eot_oppo_life": "18.0",
+                    "user_mana_spent": "2.0", "oppo_mana_spent": "2.0",
+                    "oppo_combat_damage_taken": "2"},
+                3: {"cards_drawn": [RID_L2],
+                    "eot_user_cards_in_hand": [RID_A, RID_A, RID_C, RID_D, RID_L2],
+                    "eot_oppo_cards_in_hand": "4.0",
+                    "eot_user_lands_in_play": [RID_L1, RID_L2],
+                    "eot_oppo_lands_in_play": [RID_L1, RID_L2],
+                    "eot_user_creatures_in_play": [RID_B],
+                    "eot_oppo_creatures_in_play": [RID_OPP],
+                    "eot_oppo_non_creatures_in_play": [RID_OPP],
+                    "eot_user_life": "17.0", "eot_oppo_life": "12.0",
+                    "user_mana_spent": "3.0", "oppo_mana_spent": "0.0",
+                    "user_combat_damage_taken": "3"},
+            },
+        ),
+        # rg1: single mulligan on the draw; bottoming drops a duplicate 101.
+        dict(
+            draft_id="rg1", on_play=False, won=False, num_mulligans=1,
+            num_turns=2, wr_bucket=0.54,
+            candidate_hands=[
+                [RID_A, RID_B, RID_C, RID_D, RID_L1, RID_L2, RID_A],
+                [RID_A, RID_A, RID_B, RID_C, RID_L1, RID_L1, RID_L2],
+            ],
+            opening_hand=[RID_A, RID_B, RID_C, RID_L1, RID_L1, RID_L2],
+            deck={CARD_A: 2, CARD_B: 2},
+            turns={
+                1: {"cards_drawn": [RID_D],
+                    "eot_user_cards_in_hand": [RID_A, RID_B, RID_C, RID_D, RID_L1, RID_L2],
+                    "eot_oppo_cards_in_hand": "6.0",
+                    "eot_user_lands_in_play": [RID_L1],
+                    "lands_played": [RID_L1],
+                    "eot_user_life": "20.0", "eot_oppo_life": "20.0"},
+                2: {"cards_drawn": [RID_B],
+                    "eot_user_cards_in_hand": [RID_A, RID_B, RID_B, RID_C, RID_D, RID_L2],
+                    "eot_oppo_cards_in_hand": "5.0",
+                    "eot_user_lands_in_play": [RID_L1],
+                    "eot_oppo_lands_in_play": [RID_L1, RID_L2],
+                    "eot_oppo_creatures_in_play": [RID_OPP],
+                    "eot_user_life": "16.0", "eot_oppo_life": "20.0",
+                    "user_combat_damage_taken": "4"},
+            },
+        ),
+        # rg2: double mulligan; kept 5, bottomed [104, 101] in candidate order.
+        dict(
+            draft_id="rg2", on_play=True, won=False, num_mulligans=2,
+            num_turns=2,
+            candidate_hands=[
+                [RID_A, RID_B, RID_C, RID_D, RID_L1, RID_L2, RID_B],
+                [RID_B, RID_C, RID_D, RID_D, RID_L1, RID_L1, RID_L2],
+                [RID_B, RID_C, RID_D, RID_L1, RID_L2, RID_A, RID_A],
+            ],
+            opening_hand=[RID_B, RID_C, RID_L1, RID_L2, RID_A],
+            deck={CARD_B: 1, CARD_C: 1},
+            turns={
+                1: {"lands_played": [RID_L1],
+                    "eot_user_cards_in_hand": [RID_B, RID_C, RID_L2, RID_A],
+                    "eot_oppo_cards_in_hand": "7.0",
+                    "eot_user_lands_in_play": [RID_L1],
+                    "eot_user_life": "20.0", "eot_oppo_life": "20.0"},
+                2: {"eot_user_cards_in_hand": [RID_B, RID_C, RID_L2, RID_A],
+                    "eot_oppo_cards_in_hand": "6.0",
+                    "eot_user_lands_in_play": [RID_L1],
+                    "eot_user_life": "15.0", "eot_oppo_life": "20.0"},
+            },
+        ),
+        # rg3: subset anomaly — opening_hand holds an id (999) that is not in
+        # candidate_hand_1. Dropped from replay_mull only; its turn/game rows
+        # still curate.
+        dict(
+            draft_id="rg3", on_play=True, won=True, num_mulligans=0,
+            num_turns=1,
+            candidate_hands=[[RID_A, RID_B, RID_C, RID_D, RID_L1, RID_L2, RID_L2]],
+            opening_hand=[RID_A, RID_B, RID_C, RID_D, RID_L1, RID_L2, RID_GHOST],
+            deck={CARD_A: 1},
+            turns={
+                1: {"eot_user_cards_in_hand": [RID_A, RID_B, RID_C, RID_D, RID_L1, RID_L2],
+                    "eot_oppo_cards_in_hand": "7.0", "lands_played": [RID_L2],
+                    "eot_user_lands_in_play": [RID_L2],
+                    "eot_user_life": "20.0", "eot_oppo_life": "20.0"},
+            },
+        ),
+        # rg4: zero-fill padding — num_turns=2, turn 3/4 columns keep padding
+        # values ('0.0' life etc.) that must never surface as rows.
+        dict(
+            draft_id="rg4", on_play=False, won=False, num_mulligans=0,
+            num_turns=2,
+            candidate_hands=[[RID_A, RID_A, RID_B, RID_C, RID_L1, RID_L1, RID_L2]],
+            opening_hand=[RID_A, RID_A, RID_B, RID_C, RID_L1, RID_L1, RID_L2],
+            deck={CARD_A: 2, CARD_B: 1, CARD_C: 1},
+            turns={
+                1: {"cards_drawn": [RID_D], "lands_played": [RID_L1],
+                    "eot_user_cards_in_hand": [RID_A, RID_A, RID_B, RID_C, RID_D, RID_L1, RID_L2],
+                    "eot_oppo_cards_in_hand": "7.0",
+                    "eot_user_lands_in_play": [RID_L1],
+                    "eot_user_life": "20.0", "eot_oppo_life": "20.0"},
+                2: {"cards_drawn": [RID_C], "lands_played": [RID_L1],
+                    "eot_user_cards_in_hand": [RID_A, RID_A, RID_B, RID_C, RID_C, RID_D, RID_L2],
+                    "eot_oppo_cards_in_hand": "6.0",
+                    "eot_user_lands_in_play": [RID_L1, RID_L1],
+                    "eot_user_life": "18.0", "eot_oppo_life": "19.0"},
+            },
+        ),
+        # rg5: negative combat damage on turn 2, and an EMPTY hand within
+        # range (hellbent) that must curate as [] rather than NULL.
+        dict(
+            draft_id="rg5", on_play=True, won=True, num_mulligans=0,
+            num_turns=2,
+            candidate_hands=[[RID_B, RID_B, RID_C, RID_D, RID_L1, RID_L2, RID_L2]],
+            opening_hand=[RID_B, RID_B, RID_C, RID_D, RID_L1, RID_L2, RID_L2],
+            deck={CARD_B: 2},
+            turns={
+                1: {"lands_played": [RID_L1],
+                    "eot_user_cards_in_hand": [RID_B, RID_B, RID_C, RID_D, RID_L2, RID_L2],
+                    "eot_oppo_cards_in_hand": "7.0",
+                    "eot_user_lands_in_play": [RID_L1],
+                    "eot_user_life": "20.0", "eot_oppo_life": "20.0"},
+                2: {"eot_user_cards_in_hand": [],
+                    "eot_oppo_cards_in_hand": "5.0",
+                    "eot_user_lands_in_play": [RID_L1],
+                    "eot_user_creatures_in_play": [RID_B, RID_B],
+                    "eot_user_life": "22.0", "eot_oppo_life": "14.0",
+                    "user_combat_damage_taken": "-2",
+                    "oppo_combat_damage_taken": "6",
+                    "user_mana_spent": "4.0"},
+            },
+        ),
+    ]
+
+
+# ---------------------------------------------------------------------------
 # DraftFM foundation serving fixtures (registry tier + OnnxDraftFMModel).
 
 FOUNDATION_MANIFEST_HASH = "synth-manifest-hash"

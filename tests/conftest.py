@@ -40,6 +40,8 @@ def data_root(tmp_path, monkeypatch):
         "CARD_RATINGS_DIR": lands / "card_ratings",
         "COLOR_RATINGS_DIR": lands / "color_ratings",
         "CURATED_DIR": lands / "curated",
+        "REPLAY_MULL_DIR": lands / "curated" / "replay_mull",
+        "REPLAY_TURNS_DIR": lands / "curated" / "replay_turns",
         "METRICS_DIR": lands / "metrics",
         "MODELS_DIR": root / "models",
         "SCRYFALL_PROCESSED_DIR": root / "processed",
@@ -97,6 +99,14 @@ def draft_raw(data_root):
 def game_raw(data_root):
     dest = paths.raw_dataset_path("game", _synth.SET, _synth.FMT)
     _synth.write_game_csv(dest)
+    return dest
+
+
+@pytest.fixture
+def replay_raw(data_root):
+    """Hand-computed raw replay CSV (6 games, see _synth.hand_replay_games)."""
+    dest = paths.raw_dataset_path("replay", _synth.SET, _synth.FMT)
+    _synth.write_replay_csv(dest)
     return dest
 
 

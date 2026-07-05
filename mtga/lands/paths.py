@@ -18,6 +18,8 @@ CARDS_DIR = LANDS_DIR / "cards"
 CARD_RATINGS_DIR = LANDS_DIR / "card_ratings"
 COLOR_RATINGS_DIR = LANDS_DIR / "color_ratings"
 CURATED_DIR = LANDS_DIR / "curated"
+REPLAY_MULL_DIR = CURATED_DIR / "replay_mull"
+REPLAY_TURNS_DIR = CURATED_DIR / "replay_turns"
 METRICS_DIR = LANDS_DIR / "metrics"
 MODELS_DIR = DATA_ROOT / "models"
 
@@ -55,6 +57,23 @@ def curated_path(data_type, set_code, limited_type):
 def vocab_path(set_code, limited_type):
     """Ordered card-name vocabulary sidecar for a curated draft file."""
     return CURATED_DIR / "draft" / f"{set_code}.{limited_type}.vocab.json"
+
+
+# Replay curations (mtga/replay/etl.py). Derived from CURATED_DIR at call
+# time (not the constants above) so tests that repoint CURATED_DIR isolate.
+def replay_mull_path(set_code, limited_type):
+    """One row per keep/mull decision, from the replay dump."""
+    return CURATED_DIR / "replay_mull" / f"{set_code}.{limited_type}.parquet"
+
+
+def replay_turns_path(set_code, limited_type):
+    """One row per (game, user turn) end-of-turn state."""
+    return CURATED_DIR / "replay_turns" / f"{set_code}.{limited_type}.parquet"
+
+
+def replay_games_path(set_code, limited_type):
+    """Per-game sidecar for replay_turns: meta + deck name-counts, keyed by game_seq."""
+    return CURATED_DIR / "replay_turns" / f"{set_code}.{limited_type}.games.parquet"
 
 
 def card_ratings_path(set_code, limited_type, date_str):
