@@ -586,6 +586,91 @@ def hand_replay_games():
 
 
 # ---------------------------------------------------------------------------
+# Mulligan-model fixtures (mtga/mulligan): the Arena-id -> 17Lands-name map
+# (cards.csv) and a hand-computable frozen card-feature parquet covering the
+# replay games' hand ids. Lands 111/112 appear only in hands, never in the
+# deck_* name columns, exactly like the real files' basics.
+
+CARD_L1, CARD_L2 = "Plains", "Island"
+RID_A_ALT = 201  # second printing of CARD_A: many ids map to one name
+
+# name -> (mana value, {pip color: count}, colors, type). CARD_D's mana value
+# 5 makes it the only non-land above the cheap-spell threshold (cmc <= 3).
+CARDFEAT_SPEC = {
+    CARD_A: (1, {"r": 1}, "r", "instant"),
+    CARD_B: (3, {"w": 1}, "w", "creature"),
+    CARD_C: (3, {"u": 2}, "u", "creature"),
+    CARD_D: (5, {"g": 1}, "g", "creature"),
+    CARD_L1: (0, {}, "", "land"),
+    CARD_L2: (0, {}, "", "land"),
+}
+
+
+def write_mull_cards_csv():
+    """cards.csv (17Lands id->name map) for the replay fixtures' Arena ids."""
+    rows = [
+        (RID_A, CARD_A), (RID_A_ALT, CARD_A), (RID_B, CARD_B),
+        (RID_C, CARD_C), (RID_D, CARD_D), (RID_L1, CARD_L1), (RID_L2, CARD_L2),
+    ]
+    paths.CARDS_CSV.parent.mkdir(parents=True, exist_ok=True)
+    with open(paths.CARDS_CSV, "w", newline="") as fh:
+        writer = csv.writer(fh)
+        writer.writerow(["id", "expansion", "name", "rarity", "color_identity",
+                         "mana_value", "types", "is_booster"])
+        for card_id, name in rows:
+            writer.writerow([card_id, SET, name, "common", "C", 1.0,
+                             "Creature", True])
+    return paths.CARDS_CSV
+
+
+def write_cardfeats():
+    """Synthetic cardfeats parquet with the real 391-column frozen layout."""
+    from mtga.foundation.featurize import feature_blocks
+    from mtga.lands import names
+
+    columns = [c for block in feature_blocks() for c in block["columns"]]
+    rows = []
+    for name, (mana_value, pips, colors, card_type) in CARDFEAT_SPEC.items():
+        row = dict.fromkeys(columns, 0.0)
+        row["cmc_scaled"] = mana_value / 8.0
+        row[f"cmc_is_{mana_value}"] = 1.0
+        for color, count in pips.items():
+            row[f"pip_{color}"] = count / 4.0
+        for color in colors:
+            row[f"color_{color}"] = 1.0
+        row[f"type_{card_type}"] = 1.0
+        rows.append({"name_display": name,
+                     "name_norm": names.norm_17lands(name), **row})
+    frame = pd.DataFrame(rows)
+    paths.CARDFEATS_PARQUET.parent.mkdir(parents=True, exist_ok=True)
+    frame.to_parquet(paths.CARDFEATS_PARQUET, index=False)
+    return frame
+
+
+def mulligan_training_games(n=40):
+    """n replay games with a deterministic crc32 split behavior.
+
+    draft_id mull00..mull{n-1}: game i wins iff i is even, mulligans once
+    iff i % 5 == 0 (so both the crc32-val and train halves see kept wins,
+    kept losses, and mulled decisions for n >= 40 at val_permille=500).
+    """
+    keep7 = [RID_A, RID_B, RID_C, RID_D, RID_L1, RID_L1, RID_L2]
+    mull7 = [RID_A, RID_A, RID_B, RID_C, RID_L1, RID_L1, RID_L2]
+    games = []
+    for i in range(n):
+        mulls = 1 if i % 5 == 0 else 0
+        games.append(dict(
+            draft_id=f"mull{i:02d}", on_play=i % 2 == 0, won=i % 2 == 0,
+            num_mulligans=mulls, num_turns=1,
+            candidate_hands=[keep7] if mulls == 0 else [keep7, mull7],
+            opening_hand=keep7 if mulls == 0
+            else [RID_A, RID_A, RID_B, RID_C, RID_L1, RID_L2],
+            deck={CARD_A: 7, CARD_B: 6, CARD_C: 5, CARD_D: 2},
+        ))
+    return games
+
+
+# ---------------------------------------------------------------------------
 # DraftFM foundation serving fixtures (registry tier + OnnxDraftFMModel).
 
 FOUNDATION_MANIFEST_HASH = "synth-manifest-hash"
