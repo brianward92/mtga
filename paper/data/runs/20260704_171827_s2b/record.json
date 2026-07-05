@@ -1,0 +1,55 @@
+{
+  "run_id": "20260704_171827_s2b",
+  "config": {
+    "name": "s2b",
+    "sets": [
+      [
+        "MOM",
+        "PremierDraft"
+      ],
+      [
+        "MOM",
+        "TradDraft"
+      ],
+      [
+        "TDM",
+        "PremierDraft"
+      ],
+      [
+        "TDM",
+        "TradDraft"
+      ]
+    ],
+    "seed": 17,
+    "batch_size": 8192,
+    "lr": 0.001,
+    "warmup_steps": 2000,
+    "epochs": 4.0,
+    "max_steps": 72952,
+    "d_model": 256,
+    "dropout": 0.1,
+    "set_ctx": true,
+    "label_smoothing": 0.05,
+    "sampling_alpha": 0.5,
+    "val_every": 2000,
+    "val_max_picks": 200000,
+    "patience": 3,
+    "device": "mps",
+    "parity_check": false,
+    "no_text": false,
+    "skill_filter": false
+  },
+  "n_train_picks": 14521984,
+  "n_shards": 4,
+  "planned_steps": 72952,
+  "torch_version": "2.12.1",
+  "n_params": 2198895,
+  "best_val_top1": 0.6758317551612074,
+  "best_step": 8000,
+  "wall_clock_s": 2245.7,
+  "examples_per_s": 29183,
+  "artifacts": {
+    "best": "$DATA_ROOT/foundation/runs/20260704_171827_s2b/best.pt",
+    "best_sha256": "79e2f953788f97449e00a322f11e76c11f914a908ece60e7562a801d47231481"
+  }
+}

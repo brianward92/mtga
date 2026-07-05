@@ -1,0 +1,74 @@
+\section{Analysis}
+\label{sec:analysis}
+
+\begin{table}[t]
+  \centering
+  \caption{Pre-registered ablations: zero-shot expert top-1 (\%), point
+  estimates (per-cell 95\% CI half-widths are ${\sim}\pm0.1$--$0.2$pp on
+  the dev sets, Table~\ref{tab:main}; paired-difference CIs accompany the
+  deltas in the text). A-notext drops the 384-d text embedding; A-noUB
+  removes the three licensed-IP training sets. The (variant $\times$ set)
+  grid quantifies the licensed-IP text penalty with dev evidence before
+  MSH is seen.}
+  \label{tab:ablations}
+  \small
+  \input{tables/ablations}
+\end{table}
+
+\paragraph{The licensed-IP shift.}
+MSH's names and flavor come from a comic universe, not from \mtg{}; its
+text lives in the sentence encoder's pretraining as a different genre.
+This is the distribution shift most likely to break a text-dependent
+model on exactly the day it matters, and it is why the protocol makes a
+licensed-IP set (TMT) a development set: the rehearsal happens where it
+can still inform design. Two mitigations are built in: card names are
+masked out of the text before embedding (\S\ref{sec:features}), so the
+encoder sees mechanics, not franchises; and the ablation grid of
+Table~\ref{tab:ablations} separates what the text embedding contributes
+on in-universe sets (SOS, BRO) from what it contributes on licensed sets
+(TMT, MSH). Zero-shot, the licensed dev set is not the hard one: TMT
+reaches \FdevTmt\% against SOS's \FdevSos\%
+(and \RatioTmt\% vs \RatioSos\% of the respective ceilings), suggesting
+the masking plus structured features carry the load. Whether that holds
+because text adds little on licensed sets or because TMT is simply an
+easier format is exactly what the grid decides:
+\pending{A-notext/A-noUB deltas per set and the UB-penalty estimate}.
+If the test set is harder than the trio average, the pre-registered
+framing stands: a licensed-IP test makes the zero-shot claim more
+credible, not less.
+
+\paragraph{Why BRO transfers worst.}
+BRO sits \pending{BRO gap vs trio mean} below the other dev sets and only
+\RatioBro\% of its ceiling. Three candidate explanations are checkable in
+the per-pick curves: its packs mix in a 63-card retro-artifact bonus sheet
+drawn from a much older design idiom, inflating the effective card pool;
+artifact-heavy formats weaken color-signal features that transfer well
+elsewhere; and its 2022 play patterns are the furthest in time from the
+corpus median. \pending{per-(pack,pick) curve comparison and
+bonus-sheet-slice accuracy}
+
+\paragraph{Skill conditioning.}
+Conditioning is a scorer-side input (\S\ref{sec:arch}), so one model
+serves any audience. In human-model mode (each drafter's true bucket, all
+users) the model scores \FdevBroAllUsers\% / \FdevTmtAllUsers\% /
+\FdevSosAllUsers\% on BRO / TMT / SOS---within a point of the expert-slice
+deployment numbers, consistent with skill moving picks less than card
+quality does. The pre-registered effect size---deployment-mode accuracy as
+a function of the conditioning bucket, and the gap between conditioning on
+the top bucket versus the drafter's own---is \pending{skill-conditioning
+effect on MSH}.
+
+\paragraph{Calibration.}
+Zero-shot confidence is imperfectly calibrated: top-label ECE is
+\FdevBroEce{} / \FdevTmtEce{} / \FdevSosEce{} on the dev trio, against
+\CeilSosEce{} for the within-set SOS ceiling. The protocol permits one
+calibration decision---a temperature fitted on dev only and frozen into
+the battery, never fitted on MSH; the frozen choice and MSH ECE are
+\pending{temperature decision + MSH ECE}.
+
+\paragraph{Late-draft retention.}
+Later picks are where pool context dominates and where a set-agnostic
+model could plausibly collapse to rate-the-card. The pre-registered
+statistic (model/ceiling top-1 on picks 8+) is \pending{late-draft
+retention, dev trio and MSH}, alongside the per-(pack, pick) curves
+against the per-cell random floor.

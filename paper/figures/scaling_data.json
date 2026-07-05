@@ -1,0 +1,91 @@
+{
+  "rungs": [
+    {
+      "rung": "S1",
+      "config_name": "s1",
+      "run_id": "20260704_154741_s1",
+      "n_sets": 1,
+      "train_picks": 5412775,
+      "dev_mean_top1": null,
+      "in_ledger": false
+    },
+    {
+      "rung": "S2",
+      "config_name": "s2",
+      "run_id": "20260704_161450_s2",
+      "n_sets": 2,
+      "train_picks": 13261675,
+      "dev_mean_top1": null,
+      "in_ledger": false
+    },
+    {
+      "rung": "S2b",
+      "config_name": "s2b",
+      "run_id": "20260704_171827_s2b",
+      "n_sets": 2,
+      "train_picks": 14521984,
+      "dev_mean_top1": null,
+      "in_ledger": false
+    },
+    {
+      "rung": "S4",
+      "config_name": "s4",
+      "run_id": "20260704_175554_s4",
+      "n_sets": 4,
+      "train_picks": 27792360,
+      "dev_mean_top1": null,
+      "in_ledger": false
+    },
+    {
+      "rung": "S4b",
+      "config_name": "s4b",
+      "run_id": null,
+      "n_sets": 4,
+      "train_picks": null,
+      "dev_mean_top1": null,
+      "in_ledger": false
+    },
+    {
+      "rung": "S8",
+      "config_name": "s8",
+      "run_id": null,
+      "n_sets": 8,
+      "train_picks": null,
+      "dev_mean_top1": null,
+      "in_ledger": false
+    },
+    {
+      "rung": "S16",
+      "config_name": "s16",
+      "run_id": null,
+      "n_sets": 16,
+      "train_picks": null,
+      "dev_mean_top1": null,
+      "in_ledger": false
+    },
+    {
+      "rung": "S27",
+      "config_name": "f_dev",
+      "run_id": "20260704_135822_f_dev",
+      "n_sets": 28,
+      "train_picks": 149407128,
+      "dev_mean_top1": 0.543032681830879,
+      "in_ledger": false
+    }
+  ],
+  "anchors": {
+    "expert_tuned": {
+      "top1": 0.4454,
+      "label": "DraftsimBot 44.5 (expert-tuned, M19)"
+    },
+    "gpt4o": {
+      "top1": 0.43,
+      "label": "GPT-4o zero-shot 43 (NEO)"
+    },
+    "bertram": {
+      "top1": 0.5544,
+      "label": "Bertram et al. 55.4* (BRO, incl. post-release meta)"
+    }
+  },
+  "ceiling_dev_mean": 0.6893833333333333
+}

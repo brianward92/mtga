@@ -1,0 +1,80 @@
+\section{Limitations}
+\label{sec:limitations}
+
+\paragraph{The target is agreement, not optimality.}
+Top-1 agreement with expert humans measures imitation. Experts disagree
+with each other (the within-set ceiling is ${\sim}70\%$, not 100\%), and
+agreeing with them is not the same as maximising win rate; a model could
+in principle draft better than its agreement suggests, or worse. Win-rate
+evaluation of zero-shot drafters is future work.
+
+\paragraph{Population.}
+\seventeenlands{} users are self-selected: they run a tracker, they draft
+on Arena, and the expert slice further conditions on volume and success.
+All numbers are relative to this population; paper drafting, other
+platforms, and casual play are out of scope.
+
+\paragraph{One evaluation round.}
+Pre-registration buys credibility at the cost of adaptivity: the frozen
+battery cannot react to surprises in the test snapshot, and a single set
+is a sample of one from the distribution of future sets. The dev-trio
+spread and the composition probes bound, but do not eliminate,
+set-to-set variance in what the headline number would be on the
+\emph{next} set.
+
+\paragraph{Text and language.}
+The text encoder is English-only and frozen; rules text is embedded as
+prose, so mechanics whose meaning is mostly numeric or positional may be
+under-represented. Name masking removes the most direct pretraining
+leak for licensed sets, but flavor vocabulary in the remaining text still
+differs by universe (\S\ref{sec:analysis}).
+
+\paragraph{Numerics.}
+Training runs on an accelerator backend with documented silent-error
+classes; we gate on CPU parity and skip non-finite steps
+(\S\ref{sec:training}), which guards the classes we know about.
+
+\section{Reproducibility}
+\label{sec:repro}
+
+Every training and evaluation run appends one record to an append-only
+ledger: run id, git sha, protocol tag, seed, framework version, full
+config, data-manifest hash, wall clock, throughput, artifact sha256s, and
+dev metrics. Every table cell in this paper carries its source run id as
+a comment in the generated table file; tables and the scaling figure are
+emitted by a script from run records and cached evaluation outputs, and
+the prose reads numbers from generated macros, so no result number in
+this document is typed by hand.
+
+Frozen identifiers: protocol tag \texttt{\ProtocolTag}; data-manifest
+content hash \texttt{\DataManifestHash}; featurizer-manifest content hash
+\texttt{\FeaturizerHash}; F-dev run \texttt{\FdevRunId}. The MSH snapshot
+sha256 and ETag are recorded at freeze time and reported here:
+\pending{MSH snapshot sha256, ETag, download timestamp, gate report}.
+
+Released with the paper: training and evaluation code, the frozen
+protocol document and metric implementations, data and featurizer
+manifests, model weights for every battery member, and the per-pick
+prediction files from which every statistic is computed (archived on
+Zenodo). Raw \seventeenlands{} bytes for the test snapshot are deposited
+only after a courtesy note to \seventeenlands{}; all other inputs are
+re-derivable from public sources via the manifests.
+
+\section{Licensing and attribution}
+\label{sec:licensing}
+
+Draft data is from the \seventeenlands{} public datasets
+\citep{seventeenlands}, used under CC BY 4.0 and per the project's usage
+guidelines (bulk S3 downloads; no API scraping). Card metadata is from
+Scryfall \citep{scryfall}, used per its API guidelines; Scryfall neither
+produces nor endorses this work.
+
+Portions of the materials used are property of Wizards of the Coast.
+\copyright{} Wizards of the Coast LLC. This work contains unofficial Fan
+Content permitted under the Wizards of the Coast Fan Content Policy; it
+is not approved or endorsed by Wizards. \mtg{} and its card names and
+text are trademarks and copyrights of Wizards of the Coast. Licensed-IP
+card names (including Marvel-universe names in MSH and TMT) appear only
+as data strings in sourced fields of the released artifacts and are the
+property of their respective owners. No card images are used or
+redistributed.

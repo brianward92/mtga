@@ -1,0 +1,59 @@
+\section{Related work}
+\label{sec:related}
+
+\paragraph{Generalised card representations.}
+Bertram, F\"urnkranz, and M\"uller~\citep{bertram2024cards} established the
+zero-shot drafting problem and remain its only published quantitative
+result. They replace one-hot card identities with concatenated feature
+vectors---hand-engineered attributes plus a Sentence-BERT
+embedding~\citep{reimers2019sbert} of card text (1306-d), a learned
+autoencoding of card images (1024-d), and 16 post-release usage statistics
+from \seventeenlands{}---inside a contextual-preference-ranking model
+trained with a triplet loss. Two of their findings shape our design: feature
+representations match one-hot accuracy within a set (nothing is lost by
+generalising), and multi-set pretraining, not the representation alone, is
+what buys transfer. Pretrained on 13 sets and evaluated on held-out BRO,
+their best representation reaches 55.44\% pick agreement. That
+representation includes the usage-statistics block, which is computed from
+human play after a set's release; the number is therefore an anchor for
+zero-shot \emph{card generalisation} rather than for day-one deployment,
+where such statistics cannot exist. The same paper's day-one-feasible
+representation (features only) reaches 33.6--35.6\% on unseen sets under
+single-set training; no multi-set features-only number is published. Filling
+that gap---multi-set training, public card information only---is this
+paper's headline experiment, and we adopt their held-out BRO as a
+development set so the comparison is on the same holdout. A companion
+paper~\citep{bertram2024infonce} improves the within-set triplet objective
+with an adapted InfoNCE loss but reports no unseen-set results.
+
+\paragraph{Within-set pick models.}
+Ward et al.~\citep{ward2021drafting} compare heuristic and neural drafters
+on M19 and report the two most useful reference points below the
+data-driven regime: an expert-tuned rating bot at 44.5\% top-1 agreement
+and a random agent at 22\%. Their neural drafter (48.7\%) and its
+successors---the statistical-drafting MLPs deployed at
+statisticaldrafting.com~\citep{brooks2024statistical} (${\sim}70\%$) and
+Czerner's puder transformer~\citep{czerner2025puder} (71\%)---define the
+within-set state of the art, and the statistical-drafting architecture is
+the direct lineage of the per-set ceiling models we compare against.
+All are one-hot models over a fixed card vocabulary; none can score an
+unseen set. The deployment gap is explicit: statistical-drafting documents
+that no model can ship until \seventeenlands{} data appears, roughly two
+weeks post-release~\citep{brooks2024statistical}, and Draftsim's day-one
+ratings are written by human experts~\citep{draftsimratings}.
+
+\paragraph{LLMs as drafters.}
+UrzaGPT~\citep{bertram2025urzagpt} evaluates large language models on draft
+picks. Zero-shot GPT-4o reaches 43\%---below the hour-zero heuristics we
+measure (\S\ref{sec:results})---and providing full rules text in the prompt
+lowers it; open 7--8B models fail to pick legal cards until LoRA-tuned on a
+million picks from the target set, after which they still trail small
+supervised MLPs at orders of magnitude more inference cost. We take the
+implied guidance: use a frozen text \emph{embedding} as one feature block,
+not a language model as the policy.
+
+\paragraph{Text-grounded transfer in card games.}
+Cardsformer~\citep{xia2023cardsformer} encodes Hearthstone card
+descriptions with a language model so a gameplay policy generalises to
+unseen cards---the closest cross-game precedent for text-mediated transfer,
+applied to gameplay rather than drafting.

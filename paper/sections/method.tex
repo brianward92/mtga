@@ -1,0 +1,104 @@
+\section{Method}
+\label{sec:method}
+
+\subsection{Cards as frozen feature vectors}
+\label{sec:features}
+
+Every card is a fixed 775-dimensional vector computed from public
+information alone, frozen before training.
+
+\paragraph{Structured features (391-d).}
+Parsed from the card's Scryfall record: mana value (scaled + bucketed
+one-hot, 10), mana-cost pips including hybrid/Phyrexian/X structure (10),
+colors (8), color identity (5), supertypes (3), card types (9), creature
+subtypes (top-128 vocabulary + an unmatched count, 129), power / toughness
+/ loyalty each as (scaled, missing, star) triples (9), rarity (5), keyword
+abilities (166 slots + unmatched count, 167), layout including back-face
+flags for double-faced cards (10), and text-shape features: length, line
+count, and 24 regex flags over rules text for common functional categories
+(removal, card draw, counterspells, tokens, ramp, \ldots) (26).
+Double-faced and split cards take numeric blocks from the front face.
+Subtype and keyword vocabularies are counted over \emph{training} sets
+only; a registry gate refuses to fit vocabularies on the held-out set. The
+resulting featurizer manifest is content-hashed
+(\texttt{\FeaturizerHash}) and released; held-out cards featurize through
+the frozen manifest, with out-of-vocabulary subtypes and keywords absorbed
+by the unmatched counters. Scalars are clipped to $[0,1]$; parse failures
+set a missing indicator, never a silent zero.
+
+\paragraph{Text embedding (384-d).}
+The card's type line and rules text, embedded with a frozen
+\texttt{bge-small-en-v1.5} sentence encoder~\citep{xiao2023bge}
+($L_2$-normalised). The card's own name (and, for legendary cards, its
+short name) is masked to a placeholder token before embedding, so the
+encoder cannot key on names it may know from pretraining---a deliberate
+handicap that matters for licensed-IP sets (\S\ref{sec:analysis}).
+Parenthetical reminder text is kept: for a brand-new mechanic it is the
+only definition the model will ever see. Back faces are appended for
+double-faced cards.
+
+\subsection{Architecture}
+\label{sec:arch}
+
+DraftFM is a two-tower scorer with \FdevParams M parameters. Its two design
+invariants are the zero-shot contract:
+
+\begin{enumerate}
+  \item \textbf{No set identity.} There is no set embedding and no
+  per-card parameter anywhere. The only way the model can know what set it
+  is drafting is a \emph{set-context tower} that reads the set's full card
+  list, plus the drafter's accumulating pool. ``Blue is the aggressive
+  color in this set'' must be inferred from the card list; an inference of
+  that form transfers to a set released tomorrow, a memorized set
+  identifier cannot.
+  \item \textbf{Skill conditions the scorer, not the cards.} Card
+  semantics are skill-invariant; the pick policy is not. Skill-bucket
+  embeddings enter only the context pathway. Serving conditions on a fixed
+  high-skill bucket; training sees every pick tagged with its drafter's
+  bucket.
+\end{enumerate}
+
+A shared \emph{card encoder} (LayerNorm $\to$ 775--512--256 MLP, GELU)
+maps feature vectors to $d{=}256$ embeddings. Because training batches are
+homogeneous in (set, format), the encoder runs once per step over the
+set's full card list ($\sim$400 rows) and everything downstream gathers
+rows from that table. The \emph{pool tower} represents the drafter's pool
+as the set of distinct cards held, each embedding translated by a learned
+count embedding (counts capped at 8), pooled by cross-attention from four
+learned queries (4 heads); an empty pool attends over a learned null token.
+The \emph{set-context tower} applies the same query-pooling to the entire
+card list (with a rarity embedding added) to produce the set summary. A
+context MLP combines the set summary with skill and format embeddings,
+seven pick-position features (pack/pick indices, pool size), and four
+set-shape scalars (card-list size, picks-per-pack indicator) into a 64-d
+context. Each candidate $c$ in the pack is scored by an MLP over
+$[\,c;\; p;\; c \odot p;\; \mathrm{ctx}\,]$, where $p$ is the pool summary
+and $c \odot p$ the elementwise interaction; a softmax over the pack's
+real slots gives the pick distribution.
+
+\subsection{Training}
+\label{sec:training}
+
+One recipe for every run in the paper (fixed before the scaling and
+ablation studies; the protocol forbids per-rung tuning). Batches of 8{,}192
+picks are drawn from one (set, format) shard at a time, shards sampled
+proportionally to $n_{\text{picks}}^{0.5}$---an interpolation between
+pick-uniform (which lets the largest sets dominate) and set-uniform (which
+oversamples tiny sets). AdamW ($\beta_1{=}0.9$, $\beta_2{=}0.98$, weight
+decay 0.01), peak learning rate $10^{-3}$, 2{,}000-step linear warmup,
+cosine decay; cross-entropy with label smoothing 0.05 renormalised over
+real pack slots. The presentation budget is four epochs; within-training
+validation (never the dev sets) is evaluated every 2{,}000 steps and
+training stops after three non-improving evaluations. Seed 17 throughout;
+seed variance is measured at two scaling rungs (\S\ref{sec:protocol}).
+
+Training runs on a single Apple M3 Ultra workstation (96\,GB unified
+memory) in PyTorch 2.12 eager mode on the MPS backend, at
+$\sim$\FdevExamplesPerSec{} picks/s; the full \FdevPicks M-pick run takes
+about \FdevWallHours{} hours, stopping at step 34{,}000. Correctness on
+this backend is not assumed: a CPU-vs-accelerator parity check on losses
+and gradient norms gates every launch, LayerNorm is composed from
+primitive ops (the fused kernel's backward is wrong on some chip/OS
+combinations), and a watchdog skips non-finite gradient steps and halts on
+recurrence. Inference exports to ONNX (opset 18) and runs on a consumer
+x86-64 machine, CPU-only, well under a millisecond per pick.

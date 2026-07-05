@@ -1,0 +1,150 @@
+\section{Results}
+\label{sec:results}
+
+\begin{table}[t]
+  \centering
+  \caption{Zero-shot expert-slice top-1 agreement (\%), deployment mode,
+  forced picks included; 95\% cluster-bootstrap CIs over drafts in
+  parentheses. F-full's dev cells are never quoted (it trains on those
+  sets). Each cell's source run is recorded as a comment in the generated
+  table file.}
+  \label{tab:main}
+  \footnotesize
+  \setlength{\tabcolsep}{3.5pt}
+  \input{tables/main_results}
+\end{table}
+
+\paragraph{Zero-shot transfer on the development trio.}
+Table~\ref{tab:main} is the paper's central result. Trained on
+\FdevPicks M picks from \FdevSets{} sets and shown three sets it has never
+seen a pick from, DraftFM agrees with the expert pick \FdevDevMean\% of the
+time: \FdevBro\% on BRO, \FdevTmt\% on TMT, \FdevSos\% on SOS. Per-set
+models trained directly on each target reach \CeilBro\% / \CeilTmt\% /
+\CeilSos\%; the zero-shot model recovers \RatioBro\% / \RatioTmt\% /
+\RatioSos\% of those ceilings (unaligned ratio; the pre-registered
+normalized score on identical picks is \pending{aligned normalized scores,
+dev trio}). Excluding forced picks lowers the three numbers to
+\FdevBroNonForced\% / \FdevTmtNonForced\% / \FdevSosNonForced\%. The
+deployment-mode skill bucket selected on dev is the \DeployBucket{}
+win-rate bucket.
+
+\paragraph{Reading the BRO row.}
+BRO is the holdout on which \citet{bertram2024cards} report 55.44\%---the
+strongest published unseen-set number, achieved with card features, learned
+image embeddings, \emph{and} 16 usage statistics computed from human play
+after the set's release. Our \FdevBro\% is below it. The comparison the
+BRO row is designed for is the day-one setting, where usage statistics do
+not exist: against the same paper's features-only representation
+(33.6--35.6\%, single-set training) and every day-one-feasible baseline in
+Table~\ref{tab:baselines}, multi-set training on public card features
+closes most of the distance toward the meta-inclusive number while using
+strictly release-day information. BRO is also the trio's hardest set for
+transfer---its packs mix in a 63-card retro-artifact bonus sheet---and the
+gap between the BRO and TMT/SOS rows is analysed in \S\ref{sec:analysis}.
+
+\begin{table}[t]
+  \centering
+  \caption{Baselines and published anchors. Upper block: our measured
+  baselines (rehearsal rows will be replaced by frozen MSH rows by the same
+  pipeline). Lower block: published numbers, quoted from their papers; test
+  sets and information regimes differ, so these situate rather than
+  compare. $^{*}$~=~uses post-release or otherwise non-day-one
+  information.}
+  \label{tab:baselines}
+  \footnotesize
+  \setlength{\tabcolsep}{3.5pt}
+  \input{tables/baselines}
+\end{table}
+
+\paragraph{Baselines.}
+Table~\ref{tab:baselines}: random picking scores \BaseRandom\%, and an
+hour-zero heuristic (prefer lower rarity for playables, follow the pool's
+colors) reaches \BaseRarity\%---already above GPT-4o's 43\%
+\citep{bertram2025urzagpt} and close to the expert-tuned 44.5\% of
+\citet{ward2021drafting}, a useful caution about how much of drafting is
+surface regularity. DraftFM's zero-shot numbers clear every
+day-one-feasible row on all three dev sets. The three asterisked
+post-release baselines bound what cheap human data buys within days of
+release; their MSH rows execute with the frozen evaluation.
+
+\paragraph{The frozen MSH evaluation.}
+The headline: F-full expert-slice deployment-mode top-1 on MSH is
+\FfullMsh\% (CI in Table~\ref{tab:main}). Snapshot gates, identifiers,
+and hashes are reported in Appendix~\ref{sec:repro}. \pending{MSH secondary metrics: top-3, all-users
+top-1, normalized score vs the post-day-one MSH ceiling, log-loss, ECE,
+late-draft retention}
+
+% ======================================================================
+% CLAIMS BAND ALTERNATIVES (pre-registered; docs/eval_protocol.md §6).
+% Exactly ONE of the three paragraphs below is uncommented at MSH time,
+% chosen solely by the frozen headline number. The text is drafted before
+% the result exists and must not be softened or sharpened after the fact.
+% ----------------------------------------------------------------------
+% BAND A (< 45%):
+% \paragraph{Interpretation.}
+% The headline number falls short of the strongest day-one-feasible prior,
+% the expert-tuned rating systems at 44.5\%: at current scale, multi-set
+% training on public card features alone does not buy day-one competence,
+% and hand-tuned expert ratings remain unbeaten at hour zero. The result is
+% negative for the scaling hypothesis but leaves the contributions that do
+% not depend on the headline: the frozen, tamper-evident benchmark; the
+% first meta-free multi-set zero-shot measurement; and the scaling curve,
+% whose shape (\S\ref{sec:results}) indicates whether the gap is a data
+% problem or a representation problem.
+% ----------------------------------------------------------------------
+% BAND B (45-55%):
+% \paragraph{Interpretation.}
+% The headline number makes DraftFM the strongest published drafter that
+% can exist on release day: above expert-tuned ratings (44.5\%), GPT-4o
+% (43\%), and every hour-zero heuristic we measure. It remains below the
+% 55.44\% of \citet{bertram2024cards} on held-out BRO; that number is the
+% appropriate upper reference, and it is not a day-one number---its
+% representation includes usage statistics computed from human play after
+% release, information that by construction cannot exist when a set goes
+% live. Within the information regime a deployed day-one assistant actually
+% inhabits, DraftFM sets the published state of the art.
+% ----------------------------------------------------------------------
+% BAND C (> 55%):
+% \paragraph{Interpretation.}
+% The headline number exceeds the strongest published unseen-set result,
+% the 55.44\% of \citet{bertram2024cards}, while using strictly less
+% information (no post-release usage statistics, no card images) on a
+% harder test set (a licensed-IP set with out-of-universe names and
+% flavor). The BRO development row provides the same-holdout receipt
+% against that prior. Zero-shot drafting of an unseen set is, on this
+% evidence, better served by scale over public card features than by any
+% published use of post-release data.
+% ======================================================================
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.78\linewidth]{figures/scaling_curve.pdf}
+  \caption{Zero-shot dev-trio-mean expert top-1 vs training picks (log
+  scale). Filled points: the nested scaling ladder; open points:
+  set-composition probes. Horizontal rules: published anchors and the
+  per-set ceiling mean. Generated from run records by
+  \texttt{figures/scaling\_curve.py}; rungs appear as their frozen
+  evaluations land.}
+  \label{fig:scaling}
+\end{figure}
+
+\begin{table}[t]
+  \centering
+  \caption{Scaling ladder. Rung labels are frozen protocol identifiers;
+  set and pick counts come from run records. Dev-mean is the model-selection
+  metric of \S\ref{sec:protocol}.}
+  \label{tab:scaling}
+  \small
+  \setlength{\tabcolsep}{4pt}
+  \input{tables/scaling}
+\end{table}
+
+\paragraph{Scaling.}
+Figure~\ref{fig:scaling} and Table~\ref{tab:scaling} report zero-shot
+accuracy as training grows from one set (NEO, 5.4M picks) to the full
+\FdevSets-set universe (\FdevPicks M picks), under the fixed recipe.
+Single-set training is the regime of \citet{bertram2024cards}'s
+features-only anchor; the top rung is F-dev.
+\pending{scaling-curve shape claim: slope, diminishing-returns point, and
+whether set count or pick count is the better predictor (S2b/S4b probes +
+3-seed bands at S1/S4)}

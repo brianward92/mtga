@@ -1,0 +1,66 @@
+\section{Introduction}
+\label{sec:intro}
+
+Drafting in \mtg{} is a sequential game of imperfect information: eight
+players pass packs of cards, each privately assembling a deck one pick at a
+time. Strong pick models exist---supervised models trained on human draft
+logs reach 67--71\% agreement with expert picks within a
+set~\citep{ward2021drafting,czerner2025puder,brooks2024statistical}---but
+they are set-specific. Each model encodes cards as vocabulary indices,
+learns from picks made in that set, and transfers nowhere. Because public
+draft logs appear on a delay, a data-driven assistant for a new set cannot
+exist until roughly two weeks after release~\citep{brooks2024statistical}.
+On release day, the state of the art is a spreadsheet of hand-tuned expert
+ratings~\citep{draftsimratings}.
+
+This paper asks how far pure transfer can go. DraftFM is a single pick model
+trained across every public \seventeenlands{} draft set, in which a card is
+nothing but a frozen vector of public information: structured features
+parsed from its Scryfall record and a sentence embedding of its rules text.
+The model has no set-identity parameters and no per-card weights. Whatever
+it knows about a set it must infer from the set's card list and from the
+drafter's accumulating pool---an inference that transfers to a set released
+tomorrow, where a memorized card vocabulary cannot.
+
+The evaluation is designed against a failure mode endemic to this setting:
+a ``zero-shot'' number quietly tuned on its own test set. Our protocol
+(\S\ref{sec:protocol}) was frozen, in a tagged public commit, before the
+test set existed. The test set is MSH, a licensed-IP set whose public draft
+data had not been published at the freeze; no training, tuning, or metric
+selection touches MSH pick data, and the headline number is produced by a
+single pre-registered inference pass over the first public snapshot. All
+model selection happens on three development sets (BRO, TMT, SOS) held out
+of training, chosen so that our numbers align with the only published
+zero-shot benchmark~\citep{bertram2024cards} and with our own strongest
+per-set ceilings.
+
+Zero-shot on the development trio, DraftFM agrees with expert picks
+\FdevDevMean\% of the time (\FdevBro\% / \FdevTmt\% / \FdevSos\% on
+BRO / TMT / SOS)---\RatioDevMean\% of what per-set models trained on each
+target achieve, and above every published number that is achievable on
+release day (expert-tuned ratings 44.5\%~\citep{ward2021drafting}, GPT-4o
+43\%~\citep{bertram2025urzagpt}, an hour-zero rarity heuristic
+\BaseRarity\%). On MSH the frozen evaluation gives \FfullMsh\% expert top-1
+agreement.
+
+Contributions:
+\begin{itemize}
+  \item \textbf{A frozen zero-shot benchmark.} A pre-registered,
+  tamper-evident protocol for day-one draft evaluation, plus the first
+  multi-set zero-shot numbers that use no post-release information of any
+  kind (\S\ref{sec:protocol}, \S\ref{sec:results}).
+  \item \textbf{A cross-set model and recipe.} A \FdevParams M-parameter
+  two-tower architecture over frozen card features that trains on
+  \FdevPicks M picks in about \FdevWallHours{} hours on a single
+  consumer workstation (\S\ref{sec:method}).
+  \item \textbf{A scaling study.} Zero-shot accuracy as a function of
+  training-set count from 1 to \FdevSets{} sets, with seed and
+  set-composition variance (\S\ref{sec:results}).
+  \item \textbf{A licensed-IP shift analysis.} Pre-registered ablations
+  isolating what text embeddings contribute when a set's names and flavor
+  come from a licensed universe rather than in-universe \mtg{}
+  (\S\ref{sec:analysis}).
+  \item \textbf{Release.} Code, the frozen protocol, data manifests, model
+  weights, and per-pick prediction files for every number in this paper
+  (Appendix~\ref{sec:repro}).
+\end{itemize}

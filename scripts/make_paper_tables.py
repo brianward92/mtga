@@ -166,7 +166,8 @@ def cell(value, ci=None, run_id=None, dp=1):
 
 
 def pending(desc):
-    return f"\\pending{{{desc}}}", ""
+    """Table-cell placeholder: compact marker, description as a comment."""
+    return "\\pendingcell", f" % pending: {desc}"
 
 
 def emit_rows(rows):
@@ -377,8 +378,8 @@ def table_baselines(anchors, frozen):
 def table_ablations(by_name, frozen):
     members = [
         ("Full (F-dev recipe)", "f_dev", "F-dev"),
-        ("A-notext (no text embedding)", None, "A-notext"),
-        ("A-noUB (LTR/FIN/TLA removed)", None, "A-noUB"),
+        ("A-notext", None, "A-notext"),
+        ("A-noUB", None, "A-noUB"),
     ]
     # Ablation runs are discovered by config-name convention.
     for name, entry in by_name.items():
@@ -537,7 +538,7 @@ def numbers_macros(anchors, fdev, frozen):
             macro(name, f"\\pending{{{member}}}")
 
     m = msh_expert(frozen, "F-full")
-    macro("FfullMsh", cell(m["top1"], m["ci"], None)[0] if m
+    macro("FfullMsh", pct(m["top1"]) if m
           else "\\pending{F-full MSH top-1}",
           m["run_id"] if m else None)
     macro("ProtocolTag", anchors["manifests"]["protocol_tag"])
