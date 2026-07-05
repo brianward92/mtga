@@ -8,23 +8,28 @@ rg0's deck {A:2, B:1, C:1, D:1} has color counts [W1, U1, B0, R2, G1], so
 top-2 colors {R, W} and a pip match of (1+1)/5 = 0.4.
 """
 
+import dataclasses
 import json
 
 import numpy as np
 import pytest
 
 import _synth
+from mtga.foundation import runlog
 from mtga.lands import paths
 from mtga.mulligan import data as mdata
 from mtga.mulligan import train as mtrain
 from mtga.mulligan.model import MulliganNet, predict_proba
 
+SET2 = "TS2"  # second synthetic set for the multi-set (v2) loading tests
 
-def _curate_replay():
+
+def _curate_replay(set_code=None):
     from mtga.replay import etl
 
-    assert etl.curate_mulligans(_synth.SET, _synth.FMT)["status"] == "CURATED"
-    assert etl.curate_turn_states(_synth.SET, _synth.FMT)["status"] == "CURATED"
+    set_code = set_code or _synth.SET
+    assert etl.curate_mulligans(set_code, _synth.FMT)["status"] == "CURATED"
+    assert etl.curate_turn_states(set_code, _synth.FMT)["status"] == "CURATED"
 
 
 @pytest.fixture
@@ -45,6 +50,37 @@ def training_raw(data_root):
     _synth.write_cardfeats()
     _curate_replay()
     return dest
+
+
+@pytest.fixture
+def training_raw_two_sets(training_raw):
+    """training_raw's SET (40 games) plus a second set SET2 (30 games).
+
+    SET2 reuses the same cards.csv/cardfeats fixtures training_raw already
+    wrote — cardfeats is a GLOBAL, cross-set manifest in production (one
+    parquet keyed by name_norm, covering every set), so a real second set
+    would resolve through the identical card matrix too; only the deck/hand
+    data is set-specific. Distinct draft_id prefixes keep the two sets'
+    crc32 split buckets independent (mirrors 17lands' globally-unique
+    draft_id convention).
+    """
+    dest2 = paths.raw_dataset_path("replay", SET2, _synth.FMT)
+    _synth.write_replay_csv(
+        dest2, games=_synth.mulligan_training_games(n=30, draft_prefix="ts2_"))
+    _curate_replay(SET2)
+    return _synth.SET, SET2
+
+
+@pytest.fixture
+def training_raw_two_sets_colliding(training_raw):
+    """Like training_raw_two_sets, but SET2 reuses SET's default draft_id
+    range ("mull00".."mull29") -- a real collision, not a hypothetical one,
+    to exercise concat_datasets's set-code prefixing (mirrors
+    test_winprob.py's winprob_multiset_raw fixture)."""
+    dest2 = paths.raw_dataset_path("replay", SET2, _synth.FMT)
+    _synth.write_replay_csv(dest2, games=_synth.mulligan_training_games(n=30))
+    _curate_replay(SET2)
+    return _synth.SET, SET2
 
 
 def test_feature_columns_match_frozen_layout():
@@ -226,4 +262,152 @@ def test_train_smoke_artifacts_and_ledger(training_raw, tmp_path, monkeypatch):
     logged = json.loads(lines[0])
     assert logged["run_id"] == record["run_id"]
     assert logged["metrics"]["auc"] == report["outcome_head"]["auc"]
+    assert logged["artifacts"]["checkpoint_sha256"]
+
+
+# ---------------------------------------------------------------------------
+# v2: cross-set loading + training (mtga/mulligan/data.py's
+# MultiSetMulliganData/load_datasets/concat_datasets and train.py's
+# train_crossset).
+
+
+def test_load_datasets_concatenates_sets(training_raw_two_sets):
+    set1, set2 = training_raw_two_sets
+    single1 = mdata.load_dataset(set1, _synth.FMT)
+    single2 = mdata.load_dataset(set2, _synth.FMT)
+    multi = mdata.load_datasets([set1, set2], _synth.FMT)
+
+    assert multi.n_rows == single1.n_rows + single2.n_rows
+    assert multi.input_dim == single1.input_dim == single2.input_dim
+    assert multi.set_names == [set1, set2]
+    assert (multi.set_code[:single1.n_rows] == set1).all()
+    assert (multi.set_code[single1.n_rows:] == set2).all()
+    assert (multi.set_index[:single1.n_rows] == 0).all()
+    assert (multi.set_index[single1.n_rows:] == 1).all()
+
+    # A batch straddling both sets assembles identically to each set's own
+    # single-set assemble(), row for row — the point of keeping deck_counts/
+    # F_deck one-per-set behind a set_index rather than forcing one matrix.
+    n1 = single1.n_rows
+    mixed_idx = np.array([0, 1, n1, n1 + 1, 2])
+    got = mdata.assemble(multi, mixed_idx)
+    want = np.concatenate([
+        mdata.assemble(single1, np.array([0])),
+        mdata.assemble(single1, np.array([1])),
+        mdata.assemble(single2, np.array([0])),
+        mdata.assemble(single2, np.array([1])),
+        mdata.assemble(single1, np.array([2])),
+    ], axis=0)
+    np.testing.assert_allclose(got, want)
+
+    # Per-set masking on the concatenated pool reproduces the single-set
+    # anchors/continuation-table computations exactly.
+    assert (mdata.mulligan_anchors(multi, mask=(multi.set_code == set2))
+           == mdata.mulligan_anchors(single2))
+    assert (mdata.continuation_table(multi, mask=(multi.set_code == set1))
+           == mdata.continuation_table(single1))
+
+
+def test_load_datasets_prefixes_draft_id_against_collisions(
+        training_raw_two_sets_colliding):
+    # SET and SET2 both wrote "mull00".."mull29" -- a real collision. A
+    # draft_id legitimately repeats WITHIN a set (one row per candidate
+    # hand: keep + mulligan decisions on the same draft), so the invariant
+    # isn't row-level uniqueness -- it's that the two sets' draft_id SPACES
+    # never overlap once prefixed, so split_by_draft can't merge unrelated
+    # drafts from different sets into one crc32 bucket.
+    set1, set2 = training_raw_two_sets_colliding
+    multi = mdata.load_datasets([set1, set2], _synth.FMT)
+
+    ids = np.asarray(multi.draft_id)
+    assert f"{set1}:mull00" in ids and f"{set2}:mull00" in ids
+    ids1 = set(ids[multi.set_code == set1])
+    ids2 = set(ids[multi.set_code == set2])
+    assert ids1.isdisjoint(ids2)
+
+
+def test_concat_datasets_requires_one_set(training_raw_two_sets):
+    with pytest.raises(ValueError, match="at least one shard"):
+        mdata.concat_datasets([])
+
+
+def test_concat_datasets_rejects_divergent_card_matrix(training_raw_two_sets):
+    set1, set2 = training_raw_two_sets
+    shard1 = mdata.load_dataset(set1, _synth.FMT)
+    shard2 = mdata.load_dataset(set2, _synth.FMT)
+    diverged = dataclasses.replace(shard2, F=shard2.F + 1.0)
+    with pytest.raises(ValueError, match="global card matrix"):
+        mdata.concat_datasets([shard1, diverged])
+
+
+def test_train_crossset_checks_anchors_per_set(training_raw_two_sets, monkeypatch):
+    set1, set2 = training_raw_two_sets
+
+    # A wrong anchor entry for set1 must still be caught under concatenation
+    # (i.e. the per-set mask, not some blended cross-set anchor, is checked).
+    monkeypatch.setitem(mtrain.EXPECTED_ANCHORS, (set1, _synth.FMT), {0: 0.999})
+    with pytest.raises(ValueError, match="anchor mismatch"):
+        mtrain.train_crossset(
+            [set1, set2], _synth.FMT, epochs=1, batch_size=16, hidden=(8,),
+            seed=3, patience=1, val_permille=500, progress=lambda *_: None)
+
+
+def test_train_crossset_smoke_held_out_and_artifacts(
+        training_raw_two_sets, tmp_path, monkeypatch):
+    set1, set2 = training_raw_two_sets
+
+    # A correct per-set anchor entry should reproduce and be reported back,
+    # exercising the happy path of the same check.
+    single1_anchors = mdata.mulligan_anchors(mdata.load_dataset(set1, _synth.FMT))
+    correct = {m: round(a["win_rate"], 3) for m, a in single1_anchors.items()}
+    monkeypatch.setitem(mtrain.EXPECTED_ANCHORS, (set1, _synth.FMT), correct)
+
+    model, report, context = mtrain.train_crossset(
+        [set1], _synth.FMT, held_out_sets=[set2], epochs=2, batch_size=16,
+        lr=1e-2, hidden=(8,), seed=3, patience=3, val_permille=500,
+        progress=lambda *_: None)
+
+    assert report["anchors"][set1] == correct
+    assert report["train_sets"] == [set1] and report["held_out_sets"] == [set2]
+    assert report["n_decisions"] == mdata.load_dataset(set1, _synth.FMT).n_rows
+    assert report["n_decisions"] == 48 and report["n_kept"] == 40  # same 40-game shape as v1
+    assert 0.0 <= report["outcome_head"]["auc"] <= 1.0
+    assert 0.0 <= report["decision"]["agreement"] <= 1.0
+    # per_set_val only ever covers TRAINING sets (set2 never enters the split).
+    assert set(report["per_set_val"]) == {set1}
+
+    held = report["held_out"]
+    held_reference = mdata.load_dataset(set2, _synth.FMT)
+    assert held["n_decisions"] == held_reference.n_rows
+    assert held["n_kept"] == int(held_reference.kept.sum())
+    assert 0.0 <= held["outcome_head"]["auc"] <= 1.0
+    assert 0.0 <= held["decision"]["agreement"] <= 1.0
+    assert set(held["per_set"]) == {set2}
+    # The held-out decision agreement uses the SAME continuation table as
+    # the in-training decision analysis (fit once, on train_sets only).
+    assert report["decision"]["thresholds"] == held["decision"]["thresholds"]
+
+    out_dir = mtrain.save_crossset_version(model, report, context, tag="v2-test")
+    assert out_dir == paths.MODELS_DIR / "_mulligan" / "v2-test"
+    for artifact in ["checkpoint.pt", "meta.json", "metrics.json",
+                     "continuation.json"]:
+        assert (out_dir / artifact).exists()
+    with open(out_dir / "meta.json") as fh:
+        meta = json.load(fh)
+    assert meta["model_id"] == "_mulligan/v2-test"
+    assert meta["train_sets"] == [set1] and meta["held_out_sets"] == [set2]
+    assert meta["data_etags"][set1] == "etag-replay-1"
+    assert set2 in meta["data_etags"]
+    with open(out_dir / "continuation.json") as fh:
+        assert json.load(fh) == report["continuation"]
+
+    monkeypatch.setattr(runlog, "LEDGER", tmp_path / "ledger.jsonl")
+    record = mtrain.ledger_run_crossset(report, context, out_dir)
+    lines = (tmp_path / "ledger.jsonl").read_text().strip().splitlines()
+    assert len(lines) == 1
+    logged = json.loads(lines[0])
+    assert logged["run_id"] == record["run_id"]
+    assert logged["metrics"]["held_out_auc"] == held["outcome_head"]["auc"]
+    assert (logged["metrics"]["held_out_decision_agreement"]
+           == held["decision"]["agreement"])
     assert logged["artifacts"]["checkpoint_sha256"]

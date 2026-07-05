@@ -42,6 +42,27 @@ Known biases (documented, not corrected in v1):
     candidate comes from a land-count-adjusted deal, mulligan redraws do
     not. 7-card and 6-card hand distributions differ by construction,
     which the hand-size one-hot absorbs.
+
+v2 cross-set loading (load_datasets/concat_datasets/MultiSetMulliganData):
+  same per-decision features, concatenated across every set's replay_mull
+  file, mirroring DraftFM's cross-set philosophy (one model, many sets,
+  zero-shot held-out generalization) rather than one model per set. The
+  card feature matrix F is already GLOBAL (load_card_matrix reads the
+  frozen cross-set cardfeats manifest regardless of set_code), so hand
+  pooling concatenates for free; each set's DECK vocabulary differs
+  (deck_* column names are set-specific), so deck_counts/F_deck/deck_size
+  stay one-array-per-set and a per-row set_index says which set's arrays
+  to use — this keeps the int8 deck-count memory footprint linear in the
+  corpus (~5GB for 22 sets) instead of the ~25GB a precomputed per-row
+  [N, 391] deck-mean array would cost. set_code is not a source column
+  (replay_mull rows don't carry it) — it is derived from the filename
+  argument to load_dataset() and stamped onto every row, per-set breakdown
+  and held-out masking key. No set-identity FEATURE is added to the model
+  input (extras/hand/deck stay exactly as in v1): DraftFM's zero-shot
+  contract is "no set-identity embedding anywhere" so an unseen set is
+  never disadvantaged by a missing embedding row, and the same discipline
+  applies here — see mtga/mulligan/train.py's train_crossset docstring for
+  how per-set calibration gaps are surfaced (diagnostic only, not modeled).
 """
 
 from dataclasses import dataclass
@@ -180,6 +201,7 @@ class MulliganData:
     num_mulligans: np.ndarray  # int8 [N]
     draft_id: pd.Series      # [N] split key
     game_seq: np.ndarray     # int64 [N]
+    set_code: np.ndarray     # object [N] source set, e.g. "DSK" (all rows equal)
 
     @property
     def n_rows(self):
@@ -188,6 +210,12 @@ class MulliganData:
     @property
     def input_dim(self):
         return 3 * self.F.shape[1] + self.extras.shape[1]
+
+    def deck_mean(self, idx):
+        """Count-weighted mean-pool of the deck's cards for a row-index batch."""
+        pos = self.game_pos[idx]
+        counts = self.deck_counts[pos].astype(np.float32)
+        return counts @ self.F_deck / self.deck_size[pos][:, None]
 
 
 def build_extras(F, hand_rows, deck_counts, F_deck, deck_size, game_pos,
@@ -238,10 +266,18 @@ def build_extras(F, hand_rows, deck_counts, F_deck, deck_size, game_pos,
     ]).astype(np.float32)
 
 
-def load_dataset(set_code, limited_type):
-    """All on-disk sources -> one MulliganData."""
-    F, row_by_norm = load_card_matrix()
-    lookup = arena_row_lookup(row_by_norm)
+def load_dataset(set_code, limited_type, F=None, row_by_norm=None, lookup=None):
+    """All on-disk sources -> one MulliganData.
+
+    F/row_by_norm/lookup may be passed in (pre-loaded once) so callers
+    assembling many sets (load_datasets) don't re-read the shared, global
+    cardfeats parquet per set; by default each call loads its own copy, so
+    single-set behavior is unchanged.
+    """
+    if F is None:
+        F, row_by_norm = load_card_matrix()
+    if lookup is None:
+        lookup = arena_row_lookup(row_by_norm)
     frame, hand_ids = load_decisions(set_code, limited_type)
     hand_rows = hand_feature_rows(hand_ids, lookup)
     deck_counts, deck_rows, game_lookup = load_deck_arrays(
@@ -268,18 +304,146 @@ def load_dataset(set_code, limited_type):
         kept=frame["kept"].to_numpy().astype(bool),
         on_play=on_play, hand_size=hand_size,
         num_mulligans=frame["num_mulligans"].to_numpy(),
-        draft_id=frame["draft_id"], game_seq=game_seq)
+        draft_id=frame["draft_id"], game_seq=game_seq,
+        set_code=np.full(len(frame), set_code, dtype=object))
 
 
 def assemble(data, idx):
-    """Model input for a row-index batch: float32 [B, data.input_dim]."""
+    """Model input for a row-index batch: float32 [B, data.input_dim].
+
+    Polymorphic over MulliganData (single set) and MultiSetMulliganData
+    (concatenated sets) — both expose F/hand_rows/extras and a deck_mean(idx)
+    method, so cross-set training reuses this unchanged.
+    """
     hand = data.F[data.hand_rows[idx]]                    # [B, 7, 391]
-    pos = data.game_pos[idx]
-    counts = data.deck_counts[pos].astype(np.float32)
-    deck_mean = counts @ data.F_deck / data.deck_size[pos][:, None]
     return np.concatenate(
-        [hand.mean(axis=1), hand.max(axis=1), deck_mean, data.extras[idx]],
+        [hand.mean(axis=1), hand.max(axis=1), data.deck_mean(idx), data.extras[idx]],
         axis=1)
+
+
+# ---------------------------------------------------------------------------
+# v2: cross-set concatenation (see module docstring).
+
+
+@dataclass
+class MultiSetMulliganData:
+    """Concatenation of several sets' MulliganData, deck arrays kept per-set.
+
+    Every field except deck_counts/F_deck/deck_size/game_pos is the plain
+    row-wise concatenation of the source shards (F is shared, so hand_rows
+    indexes it directly with no remapping). deck_counts/F_deck/deck_size
+    stay lists indexed by set_index (each set's deck column vocabulary is
+    different, so there is no single [G, C] matrix to share); game_pos is
+    the row's position WITHIN its own set's deck_counts[set_index[row]].
+
+    draft_id is prefixed "<SET>:" per shard before concatenation (see
+    concat_datasets) so the crc32 split (mtga.models.draftnet.split_by_draft)
+    stays globally unique even if two sets' 17Lands draft_ids ever collided
+    as raw strings -- mirrors mtga.winprob.data.load_many's identical fix.
+    """
+
+    F: np.ndarray                # float32 [n_names, 391], shared
+    hand_rows: np.ndarray        # int32 [N, 7]
+    extras: np.ndarray           # float32 [N, len(EXTRA_COLUMNS)]
+    won: np.ndarray
+    kept: np.ndarray
+    on_play: np.ndarray
+    hand_size: np.ndarray
+    num_mulligans: np.ndarray
+    draft_id: pd.Series
+    game_seq: np.ndarray
+    set_code: np.ndarray          # object [N], per-row source set
+    set_index: np.ndarray         # int32 [N], index into the *_by_set lists
+    set_names: list               # set_names[set_index[row]] == set_code[row]
+    deck_counts_by_set: list       # int8 [G_s, C_s] per set
+    F_deck_by_set: list             # float32 [C_s, 391] per set
+    deck_size_by_set: list          # float32 [G_s] per set
+    game_pos: np.ndarray           # int32 [N], row of deck_counts_by_set[set_index]
+
+    @property
+    def n_rows(self):
+        return len(self.won)
+
+    @property
+    def input_dim(self):
+        return 3 * self.F.shape[1] + self.extras.shape[1]
+
+    def deck_mean(self, idx):
+        """Count-weighted deck mean-pool for a row-index batch, grouped by
+        source set (each set's deck_counts/F_deck are a different shape)."""
+        idx = np.asarray(idx)
+        out = np.empty((len(idx), self.F.shape[1]), dtype=np.float32)
+        set_here = self.set_index[idx]
+        for s in np.unique(set_here):
+            sel = set_here == s
+            pos = self.game_pos[idx[sel]]
+            counts = self.deck_counts_by_set[s][pos].astype(np.float32)
+            out[sel] = (counts @ self.F_deck_by_set[s]
+                       / self.deck_size_by_set[s][pos][:, None])
+        return out
+
+
+def concat_datasets(shards):
+    """Concatenate per-set MulliganData shards into one MultiSetMulliganData.
+
+    shards must share the identical F (all loaded from the one global
+    cardfeats matrix, e.g. via load_datasets or load_dataset(..., F=...)).
+    """
+    if not shards:
+        raise ValueError("concat_datasets needs at least one shard")
+    F = shards[0].F
+    for shard in shards[1:]:
+        if shard.F is not F and not np.array_equal(shard.F, F):
+            raise ValueError(
+                "concat_datasets: shards must share one global card matrix "
+                "(pass F= from a single load_card_matrix() call)")
+
+    set_names = [str(shard.set_code[0]) for shard in shards]
+    set_index = np.concatenate([
+        np.full(shard.n_rows, i, dtype=np.int32)
+        for i, shard in enumerate(shards)])
+
+    return MultiSetMulliganData(
+        F=F,
+        hand_rows=np.concatenate([s.hand_rows for s in shards], axis=0),
+        extras=np.concatenate([s.extras for s in shards], axis=0),
+        won=np.concatenate([s.won for s in shards]),
+        kept=np.concatenate([s.kept for s in shards]),
+        on_play=np.concatenate([s.on_play for s in shards]),
+        hand_size=np.concatenate([s.hand_size for s in shards]),
+        num_mulligans=np.concatenate([s.num_mulligans for s in shards]),
+        # Prefixed with each shard's set code before concatenation so the
+        # crc32 split (mtga.models.draftnet.split_by_draft) stays globally
+        # unique even if two sets' 17Lands draft_ids ever collided as raw
+        # strings (mirrors mtga.winprob.data.load_many's identical fix).
+        draft_id=pd.concat(
+            [set_names[i] + ":" + s.draft_id.astype(str)
+             for i, s in enumerate(shards)], ignore_index=True),
+        game_seq=np.concatenate([s.game_seq for s in shards]),
+        set_code=np.concatenate([s.set_code for s in shards]),
+        set_index=set_index,
+        set_names=set_names,
+        deck_counts_by_set=[s.deck_counts for s in shards],
+        F_deck_by_set=[s.F_deck for s in shards],
+        deck_size_by_set=[s.deck_size for s in shards],
+        game_pos=np.concatenate([s.game_pos for s in shards]),
+    )
+
+
+def load_datasets(set_codes, limited_type):
+    """replay_mull/replay_turns of MULTIPLE sets -> one MultiSetMulliganData.
+
+    The v2 (cross-set) counterpart of load_dataset: loads the shared global
+    card matrix once, then each set's decisions/deck arrays, and concatenates
+    them (see MultiSetMulliganData / module docstring for why the deck
+    arrays stay per-set rather than one shared matrix).
+    """
+    F, row_by_norm = load_card_matrix()
+    lookup = arena_row_lookup(row_by_norm)
+    shards = [load_dataset(code, limited_type, F=F, row_by_norm=row_by_norm,
+                          lookup=lookup)
+              for code in set_codes]
+    return concat_datasets(shards)
 
 
 # ---------------------------------------------------------------------------
