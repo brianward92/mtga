@@ -67,7 +67,7 @@ def test_eval_only_and_excluded():
     assert corpus.EVAL_ONLY == {"MSH"}
     assert "MSH" not in corpus.CORPUS
     assert "MSH" not in corpus.TRAINING_SETS
-    assert set(corpus.EXCLUDED) == {"OM1", "Cube", "VOW.QuickDraft"}
+    assert set(corpus.EXCLUDED) == {"OM1", "Cube"}
     assert not set(corpus.EXCLUDED) & set(corpus.CORPUS)
 
 
@@ -105,3 +105,20 @@ def test_corpus_jobs_refuses_excluded_and_unknown():
         corpus.corpus_jobs(["OM1"])
     with pytest.raises(ValueError, match="not in the training-corpus registry"):
         corpus.corpus_jobs(["KHM"])  # no draft data exists for KHM
+
+
+def test_extras_never_leak_into_corpus_jobs():
+    assert set(corpus.EXTRAS) == {"VOW.QuickDraft"}
+    jobs = corpus.corpus_jobs()
+    assert ("VOW", "QuickDraft") not in jobs
+    assert not any(s in corpus.EXTRAS for s, _ in jobs)
+
+
+def test_extras_jobs_expands_and_narrows():
+    assert corpus.extras_jobs() == [("VOW", "QuickDraft")]
+    assert corpus.extras_jobs(["VOW.QuickDraft"]) == [("VOW", "QuickDraft")]
+
+
+def test_extras_jobs_refuses_unknown():
+    with pytest.raises(ValueError, match="not a registered extra"):
+        corpus.extras_jobs(["VOW.PremierDraft"])

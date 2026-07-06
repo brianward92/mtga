@@ -4,6 +4,7 @@
   train_draftfm.py --name f_dev --holdout BRO,TMT,SOS
   train_draftfm.py --name s1 --sets NEO
   train_draftfm.py --name a_notext --holdout BRO,TMT,SOS --no-text
+  train_draftfm.py --name a_extras --holdout BRO,TMT,SOS --extras VOW.QuickDraft
 """
 
 import argparse
@@ -17,6 +18,10 @@ def create_parser():
     parser.add_argument("--name", required=True)
     parser.add_argument("--sets", default=None,
                         help="comma set codes (default: full training corpus)")
+    parser.add_argument("--extras", default="",
+                        help="comma-separated corpus.EXTRAS keys to append "
+                             "(opt-in ablation, e.g. VOW.QuickDraft; never "
+                             "included by default)")
     parser.add_argument("--holdout", default="",
                         help="comma set codes excluded from training")
     parser.add_argument("--seed", type=int, default=17)
@@ -50,6 +55,9 @@ def main():
         pairs = corpus.corpus_jobs(requested)
     else:
         pairs = corpus.corpus_jobs(None)
+    if args.extras:
+        extra_keys = [e.strip() for e in args.extras.split(",") if e.strip()]
+        pairs += corpus.extras_jobs(extra_keys)
     holdout = {s.strip().upper() for s in args.holdout.split(",") if s.strip()}
     pairs = [(s, f) for s, f in pairs if s not in holdout]
 

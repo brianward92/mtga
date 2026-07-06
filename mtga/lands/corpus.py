@@ -31,7 +31,7 @@ CORPUS = {  # release order — this ordering IS the scaling-curve ordering
     "STX": SetSpec("STX", ("PremierDraft", "TradDraft"), "match_buckets", tar_in_gzip=True, p1p1_missing=True, picks_per_pack=15, bonus_sheets=("STA",)),
     "AFR": SetSpec("AFR", ("PremierDraft",), "match_buckets", tar_in_gzip=True, p1p1_missing=True),
     "MID": SetSpec("MID", ("PremierDraft",), "match_buckets_rank", tar_in_gzip=True),
-    "VOW": SetSpec("VOW", ("PremierDraft",), "match_buckets_rank", tar_in_gzip=True),  # QuickDraft file EXCLUDED (bot pods)
+    "VOW": SetSpec("VOW", ("PremierDraft",), "match_buckets_rank", tar_in_gzip=True),  # QuickDraft is opt-in only, see EXTRAS
     "NEO": SetSpec("NEO", ("PremierDraft", "TradDraft"), "modern"),
     "SNC": SetSpec("SNC", ("PremierDraft", "TradDraft"), "modern"),
     "HBG": SetSpec("HBG", ("PremierDraft", "TradDraft"), "modern", notes="Alchemy/digital-only; 5 'A-' names; needs digital Scryfall rows"),
@@ -64,10 +64,20 @@ CORPUS = {  # release order — this ordering IS the scaling-curve ordering
 EXCLUDED = {  # never downloaded/curated for training
     "OM1": "PickTwo format: 2 picks/row, pool_ cols undercount, 153/232 names not on Scryfall",
     "Cube": "curated 545-card singleton pool, no expansion, P1P1 missing",
-    "VOW.QuickDraft": "human picks in bot pods; off-distribution wheel dynamics",
 }
 
 EVAL_ONLY = {"MSH"}  # hard gate: never trained on, never expanded by --corpus
+
+# Opt-in-only ablation members (A-extras, protocol §4.1): never expanded by
+# --corpus or corpus_jobs(); must be requested explicitly via --extras /
+# extras_jobs(), so they can never silently leak into the default corpus.
+EXTRAS = {
+    "VOW.QuickDraft": SetSpec(
+        "VOW", ("QuickDraft",), "match_buckets_rank", tar_in_gzip=True,
+        notes="human picks in bot pods; off-distribution wheel dynamics vs "
+              "PremierDraft. A-extras candidate only, never in TRAINING_SETS.",
+    ),
+}
 
 TRAINING_SETS = list(CORPUS)  # 31 sets, 59 (set, format) shards
 
@@ -97,4 +107,20 @@ def corpus_jobs(requested=None):
             reason = excluded.get(code, "not in the training-corpus registry")
             raise ValueError(f"{code} is not a training set ({reason})")
         pairs.extend((code, fmt) for fmt in CORPUS[code].formats)
+    return pairs
+
+
+def extras_jobs(requested=None):
+    """(set_code, format) pairs for opt-in ablation extras (protocol §4.1).
+
+    Never reachable through corpus_jobs/--corpus. `requested` narrows to a
+    subset of EXTRAS keys (default: all of them); unknown keys refuse loudly.
+    """
+    keys = list(EXTRAS) if requested is None else [k.strip() for k in requested]
+    pairs = []
+    for key in keys:
+        if key not in EXTRAS:
+            raise ValueError(f"{key} is not a registered extra (know: {sorted(EXTRAS)})")
+        spec = EXTRAS[key]
+        pairs.extend((spec.code, fmt) for fmt in spec.formats)
     return pairs

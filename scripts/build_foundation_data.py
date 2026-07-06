@@ -19,6 +19,10 @@ from mtga.lands import corpus, names, paths
 def create_parser():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sets", default=None, help="comma list; default corpus")
+    parser.add_argument("--extras", default="",
+                         help="comma-separated corpus.EXTRAS keys to append "
+                              "(opt-in ablation shards, e.g. VOW.QuickDraft; "
+                              "never included by default)")
     parser.add_argument("--force", action="store_true")
     return parser
 
@@ -66,6 +70,9 @@ def main():
         pairs = corpus.corpus_jobs(requested)
     else:
         pairs = corpus.corpus_jobs(None)
+    if args.extras:
+        extra_keys = [e.strip() for e in args.extras.split(",") if e.strip()]
+        pairs += corpus.extras_jobs(extra_keys)
 
     manifest, table_for = load_feature_lookup()
     for set_code, fmt in pairs:
