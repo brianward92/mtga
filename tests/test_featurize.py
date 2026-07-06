@@ -329,6 +329,22 @@ def test_front_face_name_matches(hand_universe):
     assert prov[0]["match"] == "full"
 
 
+def test_back_face_name_matches(hand_universe):
+    """Some 17Lands rows (e.g. LCI's back-face bonus-sheet lands) reference
+    a transform card by its BACK face name alone -- back_map is the
+    front_map fallback's mirror image for exactly that case."""
+    frame, prov = featurized(hand_universe, ["Night Terror"])
+    assert prov[0]["match"] == "back"
+    # Resolves to the SAME combined-name row as the front-face query, and
+    # still extracts front-face fields (the featurizer's own invariant) --
+    # querying by the back-face name must not leak back-face numerics in.
+    front_frame, _ = featurized(hand_universe, ["Moon Howler"])
+    row = frame.loc["Night Terror"]
+    front_row = front_frame.loc["Moon Howler"]
+    assert row["cmc_is_2"] == front_row["cmc_is_2"] == 1.0
+    assert row["power_scaled"] == front_row["power_scaled"]
+
+
 # ---------------------------------------------------------------------------
 # scripts/build_card_features.py end-to-end on the synthetic universe.
 

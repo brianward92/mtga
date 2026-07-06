@@ -188,6 +188,11 @@ def _front_face(full_name):
     return full_name.split(" // ")[0]
 
 
+def _back_face(full_name):
+    parts = full_name.split(" // ")
+    return parts[1] if len(parts) > 1 else None
+
+
 def resolve_names(query_names, cards=None, faces=None,
                   prefer_sets_by_name=None):
     """Join 17Lands names to one Scryfall printing each.
@@ -195,6 +200,9 @@ def resolve_names(query_names, cards=None, faces=None,
     Returns a list of records aligned with query_names:
       {name, name_norm, card: row-dict, faces: [face-dicts], match,
        in_expansion}.
+    Some transform/MDFC bonus-sheet cards (e.g. LCI's back-face lands) are
+    referenced by 17Lands under their BACK face name alone -- back_map is
+    the front_map fallback's mirror image for exactly that case.
     Raises UnmatchedNamesError listing every name with no candidate row.
     """
     if cards is None or faces is None:
@@ -202,13 +210,17 @@ def resolve_names(query_names, cards=None, faces=None,
     prefer_sets_by_name = prefer_sets_by_name or {}
 
     rows = cards.to_dict("records")
-    full_map, front_map = {}, {}
+    full_map, front_map, back_map = {}, {}, {}
     for i, row in enumerate(rows):
-        full = names.norm(_s(row["name"]))
+        full_name = _s(row["name"])
+        full = names.norm(full_name)
         full_map.setdefault(full, []).append(i)
-        front = names.norm(_front_face(_s(row["name"])))
+        front = names.norm(_front_face(full_name))
         if front != full:
             front_map.setdefault(front, []).append(i)
+        back_name = _back_face(full_name)
+        if back_name is not None:
+            back_map.setdefault(names.norm(back_name), []).append(i)
 
     faces_by_card = {}
     if len(faces):
@@ -223,6 +235,9 @@ def resolve_names(query_names, cards=None, faces=None,
         if not candidates:
             match = "front"
             candidates = front_map.get(key)
+        if not candidates:
+            match = "back"
+            candidates = back_map.get(key)
         if not candidates:
             unmatched.append(query)
             continue
