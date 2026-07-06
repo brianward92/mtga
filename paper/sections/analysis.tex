@@ -33,6 +33,25 @@ initialization, though the close margins between it and the neighboring
 recipe-search variants (54.2--54.8 dev-mean, Table~\ref{tab:ablations})
 mean the full ranking has not been seed-checked.
 
+\paragraph{The flexibility-clause extras.} % run=20260705_220253_a_extras:
+% BRO 0.4888 (CI 0.4878-0.4898), TMT 0.5758 (CI 0.5739-0.5776), SOS 0.5601
+% (CI 0.5592-0.5611), dev-mean 0.5416, vs. A-noctx's 50.0/57.7/56.6/54.8.
+The protocol's flexibility clause (\S\ref{sec:protocol}) admits VOW
+QuickDraft and the Powered Cube into F-full's training data only if a
+dev-trio ablation shows a gain over A-noctx. A-noctx plus VOW QuickDraft
+(same recipe and holdout, one shard added) scores 48.9/57.6/56.0, dev-mean
+54.2 -- lower than A-noctx's 50.0/57.7/56.6/54.8 on all three dev sets, most
+of that gap (BRO, $-$1.1pp) well outside the per-cell CI half-widths in
+Table~\ref{tab:ablations}'s caption. The clause's own rule therefore
+excludes it: F-full's frozen recipe (\S\ref{sec:arch}) does not train on VOW
+QuickDraft. The Powered Cube half of the clause was not tested at all --
+bulk per-pick data for it is not available through the public
+\seventeenlands{} pipeline this paper otherwise relies on exclusively, and
+acquiring it by another route was out of scope. Both extras are therefore
+absent from F-full's training data: one by a pre-registered failed
+ablation, the other by an unmet data precondition, and the frozen recipe
+is exactly the 31-set corpus described in \S\ref{sec:data}.
+
 \paragraph{The licensed-IP shift.}
 MSH's names and flavor come from a comic universe, not from \mtg{}. Its
 text lives in the sentence encoder's pretraining as a different genre.
