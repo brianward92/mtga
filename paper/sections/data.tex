@@ -14,19 +14,23 @@ Files were fetched once from the public S3 bucket, per the
 sha256 and ETag in a data manifest (content hash
 \texttt{\DataManifestHash}); the manifest is released with the paper.
 
-Three public files are excluded for structural reasons, recorded in the
-corpus registry: OM1 (a pick-two format whose rows carry two picks and
-whose pool columns undercount them, and whose digital-only cards largely do
-not exist on Scryfall), the Powered Cube (a curated 545-card singleton pool
-with no expansion structure), and the VOW QuickDraft file (human picks
-inside bot pods, off-distribution pack dynamics). Everything else is kept,
-including digital-only and remaster sets.
+Two public files are structurally excluded from the corpus, recorded in the
+corpus registry: OM1 (a pick-two format whose rows carry two picks and whose
+pool columns undercount them, and whose digital-only cards largely do not
+exist on Scryfall) and the Powered Cube (a curated 545-card singleton pool
+with no expansion structure). A third, the VOW QuickDraft file (human picks
+inside bot pods, off-distribution pack dynamics), is held out of the
+default corpus for a distributional reason rather than a structural one: it
+is one of the two pre-registered flexibility-clause extras
+(\S\ref{sec:protocol}) that may join F-full's training data if a dev-trio
+ablation shows a gain. Everything else is kept, including digital-only and
+remaster sets.
 
 \paragraph{Normalization.}
 The corpus spans three schema eras and several quirks, all normalised at
 ETL time: the 2021 files are gzipped tarballs rather than plain gzipped
 CSVs, and the oldest era reports match-based rather than game-based skill
-buckets (harmonised; identical in best-of-one). Six sets are missing the
+buckets (harmonised; identical in best-of-one). Five sets are missing the
 first pick of each draft in the source logs (an annotation, not an
 exclusion), and packs are 13, 14, or 15 picks depending on the set (a model
 input, \S\ref{sec:method}). Card names are joined to Scryfall by
@@ -44,10 +48,13 @@ $\geq 100$, the same filter the per-set ceiling models train and evaluate
 on, so ceiling comparisons are population-matched.
 
 \paragraph{The held-out sets.}
-Four sets never contribute a pick to training. BRO, TMT, and SOS are the
-development trio (\S\ref{sec:protocol}): all model selection keys on
-zero-shot accuracy over these three. MSH, the test set, is stricter: a
-registry-level gate (\texttt{EVAL\_ONLY}) makes every training and
+Four sets never contribute a pick to model selection. BRO, TMT, and SOS are
+the development trio (\S\ref{sec:protocol}): all model selection keys on
+zero-shot accuracy over these three, computed from \emph{F-dev}, which
+trains on none of them. Once selection is frozen, the headline model
+(\emph{F-full}) retrains on all 31 sets, dev trio included: only MSH stays
+unseen by every model in the battery. MSH, the test set, is stricter still:
+a registry-level gate (\texttt{EVAL\_ONLY}) makes every training and
 feature-fitting code path refuse MSH pick data outright, and at the
 protocol freeze its public data did not yet exist. MSH \emph{card} features
 from Scryfall are permitted. That is the zero-shot

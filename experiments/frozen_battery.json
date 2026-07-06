@@ -1,6 +1,7 @@
 {
   "protocol_tag": "eval-protocol-v1",
-  "_comment": "Pre-registered battery (docs/eval_protocol.md section 4). Freeze artifact-backed members with their file sha256 (path points at the artifact FILE, e.g. runs/<id>/best.pt) BEFORE the T0 snapshot download; frozen_snapshot is filled at T0 with the raw MSH csv.gz path, sha256, and S3 ETag. run_frozen_eval.py refuses real mode while any of these are null.",
+  "_comment": "Pre-registered battery (docs/eval_protocol.md section 4). Freeze artifact-backed members with their file sha256 (path points at the artifact FILE, e.g. runs/<id>/best.pt) BEFORE the T0 snapshot download; frozen_snapshot is filled at T0 with the raw MSH csv.gz path, sha256, and S3 ETag. run_frozen_eval.py refuses real mode while any of these are null. Paths are absolute on n42 (torch training box, where these checkpoints live and where run_frozen_eval.py must run to call load_checkpoint). draftfm members carry condition={wr_id:33, games_id:6} for deployment-mode scoring (matches scripts/export_draftfm.py's serving default, ~0.66 win rate / 1000-games bucket); member_frames also always computes 'human' mode (no override) for the same member.",
+  "_pending": "A-noUB (LTR/FIN/TLA removed) is still training (mbp screen noubqueue) -- append it here once done, before the T0 snapshot download. Post-day-1 rows (per-set MSH ceiling, F-full fine-tuned on MSH) are pre-registered in docs/eval_protocol.md section 4.6 but their artifacts don't exist yet by design (trained only after this zero-shot battery runs against the frozen MSH snapshot) -- they get appended in a follow-up commit, never added or iterated before T0.",
   "frozen_snapshot": {
     "path": null,
     "sha256": null,
@@ -14,6 +15,123 @@
     {
       "name": "baseline-rarity",
       "kind": "baseline-rarity"
+    },
+    {
+      "name": "f-full",
+      "kind": "draftfm",
+      "run": "20260705_110743_f_full",
+      "path": "/Users/brianward/dat/mtga/foundation/runs/20260705_110743_f_full/best.pt",
+      "sha256": "61f87c1a0f84daa1baf254f1386deb819edd59d7f175aa3621a9cb620eee6167",
+      "condition": {"wr_id": 33, "games_id": 6},
+      "_note": "headline model: final recipe (set_ctx=False, winning ablation), all 31 sets, no dev holdout. Its own dev numbers are meaningless and never quoted."
+    },
+    {
+      "name": "f-dev",
+      "kind": "draftfm",
+      "run": "20260704_135822_f_dev",
+      "path": "/Users/brianward/dat/mtga/foundation/runs/20260704_135822_f_dev/best.pt",
+      "sha256": "c10e93e6e5022c217d03f41ba3f0e5975a2d460b96b59337d33ac422a314741d",
+      "condition": {"wr_id": 33, "games_id": 6},
+      "_note": "universe minus dev trio (BRO/TMT/SOS); doubles as scaling rung S27 (F-dev universe)."
+    },
+    {
+      "name": "s1",
+      "kind": "draftfm",
+      "run": "20260704_154741_s1",
+      "path": "/Users/brianward/dat/mtga/foundation/runs/20260704_154741_s1/best.pt",
+      "sha256": "8b2b8cdf737fc5863e951563ddc11630b4c2b9ad78d8180fc225ee15cc261448",
+      "condition": {"wr_id": 33, "games_id": 6},
+      "_note": "scaling rung S1={NEO} (Bertram anchor)."
+    },
+    {
+      "name": "s2",
+      "kind": "draftfm",
+      "run": "20260704_161450_s2",
+      "path": "/Users/brianward/dat/mtga/foundation/runs/20260704_161450_s2/best.pt",
+      "sha256": "0be4890dc410025f1873aadaf9b9ffc5d353c20f356c2819a7abbd1e280797e4",
+      "condition": {"wr_id": 33, "games_id": 6},
+      "_note": "scaling rung S2=S1+DSK."
+    },
+    {
+      "name": "s2b",
+      "kind": "draftfm",
+      "run": "20260704_171827_s2b",
+      "path": "/Users/brianward/dat/mtga/foundation/runs/20260704_171827_s2b/best.pt",
+      "sha256": "79e2f953788f97449e00a322f11e76c11f914a908ece60e7562a801d47231481",
+      "condition": {"wr_id": 33, "games_id": 6},
+      "_note": "scaling composition probe S2b={MOM,TDM}."
+    },
+    {
+      "name": "s4",
+      "kind": "draftfm",
+      "run": "20260704_175554_s4",
+      "path": "/Users/brianward/dat/mtga/foundation/runs/20260704_175554_s4/best.pt",
+      "sha256": "5b35bb209b3daaa03e4723e7d56e4ed2a222b89a130acba0da3622cf8f100068",
+      "condition": {"wr_id": 33, "games_id": 6},
+      "_note": "scaling rung S4=S2+DMU,FIN."
+    },
+    {
+      "name": "s4b",
+      "kind": "draftfm",
+      "run": "20260704_191659_s4b",
+      "path": "/Users/brianward/dat/mtga/foundation/runs/20260704_191659_s4b/best.pt",
+      "sha256": "2382932cb470ff98d575e37a6ebd9963bf83355261ebdd56520ade4ad1aeb176",
+      "condition": {"wr_id": 33, "games_id": 6},
+      "_note": "scaling composition probe S4b={STX,SNC,OTJ,TLA}."
+    },
+    {
+      "name": "s8",
+      "kind": "draftfm",
+      "run": "20260704_202620_s8",
+      "path": "/Users/brianward/dat/mtga/foundation/runs/20260704_202620_s8/best.pt",
+      "sha256": "ef23bff70621a8278d1dbeb9387fa90ec6656bcc3dcf22c4e969b1f3df416d1a",
+      "condition": {"wr_id": 33, "games_id": 6},
+      "_note": "scaling rung S8=S4+STX,MOM,BLB,TLA."
+    },
+    {
+      "name": "s16",
+      "kind": "draftfm",
+      "run": "20260704_213310_s16",
+      "path": "/Users/brianward/dat/mtga/foundation/runs/20260704_213310_s16/best.pt",
+      "sha256": "87c9e3e9ea36281c5c8e5cf582ac513fc24f7a942740442b45bffa67a89ff2e4",
+      "condition": {"wr_id": 33, "games_id": 6},
+      "_note": "scaling rung S16=S8+AFR,SNC,ONE,LTR,WOE,MKM,OTJ,EOE."
+    },
+    {
+      "name": "a-notext",
+      "kind": "draftfm",
+      "run": "20260704_135710_a_notext",
+      "path": "/Users/brianward/dat/mtga/foundation/runs/20260704_135710_a_notext/best.pt",
+      "sha256": "824623d0aed62f8f1d039d8d195cfcd3db7a86f4da7ca06bc2d123dd32e50861",
+      "condition": {"wr_id": 33, "games_id": 6},
+      "_note": "ablation: no oracle-text embedding (structured 391-d only). Pre-registered for the UB-shift analysis."
+    },
+    {
+      "name": "a-noctx",
+      "kind": "draftfm",
+      "run": "20260704_160422_a_noctx",
+      "path": "/Users/brianward/dat/mtga/foundation/runs/20260704_160422_a_noctx/best.pt",
+      "sha256": "d3eb5e65b7a6b2446877c18c741138e0122c6cd1fef1543c4d557a8b419ea804",
+      "condition": {"wr_id": 33, "games_id": 6},
+      "_note": "ablation: set_ctx=False (no set-context cross-attention). Won the dev-trio ablation sweep; this recipe is what F-full and F-dev actually use."
+    },
+    {
+      "name": "a-proportional",
+      "kind": "draftfm",
+      "run": "20260704_201946_a_proportional",
+      "path": "/Users/brianward/dat/mtga/foundation/runs/20260704_201946_a_proportional/best.pt",
+      "sha256": "5463d3c9262148cc2127ae1d1e60716bc7a36f251c71dd2a4115dd873a038658",
+      "condition": {"wr_id": 33, "games_id": 6},
+      "_note": "ablation: proportional (not sqrt) per-set sampling."
+    },
+    {
+      "name": "a-topfilter",
+      "kind": "draftfm",
+      "run": "20260705_030215_a_topfilter",
+      "path": "/Users/brianward/dat/mtga/foundation/runs/20260705_030215_a_topfilter/best.pt",
+      "sha256": "f0240ba209eda57094b8c3afafd982fd1280afac3542b9bcc350c77b34449fd8",
+      "condition": {"wr_id": 33, "games_id": 6},
+      "_note": "ablation: train on expert (top-skill) picks only, no skill conditioning."
     }
   ]
 }

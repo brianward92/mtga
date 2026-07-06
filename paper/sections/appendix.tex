@@ -37,28 +37,13 @@ classes; we gate on CPU parity and skip non-finite steps
 \section{Reproducibility}
 \label{sec:repro}
 
-Every training and evaluation run appends one record to an append-only
-ledger: run id, git sha, protocol tag, seed, framework version, full
-config, data-manifest hash, wall clock, throughput, artifact sha256s, and
-dev metrics. Every table cell in this paper carries its source run id as
-a comment in the generated table file; tables and the scaling figure are
-emitted by a script from run records and cached evaluation outputs, and
-the prose reads numbers from generated macros, so no result number in
-this document is typed by hand.
-
-Frozen identifiers: protocol tag \texttt{\ProtocolTag}; data-manifest
-content hash \texttt{\DataManifestHash}; featurizer-manifest content hash
-\texttt{\FeaturizerHash}; F-dev run \texttt{\FdevRunId}. The MSH snapshot
-sha256 and ETag are recorded at freeze time and reported here:
-\pending{MSH snapshot sha256, ETag, download timestamp, gate report}.
-
-Released with the paper: training and evaluation code, the frozen
-protocol document and metric implementations, data and featurizer
-manifests, model weights for every battery member, and the per-pick
-prediction files from which every statistic is computed (archived on
-Zenodo). Raw \seventeenlands{} bytes for the test snapshot are deposited
-only after a courtesy note to \seventeenlands{}; all other inputs are
-re-derivable from public sources via the manifests.
+Every result in this paper traces to a run id in an append-only ledger,
+and every table cell and prose number is emitted by a script from that
+ledger and cached evaluation outputs -- no result number here is typed
+by hand. The ledger schema, frozen identifiers (protocol tag, manifest
+hashes), release contents, and script-level pointers for reproducing any
+specific number are in the companion implementation reference, not
+repeated here.
 
 \section{Licensing and attribution}
 \label{sec:licensing}
@@ -73,24 +58,23 @@ Card metadata is from Scryfall \citep{scryfall}, used per its API
 guidelines; Scryfall neither produces nor endorses this work.
 
 \paragraph{Card images.}
-Figures~\ref{fig:teaser}, \ref{fig:bro-tierlist}, and \ref{fig:closecall}
-reproduce official Scryfall card scans \citep{scryfall}, fetched directly
-from Scryfall's own hosted image URLs by
-\texttt{figures/fetch\_example\_cards.py} (released with the paper, along
-with the cached images and their source manifest). Scryfall's stated
-policy on card images (``Use of Scryfall Data and Images,''
-\url{https://scryfall.com/docs/api}) permits this use, subject to rules we
-follow throughout: every image is shown full and unmodified, with no
-cropping, distorting, blurring, sharpening, desaturating, color-shifting,
-or watermarking of the card art itself. Any score or label in a
-figure sits beside the image, never on top of it. Because the full card
-image is always used (never an art crop), the copyright and artist line
-Scryfall prints at the bottom of the card remains visible in every
-figure, and nothing here implies that Wizards of the Coast produced or
-endorses this work. The cards illustrated are drawn from BRO and SOS,
-both public, released development sets (\S\ref{sec:data}), never from
-MSH, which remains untouched until the frozen evaluation of
-\S\ref{sec:protocol}.
+Figures~\ref{fig:teaser}, \ref{fig:bro-tierlist}, \ref{fig:closecall},
+\ref{fig:tmt-tierlist}, and \ref{fig:gallery} reproduce official Scryfall
+card scans \citep{scryfall}, fetched directly from Scryfall's own hosted
+image URLs (fetch script and source manifest released with the
+companion reference). Scryfall's stated policy on card images (``Use of
+Scryfall Data and Images,'' \url{https://scryfall.com/docs/api}) permits
+this use, subject to rules we follow throughout: every image is shown
+full and unmodified, with no cropping, distorting, blurring, sharpening,
+desaturating, color-shifting, or watermarking of the card art itself.
+Any score or label in a figure sits beside the image, never on top of
+it. Because the full card image is always used (never an art crop), the
+copyright and artist line Scryfall prints at the bottom of the card
+remains visible in every figure, and nothing here implies that Wizards
+of the Coast produced or endorses this work. The cards illustrated are
+drawn from BRO, SOS, TMT, LTR, LCI, and DMU -- all public, released
+sets (\S\ref{sec:data}) -- never from MSH, which remains untouched until
+the frozen evaluation of \S\ref{sec:protocol}.
 
 \paragraph{Wizards of the Coast intellectual property.}
 Portions of the materials used, including all card names, text, and art

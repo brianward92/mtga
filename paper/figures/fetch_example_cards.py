@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """Fetch real, unmodified Scryfall card images for the paper's illustrative
-"verdict panel" figures (§2 teaser, §4.2, §6, §7).
+"verdict panel" figures (§2 teaser, §4.2, §6, §7) plus the additional
+per-set examples (TMT, and the F-full-served LTR/LCI/DMU gallery).
 
 These figures show the deployed pick-scoring interface next to the actual
-card it is scoring. Every card here is drawn from a development set (BRO or
-SOS) that is public and legally inspectable -- never from MSH, which stays
-untouched until the frozen evaluation (paper/sections/protocol.tex).
+card it is scoring. Every card here is drawn from a released, public set
+that is legally inspectable -- BRO, SOS, TMT (dev-trio sets), and LTR, LCI,
+DMU (training-corpus sets served zero-shot by F-full, never their own
+per-set model) -- never from MSH, which stays untouched until the frozen
+evaluation (paper/sections/protocol.tex).
 
 Usage:
     python3 figures/fetch_example_cards.py
@@ -38,13 +41,16 @@ SCRYFALL_HEADERS = {
 REQUEST_DELAY_S = 0.15
 
 # (slug, exact card name, set code) -- set code disambiguates cards that have
-# been printed more than once. All four are dev-set cards (BRO or SOS),
-# never MSH.
+# been printed more than once. Never MSH.
 CARDS = [
     ("emeritus-of-ideation", "Emeritus of Ideation", "sos"),
     ("steel-seraph", "Steel Seraph", "bro"),
     ("sundering-archaic", "Sundering Archaic", "sos"),
     ("flow-state", "Flow State", "sos"),
+    ("april-oneil-hacktivist", "April O'Neil, Hacktivist", "tmt"),
+    ("anduril-flame-of-the-west", "Andúril, Flame of the West", "ltr"),
+    ("bonehoard-dracosaur", "Bonehoard Dracosaur", "lci"),
+    ("sheoldred-the-apocalypse", "Sheoldred, the Apocalypse", "dmu"),
 ]
 
 

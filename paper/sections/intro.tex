@@ -4,7 +4,7 @@
 Drafting in \mtg{} is a sequential game of imperfect information: eight
 players pass packs of cards, each privately assembling a deck one pick at a
 time. Strong pick models exist. Supervised models trained on human draft
-logs reach 67--71\% agreement with expert picks within a
+logs reach 48.7--71\% agreement with expert picks within a
 set~\citep{ward2021drafting,czerner2025puder,brooks2024statistical}, but
 they are set-specific. Each model encodes cards as vocabulary indices,
 learns from picks made in that set, and transfers nowhere. Because public
@@ -18,9 +18,9 @@ trained across every public \seventeenlands{} draft set, in which a card is
 nothing but a frozen vector of public information: structured features
 parsed from its Scryfall record and a sentence embedding of its rules text.
 The model has no set-identity parameters and no per-card weights. Whatever
-it knows about a set it must infer from the set's card list and from the
-drafter's accumulating pool. That inference transfers to a set released
-tomorrow; a memorized card vocabulary cannot.
+it knows about a set it must infer from the cards in the pack and the
+drafter's accumulating pool, not from a memorized identity. That inference
+transfers to a set released tomorrow; a memorized card vocabulary cannot.
 
 The evaluation is designed against a failure mode endemic to this setting:
 a ``zero-shot'' number quietly tuned on its own test set. Our protocol
@@ -38,10 +38,10 @@ Zero-shot on the development trio, DraftFM agrees with expert picks
 \FdevDevMean\% of the time (\FdevBro\% / \FdevTmt\% / \FdevSos\% on
 BRO / TMT / SOS): \RatioDevMean\% of what per-set models trained on each
 target achieve, and above every published number attainable on release day
-(expert-tuned ratings 44.5\%~\citep{ward2021drafting},
-GPT-4o 43\%~\citep{bertram2025urzagpt}, an hour-zero rarity heuristic
-\BaseRarity\%). On MSH the frozen evaluation gives \FfullMsh\% expert top-1
-agreement.
+(expert-tuned ratings 44.5\%~\citep{ward2021drafting}, an hour-zero rarity
+heuristic \BaseRarity\%) as well as zero-shot GPT-4o
+(43\%~\citep{bertram2025urzagpt}). On MSH the frozen evaluation gives
+\FfullMsh\% expert top-1 agreement.
 
 Contributions:
 \begin{itemize}
@@ -57,8 +57,8 @@ Contributions:
   training-set count from 1 to \FdevSets{} sets, with seed and
   set-composition variance (\S\ref{sec:results}).
   \item \textbf{A licensed-IP shift analysis.} Pre-registered ablations
-  isolating what text embeddings contribute when a set's names and flavor
-  come from a licensed universe rather than in-universe \mtg{}
+  designed to isolate what text embeddings contribute when a set's names
+  and flavor come from a licensed universe rather than in-universe \mtg{}
   (\S\ref{sec:analysis}).
   \item \textbf{Release.} Code, the frozen protocol, data manifests, model
   weights, and per-pick prediction files for every number in this paper

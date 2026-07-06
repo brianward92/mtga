@@ -57,6 +57,19 @@ def rank_by_name(cards):
     return {info["name"]: grp for grp, info in cards.items()}
 
 
+_LATEX_SPECIAL = str.maketrans({
+    "&": r"\&", "%": r"\%", "$": r"\$", "#": r"\#",
+    "_": r"\_", "{": r"\{", "}": r"\}",
+})
+
+
+def tex_escape(name):
+    """Card names go straight into \\newcommand macro bodies -- escape the
+    handful of LaTeX-special characters real card names actually contain
+    (e.g. "Don & Leo, Problem Solvers")."""
+    return name.translate(_LATEX_SPECIAL)
+
+
 def p1p1_percentile(table, ev):
     vals = sorted(v for v in table.values() if v is not None)
     below = sum(1 for v in vals if v < ev)
@@ -94,9 +107,9 @@ def hero_panel(lines):
         r"\newcommand{\VHeroPercentile}{%.1f}" % pct,
         r"\newcommand{\VHeroGih}{%s\%%}" % format_winrate(stats["gih_wr"]),
         r"\newcommand{\VHeroAlsa}{%.1f}" % stats["alsa"],
-        r"\newcommand{\VHeroRunnerOneName}{%s}" % cards[r1_grp]["name"],
+        r"\newcommand{\VHeroRunnerOneName}{%s}" % tex_escape(cards[r1_grp]["name"]),
         r"\newcommand{\VHeroRunnerOnePct}{%s}" % format_pct(runner1_vs_top),
-        r"\newcommand{\VHeroRunnerTwoName}{%s}" % cards[r2_grp]["name"],
+        r"\newcommand{\VHeroRunnerTwoName}{%s}" % tex_escape(cards[r2_grp]["name"]),
         r"\newcommand{\VHeroRunnerTwoPct}{%s}" % format_pct(runner2_vs_runner1),
         r"\newcommand{\VHeroModelVersion}{%s}"
         % model.model_id.split("/")[-1],
@@ -123,9 +136,9 @@ def bro_tierlist_panel(lines):
     lines += [
         r"\newcommand{\VBroEv}{%s}" % format_ev(top_ev),
         r"\newcommand{\VBroPercentile}{%.1f}" % top_pct,
-        r"\newcommand{\VBroRunnerOneName}{%s}" % runner_names[0],
+        r"\newcommand{\VBroRunnerOneName}{%s}" % tex_escape(runner_names[0]),
         r"\newcommand{\VBroRunnerOnePercentile}{%.1f}" % runner_pcts[0],
-        r"\newcommand{\VBroRunnerTwoName}{%s}" % runner_names[1],
+        r"\newcommand{\VBroRunnerTwoName}{%s}" % tex_escape(runner_names[1]),
         r"\newcommand{\VBroRunnerTwoPercentile}{%.1f}" % runner_pcts[1],
         r"\newcommand{\VBroModelVersion}{%s}" % model.model_id.split("/")[-1],
     ]
@@ -156,13 +169,13 @@ def close_call_panel(lines):
     runner_pct = round(sigmoid(c_ev - b_ev) * 100)
 
     lines += [
-        r"\newcommand{\VCCNameA}{%s}" % cards[a_grp]["name"],
-        r"\newcommand{\VCCNameB}{%s}" % cards[b_grp]["name"],
+        r"\newcommand{\VCCNameA}{%s}" % tex_escape(cards[a_grp]["name"]),
+        r"\newcommand{\VCCNameB}{%s}" % tex_escape(cards[b_grp]["name"]),
         r"\newcommand{\VCCEvA}{%s}" % format_ev(a_ev),
         r"\newcommand{\VCCEvB}{%s}" % format_ev(b_ev),
         r"\newcommand{\VCCSplitA}{%d}" % split_a,
         r"\newcommand{\VCCSplitB}{%d}" % split_b,
-        r"\newcommand{\VCCRunnerName}{%s}" % cards[c_grp]["name"],
+        r"\newcommand{\VCCRunnerName}{%s}" % tex_escape(cards[c_grp]["name"]),
         r"\newcommand{\VCCRunnerPct}{%d}" % runner_pct,
         r"\newcommand{\VCCModelVersion}{%s}" % model.model_id.split("/")[-1],
     ]
@@ -171,19 +184,93 @@ def close_call_panel(lines):
           f"runner={cards[c_grp]['name']}={c_ev:.3f} pct={runner_pct}")
 
 
+def tmt_tierlist_panel(lines):
+    """TMT whole-set P1P1 tier list, same treatment as bro_tierlist_panel --
+    TMT is a dev-trio set with its own deployed per-set model."""
+    model = registry.resolve("TMT", "PremierDraft")
+    cards = HUB.cards("TMT")
+    table = HUB.p1p1("TMT", "PremierDraft", model)
+    name_to_grp = rank_by_name(cards)
+
+    top_name = "April O'Neil, Hacktivist"
+    runner_names = ["Sally Pride, Lioness Leader", "Don & Leo, Problem Solvers"]
+
+    top_ev = table[name_to_grp[top_name]]
+    top_pct = p1p1_percentile(table, top_ev)
+    runner_pcts = [p1p1_percentile(table, table[name_to_grp[n]])
+                   for n in runner_names]
+
+    lines += [
+        r"\newcommand{\VTmtEv}{%s}" % format_ev(top_ev),
+        r"\newcommand{\VTmtPercentile}{%.1f}" % top_pct,
+        r"\newcommand{\VTmtRunnerOneName}{%s}" % tex_escape(runner_names[0]),
+        r"\newcommand{\VTmtRunnerOnePercentile}{%.1f}" % runner_pcts[0],
+        r"\newcommand{\VTmtRunnerTwoName}{%s}" % tex_escape(runner_names[1]),
+        r"\newcommand{\VTmtRunnerTwoPercentile}{%.1f}" % runner_pcts[1],
+        r"\newcommand{\VTmtModelVersion}{%s}" % model.model_id.split("/")[-1],
+    ]
+    print(f"tmt tier list: top={top_name} ev={top_ev:.3f} pct={top_pct:.1f} "
+          f"runners_pct={runner_pcts}")
+
+
+def gallery_panel(lines):
+    """Three sets F-full serves zero-shot in production today because they
+    have no dedicated per-set model (LTR, LCI, DMU -- all in F-full's
+    31-set training corpus, so this is the deployed system's real fallback
+    behaviour, not a zero-shot-accuracy claim; the paper's zero-shot
+    numbers are the dev-trio/MSH rows only)."""
+    picks = [
+        ("LTR", "ltr", "Andúril, Flame of the West",
+         ["Horn of Gondor", "Orcish Bowmasters"]),
+        ("LCI", "lci", "Bonehoard Dracosaur",
+         ["Aclazotz, Deepest Betrayal", "Temple of the Dead"]),
+        ("DMU", "dmu", "Sheoldred, the Apocalypse",
+         ["Sphinx of Clear Skies", "Archangel of Wrath"]),
+    ]
+    model_version = None
+    for set_code, macro_prefix, top_name, runner_names in picks:
+        model = registry.resolve(set_code, "PremierDraft")
+        model_version = model.model_id.split("/")[-1]
+        cards = HUB.cards(set_code)
+        table = HUB.p1p1(set_code, "PremierDraft", model)
+        name_to_grp = rank_by_name(cards)
+        top_ev = table[name_to_grp[top_name]]
+        top_pct = p1p1_percentile(table, top_ev)
+        runner_pcts = [p1p1_percentile(table, table[name_to_grp[n]])
+                       for n in runner_names]
+        cap = macro_prefix.capitalize()
+        lines += [
+            r"\newcommand{\VGal%sEv}{%s}" % (cap, format_ev(top_ev)),
+            r"\newcommand{\VGal%sPercentile}{%.1f}" % (cap, top_pct),
+            r"\newcommand{\VGal%sRunnerOneName}{%s}" % (cap, tex_escape(runner_names[0])),
+            r"\newcommand{\VGal%sRunnerOnePercentile}{%.1f}"
+            % (cap, runner_pcts[0]),
+            r"\newcommand{\VGal%sRunnerTwoName}{%s}" % (cap, tex_escape(runner_names[1])),
+            r"\newcommand{\VGal%sRunnerTwoPercentile}{%.1f}"
+            % (cap, runner_pcts[1]),
+        ]
+        print(f"gallery {set_code}: top={top_name} ev={top_ev:.3f} "
+              f"pct={top_pct:.1f} runners_pct={runner_pcts}")
+    lines.append(r"\newcommand{\VGalModelVersion}{%s}" % model_version)
+
+
 def main():
     lines = [
         "% AUTO-GENERATED by figures/make_verdict_panels.py -- do not edit.",
         "% Real, live-scored numbers for the verdict-panel mockup figures",
-        "% (fig:teaser, fig:bro-tierlist, fig:closecall). Computed by the",
-        "% deployed per-set scoring model via mtga.draft_api.HUB / "
-        "mtga.models.registry -- the same code path behind the live "
-        "overlay and Table 1's per-set-ceiling row. BRO and SOS are "
-        "public development sets; MSH is never touched.",
+        "% (fig:teaser, fig:bro-tierlist, fig:closecall, fig:tmt-tierlist,",
+        "% fig:gallery). Computed by the deployed scoring model via "
+        "mtga.draft_api.HUB / mtga.models.registry -- the same code path "
+        "behind the live overlay. BRO/SOS/TMT are dev-trio sets scored by "
+        "their own per-set model; LTR/LCI/DMU are training-corpus sets "
+        "with no per-set model, scored by F-full (the deployed zero-shot "
+        "fallback, not a zero-shot-accuracy claim). MSH is never touched.",
     ]
     hero_panel(lines)
     bro_tierlist_panel(lines)
     close_call_panel(lines)
+    tmt_tierlist_panel(lines)
+    gallery_panel(lines)
     OUT.write_text("\n".join(lines) + "\n")
     print(f"wrote {OUT}")
 

@@ -49,7 +49,9 @@ invariants operationalize the zero-shot contract (\S\ref{sec:data}):
   is drafting is a \emph{set-context tower} that reads the set's full card
   list, plus the drafter's accumulating pool. ``Blue is the aggressive
   color in this set'' must be inferred from the card list, not memorized
-  as a set identifier.
+  as a set identifier. Whether the tower itself turns out to be necessary
+  for that inference, or whether the invariant holds just as well without
+  it, is addressed later in this section.
   \item \textbf{Skill conditions the scorer, not the cards.} Card
   semantics are skill-invariant; the pick policy is not. Skill-bucket
   embeddings enter only the context pathway. Serving conditions on a fixed
@@ -86,6 +88,16 @@ context. Each candidate $c$ in the pack is scored by an MLP over
 $[\,c;\; p;\; c \odot p;\; \mathrm{ctx}\,]$, where $p$ is the pool summary
 and $c \odot p$ the elementwise interaction; a softmax over the pack's
 real slots gives the pick distribution.
+
+The set-context tower's contribution is tested directly: the A-noctx
+ablation (Table~\ref{tab:ablations}, \S\ref{sec:analysis}) removes it and
+scores higher on all three dev sets, and that tower-free configuration --
+not the one just described -- is what F-full and the frozen MSH
+evaluation run. The first invariant holds either way, since no
+set-identity parameter exists in either configuration; dropping the tower
+only means the shipped model's sole route to set-relative signal is the
+pool tower, each candidate's own features, and the four set-shape
+scalars above, never a read of the rest of the card list.
 
 \subsection{Training}
 \label{sec:training}

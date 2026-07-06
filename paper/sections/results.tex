@@ -41,8 +41,14 @@ Table~\ref{tab:baselines}, multi-set training on public card features
 closes most of the distance toward the usage-statistics-inclusive number
 while using strictly release-day information. BRO is also the trio's
 hardest set for transfer: its packs mix in a 63-card retro-artifact bonus
-sheet. The gap between the BRO and TMT/SOS rows is analysed in
-\S\ref{sec:analysis}.
+sheet. The gap between the BRO and TMT/SOS rows -- and why TMT, the
+trio's licensed-IP dev set, nonetheless transfers as well as SOS -- is
+analysed in \S\ref{sec:analysis}; Figure~\ref{fig:tmt-tierlist} shows the
+same interface on TMT. For sets in the training corpus but without a
+dedicated per-set model, the deployed system instead falls back to
+F-full's scoring; Figure~\ref{fig:gallery} shows what that looks like
+today for LTR, LCI, and DMU -- a deployment illustration, not an
+additional zero-shot data point.
 
 \begin{figure}[t]
 \centering
@@ -76,6 +82,82 @@ Computed by the deployed per-set model, never MSH.}
 \label{fig:bro-tierlist}
 \end{figure}
 
+\begin{figure}[t]
+\centering
+\begin{minipage}[c]{0.32\linewidth}
+  \centering
+  \includegraphics[width=\linewidth]{figures/cards/april-oneil-hacktivist.jpg}
+\end{minipage}%
+\hspace{0.04\linewidth}%
+\begin{minipage}[c]{0.50\linewidth}
+  \begin{tcolorbox}[verdictpanel]
+    \vheader{TMT $\cdot$ Premier Draft}{TIER LIST}
+    {\scriptsize\itshape\color{vtextmuted}Pack hidden by Arena --- showing set tier list}\par\vspace{2.0mm}
+    {\large\bfseries\color{vrarerare}April O'Neil, Hacktivist}\par\vspace{1.6mm}
+    \Flames{5}\par\vspace{1.2mm}
+    {\scriptsize\bfseries\color{vgreen}OBVIOUS BOMB}\par\vspace{1.8mm}
+    \vbar
+    {\scriptsize\color{vtextsecondary}EV \VTmtEv}\par\vspace{2.0mm}
+    {\scriptsize\color{vtextsecondary}2\ \ \VTmtRunnerOneName\hfill\FlamesSmall{5}}\par\vspace{1.0mm}
+    {\scriptsize\color{vtextsecondary}3\ \ \VTmtRunnerTwoName\hfill\FlamesSmall{5}}\par
+    \vfooter{\VTmtModelVersion}
+  \end{tcolorbox}
+\end{minipage}
+\caption{The same interface on TMT, the dev trio's licensed-IP set
+(\S\ref{sec:analysis}) -- a comic-book bomb the text encoder has never
+seen described in \mtg{} rules-text style. April O'Neil's real EV
+(\VTmtEv) sits at the \VTmtPercentile{}th percentile of TMT's pool.
+Computed by the deployed per-set model, never MSH.}
+\label{fig:tmt-tierlist}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\begin{minipage}[b]{0.315\linewidth}
+  \centering
+  \includegraphics[width=\linewidth]{figures/cards/anduril-flame-of-the-west.jpg}\par\vspace{1mm}
+  \begin{tcolorbox}[verdictpanel]
+    \vheader{LTR}{TIER LIST}
+    {\footnotesize\bfseries\color{vraremythic}Andúril, Flame of the West}\par\vspace{1mm}
+    \FlamesSmall{5}\par\vspace{0.8mm}
+    {\scriptsize\color{vtextsecondary}EV \VGalLtrEv\ $\cdot$ pct \VGalLtrPercentile}\par
+  \end{tcolorbox}
+\end{minipage}%
+\hfill
+\begin{minipage}[b]{0.315\linewidth}
+  \centering
+  \includegraphics[width=\linewidth]{figures/cards/bonehoard-dracosaur.jpg}\par\vspace{1mm}
+  \begin{tcolorbox}[verdictpanel]
+    \vheader{LCI}{TIER LIST}
+    {\footnotesize\bfseries\color{vraremythic}Bonehoard Dracosaur}\par\vspace{1mm}
+    \FlamesSmall{5}\par\vspace{0.8mm}
+    {\scriptsize\color{vtextsecondary}EV \VGalLciEv\ $\cdot$ pct \VGalLciPercentile}\par
+  \end{tcolorbox}
+\end{minipage}%
+\hfill
+\begin{minipage}[b]{0.315\linewidth}
+  \centering
+  \includegraphics[width=\linewidth]{figures/cards/sheoldred-the-apocalypse.jpg}\par\vspace{1mm}
+  \begin{tcolorbox}[verdictpanel]
+    \vheader{DMU}{TIER LIST}
+    {\footnotesize\bfseries\color{vraremythic}Sheoldred, the Apocalypse}\par\vspace{1mm}
+    \FlamesSmall{5}\par\vspace{0.8mm}
+    {\scriptsize\color{vtextsecondary}EV \VGalDmuEv\ $\cdot$ pct \VGalDmuPercentile}\par
+  \end{tcolorbox}
+\end{minipage}
+\caption{Three sets with no dedicated per-set model -- Lord of the Rings,
+The Lost Caverns of Ixalan, Dominaria United -- all in F-full's 31-set
+training corpus. This is what the deployed system actually serves for
+them today: F-full as the fallback whenever a set has no dedicated
+per-set model, the same fallback path it would run for a set onboarded
+on day one. Real EVs and percentiles, computed the same way as
+Figures~\ref{fig:bro-tierlist} and
+\ref{fig:tmt-tierlist} -- but because F-full trained on these three sets,
+this illustrates the production fallback path, not a zero-shot-accuracy
+claim; that claim is Table~\ref{tab:main}'s dev-trio and MSH rows only.}
+\label{fig:gallery}
+\end{figure}
+
 \begin{table}[t]
   \centering
   \caption{Baselines and published anchors. Upper block: our measured
@@ -96,8 +178,10 @@ hour-zero heuristic (prefer lower rarity for playables, follow the pool's
 colors) reaches \BaseRarity\%: just below GPT-4o's 43\%
 \citep{bertram2025urzagpt} and close to the expert-tuned 44.5\% of
 \citet{ward2021drafting}, a useful caution about how much of drafting is
-surface regularity. DraftFM's zero-shot numbers clear every
-day-one-feasible row on all three dev sets. The three asterisked
+surface regularity. DraftFM's zero-shot numbers, on each of the three dev
+sets, clear every day-one-feasible baseline in the table (Random and the
+rarity heuristic are measured on SOS as a rehearsal stand-in, not
+per-set). The three asterisked
 post-release baselines bound what cheap human data buys within days of
 release. Their MSH rows are filled in once the frozen evaluation runs.
 
@@ -179,6 +263,14 @@ accuracy as training grows from one set (NEO, 5.4M picks) to the full
 \FdevSets-set universe (\FdevPicks M picks), under the fixed recipe.
 Single-set training is the regime of \citet{bertram2024cards}'s
 features-only anchor; the top rung is F-dev.
+% Seed spread (within-training top-1, not a dev-trio zero-shot re-eval):
+% run=20260704_154741_s1 (0.6824), run=20260705_170754_s1_seed18 (0.6774),
+% run=20260705_170754_s1_seed19 (0.6768); run=20260704_175554_s4 (0.6892),
+% run=20260705_170755_s4_seed18 (0.6881), run=20260705_170755_s4_seed19 (0.6880).
+Two extra seeds at S1 and S4 give within-training top-1 spreads of
+0.677--0.682 and 0.688--0.689 -- training itself is not noise-dominated at
+either rung, though this checks in-distribution stability, not a seed
+sweep of the zero-shot dev-mean the curve actually plots.
 \pending{scaling-curve shape claim: slope, diminishing-returns point, and
 whether set count or pick count is the better predictor (S2b/S4b probes +
 3-seed bands at S1/S4)}

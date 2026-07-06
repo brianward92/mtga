@@ -386,17 +386,19 @@ def table_ablations(by_name, frozen):
         ("A-topfilter", None, "A-topfilter"),
         ("A-noUB", None, "A-noUB"),
     ]
-    # Ablation runs are discovered by config-name convention.
+    # Ablation runs are discovered by config-name convention (case-insensitive
+    # -- a_noUB's embedded capitals must still match "noub").
     for name, entry in by_name.items():
-        if "notext" in name:
+        lname = name.lower()
+        if "notext" in lname:
             members[1] = (members[1][0], name, members[1][2])
-        if "noctx" in name and "seed" not in name:
+        if "noctx" in lname and "seed" not in lname:
             members[2] = (members[2][0], name, members[2][2])
-        if "proportional" in name:
+        if "proportional" in lname:
             members[3] = (members[3][0], name, members[3][2])
-        if "topfilter" in name:
+        if "topfilter" in lname:
             members[4] = (members[4][0], name, members[4][2])
-        if "noub" in name:
+        if "noub" in lname:
             members[5] = (members[5][0], name, members[5][2])
 
     rows = [

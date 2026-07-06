@@ -45,14 +45,17 @@ ratings are written by human experts~\citep{draftsimratings}.
 
 \paragraph{LLMs as drafters.}
 UrzaGPT~\citep{bertram2025urzagpt} evaluates large language models on draft
-picks. Zero-shot GPT-4o reaches 43\%, narrowly above the hour-zero
-heuristics we measure (\S\ref{sec:results}), and providing full rules text
-in the prompt lowers it. Open 7--8B models fail to pick legal cards until
+picks. Zero-shot GPT-4o reaches 43\%, narrowly above the hour-zero rarity
+heuristic we measure (\S\ref{sec:results}). We still mark it non-day-one
+in Table~\ref{tab:baselines}: NEO shipped years before GPT-4o's training
+cutoff, so its pretraining corpus cannot be shown free of the set's own
+post-release strategy discussion, a leak a frozen feature-only encoder
+cannot have. Providing full rules text in the prompt lowers GPT-4o's
+accuracy further. Open 7--8B models fail to pick legal cards until
 LoRA-tuned on a million picks from the target set, after which they still
-trail small
-supervised MLPs at orders of magnitude more inference cost. We take the
-implied guidance: use a frozen text \emph{embedding} as one feature block,
-not a language model as the policy.
+trail small supervised MLPs at orders of magnitude more inference cost. We
+take the implied guidance: use a frozen text \emph{embedding} as one
+feature block, not a language model as the policy.
 
 \paragraph{Text-grounded transfer in card games.}
 Cardsformer~\citep{xia2023cardsformer} encodes Hearthstone card
