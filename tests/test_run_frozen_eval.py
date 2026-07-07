@@ -7,6 +7,7 @@ script exists — as fast, hermetic units.
 
 import importlib.util
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -132,6 +133,65 @@ def test_ledger_must_predate_t0(tmp_path):
     with pytest.raises(rfe.RefusalError, match="never committed"):
         rfe.check_ledger_predates("d" * 64, "2026-07-07T00:00:00", "f-full",
                                   ledger)
+
+
+def test_ledger_git_predates_uses_commit_history(tmp_path):
+    """T1.4: committed-before-T0 must be proven by git history, not a
+    self-reported logged_at field. Fabricate a repo with a ledger committed
+    at a controlled date and check accept/refuse/uncommitted paths."""
+    repo = tmp_path / "repo"
+    (repo / "experiments").mkdir(parents=True)
+    ledger_rel = "experiments/ledger.jsonl"
+    sha = "e" * 64
+    (repo / ledger_rel).write_text(
+        json.dumps({"run_id": "r1", "logged_at": "2026-07-01T09:00:00",
+                    "artifacts": {"best_sha256": sha}}) + "\n")
+    env = {**os.environ,
+           "GIT_AUTHOR_DATE": "2026-07-01T09:00:00",
+           "GIT_COMMITTER_DATE": "2026-07-01T09:00:00"}
+    for cmd in [
+        ["git", "init", "-q"],
+        ["git", "add", ledger_rel],
+        ["git", "-c", "user.email=t@t", "-c", "user.name=t",
+         "commit", "-qm", "ledger"],
+    ]:
+        subprocess.run(cmd, cwd=repo, check=True, capture_output=True, env=env)
+    # Committed 2026-07-01; a T0 on 2026-07-07 postdates it -> accepted.
+    assert rfe.check_ledger_git_predates(
+        sha, "2026-07-07T00:00:00", "f-full",
+        repo=repo, ledger_rel=ledger_rel) is not None
+    # A T0 on 2026-06-30 predates the commit -> refused (would be backdated).
+    with pytest.raises(rfe.RefusalError, match="does not predate"):
+        rfe.check_ledger_git_predates(sha, "2026-06-30T00:00:00", "f-full",
+                                      repo=repo, ledger_rel=ledger_rel)
+    # A sha256 present only in the uncommitted working tree -> refused: git
+    # history cannot vouch for it (this is the honor-system hole T1.4 closes).
+    wt_sha = "f" * 64
+    with (repo / ledger_rel).open("a") as fh:
+        fh.write(json.dumps({"run_id": "r2",
+                             "artifacts": {"best_sha256": wt_sha}}) + "\n")
+    with pytest.raises(rfe.RefusalError,
+                       match="not introduced by any git commit"):
+        rfe.check_ledger_git_predates(wt_sha, "2026-07-07T00:00:00", "f-full",
+                                      repo=repo, ledger_rel=ledger_rel)
+
+
+def test_resolve_artifact_path_is_portable(monkeypatch, tmp_path):
+    """T2.7: absolute member paths pass through unchanged; relative paths
+    resolve against <DATA_ROOT>/foundation so a released battery isn't tied
+    to one box's home directory."""
+    from mtga.lands import paths
+
+    abs_p = tmp_path / "runs" / "x" / "best.pt"
+    assert rfe.resolve_artifact_path(str(abs_p)) == abs_p
+
+    monkeypatch.setattr(paths, "DATA_ROOT", tmp_path)
+    assert rfe.resolve_artifact_path("runs/x/best.pt") == \
+        tmp_path / "foundation" / "runs" / "x" / "best.pt"
+    # baselines carry no artifact; draftfm members resolve portably
+    assert rfe.member_artifact_path({"kind": "baseline-random"}) is None
+    assert rfe.member_artifact_path({"path": "runs/x/best.pt"}) == \
+        tmp_path / "foundation" / "runs" / "x" / "best.pt"
 
 
 # -- (c) T0 quality gates ------------------------------------------------------

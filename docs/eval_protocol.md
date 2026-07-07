@@ -66,7 +66,7 @@ tested convention). Zero-shot models are scored on the full slice of a
 held-out set; head-to-head rows against a per-set ceiling use the ceiling's
 val split so both models score identical picks (`evalproto.align_on_picks`).
 
-## 3. Metrics (all from `evalproto.py`, all with CIs)
+## 3. Metrics (all from `evalproto.py`)
 
 - **Primary:** top-1 agreement, expert slice, deployment mode.
 - Secondary: top-3; all-users top-1 (human-model mode); **normalized score**
@@ -75,10 +75,13 @@ val split so both models score identical picks (`evalproto.align_on_picks`).
   temperature on MSH; optional temperature fit on dev only, frozen into the
   battery config); per-(pack, pick) curves vs the per-cell random floor;
   **late-draft retention** = zero-shot/ceiling top-1 on picks 8+ of each
-  pack; non-forced variants.
+  pack; non-forced (`pack_size >= 2`) top-1, log-loss, and ECE variants
+  (forced picks are scored trivially and deflate calibration).
 - **Statistics:** cluster bootstrap over `draft_id` (B=2000,
-  seed=20260707, percentile 95% CIs); paired comparisons share resample
-  indices (`paired_bootstrap_diff`). Design effect grounded empirically:
+  seed=20260707, percentile 95% CIs) on top-1, top-3, and log-loss; ECE and
+  the non-forced variants are reported as point estimates (the binned ECE is
+  not bootstrapped). Paired comparisons share resample indices
+  (`paired_bootstrap_diff`). Design effect grounded empirically:
   **measured ICC rho = 0.0099** on SOS per-set val (1,662 drafts, 69,803
   picks) => DEFF ~= 1.4 at ~42 picks/draft; the 2,500-expert-draft gate
   gives CI half-widths ~= +/-0.3pp at p~=0.5, tighter than the design
@@ -119,8 +122,16 @@ Frozen (sha256s in `experiments/frozen_battery.json`, committed pre-T0):
    S16=+AFR,SNC,ONE,LTR,WOE,MKM,OTJ,EOE, S27=F-dev universe; probes
    S2b={MOM,TDM}, S4b={STX,SNC,OTJ,TLA}. Fixed recipe, early stop on
    within-train val, shared step cap; both #sets and total-picks reported.
-4. **Ablation members:** A-notext (no oracle-text embedding), A-noUB
-   (LTR/FIN/TLA removed) — pre-registered for the UB-shift analysis.
+4. **Ablation members** (scored zero-shot on the dev trio; supply the
+   ablation-table dev cells). *UB-shift ablations:* A-notext (no oracle-text
+   embedding, structured features only), A-noUB (the three licensed-IP sets
+   LTR/FIN/TLA removed from A-noctx). *Recipe-search variants* (run during
+   architecture/hyperparameter selection, §2, then frozen into the battery so
+   they also get an MSH row): A-noctx (no set-context cross-attention — the
+   winning recipe that F-full ships), A-proportional (proportional rather than
+   sqrt per-set sampling), A-topfilter (train on expert picks only, no skill
+   conditioning). All five are listed with sha256s in
+   `experiments/frozen_battery.json`.
 5. **Baselines:** random; RarityColorHeuristic (hour-0); asterisked
    post-release: HeuristicRatingsModel (day~2 site ratings), ALSA-argmin,
    shrunk-GIH-argmax. Cited: expert-tuned DraftsimBot 44.54% (Ward et al.),
@@ -144,14 +155,20 @@ more credible*; the TMT-vs-SOS dev gap is the quantitative footnote.
 
 ## 6. Claims bands (drafted before results exist)
 
-- **< 45%:** negative-leaning result — scale alone does not buy day-1
+Band boundaries are set to the exact cited priors (44.54%, the expert-tuned
+DraftsimBot number; 55.44%, Bertram's features+meta+image BRO number), not
+rounded to 45%/55%, so a headline number cannot fall into a boundary dead
+zone where the selected band's own cited-number claim would be false.
+
+- **< 44.54%:** negative-leaning result — scale alone does not buy day-1
   competence from features; hand-tuned expert ratings stay unbeaten at hour
   0. Contribution: the frozen benchmark, the first meta-free multi-set
   zero-shot number, the scaling curve.
-- **45–55%:** best published day-1-feasible drafter (beats expert-tuned
-  44.5%, GPT-4o 43%, hour-0 heuristics); below the meta-inclusive 55.44%
-  with the asterisk paragraph.
-- **> 55%:** zero-shot SOTA outright with strictly less information than
+- **44.54–55.44%:** best published day-1-feasible drafter (beats expert-tuned
+  44.5%, GPT-4o 43%, hour-0 heuristics, each measured on a different test
+  set — situates rather than compares head-to-head); below the
+  meta-inclusive 55.44% with the asterisk paragraph.
+- **> 55.44%:** zero-shot SOTA outright with strictly less information than
   the prior best, on a harder (UB) test set; BRO dev row as the
   same-holdout receipt.
 

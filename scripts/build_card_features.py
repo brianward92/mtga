@@ -92,6 +92,12 @@ def main(argv=None):
     features_out = args.features_out or paths.CARDFEATS_PARQUET
 
     set_codes = args.sets or discover_sets()
+    # Normalize case BEFORE the EVAL_ONLY ban: corpus.EVAL_ONLY is upper-case
+    # ({"MSH"}), so a lower-case `--sets msh` would otherwise slip past the ban
+    # and, on a case-insensitive filesystem, still glob MSH's vocab sidecar and
+    # build features from held-out data (T3.6 — the ban must not depend on glob
+    # case-sensitivity). Mirrors corpus.corpus_jobs, which upper-cases too.
+    set_codes = [c.strip().upper() for c in set_codes]
     if not set_codes:
         print(f"no curated vocabs under {paths.CURATED_DIR / 'draft'}",
               file=sys.stderr)

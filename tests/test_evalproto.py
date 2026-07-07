@@ -133,6 +133,41 @@ def test_per_pick_curve_and_alignment(small):
     assert len(a) == len(b) == 3
 
 
+def test_summarize_reports_non_forced_calibration():
+    """T3.7: summarize exposes non-forced ECE and log-loss alongside the
+    non-forced top-1. Forced picks (pack_size == 1) are scored trivially --
+    lone candidate, confidence 1.0 -- which deflates both calibration
+    numbers, so the non-forced variants must be strictly worse here."""
+    rows = []
+    for d in range(50):
+        # a genuine choice the model gets wrong at high confidence
+        rows.append((f"d{d}", 0, 0, 10, 0.6, 500, 3, 0.05, 0.9))
+        # a forced pick: lone candidate, trivially "correct", confidence 1.0
+        rows.append((f"d{d}", 0, 13, 1, 0.6, 500, 1, 1.0, 1.0))
+    result = evalproto.summarize(frame_from(rows), "mixed")
+    for key in ["top1", "top1_ci", "top3", "top3_ci", "log_loss",
+                "log_loss_ci", "ece", "top1_non_forced",
+                "log_loss_non_forced", "ece_non_forced"]:
+        assert key in result, f"summarize missing {key}"
+    nf = evalproto.non_forced(frame_from(rows))
+    assert result["top1_non_forced"] == pytest.approx(evalproto.top1(nf))
+    assert result["log_loss_non_forced"] == pytest.approx(evalproto.log_loss(nf))
+    assert result["ece_non_forced"] == pytest.approx(evalproto.ece(nf))
+    # forced picks mask the model's real (poor) performance and calibration
+    assert result["top1_non_forced"] < result["top1"]
+    assert result["ece_non_forced"] > result["ece"]
+    assert result["log_loss_non_forced"] > result["log_loss"]
+
+
+def test_summarize_non_forced_nan_when_all_forced():
+    """All-forced frame: non-forced variants are NaN, not a crash."""
+    frame = frame_from([("a", 0, 13, 1, 0.6, 500, 1, 1.0, 1.0)])
+    result = evalproto.summarize(frame, "forced-only")
+    assert np.isnan(result["top1_non_forced"])
+    assert np.isnan(result["log_loss_non_forced"])
+    assert np.isnan(result["ece_non_forced"])
+
+
 def test_validate_rejects_missing_columns(small):
     with pytest.raises(ValueError):
         evalproto.validate(small.drop(columns=["top_prob"]))

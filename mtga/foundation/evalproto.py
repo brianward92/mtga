@@ -218,7 +218,15 @@ def align_on_picks(frame_a, frame_b):
 
 
 def summarize(frame, label=""):
-    """The standard reporting block. Every number carries a bootstrap CI."""
+    """The standard reporting block.
+
+    top-1/top-3/log-loss carry cluster-bootstrap CIs. ECE and the non-forced
+    variants are point estimates only: the binned ECE is not bootstrapped
+    (out of protocol scope), and the ``pack_size >= 2`` rows are secondary
+    diagnostics. Non-forced ECE and log-loss matter because forced picks
+    (``pack_size == 1``) are scored trivially -- the model's argmax is the
+    lone candidate -- which deflates both calibration numbers.
+    """
     result = {"label": label, "n_picks": len(frame),
               "n_drafts": frame["draft_id"].nunique()}
     for name, fn in [("top1", top1), ("top3", lambda f: topk(f, 3)),
@@ -228,5 +236,8 @@ def summarize(frame, label=""):
         result[f"{name}_ci"] = [lo, hi]
     result["ece"] = ece(frame)
     nf = non_forced(frame)
-    result["top1_non_forced"] = top1(nf) if len(nf) else float("nan")
+    has_nf = len(nf) > 0
+    result["top1_non_forced"] = top1(nf) if has_nf else float("nan")
+    result["log_loss_non_forced"] = log_loss(nf) if has_nf else float("nan")
+    result["ece_non_forced"] = ece(nf) if has_nf else float("nan")
     return result

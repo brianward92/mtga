@@ -112,3 +112,63 @@ def test_rarity_baseline_scores_via_grp_ids(shard, card_store):
 def test_unknown_kind_is_refused(shard):
     with pytest.raises(ValueError, match="unknown baseline kind"):
         predict.baseline_predictions(SET, FMT, "alsa")
+
+
+# -- temperature scaling (foundation_predictions) ----------------------------
+# eval-protocol-v1's dev-only calibration decision (docs/eval_protocol.md
+# section 3): a post-hoc softmax temperature applied to a DraftFM model's
+# logits. These tests exercise the actual code path scripts/
+# fit_dev_temperature.py depends on, hermetically (a tiny real DraftFM
+# instance, not a checkpoint) -- the two properties that must hold for a
+# temperature-scaled number to be trustworthy: target_rank is exactly
+# invariant to T (a monotonic rescale can't change the argmax), and T only
+# ever flattens or sharpens the distribution, never a random perturbation.
+
+@pytest.fixture
+def tiny_draftfm(shard):
+    """A real (untrained, tiny) DraftFM instance matching the shard's
+    8-wide synthetic feature vectors, small enough to score instantly."""
+    torch = pytest.importorskip("torch")
+    from mtga.foundation.model import DraftFM
+
+    torch.manual_seed(0)
+    model = DraftFM(feat_dim=8, d=16, dropout=0.0, set_ctx=False)
+    model.eval()
+    return model
+
+
+def test_temperature_rejects_nonpositive(shard, tiny_draftfm):
+    for bad in (0.0, -1.0, -0.001):
+        with pytest.raises(ValueError, match="temperature must be > 0"):
+            predict.foundation_predictions(tiny_draftfm, SET, FMT,
+                                           temperature=bad)
+
+
+def test_temperature_preserves_target_rank(shard, tiny_draftfm):
+    """Dividing logits by a positive constant is monotonic: WHICH candidate
+    is the human's rank cannot change, only the reported confidence."""
+    base = predict.foundation_predictions(tiny_draftfm, SET, FMT,
+                                          temperature=1.0)
+    for t in (0.3, 0.7, 2.5, 5.0):
+        scaled = predict.foundation_predictions(tiny_draftfm, SET, FMT,
+                                                temperature=t)
+        assert (scaled["target_rank"].to_numpy()
+                == base["target_rank"].to_numpy()).all(), (
+            f"target_rank changed at T={t}: temperature scaling must be "
+            "rank-invariant by construction")
+
+
+def test_temperature_monotonically_reshapes_confidence(shard, tiny_draftfm):
+    """For the same logits, top_prob(T) is monotonically non-increasing in
+    T for T >= 1 (higher temperature flattens softmax toward uniform) and
+    non-decreasing for T <= 1 (lower temperature sharpens it) -- a
+    mathematical certainty for any positive-logit rescale, so a violation
+    means the implementation isn't actually doing temperature scaling."""
+    ts = [0.3, 0.7, 1.0, 1.5, 3.0]
+    frames = {t: predict.foundation_predictions(tiny_draftfm, SET, FMT,
+                                                temperature=t)
+             for t in ts}
+    top_prob_means = [frames[t]["top_prob"].mean() for t in ts]
+    for a, b in zip(top_prob_means, top_prob_means[1:]):
+        assert a >= b - 1e-6, (
+            f"mean top_prob must be non-increasing as T grows: {top_prob_means}")

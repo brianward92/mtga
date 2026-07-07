@@ -258,9 +258,21 @@ def train(config):
     out_dir = paths.DATA_ROOT / "foundation" / "runs" / run_id
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    # Featurizer manifest the model trains through -- recorded into the
+    # checkpoint so the frozen eval can refuse a model scored against a
+    # feature space that drifted since training (T2.5). Normal build order is
+    # featurize -> shard -> train, so the on-disk manifest is the one the
+    # shards carry.
+    try:
+        manifest_sha = json.loads(
+            paths.FEATURIZER_MANIFEST.read_text()).get("content_hash")
+    except (OSError, ValueError):
+        manifest_sha = None
+
     record = {"run_id": run_id, "config": asdict(config),
               "n_train_picks": total_train, "n_shards": len(shards),
-              "planned_steps": steps, "torch_version": torch.__version__}
+              "planned_steps": steps, "torch_version": torch.__version__,
+              "featurizer_manifest_sha": manifest_sha}
 
     if config.parity_check:
         record["parity"] = parity_check(config, shards)
@@ -314,13 +326,15 @@ def train(config):
               f"({elapsed/60:.0f} min)", flush=True)
         torch.save({"model": model.state_dict(), "config": asdict(config),
                     "step": (segment + 1) * config.val_every,
-                    "val_top1": val_top1},
+                    "val_top1": val_top1,
+                    "featurizer_manifest_sha": manifest_sha},
                    out_dir / "last.pt")
         if val_top1 > best["val_top1"]:
             best = {"val_top1": val_top1, "step": (segment + 1) * config.val_every}
             stale = 0
             torch.save({"model": model.state_dict(), "config": asdict(config),
-                        **best}, out_dir / "best.pt")
+                        "featurizer_manifest_sha": manifest_sha, **best},
+                       out_dir / "best.pt")
         else:
             stale += 1
             if stale >= config.patience:

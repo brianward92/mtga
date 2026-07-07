@@ -104,6 +104,28 @@ def file_sha256(path):
     return digest.hexdigest()
 
 
+def resolve_artifact_path(path):
+    """Resolve a battery member's artifact path portably (T2.7).
+
+    Absolute paths are honored as-is (back-compat + per-machine overrides). A
+    RELATIVE path resolves against ``<DATA_ROOT>/foundation``, so a released
+    battery need not hard-code one box's home directory: point MTGA_DATA_ROOT
+    at the unpacked weights. The sha256 in the battery is the authoritative
+    anchor regardless of where the file physically lives.
+    """
+    from mtga.lands import paths
+
+    p = Path(path)
+    return p if p.is_absolute() else (paths.DATA_ROOT / "foundation" / p)
+
+
+def member_artifact_path(member):
+    """Resolved checkpoint path for a battery member, or None for
+    artifact-less members (baselines carry neither path nor run)."""
+    spec = member.get("path") or member.get("run")
+    return resolve_artifact_path(spec) if spec else None
+
+
 def check_artifact_sha(path, expected, label):
     path = Path(path)
     if not path.is_file():
@@ -145,6 +167,54 @@ def check_ledger_predates(sha256, fetched_at, label,
             f"{label}: ledger entry ({logged}) does not predate the T0 "
             f"snapshot download ({fetched_at})")
     return logged
+
+
+def ledger_git_commit_ts(sha256, repo=REPO_ROOT,
+                         ledger_rel="experiments/ledger.jsonl"):
+    """Unix committer-time of the EARLIEST git commit that introduced this
+    sha256 into the tracked ledger, or None if it appears in no committed
+    version (present only in the uncommitted working tree, or the ledger is
+    untracked / not in a git repo).
+
+    ``ledger_logged_at`` above trusts a self-reported ``logged_at`` JSON
+    field, which can be typed to any value; a git committer date is anchored
+    in history and is the actual "committed-before-T0" evidence the protocol
+    claims. ``%ct`` (Unix seconds, UTC) is unambiguous across timezones.
+    ``-S`` finds the commit that changed the occurrence count of the string,
+    so the first (with ``--reverse``) is the one that introduced it.
+    """
+    result = subprocess.run(
+        ["git", "log", "--reverse", "--format=%ct", "-S", sha256,
+         "--", ledger_rel],
+        capture_output=True, cwd=str(repo), timeout=30, text=True)
+    if result.returncode != 0 or not result.stdout.strip():
+        return None
+    return int(result.stdout.strip().splitlines()[0])
+
+
+def check_ledger_git_predates(sha256, fetched_at, label, repo=REPO_ROOT,
+                              ledger_rel="experiments/ledger.jsonl"):
+    """Refuse unless a git commit that PREDATES T0 introduced this artifact's
+    sha256 into the ledger. This is the authoritative anti-backdating guard:
+    ``check_ledger_predates`` only trusts the ledger's own ``logged_at``
+    field; this trusts git history, which is far harder to forge.
+    """
+    committed_ts = ledger_git_commit_ts(sha256, repo, ledger_rel)
+    if committed_ts is None:
+        raise RefusalError(
+            f"{label}: sha256 {sha256[:12]} is not introduced by any git "
+            f"commit to {ledger_rel} (it exists only in the uncommitted "
+            f"working tree, or the ledger is untracked) — committed-before-T0 "
+            f"cannot be established from git history; commit the ledger first")
+    fetched_ts = datetime.datetime.fromisoformat(fetched_at).timestamp()
+    if committed_ts >= fetched_ts:
+        committed_iso = datetime.datetime.fromtimestamp(
+            committed_ts).isoformat(timespec="seconds")
+        raise RefusalError(
+            f"{label}: the git commit introducing this artifact's ledger "
+            f"entry ({committed_iso}) does not predate the T0 snapshot "
+            f"download ({fetched_at}) — the entry was not committed before T0")
+    return committed_ts
 
 
 # ---------------------------------------------------------------------------
@@ -279,20 +349,67 @@ def load_draftfm(path):
     return model
 
 
-def member_frames(member, set_code, fmt):
-    """{mode_label: predictions frame} for one battery member."""
+def check_manifest_consistency(members, eval_manifest_sha, out=print):
+    """Refuse if any DraftFM checkpoint records a featurizer manifest hash
+    that differs from the one the eval shard was built through (T2.5).
+
+    Legacy checkpoints (trained before train.py recorded this field) carry no
+    hash: warn loudly with both hashes so it can be verified by hand, but do
+    not block — the shipped f-full/f-dev predate the field. A recorded hash
+    that *disagrees* is a hard refusal: the model would be scoring a feature
+    space it never trained on, silently.
+    """
+    import torch
+
+    for member in members:
+        if member.get("kind") != "draftfm":
+            continue
+        label = member.get("name", "draftfm")
+        path = member_artifact_path(member)
+        ckpt_path = path if path.is_file() else path / "best.pt"
+        if not ckpt_path.is_file():
+            out(f"(c.6) WARNING {label}: checkpoint {ckpt_path} not found; "
+                f"skipping manifest check (inference will surface this)")
+            continue
+        trained = torch.load(ckpt_path, map_location="cpu",
+                             weights_only=False).get("featurizer_manifest_sha")
+        if trained is None:
+            out(f"(c.6) WARNING {label}: checkpoint records no featurizer "
+                f"manifest hash (legacy); the eval shard's manifest is "
+                f"{eval_manifest_sha}. Verify by hand that this model trained "
+                f"through the same manifest before trusting the numbers.")
+        elif eval_manifest_sha is not None and trained != eval_manifest_sha:
+            raise RefusalError(
+                f"{label}: model trained through featurizer manifest "
+                f"{trained} but the eval shard was built through "
+                f"{eval_manifest_sha} — a mismatched feature space; refusing")
+        else:
+            out(f"(c.6) {label}: featurizer manifest matches "
+                f"({eval_manifest_sha})")
+
+
+def member_frames(member, set_code, fmt, temperature=1.0):
+    """{mode_label: predictions frame} for one battery member.
+
+    temperature: the frozen dev-only calibration temperature (battery's
+    top-level "calibration" block, docs/eval_protocol.md section 3).
+    Applied to both deployment and human mode for a DraftFM member, for
+    consistency; never fitted or varied per-mode.
+    """
     from mtga.foundation import predict
 
     kind = member.get("kind")
     if kind == "draftfm":
-        model = load_draftfm(member.get("path") or member.get("run"))
+        model = load_draftfm(member_artifact_path(member))
         condition = member.get("condition") or {}
         return {
             "deployment": predict.foundation_predictions(
                 model, set_code, fmt,
                 condition_wr_id=condition.get("wr_id"),
-                condition_games_id=condition.get("games_id")),
-            "human": predict.foundation_predictions(model, set_code, fmt),
+                condition_games_id=condition.get("games_id"),
+                temperature=temperature),
+            "human": predict.foundation_predictions(
+                model, set_code, fmt, temperature=temperature),
         }
     if kind == "perset":
         return {"deployment": predict.per_set_model_predictions(
@@ -448,9 +565,8 @@ def run(args):
         print(f"(b) REHEARSAL on {set_code}: committed-before-T0 checks "
               f"skipped; artifact sha256s verified when present")
         for member in members:
-            if member.get("sha256") and (member.get("path")
-                                         or member.get("run")):
-                check_artifact_sha(member.get("path") or member.get("run"),
+            if member.get("sha256") and member_artifact_path(member):
+                check_artifact_sha(member_artifact_path(member),
                                    member["sha256"], member.get("name", "?"))
     else:
         frozen = battery["frozen_snapshot"]
@@ -475,11 +591,15 @@ def run(args):
             if is_baseline(member):
                 continue
             label = member.get("name", "?")
-            check_artifact_sha(member.get("path") or member.get("run"),
+            check_artifact_sha(member_artifact_path(member),
                                member["sha256"], label)
             check_ledger_predates(member["sha256"], fetched_at, label)
+            # Authoritative check: the ledger entry must have been *git-
+            # committed* before T0, not merely carry a self-reported
+            # logged_at (T1.4 — the self-report alone is honor-system).
+            check_ledger_git_predates(member["sha256"], fetched_at, label)
         print(f"(b) battery verified: {len(members)} members, all artifact "
-              f"hashes frozen and ledger-committed before {fetched_at}")
+              f"hashes frozen and ledger git-committed before {fetched_at}")
 
     # (c) gates on the curated snapshot.
     ensure_curated(set_code, fmt)
@@ -489,17 +609,52 @@ def run(args):
           f"p1p1_missing={gates['p1p1_missing']}")
     ensure_shard(set_code, fmt)
 
+    # (c.6) feature-space consistency: the eval shard and every DraftFM model
+    # must share a featurizer manifest, else the model scores a feature space
+    # it never trained on (T2.5). Read the hash the eval shard was built
+    # through and compare against each checkpoint's recorded training hash.
+    import numpy as np
+
+    from mtga.foundation import dataset
+
+    eval_feats = np.load(dataset.shard_dir(set_code, fmt) / "features.npz",
+                         allow_pickle=True)
+    eval_manifest_sha = (str(eval_feats["manifest_hash"])
+                         if "manifest_hash" in eval_feats.files else None)
+    check_manifest_consistency(members, eval_manifest_sha)
+
     out_root = Path(args.out_root) if args.out_root else (
         paths.DATA_ROOT / "foundation" / "frozen_eval")
     out_dir = out_root / snapshot_sha
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    # (c.5) frozen calibration temperature (docs/eval_protocol.md section 3:
+    # "optional temperature fit on dev only, frozen into the battery
+    # config"). Real (non-rehearsal) runs refuse to proceed without one, so
+    # a temperature decision can't be skipped by omission once T0 exists;
+    # the rehearsal defaults to 1.0 (no scaling) so it can validate the
+    # pipeline before a calibration block is ever written.
+    calibration = battery.get("calibration") or {}
+    temperature = calibration.get("temperature")
+    if temperature is None:
+        if rehearse:
+            temperature = 1.0
+        else:
+            raise RefusalError(
+                "battery has no \"calibration.temperature\" -- the dev-only "
+                "calibration decision (docs/eval_protocol.md section 3) "
+                "must be frozen before a real (non-rehearsal) run")
+    print(f"(c.5) calibration temperature: {temperature}"
+          + (" (rehearsal default, no calibration block)"
+             if not calibration else ""))
 
     # (d) + (e): one inference pass per member, then the frozen analysis.
     results, comparisons, frames = {}, {}, {}
     for member in members:
         name = member.get("name", member.get("kind"))
         results[name] = {}
-        for mode, frame in member_frames(member, set_code, fmt).items():
+        for mode, frame in member_frames(member, set_code, fmt,
+                                         temperature=temperature).items():
             frame.to_parquet(out_dir / f"{name}.{mode}.parquet", index=False)
             results[name][mode] = summarize_frame(frame, f"{name}/{mode}")
             evalproto.per_pick_curve(frame).to_csv(

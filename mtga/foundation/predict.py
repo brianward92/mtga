@@ -12,6 +12,11 @@ from mtga.lands import paths
 from mtga.models.draftnet import POOL_CAP, load_pick_arrays, split_by_draft
 
 BATCH = 8192
+# bge-small-en-v1.5 text-embedding width. A no-text model (structured-only,
+# 391-d) scored on a full structured+text (775-d) feature table legitimately
+# drops exactly this trailing block; any OTHER width delta means the shard was
+# featurized through a different manifest than the model trained on (T2.5).
+TEXT_EMB_DIM = 384
 
 
 def _pick_meta(set_code, limited_type):
@@ -37,13 +42,22 @@ def _pick_meta(set_code, limited_type):
 
 def foundation_predictions(model, set_code, limited_type, device="cpu",
                            condition_wr_id=None, condition_games_id=None,
-                           batch_size=BATCH):
+                           batch_size=BATCH, temperature=1.0):
     """Predictions parquet rows for a DraftFM model on one (set, format).
 
     Zero-shot evaluation: the shard may cover a set the model never trained
     on. condition_wr_id/games_id override the skill conditioning
     ("deployment mode"); None uses each drafter's true bucket ("human mode").
+
+    temperature: post-hoc scale applied to logits before the softmax
+    (dividing all real-slot logits by a positive constant, per
+    eval_protocol.md's "optional temperature fit on dev only"). Rank is
+    computed from the unscaled logits, so temperature != 1.0 changes
+    pick_prob/top_prob but never target_rank (monotonic rescale).
     """
+    if not (temperature > 0):
+        raise ValueError(f"temperature must be > 0, got {temperature!r}")
+
     import torch
 
     from mtga.foundation.dataset import PAD, Shard, shard_dir
@@ -57,7 +71,20 @@ def foundation_predictions(model, set_code, limited_type, device="cpu",
     # fix) has no normalized_shape attribute.
     expected = model.card_encoder.net[0].weight.shape[0]
     if matrix.shape[1] != expected:
-        matrix = matrix[:, :expected]
+        # The ONLY legitimate mismatch: a no-text (structured-only) model
+        # scored on a structured+text table -> drop the trailing text block.
+        # Any other width delta means the eval shard went through a different
+        # featurizer manifest than the model trained on; silently truncating
+        # would score a *wrong feature space*, so refuse instead (T2.5).
+        if matrix.shape[1] - expected == TEXT_EMB_DIM:
+            matrix = matrix[:, :expected]
+        else:
+            raise ValueError(
+                f"feature width {matrix.shape[1]} != model's expected "
+                f"{expected}, and the difference is not the {TEXT_EMB_DIM}-d "
+                f"text block: the shard for {set_code}.{limited_type} was "
+                f"featurized through a different manifest than this model "
+                f"trained on. Refusing to score a mismatched feature space")
     features = torch.from_numpy(matrix)
     shard = Shard(set_code, limited_type, features)
     shard.rarity_ids = torch.from_numpy(assets["rarity_ids"].astype(np.int64))
@@ -93,10 +120,14 @@ def foundation_predictions(model, set_code, limited_type, device="cpu",
                                                     condition_games_id)
             logits = model(table, summary, batch)
             valid = torch.isfinite(logits)
-            probs = torch.softmax(logits, dim=1)
+            # Rank from the unscaled logits: dividing by a positive
+            # temperature is monotonic, so target_rank is invariant to T by
+            # construction (checked again with an explicit assertion by the
+            # caller in scripts/fit_dev_temperature.py).
             target = batch["pick_pos"]
             target_logit = logits.gather(1, target.unsqueeze(1))
             rank = (logits > target_logit).sum(dim=1) + 1
+            probs = torch.softmax(logits / temperature, dim=1)
             ranks[rows] = rank.cpu().numpy()
             pick_probs[rows] = probs.gather(1, target.unsqueeze(1)).squeeze(1).cpu().numpy()
             top_probs[rows] = probs.max(dim=1).values.cpu().numpy()
