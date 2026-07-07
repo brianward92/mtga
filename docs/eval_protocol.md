@@ -165,9 +165,10 @@ zone where the selected band's own cited-number claim would be false.
   0. Contribution: the frozen benchmark, the first meta-free multi-set
   zero-shot number, the scaling curve.
 - **44.54–55.44%:** best published day-1-feasible drafter (beats expert-tuned
-  44.5%, GPT-4o 43%, hour-0 heuristics, each measured on a different test
-  set — situates rather than compares head-to-head); below the
-  meta-inclusive 55.44% with the asterisk paragraph.
+  44.5% and GPT-4o 43% — each measured on a different test set, situates
+  rather than compares head-to-head — and beats every hour-0 heuristic
+  head-to-head on MSH itself); below the meta-inclusive 55.44% with the
+  asterisk paragraph.
 - **> 55.44%:** zero-shot SOTA outright with strictly less information than
   the prior best, on a harder (UB) test set; BRO dev row as the
   same-holdout receipt.
