@@ -64,8 +64,17 @@ config, data-manifest hash, wall clock, throughput, artifact sha256s, and
 dev metrics. Every table cell in the main paper carries its source run
 id as a comment in the generated table file; tables and the scaling
 figure are emitted by a script from run records and cached evaluation
-outputs, and the main paper's prose reads numbers from generated macros
--- no result number in either document is typed by hand.
+outputs. Primary table and headline numbers read from generated macros;
+secondary analysis numbers (per-set deltas, diagnostic slices) are cited
+in prose with the exact producing script and run id in a source comment
+-- no number anywhere is typed by hand without that trail, macro or not.
+
+Training's MPS backend is not trusted by default: every launch runs a
+CPU-vs-accelerator parity check on losses and gradient norms before
+training proceeds, LayerNorm is composed from primitive ops rather than
+the fused kernel (whose backward pass is wrong on some chip/OS
+combinations), and a watchdog skips non-finite gradient steps during
+training and halts on recurrence rather than silently continuing.
 
 \begin{itemize}
   \item \texttt{experiments/ledger.jsonl} -- the append-only run registry
@@ -91,6 +100,7 @@ Protocol tag & \texttt{\ProtocolTag} \\
 Data-manifest content hash & \texttt{\DataManifestHash} \\
 Featurizer-manifest content hash & \texttt{\FeaturizerHash} \\
 F-dev run id & \texttt{\FdevRunId} \\
+F-full run id & \texttt{\FfullRunId} \\
 \bottomrule
 \end{tabular}
 

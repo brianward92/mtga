@@ -41,10 +41,8 @@
 % Auto-generated number macros (run scripts/make_paper_tables.py).
 \input{tables/numbers}
 
-% Verdict-panel mockup style + its own auto-generated numbers (run
-% figures/make_verdict_panels.py). Illustrative-interface figures only --
-% never used for a headline scientific claim.
-\input{figures/verdict-style}
+% Auto-generated numbers for the illustrative card figures (run
+% figures/make_verdict_panels.py).
 \input{figures/verdict_numbers}
 
 \newcommand{\seventeenlands}{17Lands}
@@ -89,28 +87,37 @@ Gathering} Sets from Public Card Features}
 \begin{abstract}
 Draft assistants for \mtg{} require weeks of post-release human pick data
 before they can model a new set; on release day they have nothing. We train
-DraftFM, a \FdevParams M-parameter pick model that represents every card as a
-frozen vector of public information (structured Scryfall features plus a
-sentence embedding of rules text) and carries no set-identity parameters, so
-it can score a set the moment its card list is public. Trained on
+DraftFM, a pick model that represents every card as a frozen vector of
+public information (structured Scryfall features plus a sentence embedding
+of rules text) and carries no set-identity parameters, so it can score a
+set the moment its card list is public. The \FdevParams M-parameter recipe
+used for architecture and hyperparameter selection, trained on
 \FdevPicks M human picks from \FdevSets{} sets of \seventeenlands{} public
-data, the model reaches \FdevDevMean\% expert-pick agreement zero-shot on
-three held-out sets (\FdevBro\% / \FdevTmt\% / \FdevSos\% on BRO / TMT /
-SOS), \RatioDevMean\% of the accuracy of per-set models trained directly on
-each target set, and above every published approach that is feasible on
-release day. The headline evaluation is pre-registered and frozen before the
-test set exists: one inference pass over the first public snapshot of MSH, a
-licensed-IP set whose pick data nothing in the pipeline has touched
-(\FfullMsh\% expert top-1). We release the code, the frozen protocol, model
-weights, and per-pick prediction files.
+data, reaches \FdevDevMean\% expert-pick agreement zero-shot on three
+held-out sets (\FdevBro\% / \FdevTmt\% / \FdevSos\% on BRO / TMT / SOS),
+\NormScoreDevMean\% of the accuracy of per-set models trained directly on
+each target set by the pre-registered normalized score (identical
+held-out picks), and above every day-one-feasible published number we could
+locate, each measured on a different test set than DraftFM's, so these
+situate rather than compare head-to-head (Table~\ref{tab:baselines}).
+A pre-registered ablation on the same held-out trio found a smaller
+recipe that is no worse within seed noise: dropping the set-context tower
+cuts the model to \FfullParams{} M parameters, with zero-shot agreement
+of \ANoctxDevMean\% against \FdevDevMean\% for the with-tower recipe -- a
+gap smaller than the 0.5pp seed spread measured on this architecture
+(\S\ref{sec:analysis}). That tower-free recipe is F-full, the model whose one
+pre-registered inference pass over the first public snapshot of MSH -- a
+licensed-IP set whose pick data nothing in the pipeline has touched -- is
+the headline evaluation (\FfullMsh\% expert top-1). We release the code,
+the frozen protocol, model weights, and per-pick prediction files.
 \end{abstract}
 
 \begin{center}
-\statbox{\FdevDevMean\%}{zero-shot expert-pick agreement on three unseen sets (\S\ref{sec:results})}
+\statbox{\FdevDevMean\%}{zero-shot expert-pick agreement, dev-selection recipe (\S\ref{sec:results})}
 \hfill
-\statbox{\RatioDevMean\%}{of a per-set-trained ceiling's accuracy, with zero picks from the target set}
+\statbox{\NormScoreDevMean\%}{of a per-set-trained ceiling's accuracy (pre-registered normalized score), with zero picks from the target set}
 \hfill
-\statbox{\FdevParams M params}{trains from scratch in \FdevWallHours{} h on one workstation (\S\ref{sec:training})}
+\statbox{\FfullParams M params}{the shipped recipe (A-noctx architecture); F-full trains from scratch in \FfullWallHours{} h on one workstation (\S\ref{sec:training})}
 \end{center}
 \vspace{1mm}
 

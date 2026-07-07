@@ -4,7 +4,9 @@
 \paragraph{Generalised card representations.}
 Bertram, F\"urnkranz, and M\"uller~\citep{bertram2024cards} established the
 zero-shot drafting problem, and their paper remains the only published
-quantitative result on it. They replace one-hot card identities with
+quantitative result on it from multi-set feature-based training (a
+separate zero-shot LLM number exists, discussed below under ``LLMs as
+drafters''). They replace one-hot card identities with
 concatenated feature vectors: hand-engineered attributes plus a
 Sentence-BERT embedding~\citep{reimers2019sbert} of card text (1306-d), a
 learned autoencoding of card images (1024-d), and 16 post-release usage
@@ -14,7 +16,7 @@ their findings shape our design: feature
 representations match one-hot accuracy within a set (nothing is lost by
 generalising), and multi-set pretraining, not the representation alone, is
 what buys transfer. Pretrained on 13 sets and evaluated on held-out BRO,
-their best representation reaches 55.44\% pick agreement. That
+their best representation reaches 55.4\% pick agreement. That
 representation includes the usage-statistics block, which is computed from
 human play after a set's release; the number is therefore an anchor for
 zero-shot \emph{card generalisation} rather than for day-one deployment,

@@ -4,8 +4,10 @@
 Drafting in \mtg{} is a sequential game of imperfect information: eight
 players pass packs of cards, each privately assembling a deck one pick at a
 time. Strong pick models exist. Supervised models trained on human draft
-logs reach 48.7--71\% agreement with expert picks within a
-set~\citep{ward2021drafting,czerner2025puder,brooks2024statistical}, but
+logs reach 48.7--71\% agreement with human picks within a
+set~\citep{ward2021drafting,czerner2025puder,brooks2024statistical} (a
+general, not expert-filtered, pick population; experts are easier to
+predict, scoring several points higher), but
 they are set-specific. Each model encodes cards as vocabulary indices,
 learns from picks made in that set, and transfers nowhere. Because public
 draft logs appear on a delay, a data-driven assistant for a new set cannot
@@ -31,31 +33,42 @@ selection touches MSH pick data, and the headline number is produced by a
 single pre-registered inference pass over the first public snapshot. All
 model selection happens on three development sets (BRO, TMT, SOS) held out
 of training, chosen so our numbers are directly comparable to the only
-published zero-shot benchmark~\citep{bertram2024cards} (same BRO holdout)
-and to our own strongest per-set ceilings.
+published multi-set feature-based zero-shot benchmark~\citep{bertram2024cards}
+(same BRO holdout) and to our own strongest per-set ceilings.
 
 Zero-shot on the development trio, DraftFM agrees with expert picks
 \FdevDevMean\% of the time (\FdevBro\% / \FdevTmt\% / \FdevSos\% on
-BRO / TMT / SOS): \RatioDevMean\% of what per-set models trained on each
-target achieve, and above every published number attainable on release day
-(expert-tuned ratings 44.5\%~\citep{ward2021drafting}, an hour-zero rarity
-heuristic \BaseRarity\%) as well as zero-shot GPT-4o
-(43\%~\citep{bertram2025urzagpt}). On MSH the frozen evaluation gives
-\FfullMsh\% expert top-1 agreement.
+BRO / TMT / SOS): \NormScoreDevMean\% of what per-set models trained on
+each target achieve by the pre-registered normalized score (identical
+held-out picks, \S\ref{sec:protocol}), and above every published number
+attainable on release day
+that we could locate (expert-tuned ratings 44.5\%~\citep{ward2021drafting}
+on M19, an hour-zero rarity heuristic \BaseRarity\%, measured on SOS as a
+rehearsal stand-in rather than per dev set) as well as zero-shot GPT-4o
+(43\%~\citep{bertram2025urzagpt} on NEO) -- each on a different test set
+than DraftFM's, so these situate rather than compare head-to-head
+(Table~\ref{tab:baselines}); the one same-set comparison available is the
+rarity heuristic against DraftFM's own SOS number (\FdevSos\%). On MSH the
+frozen evaluation gives \FfullMsh\% expert top-1 agreement.
 
 Contributions:
 \begin{itemize}
-  \item \textbf{A cross-set model and recipe.} A \FdevParams M-parameter
-  two-tower architecture over frozen card features that trains on
-  \FdevPicks M picks in about \FdevWallHours{} hours on a single
-  consumer workstation (\S\ref{sec:method}).
+  \item \textbf{A cross-set model and recipe.} A two-tower architecture
+  over frozen card features, refined by a pre-registered ablation from a
+  \FdevParams M-parameter design with a set-context tower to the
+  \FfullParams M-parameter tower-free recipe that ships (A-noctx,
+  \S\ref{sec:analysis}), training on \FdevPicks M picks in about
+  \FdevWallHours{} hours on a single consumer workstation
+  (\S\ref{sec:method}).
   \item \textbf{A frozen zero-shot benchmark.} A pre-registered,
   tamper-evident protocol for day-one draft evaluation, plus the first
   multi-set zero-shot numbers that use no post-release information of any
   kind (\S\ref{sec:protocol}, \S\ref{sec:results}).
   \item \textbf{A scaling study.} Zero-shot accuracy as a function of
-  training-set count from 1 to \FdevSets{} sets, with seed and
-  set-composition variance (\S\ref{sec:results}).
+  training-set count from 1 to \FdevSets{} sets, with set-composition
+  probes and zero-shot seed bands at two rungs (\S\ref{sec:results}; the
+  bands bound the curve's seed noise rather than fully characterize it,
+  see caveat there).
   \item \textbf{A licensed-IP shift analysis.} Pre-registered ablations
   designed to isolate what text embeddings contribute when a set's names
   and flavor come from a licensed universe rather than in-universe \mtg{}
@@ -67,33 +80,26 @@ Contributions:
 
 \begin{figure}[t]
 \centering
-\begin{minipage}[c]{0.32\linewidth}
-  \centering
-  \includegraphics[width=\linewidth]{figures/cards/emeritus-of-ideation.jpg}
-\end{minipage}%
-\hspace{0.04\linewidth}%
-\begin{minipage}[c]{0.50\linewidth}
-  \begin{tcolorbox}[verdictpanel]
-    \vheader{SOS $\cdot$ Premier Draft}{P1P1}
-    {\large\bfseries\color{vraremythic}Emeritus of Ideation}\par\vspace{1.6mm}
-    \Flames{5}\par\vspace{1.2mm}
-    {\scriptsize\bfseries\color{vgreen}OBVIOUS BOMB --- JUST TAKE IT}\hfill{\scriptsize\bfseries\color{vtextsecondary}\VHeroDominance}\par\vspace{1.8mm}
-    \vbar
-    {\scriptsize\color{vtextsecondary}EV \VHeroEv\ $\cdot$ GIH \VHeroGih\ $\cdot$ ALSA \VHeroAlsa}\par\vspace{2.0mm}
-    {\scriptsize\color{vtextsecondary}2\ \ \VHeroRunnerOneName\hfill \VHeroRunnerOnePct\%}\par\vspace{0.8mm}
-    {\scriptsize\color{vtextsecondary}3\ \ \VHeroRunnerTwoName\hfill \VHeroRunnerTwoPct\%}\par
-    \vfooter{\VHeroModelVersion}
-  \end{tcolorbox}
-\end{minipage}
-\caption{The pick-scoring interface, on an actual first pick. The card
-(left) is Scryfall's unmodified scan, copyright and artist line intact; the
-panel (right) mirrors the deployed overlay's live ``verdict'' view
-(\S\ref{sec:arch}) and every number in it is real, computed by the shipped
-per-set scoring model (Table~\ref{tab:main}'s per-set ceiling) over an
-actual thirteen-card SOS pack, empty pool. SOS is a public development set,
-never the frozen MSH test set (\S\ref{sec:protocol}). This figure
-illustrates the interface, not a headline result. Numbers regenerated by
+\includegraphics[width=0.24\linewidth]{figures/cards/emeritus-of-ideation.jpg}
+\caption{Emeritus of Ideation, an actual first pick from a real thirteen-card
+SOS pack (empty pool). The per-set ceiling model (Table~\ref{tab:main})
+ranks it above every other card in the pack by a wide margin: real
+expected value\protect\footnotemark{} \VHeroEv, seen in \VHeroGih{} of games it's
+in, average last-seen-at pick \VHeroAlsa, and \VHeroDominance{} model
+dominance over the closest candidate in the pack (\VHeroRunnerOneName).
+SOS is a public development set, never the frozen MSH test set
+(\S\ref{sec:protocol}); this figure illustrates the model's output, not a
+headline result. Numbers regenerated by
 \texttt{figures/make\_verdict\_panels.py}.}
 \label{fig:teaser}
 \end{figure}
+\footnotetext{\emph{Expected value} is this per-set model's own raw score
+for the card (higher is better; not a model input, and not the top-1
+agreement metric reported elsewhere in this paper). \emph{GIH\%} and
+\emph{ALSA} are \seventeenlands{} per-card statistics reported for
+context: GIH\% is win rate in games where the card was drawn, and ALSA is
+the average pick number at which the card was last seen (lower means
+drafters value it more highly). \emph{Model dominance} is this paper's
+own pairwise measure, $\mathrm{sigmoid}(\text{top EV} - \text{runner-up
+EV})$.}
 \FloatBarrier

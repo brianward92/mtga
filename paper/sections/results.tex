@@ -16,24 +16,41 @@
 \end{table}
 
 \paragraph{Zero-shot transfer on the development trio.}
-Table~\ref{tab:main} is the paper's central result: the F-dev
-\FdevDevMean\% headline from \S\ref{sec:intro}, trained on \FdevPicks M
-picks from \FdevSets{} sets and evaluated on three sets it has never seen a
-pick from. Broken out per set, DraftFM reaches \FdevBro\% / \FdevTmt\% /
+% Aligned normalized score (scripts/eval_normalized_score.py, inner-joined
+% on identical (draft_id, pack, pick) so zero-shot and ceiling score the
+% same picks -- a much smaller aligned subset than the unaligned ratio's
+% full slice, since the ceiling model's val split is small): run=
+% 20260704_135822_f_dev. BRO 0.7430 (CI 0.7363-0.7503, n=59,572 aligned
+% picks), TMT 0.8132 (CI 0.8015-0.8251, n=17,261), SOS 0.8019 (CI
+% 0.7960-0.8077, n=69,803), dev-mean 0.7860.
+Table~\ref{tab:main} reports zero-shot transfer on the development trio:
+F-dev, the recipe used for architecture and hyperparameter selection,
+reaches \FdevDevMean\% agreement, trained on \FdevPicks M picks from
+\FdevSets{} sets and evaluated on three sets it has never seen a pick
+from. (The paper's actual headline result is the frozen MSH number
+reported below; every number in this paragraph is a dev-trio rehearsal
+by the protocol's own design, \S\ref{sec:protocol}.) Broken out per set,
+DraftFM reaches \FdevBro\% / \FdevTmt\% /
 \FdevSos\% on BRO / TMT / SOS against per-set ceilings of \CeilBro\% /
-\CeilTmt\% / \CeilSos\%, recovering \RatioBro\% / \RatioTmt\%
-/ \RatioSos\% of those ceilings (unaligned ratio; the pre-registered
-normalized score on identical picks is \pending{aligned normalized scores,
-dev trio}). Excluding forced picks lowers the three numbers to
-\FdevBroNonForced\% / \FdevTmtNonForced\% / \FdevSosNonForced\%. The
-deployment-mode skill bucket selected on dev is the \DeployBucket{}
-win-rate bucket.
+\CeilTmt\% / \CeilSos\%, recovering \NormScoreBro\% / \NormScoreTmt\%
+/ \NormScoreSos\% of those ceilings by the pre-registered normalized
+score (dev-mean \NormScoreDevMean\%; aligning zero-shot and ceiling to
+identical held-out picks, \S\ref{sec:protocol}). The simpler unaligned
+ratio over the full slice -- \RatioBro\% / \RatioTmt\% / \RatioSos\%,
+dev-mean \RatioDevMean\% -- corroborates this on a much larger sample
+(the aligned subset is capped by the ceiling model's own held-out split)
+but is not itself the pre-registered metric. Excluding forced picks
+lowers the three numbers to \FdevBroNonForced\% / \FdevTmtNonForced\% /
+\FdevSosNonForced\%. The deployment-mode skill bucket selected on dev is
+the \DeployBucket{} win-rate bucket.
 
 \paragraph{Reading the BRO row.}
-BRO is the holdout on which \citet{bertram2024cards} report 55.44\%: the
+BRO is the holdout on which \citet{bertram2024cards} report 55.4\%: the
 strongest published unseen-set number, achieved with card features, learned
 image embeddings, \emph{and} 16 usage statistics computed from human play
-after the set's release. Our \FdevBro\% is below it. The comparison the
+after the set's release, on an all-users (not expert-filtered) pick
+population. Our \FdevBro\% (expert slice; \FdevBroAllUsers\% all-users, the
+population-matched comparator) is below it. The comparison the
 BRO row is designed for is the day-one setting, where usage statistics do
 not exist: against the same paper's features-only representation
 (33.6--35.6\%, single-set training) and every day-one-feasible baseline in
@@ -41,131 +58,82 @@ Table~\ref{tab:baselines}, multi-set training on public card features
 closes most of the distance toward the usage-statistics-inclusive number
 while using strictly release-day information. BRO is also the trio's
 hardest set for transfer: its packs mix in a 63-card retro-artifact bonus
-sheet. The gap between the BRO and TMT/SOS rows -- and why TMT, the
-trio's licensed-IP dev set, nonetheless transfers as well as SOS -- is
-analysed in \S\ref{sec:analysis}; Figure~\ref{fig:tmt-tierlist} shows the
-same interface on TMT. For sets in the training corpus but without a
-dedicated per-set model, the deployed system instead falls back to
-F-full's scoring; Figure~\ref{fig:gallery} shows what that looks like
-today for LTR, LCI, and DMU -- a deployment illustration, not an
-additional zero-shot data point.
+sheet, examined directly in \S\ref{sec:analysis}. The gap between the BRO
+and TMT/SOS rows -- and why TMT, the trio's licensed-IP dev set,
+nonetheless transfers as well as SOS -- is analysed there too;
+Figure~\ref{fig:tmt-tierlist} shows a real P1P1 bomb from TMT scored the
+same way. For sets in the training corpus but without a dedicated per-set
+model, the deployed system instead falls back to F-full's scoring;
+Figure~\ref{fig:gallery} shows what that looks like today for LTR, LCI,
+and DMU -- a deployment illustration, not an additional zero-shot data
+point.
 
 \begin{figure}[t]
 \centering
-\begin{minipage}[c]{0.32\linewidth}
-  \centering
-  \includegraphics[width=\linewidth]{figures/cards/steel-seraph.jpg}
-\end{minipage}%
-\hspace{0.04\linewidth}%
-\begin{minipage}[c]{0.50\linewidth}
-  \begin{tcolorbox}[verdictpanel]
-    \vheader{BRO $\cdot$ Premier Draft}{TIER LIST}
-    {\scriptsize\itshape\color{vtextmuted}Pack hidden by Arena --- showing set tier list}\par\vspace{2.0mm}
-    {\large\bfseries\color{vrarerare}Steel Seraph}\par\vspace{1.6mm}
-    \Flames{5}\par\vspace{1.2mm}
-    {\scriptsize\bfseries\color{vgreen}OBVIOUS BOMB}\par\vspace{1.8mm}
-    \vbar
-    {\scriptsize\color{vtextsecondary}EV \VBroEv}\par\vspace{2.0mm}
-    {\scriptsize\color{vtextsecondary}2\ \ \VBroRunnerOneName\hfill\FlamesSmall{5}}\par\vspace{1.0mm}
-    {\scriptsize\color{vtextsecondary}3\ \ \VBroRunnerTwoName\hfill\FlamesSmall{5}}\par
-    \vfooter{\VBroModelVersion}
-  \end{tcolorbox}
-\end{minipage}
-\caption{The same interface in \emph{tier-list} mode (no live pack; Arena
-hides the pack between picks), on BRO, the dev trio's hardest transfer
-set. Flames come from the card's percentile rank in the whole set's
-P1P1 expected value, not a head-to-head split, so no percentage is shown
-(\S\ref{sec:arch}). Steel Seraph's real EV (\VBroEv) sits at the
-\VBroPercentile{}th percentile of BRO's card pool; the two runners-up sit
-at the \VBroRunnerOnePercentile{}th and \VBroRunnerTwoPercentile{}th.
-Computed by the deployed per-set model, never MSH.}
+\includegraphics[width=0.24\linewidth]{figures/cards/steel-seraph.jpg}
+\caption{Steel Seraph, BRO -- the dev trio's hardest transfer set
+(\S\ref{sec:analysis}). Real P1P1 expected value \VBroEv, the
+\VBroPercentile{}th percentile of BRO's card pool by the deployed per-set
+model's own ranking; the next two candidates in the pack,
+\VBroRunnerOneName{} and \VBroRunnerTwoName{}, rank at the
+\VBroRunnerOnePercentile{}th and \VBroRunnerTwoPercentile{}th. Percentile,
+not a head-to-head split: Arena hides the pack between picks in this mode
+(\S\ref{sec:arch}). Never MSH.}
 \label{fig:bro-tierlist}
 \end{figure}
 
 \begin{figure}[t]
 \centering
-\begin{minipage}[c]{0.32\linewidth}
-  \centering
-  \includegraphics[width=\linewidth]{figures/cards/april-oneil-hacktivist.jpg}
-\end{minipage}%
-\hspace{0.04\linewidth}%
-\begin{minipage}[c]{0.50\linewidth}
-  \begin{tcolorbox}[verdictpanel]
-    \vheader{TMT $\cdot$ Premier Draft}{TIER LIST}
-    {\scriptsize\itshape\color{vtextmuted}Pack hidden by Arena --- showing set tier list}\par\vspace{2.0mm}
-    {\large\bfseries\color{vrarerare}April O'Neil, Hacktivist}\par\vspace{1.6mm}
-    \Flames{5}\par\vspace{1.2mm}
-    {\scriptsize\bfseries\color{vgreen}OBVIOUS BOMB}\par\vspace{1.8mm}
-    \vbar
-    {\scriptsize\color{vtextsecondary}EV \VTmtEv}\par\vspace{2.0mm}
-    {\scriptsize\color{vtextsecondary}2\ \ \VTmtRunnerOneName\hfill\FlamesSmall{5}}\par\vspace{1.0mm}
-    {\scriptsize\color{vtextsecondary}3\ \ \VTmtRunnerTwoName\hfill\FlamesSmall{5}}\par
-    \vfooter{\VTmtModelVersion}
-  \end{tcolorbox}
-\end{minipage}
-\caption{The same interface on TMT, the dev trio's licensed-IP set
-(\S\ref{sec:analysis}) -- a comic-book bomb the text encoder has never
-seen described in \mtg{} rules-text style. April O'Neil's real EV
-(\VTmtEv) sits at the \VTmtPercentile{}th percentile of TMT's pool.
-Computed by the deployed per-set model, never MSH.}
+\includegraphics[width=0.24\linewidth]{figures/cards/april-oneil-hacktivist.jpg}
+\caption{April O'Neil, Hacktivist, TMT -- the dev trio's licensed-IP set
+(\S\ref{sec:analysis}), a comic-book bomb the text encoder never saw
+described in \mtg{} rules-text style. Real P1P1 expected value \VTmtEv,
+the \VTmtPercentile{}th percentile of TMT's card pool. Never MSH.}
 \label{fig:tmt-tierlist}
 \end{figure}
 
 \begin{figure}[t]
 \centering
-\begin{minipage}[b]{0.315\linewidth}
+\begin{minipage}[b]{0.20\linewidth}
   \centering
-  \includegraphics[width=\linewidth]{figures/cards/anduril-flame-of-the-west.jpg}\par\vspace{1mm}
-  \begin{tcolorbox}[verdictpanel]
-    \vheader{LTR}{TIER LIST}
-    {\footnotesize\bfseries\color{vraremythic}Andúril, Flame of the West}\par\vspace{1mm}
-    \FlamesSmall{5}\par\vspace{0.8mm}
-    {\scriptsize\color{vtextsecondary}EV \VGalLtrEv\ $\cdot$ pct \VGalLtrPercentile}\par
-  \end{tcolorbox}
+  \includegraphics[width=\linewidth]{figures/cards/anduril-flame-of-the-west.jpg}\par
+  \small LTR: EV \VGalLtrEv, pct \VGalLtrPercentile
 \end{minipage}%
 \hfill
-\begin{minipage}[b]{0.315\linewidth}
+\begin{minipage}[b]{0.20\linewidth}
   \centering
-  \includegraphics[width=\linewidth]{figures/cards/bonehoard-dracosaur.jpg}\par\vspace{1mm}
-  \begin{tcolorbox}[verdictpanel]
-    \vheader{LCI}{TIER LIST}
-    {\footnotesize\bfseries\color{vraremythic}Bonehoard Dracosaur}\par\vspace{1mm}
-    \FlamesSmall{5}\par\vspace{0.8mm}
-    {\scriptsize\color{vtextsecondary}EV \VGalLciEv\ $\cdot$ pct \VGalLciPercentile}\par
-  \end{tcolorbox}
+  \includegraphics[width=\linewidth]{figures/cards/bonehoard-dracosaur.jpg}\par
+  \small LCI: EV \VGalLciEv, pct \VGalLciPercentile
 \end{minipage}%
 \hfill
-\begin{minipage}[b]{0.315\linewidth}
+\begin{minipage}[b]{0.20\linewidth}
   \centering
-  \includegraphics[width=\linewidth]{figures/cards/sheoldred-the-apocalypse.jpg}\par\vspace{1mm}
-  \begin{tcolorbox}[verdictpanel]
-    \vheader{DMU}{TIER LIST}
-    {\footnotesize\bfseries\color{vraremythic}Sheoldred, the Apocalypse}\par\vspace{1mm}
-    \FlamesSmall{5}\par\vspace{0.8mm}
-    {\scriptsize\color{vtextsecondary}EV \VGalDmuEv\ $\cdot$ pct \VGalDmuPercentile}\par
-  \end{tcolorbox}
+  \includegraphics[width=\linewidth]{figures/cards/sheoldred-the-apocalypse.jpg}\par
+  \small DMU: EV \VGalDmuEv, pct \VGalDmuPercentile
 \end{minipage}
 \caption{Three sets with no dedicated per-set model -- Lord of the Rings,
 The Lost Caverns of Ixalan, Dominaria United -- all in F-full's 31-set
-training corpus. This is what the deployed system actually serves for
-them today: F-full as the fallback whenever a set has no dedicated
-per-set model, the same fallback path it would run for a set onboarded
-on day one. Real EVs and percentiles, computed the same way as
-Figures~\ref{fig:bro-tierlist} and
-\ref{fig:tmt-tierlist} -- but because F-full trained on these three sets,
-this illustrates the production fallback path, not a zero-shot-accuracy
-claim; that claim is Table~\ref{tab:main}'s dev-trio and MSH rows only.}
+training corpus. This illustrates F-full's fallback scoring path for
+training-corpus sets without a dedicated per-set model -- the same path
+a newly released set would use before a per-set model exists for it.
+Real EVs and percentiles, computed the same way as
+Figures~\ref{fig:bro-tierlist} and \ref{fig:tmt-tierlist} -- but because
+F-full trained on these three sets, this illustrates the production
+fallback path, not a zero-shot-accuracy claim; that claim is
+Table~\ref{tab:main}'s dev-trio and MSH rows only.}
 \label{fig:gallery}
 \end{figure}
 
 \begin{table}[t]
   \centering
   \caption{Baselines and published anchors. Upper block: our measured
-  baselines (practice rows will be replaced by frozen MSH rows by the same
-  pipeline). Lower block: published numbers, quoted from their papers; test
-  sets and information regimes differ, so these situate rather than
-  compare. $^{*}$~=~uses post-release or otherwise non-day-one
-  information.}
+  baselines, expert-slice deployment-mode top-1 (practice rows will be
+  replaced by frozen MSH rows by the same pipeline). Lower block: published
+  numbers, quoted from their papers on their own (general-player, not
+  expert-filtered) pick populations; test sets, information regimes, and
+  pick populations all differ from the upper block and from each other, so
+  these situate rather than compare. $^{*}$~=~uses post-release or
+  otherwise non-day-one information.}
   \label{tab:baselines}
   \footnotesize
   \setlength{\tabcolsep}{3.5pt}
@@ -188,7 +156,8 @@ release. Their MSH rows are filled in once the frozen evaluation runs.
 \paragraph{The frozen MSH evaluation.}
 The headline: F-full expert-slice deployment-mode top-1 on MSH is
 \FfullMsh\% (CI in Table~\ref{tab:main}). Snapshot gates, identifiers,
-and hashes are reported in Appendix~\ref{sec:repro}. \pending{MSH secondary metrics: top-3, all-users
+and hashes are reported in the companion implementation reference
+(Appendix~\ref{sec:repro} points there). \pending{MSH secondary metrics: top-3, all-users
 top-1, normalized score vs the post-day-one MSH ceiling, log-loss, ECE,
 late-draft retention}
 
@@ -197,11 +166,17 @@ late-draft retention}
 % Exactly ONE of the three paragraphs below is uncommented at MSH time,
 % chosen solely by the frozen headline number. The text is drafted before
 % the result exists and must not be softened or sharpened after the fact.
+% Boundaries are set to the exact cited priors (44.54%, 55.44%), not
+% rounded to 45%/55%, so no headline number can fall into a dead zone
+% where the selected band's own cited-number claim would be false --
+% fixed pre-T0, 2026-07-07, per Brian's explicit live decision (see
+% docs/adversarial_review_2026-07-06.md and /tmp/DISCUSSION.md for the
+% finding and the authorization to touch this frozen block this one time).
 % ----------------------------------------------------------------------
-% BAND A (< 45%):
+% BAND A (< 44.54%):
 % \paragraph{Interpretation.}
 % The headline number falls short of the strongest day-one-feasible prior,
-% the expert-tuned rating systems at 44.5\%: at current scale, multi-set
+% the expert-tuned rating systems at 44.54\%: at current scale, multi-set
 % training on public card features alone does not buy day-one competence,
 % and hand-tuned expert ratings remain unbeaten at hour zero. The result is
 % negative for the scaling hypothesis but leaves the contributions that do
@@ -210,19 +185,21 @@ late-draft retention}
 % curve, whose shape (Figure~\ref{fig:scaling}) indicates whether the gap
 % is a data problem or a representation problem.
 % ----------------------------------------------------------------------
-% BAND B (45-55%):
+% BAND B (44.54--55.44%):
 % \paragraph{Interpretation.}
-% The headline number makes DraftFM the strongest published drafter that
-% can exist on release day: above expert-tuned ratings (44.5\%), GPT-4o
-% (43\%), and every hour-zero heuristic we measure. It remains below the
-% 55.44\% of \citet{bertram2024cards} on held-out BRO. That number is the
-% appropriate upper reference, and it is not a day-one number: its
-% representation includes usage statistics computed from human play after
-% release, information that by construction cannot exist when a set goes
-% live. Within the information regime a deployed day-one assistant actually
-% inhabits, DraftFM sets the published state of the art.
+% The headline number makes DraftFM the strongest published day-one-feasible
+% drafter we could locate: above expert-tuned ratings (44.5\%), GPT-4o
+% (43\%), and every hour-zero heuristic we measure -- each measured on a
+% different test set than DraftFM's, so these situate rather than compare
+% head-to-head. It remains below the 55.44\% of \citet{bertram2024cards} on
+% held-out BRO. That number is the appropriate upper reference, and it is
+% not a day-one number: its representation includes usage statistics
+% computed from human play after release, information that by construction
+% cannot exist when a set goes live. Within the information regime a
+% deployed day-one assistant actually inhabits, DraftFM sets the published
+% state of the art.
 % ----------------------------------------------------------------------
-% BAND C (> 55%):
+% BAND C (> 55.44%):
 % \paragraph{Interpretation.}
 % The headline number exceeds the strongest published unseen-set result,
 % the 55.44\% of \citet{bertram2024cards}, while using strictly less
@@ -248,9 +225,12 @@ late-draft retention}
 
 \begin{table}[t]
   \centering
-  \caption{Scaling ladder. Rung labels are frozen protocol identifiers;
-  set and pick counts come from run records. Dev-mean is the model-selection
-  metric of \S\ref{sec:protocol}.}
+  \caption{Scaling ladder. Rung labels are frozen protocol identifiers, not
+  set counts (\emph{S27} names the top rung's run, which trains on 28 sets
+  -- a naming artifact from an earlier corpus size, kept as-is rather than
+  renamed after the fact); set and pick counts in the table are the real
+  values from run records. Dev-mean is the model-selection metric of
+  \S\ref{sec:protocol}.}
   \label{tab:scaling}
   \small
   \setlength{\tabcolsep}{4pt}
@@ -269,8 +249,35 @@ features-only anchor; the top rung is F-dev.
 % run=20260705_170755_s4_seed18 (0.6881), run=20260705_170755_s4_seed19 (0.6880).
 Two extra seeds at S1 and S4 give within-training top-1 spreads of
 0.677--0.682 and 0.688--0.689 -- training itself is not noise-dominated at
-either rung, though this checks in-distribution stability, not a seed
-sweep of the zero-shot dev-mean the curve actually plots.
-\pending{scaling-curve shape claim: slope, diminishing-returns point, and
-whether set count or pick count is the better predictor (S2b/S4b probes +
-3-seed bands at S1/S4)}
+either rung, checking in-distribution training stability and complementing
+the zero-shot dev-mean seed spread reported below.
+% Log-linear fit of dev-mean top-1 on log2(train picks), nested ladder only
+% (S1..F-dev/S27): scripts/analyze_scaling_shape.py, reading
+% paper/figures/scaling_data.json (same source scaling_curve.py plots from).
+% slope=1.037pp/doubling, R^2=0.980, max |residual|=0.43pp (S2). Per-segment
+% doubling-normalized deltas: S1-S2 1.57, S2-S4 0.67, S4-S8 0.79, S8-S16
+% 1.01, S16-F-dev 1.68 pp/doubling -- non-monotonic, no decay toward the
+% top rung.
+A log-linear fit of dev-mean top-1 on $\log_2$(training picks) across the
+nested ladder (S1 through F-dev, 5.4M--149.4M picks) tracks the six rungs
+closely -- slope 1.0 percentage point per doubling, $R^2=0.98$, no rung
+off the fitted line by more than 0.4pp -- but that same fit argues against,
+not for, reading a diminishing-returns point into the tested range: the
+per-doubling gain moves between 0.7 and 1.7pp/doubling non-monotonically
+(lowest across the S2--S8 middle of the ladder, highest at the S1--S2 start
+and the S16--F-dev end) rather than decaying toward the top rung. Six
+error-bar-free points on a fit whose own top rung is the model selected on
+this axis are not strong evidence of log-linearity; the honest reading is
+narrower than it looks: no diminishing returns are visible over the two
+orders of magnitude tested, not that returns have been shown not to
+saturate beyond it. Re-scoring those same extra-seed checkpoints on the
+zero-shot dev-mean the curve plots -- the metric on the axis, not
+within-training top-1 -- gives per-seed spreads of \SeedSpreadSone pp at S1
+and \SeedSpreadSfour pp at S4, at most about a quarter of the
+\SeedGainSoneSfour pp gain from S1 to S4, so the rung-to-rung climb is not a
+seed artifact. These are three-seed spreads at two rungs that also fold in
+an early-stop-step difference (the two added seeds stopped at half the
+reference seed's step), so they bound the curve's seed noise rather than
+fully characterize it, and stand at S1/S4 as a proxy for the top rung.
+\pending{whether set count or pick count better predicts the curve
+(S2b/S4b probes)}

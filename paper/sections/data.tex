@@ -59,4 +59,10 @@ feature-fitting code path refuse MSH pick data outright, and at the
 protocol freeze its public data did not yet exist. MSH \emph{card} features
 from Scryfall are permitted. That is the zero-shot
 contract: public card information only, no human behavioral data of any
-kind.
+kind. ``Unseen'' describes the set, not every card in it: BRO/TMT/SOS
+packs include some ordinary reprints (mostly base-set staples and basic
+lands) that also appear in F-dev's training corpus under other sets. This
+confers no advantage under the zero-shot contract above -- a reprint has no
+memorized identity to exploit, only the same frozen feature vector any
+novel card with identical features would get -- but it does mean set-level
+and card-level novelty are not the same claim.

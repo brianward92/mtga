@@ -19,8 +19,12 @@ count, and 24 regex flags over rules text for common functional categories
 (removal, card draw, counterspells, tokens, ramp, \ldots) (26).
 Double-faced and split cards take numeric blocks from the front face.
 Subtype and keyword vocabularies are counted over \emph{training} sets
-only; a registry gate refuses to fit vocabularies on the held-out set. The
-resulting featurizer manifest is content-hashed
+only; a registry gate refuses to fit vocabularies on MSH, the frozen test
+set (\S\ref{sec:protocol}). This blindness is guaranteed for MSH
+specifically; it does not mean the dev trio's cards were excluded from
+every vocabulary in the release (\S\ref{sec:data}), so ``dev-trio
+zero-shot'' is a claim about training picks, not about vocabulary
+provenance. The resulting featurizer manifest is content-hashed
 (\texttt{\FeaturizerHash}) and released; held-out cards featurize through
 the frozen manifest, with out-of-vocabulary subtypes and keywords absorbed
 by the unmatched counters. Scalars are clipped to $[0,1]$; parse failures
@@ -119,10 +123,8 @@ at two scaling rungs (\S\ref{sec:protocol}).
 Training runs on a single Apple M3 Ultra workstation (96\,GB unified
 memory) in PyTorch 2.12 eager mode on the MPS backend, at
 $\sim$\FdevExamplesPerSec{} picks/s. The full \FdevPicks M-pick run takes
-about \FdevWallHours{} hours, stopping at step 34{,}000. Correctness on
-this backend is not assumed: a CPU-vs-accelerator parity check on losses
-and gradient norms gates every launch, LayerNorm is composed from
-primitive ops (the fused kernel's backward is wrong on some chip/OS
-combinations), and a watchdog skips non-finite gradient steps and halts on
-recurrence. Inference exports to ONNX (opset 18) and runs on a consumer
-x86-64 machine, CPU-only, well under a millisecond per pick.
+about \FdevWallHours{} hours, stopping at step 34{,}000. Training-backend
+correctness is not assumed and is actively gated rather than hoped for;
+specifics are in the companion reference. Inference
+exports to ONNX (opset 18) and runs on a consumer x86-64 machine,
+CPU-only, well under a millisecond per pick.

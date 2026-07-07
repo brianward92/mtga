@@ -94,8 +94,17 @@ def discover_runs(repo):
                      "root": str(root)}
             if (d / "record.json").exists():
                 entry["record"] = load_json(d / "record.json")
-            if (d / "zeroshot" / "summary.json").exists():
-                entry["summary"] = load_json(d / "zeroshot" / "summary.json")
+            zs = d / "zeroshot"
+            if (zs / "summary.json").exists():
+                entry["summary"] = load_json(zs / "summary.json")
+            # Secondary zero-shot analyses (eval_*.py outputs) live beside the
+            # summary; load whichever are present so their numbers reach the
+            # prose macros instead of being transcribed by hand.
+            for key, fname in (("normalized_score", "normalized_score.json"),
+                               ("late_retention", "late_draft_retention.json"),
+                               ("bro_transfer", "bro_transfer_analysis.json")):
+                entry[key] = load_json(zs / fname) if (zs / fname).exists() \
+                    else None
             if entry["record"] or entry["summary"]:
                 runs[d.name] = entry
     return runs
@@ -258,7 +267,7 @@ def rehearsal_baselines(frozen):
 
 # --- tables -----------------------------------------------------------------
 
-def table_main(anchors, fdev, ffull, frozen, ledger):
+def table_main(anchors, fdev, ffull, a_noctx, frozen, ledger):
     ceil = anchors["ceilings"]
     rows = [
         r"\begin{tabular}{lccccc}",
@@ -288,6 +297,31 @@ def table_main(anchors, fdev, ffull, frozen, ledger):
     fdev_cells.append(cell(m["top1"], m["ci"], m["run_id"]) if m
                       else pending("eval"))
     rows.append(fdev_cells)
+
+    # A-noctx row: the pre-registered architecture ablation that won the
+    # dev-trio sweep -- same architecture F-full ships (verified by matching
+    # param counts), held out on the dev trio, so unlike F-full's own row
+    # (never quoted) this one is a real, honest zero-shot number for the
+    # shipped recipe. Surfaced here, not just in the ablation grid, so the
+    # reader doesn't have to infer the selected model from six other rows.
+    anoctx_cells = [r"\quad DraftFM (A-noctx, selected dev recipe)"]
+    anoctx_vals = []
+    anoctx_run_id = a_noctx["run_id"] if a_noctx else None
+    for s in DEV_SETS:
+        d = dev_expert(a_noctx["summary"] if a_noctx else None, s)
+        if d:
+            anoctx_cells.append(cell(d["top1"], d["ci"], anoctx_run_id))
+            anoctx_vals.append(d["top1"])
+        else:
+            anoctx_cells.append(pending(s))
+    if len(anoctx_vals) == 3:
+        mean = a_noctx["summary"].get("dev_mean_expert_top1",
+                                      sum(anoctx_vals) / 3)
+        anoctx_cells.append(cell(mean, run_id=anoctx_run_id))
+    else:
+        anoctx_cells.append(pending("mean"))
+    anoctx_cells.append(r"--")  # A-noctx is dev-only, never scored on MSH
+    rows.append(anoctx_cells)
 
     # F-full row: dev cells never quoted (trained on the dev sets).
     ffull_cells = [r"DraftFM (F-full, zero-shot)"]
@@ -335,7 +369,7 @@ def table_baselines(anchors, frozen):
         r"\begin{tabular}{llll}",
         r"\toprule",
         r"\rowcolor{tblhead}",
-        r"Method & Information used & Test set & Expert top-1 (\%) \\",
+        r"Method & Information used & Test set & Top-1 agreement (\%) \\",
         r"\midrule",
     ]
 
@@ -495,7 +529,7 @@ def table_scaling(by_name, frozen, ledger):
     return emit_rows(rows), curve
 
 
-def numbers_macros(anchors, fdev, frozen):
+def numbers_macros(anchors, fdev, ffull, a_noctx, frozen, calibration=None):
     """LaTeX macros so results/analysis prose needs no edits when numbers
     land. Missing values render as \\pending{...}."""
     out = []
@@ -538,6 +572,15 @@ def numbers_macros(anchors, fdev, frozen):
     for s in DEV_SETS:
         macro(f"Ceil{s.title()}", pct(ceil[s]["top1"]), ceil[s]["run_id"])
     if len(dev_vals) == 3:
+        # Unweighted mean of the three PER-SET ratios (zeroshot/ceiling,
+        # unaligned picks) -- NOT the ratio of the means, and NOT the
+        # pre-registered aligned normalized score (evalproto.summarize's
+        # "normalized score", docs/eval_protocol.md section 3; computed
+        # separately by eval_normalized_score.py, currently 78.6% dev-mean,
+        # cited alongside this ratio in results.tex's "Zero-shot transfer"
+        # paragraph). The two are close (78.7 vs 78.6) but are different
+        # aggregates over different (unaligned vs. aligned) pick sets --
+        # don't conflate them if this macro's definition ever changes.
         ratios = [d / ceil[s]["top1"] for d, s in zip(dev_vals, DEV_SETS)]
         for s, r in zip(DEV_SETS, ratios):
             macro(f"Ratio{s.title()}", f"{100 * r:.1f}")
@@ -574,6 +617,181 @@ def numbers_macros(anchors, fdev, frozen):
         macro("FdevExamplesPerSec", f"{rec['examples_per_s']:,}",
               fdev["run_id"])
         macro("FdevRunId", fdev["run_id"].replace("_", r"\_"))
+
+    # F-full: the actual shipped/frozen recipe (A-noctx's architecture,
+    # retrained on all 31 sets). Its own dev numbers are never quoted
+    # (table_main already enforces this); the one legitimate prose fact is
+    # its param count, which the abstract/intro need to stop conflating
+    # with F-dev's.
+    if ffull and ffull["record"]:
+        rec = ffull["record"]
+        macro("FfullParams", f"{rec['n_params'] / 1e6:.1f}", ffull["run_id"])
+        macro("FfullPicks", f"{rec['n_train_picks'] / 1e6:.1f}", ffull["run_id"])
+        macro("FfullWallHours", f"{rec['wall_clock_s'] / 3600:.1f}",
+              ffull["run_id"])
+        macro("FfullRunId", ffull["run_id"].replace("_", r"\_"))
+
+    # A-noctx: the winning architecture ablation -- same param count as
+    # F-full (verified: both 1,637,999), held out on the dev trio, so its
+    # numbers (unlike F-full's) are the honest zero-shot proxy for "how
+    # does the shipped architecture do." Sourced the same way as F-dev's
+    # per-set/ratio macros above, just for a different run.
+    if a_noctx:
+        anoctx_vals = []
+        run_id = a_noctx["run_id"]
+        for s in DEV_SETS:
+            d = dev_expert(a_noctx["summary"], s)
+            if d:
+                macro(f"ANoctx{s.title()}", pct(d["top1"]), run_id)
+                anoctx_vals.append(d["top1"])
+            else:
+                macro(f"ANoctx{s.title()}", f"\\pending{{A-noctx {s}}}")
+        if len(anoctx_vals) == 3:
+            mean = a_noctx["summary"].get("dev_mean_expert_top1",
+                                          sum(anoctx_vals) / 3)
+            macro("ANoctxDevMean", pct(mean), run_id)
+            ratios = [v / ceil[s]["top1"] for v, s in zip(anoctx_vals, DEV_SETS)]
+            for s, r in zip(DEV_SETS, ratios):
+                macro(f"RatioANoctx{s.title()}", f"{100 * r:.1f}")
+            macro("RatioANoctxDevMean", f"{100 * sum(ratios) / 3:.1f}")
+        else:
+            macro("ANoctxDevMean", "\\pending{A-noctx dev mean}")
+
+    # Frozen dev-only calibration temperature (experiments/frozen_battery.json
+    # "calibration" block, docs/eval_protocol.md section 3). Never fitted on
+    # MSH -- MSH ECE stays a separate, still-pending quantity.
+    if calibration:
+        macro("FrozenTemperature", f"{calibration['temperature']:.2f}",
+              calibration.get("fit_run"))
+        macro("DevMeanEceAtTOne", f"{calibration['dev_mean_ece_at_t1']:.3f}",
+              calibration.get("fit_run"))
+        macro("DevMeanEceAtFrozenT",
+              f"{calibration['dev_mean_ece_at_frozen_t']:.3f}",
+              calibration.get("fit_run"))
+    else:
+        macro("FrozenTemperature", "\\pending{frozen temperature}")
+        macro("DevMeanEceAtTOne", "\\pending{dev mean ECE at T=1}")
+        macro("DevMeanEceAtFrozenT", "\\pending{dev mean ECE at frozen T}")
+    return out
+
+
+def pp_ci(lo, hi):
+    """Format a [lo, hi] fraction pair as a 'lo--hi' percentage-point range.
+    Auto-precision: 2 decimals when a bound is under 0.1pp (so a small but
+    nonzero interval like 0.09--0.33 still reads as excluding zero), else 1."""
+    lo_pp, hi_pp = 100 * lo, 100 * hi
+    dp = 2 if min(abs(lo_pp), abs(hi_pp)) < 0.1 else 1
+    return f"{lo_pp:.{dp}f}--{hi_pp:.{dp}f}"
+
+
+def analysis_macros(fdev, ablation_deltas, seed_bands):
+    """Macros for the secondary Analysis/Results statistics that were
+    previously transcribed into prose by hand. Every value is read from a
+    machine-readable source -- the f_dev run's zeroshot eval JSONs
+    (eval_normalized_score / eval_late_draft_retention / eval_bro_transfer_
+    analysis), experiments/ablation_deltas.json, and paper/data/seed_bands.json.
+    Missing sources render as \\pending{...}; this function never invents a
+    value. CI bounds and a few order-of-rounding-sensitive derived quantities
+    stay in prose by design (see companion.tex provenance note)."""
+    out = []
+
+    def macro(name, body, run_id=None):
+        comment = f" % run={run_id}" if run_id else ""
+        out.append(f"\\newcommand{{\\{name}}}{{{body}}}{comment}")
+
+    def pend(name, desc):
+        macro(name, f"\\pending{{{desc}}}")
+
+    run_id = fdev["run_id"] if fdev else None
+
+    # -- Pre-registered aligned normalized score (results.tex "Zero-shot
+    #    transfer"; eval_normalized_score.py). The pre-registered dev headline.
+    ns = fdev.get("normalized_score") if fdev else None
+    if ns:
+        for s in DEV_SETS:
+            block = ns["per_set"][f"{s}.PremierDraft"]
+            macro(f"NormScore{s.title()}",
+                  f"{100 * block['normalized_score']:.1f}", run_id)
+        macro("NormScoreDevMean",
+              f"{100 * ns['dev_mean_normalized_score']:.1f}", run_id)
+    else:
+        for s in DEV_SETS:
+            pend(f"NormScore{s.title()}", f"normalized score {s}")
+        pend("NormScoreDevMean", "normalized score dev mean")
+
+    # -- Late-draft retention (analysis.tex "Late-draft retention";
+    #    eval_late_draft_retention.py).
+    lr = fdev.get("late_retention") if fdev else None
+    if lr:
+        for s in DEV_SETS:
+            macro(f"LateRet{s.title()}",
+                  f"{100 * lr['per_set'][s]['late_draft_retention']:.1f}",
+                  run_id)
+        macro("LateRetDevMean",
+              f"{100 * lr['dev_mean_late_draft_retention']:.1f}", run_id)
+    else:
+        for s in DEV_SETS:
+            pend(f"LateRet{s.title()}", f"late retention {s}")
+        pend("LateRetDevMean", "late retention dev mean")
+
+    # -- BRO bonus-sheet slice (analysis.tex "Why BRO transfers worst";
+    #    eval_bro_transfer_analysis.py).
+    bt = fdev.get("bro_transfer") if fdev else None
+    if bt:
+        present = bt["bonus_slice"]["bonus_present"]["top1"]
+        absent = bt["bonus_slice"]["bonus_absent"]["top1"]
+        macro("BonusPresentTopOne", f"{100 * present:.1f}", run_id)
+        macro("BonusAbsentTopOne", f"{100 * absent:.1f}", run_id)
+        macro("BonusRawGap", f"{100 * (absent - present):.1f}", run_id)
+        strat = bt["bonus_slice_stratified_gap"]
+        macro("BonusStratGap", f"{100 * strat['point']:.1f}", run_id)
+        macro("BonusStratGapCi", pp_ci(*strat["ci"]), run_id)
+        macro("BroTrioShortfall", f"{100 * bt['gap_vs_others']:.1f}", run_id)
+        macro("BonusPresentFrac",
+              f"{100 * bt['bonus_slice']['bonus_present']['frac_of_picks']:.0f}",
+              run_id)
+    else:
+        for name, desc in [("BonusPresentTopOne", "bonus-present top1"),
+                           ("BonusAbsentTopOne", "bonus-absent top1"),
+                           ("BonusRawGap", "bonus raw gap"),
+                           ("BonusStratGap", "bonus stratified gap"),
+                           ("BonusStratGapCi", "bonus stratified gap CI"),
+                           ("BroTrioShortfall", "BRO trio shortfall"),
+                           ("BonusPresentFrac", "bonus-present frac")]:
+            pend(name, desc)
+
+    # -- Pre-registered ablation paired-difference deltas (analysis.tex "The
+    #    licensed-IP shift"; eval_ablation_deltas.py, evalproto.paired_
+    #    bootstrap_diff). Point in pp + CI range in pp.
+    SHORT = {"text_penalty": "TextPen", "ub_penalty": "UbPen"}
+    for label, prefix in SHORT.items():
+        block = (ablation_deltas or {}).get(label)
+        for s in DEV_SETS:
+            if block and s in block:
+                macro(f"{prefix}{s.title()}",
+                      f"{100 * block[s]['point']:.1f}")
+                macro(f"{prefix}{s.title()}Ci", pp_ci(*block[s]["ci"]))
+            else:
+                pend(f"{prefix}{s.title()}", f"{label} {s}")
+                pend(f"{prefix}{s.title()}Ci", f"{label} {s} CI")
+
+    # -- Zero-shot training-seed spread on the dev-mean (paper/data/
+    #    seed_bands.json; scored on the S1/S4 rungs). Provided for the
+    #    abstract's seed-variance citation; point values in pp.
+    # Macro names spell out the digit (Sone/Sfour) -- LaTeX control words
+    # cannot contain digits.
+    for rung, word in (("S1", "Sone"), ("S4", "Sfour")):
+        band = (seed_bands or {}).get(rung, {}).get("_band")
+        if band:
+            macro(f"SeedSpread{word}", f"{100 * band['spread']:.2f}")
+        else:
+            pend(f"SeedSpread{word}", f"seed spread {rung}")
+    s1 = (seed_bands or {}).get("S1", {}).get("_band")
+    s4 = (seed_bands or {}).get("S4", {}).get("_band")
+    if s1 and s4:
+        macro("SeedGainSoneSfour", f"{100 * (s4['mean'] - s1['mean']):.2f}")
+    else:
+        pend("SeedGainSoneSfour", "S1->S4 seed-mean gain")
     return out
 
 
@@ -590,10 +808,18 @@ def main(argv=None):
     by_name = runs_by_config_name(runs)
     fdev = by_name.get("f_dev")
     ffull = by_name.get("f_full")
+    a_noctx = by_name.get("a_noctx")
+    battery_path = repo / "experiments" / "frozen_battery.json"
+    battery = load_json(battery_path) if battery_path.exists() else {}
+    calibration = battery.get("calibration")
+    deltas_path = repo / "experiments" / "ablation_deltas.json"
+    ablation_deltas = load_json(deltas_path) if deltas_path.exists() else None
+    seed_path = repo / "paper" / "data" / "seed_bands.json"
+    seed_bands = load_json(seed_path) if seed_path.exists() else None
 
     tables = repo / "paper" / "tables"
     write_table(tables / "main_results.tex",
-                table_main(anchors, fdev, ffull, frozen, ledger),
+                table_main(anchors, fdev, ffull, a_noctx, frozen, ledger),
                 "Main results: expert-slice deployment-mode top-1 (95% "
                 "cluster-bootstrap CIs over drafts).")
     write_table(tables / "baselines.tex", table_baselines(anchors, frozen),
@@ -606,7 +832,9 @@ def main(argv=None):
                 "Scaling ladder (protocol section 4.3). Rung labels are "
                 "frozen identifiers; counts come from run records.")
     write_table(tables / "numbers.tex",
-                numbers_macros(anchors, fdev, frozen),
+                numbers_macros(anchors, fdev, ffull, a_noctx, frozen,
+                              calibration)
+                + analysis_macros(fdev, ablation_deltas, seed_bands),
                 "Number macros used by the prose.")
 
     figures = repo / "paper" / "figures"

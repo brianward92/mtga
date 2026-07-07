@@ -3,10 +3,11 @@
 
 The evaluation is frozen at a public git tag (\texttt{\ProtocolTag}) that
 predates the existence of the test data. The tag fixes the protocol
-document, the metric implementations, and the battery of models to be
-evaluated; the evaluation script refuses to run if the metric module drifts
-from the tagged version, and refuses any model artifact whose hash was not
-committed to the experiment ledger before the test data was downloaded.
+document and the metric implementations, with a hash guard that refuses to
+run if the metric module drifts from the tagged version. The model battery
+is anchored separately, by the sha256 of each artifact recorded in the
+experiment ledger before the test data was downloaded; the battery file
+itself is not part of the tagged tree.
 There is one evaluation round. Any second round would require a new public
 tag and disclosure of the total number of rounds.
 
@@ -42,11 +43,13 @@ per-set ceilings and prior work; non-forced variants are secondary rows.
 
 Every architecture, hyperparameter, text-encoder, and conditioning decision
 keys on one number: the unweighted mean over \{BRO, TMT, SOS\} of
-expert-slice deployment-mode top-1, computed zero-shot from a single
+expert-slice deployment-mode top-1 (ties broken by mean log-loss),
+computed zero-shot from a single
 development run (\emph{F-dev}) trained on the universe minus those three
 sets and MSH. The trio is chosen for external validity: BRO is the same
-holdout as the only published zero-shot number~\citep{bertram2024cards},
-SOS carries our most mature per-set ceiling, and TMT is a licensed-IP set:
+holdout as the only published multi-set feature-based zero-shot
+number~\citep{bertram2024cards}, SOS carries our most mature per-set
+ceiling, and TMT is a licensed-IP set:
 the rehearsal for MSH's distribution shift. Early stopping never sees dev
 metrics (\S\ref{sec:training}), so the scaling curve is not selected on its
 own y-axis.
@@ -58,7 +61,9 @@ mode. Secondary: top-3; all-users top-1 (human-model mode); the
 \emph{normalized score}---zero-shot top-1 divided by the per-set ceiling's
 top-1 on identical picks (aligned pick-by-pick on the ceiling's validation
 split); mean log-loss; top-label expected calibration error (15 equal-mass
-bins, no post-hoc temperature on the test set); per-(pack, pick) accuracy
+bins; a temperature is fit on the dev trio only and frozen into the
+battery before T0, never fit on the test set itself,
+\S\ref{sec:analysis}); per-(pack, pick) accuracy
 curves against the per-cell random floor; and \emph{late-draft retention},
 the model/ceiling ratio restricted to picks 8+ of each pack, where pool
 context dominates.
@@ -69,7 +74,8 @@ resample indices. Clustering matters little but is grounded empirically:
 measured intraclass correlation of pick correctness within drafts is
 $\rho = 0.0099$ (per-set SOS validation; 1{,}662 drafts, 69{,}803 picks),
 a design effect of ${\sim}1.4$ at ${\sim}42$ picks per draft, giving CI
-half-widths ${\sim}\pm0.3$pp at the 2{,}500-expert-draft gate. Seed
+half-widths ${\sim}\pm0.36$pp at the 2{,}500-expert-draft gate (binomial
+approximation at $p{=}0.5$). Seed
 variance is measured with three seeds at two scaling rungs, and
 set-composition variance with two probe rungs (\S\ref{sec:results}).
 
