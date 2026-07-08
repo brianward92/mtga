@@ -63,6 +63,6 @@
   "manifests": {
     "data_manifest_content_hash": "443bd25f72ee66e691a69c738ee374b14c6c415ee46275ca57dfbdf851c7704a",
     "featurizer_manifest_hash": "e1313cadd03bf1e3bc943782348cd94868f06c5753a4f013ebf3cdd2b83ce9f6",
-    "protocol_tag": "eval-protocol-v1"
+    "protocol_tag": "eval-protocol-v1.1"
   }
 }

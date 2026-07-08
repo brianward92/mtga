@@ -62,7 +62,7 @@ def ratio_cluster_bootstrap(frame_a, frame_b, stat_fn=evalproto.top1,
     Mirrors evalproto.paired_bootstrap_diff's resampling machinery exactly;
     only the final combine step (ratio instead of difference) differs. This
     is NOT added to evalproto.py itself: that module is FROZEN at tag
-    eval-protocol-v1 (docs/eval_protocol.md) and a ratio-CI helper is new
+    eval-protocol-v1.1 (docs/eval_protocol.md) and a ratio-CI helper is new
     analysis code, not a change to a pre-registered metric.
     """
     drafts_a = set(frame_a["draft_id"])

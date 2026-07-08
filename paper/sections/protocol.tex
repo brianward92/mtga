@@ -3,11 +3,13 @@
 
 The evaluation is frozen at a public git tag (\texttt{\ProtocolTag}) that
 predates the existence of the test data. The tag fixes the protocol
-document and the metric implementations, with a hash guard that refuses to
-run if the metric module drifts from the tagged version. The model battery
-is anchored separately, by the sha256 of each artifact recorded in the
-experiment ledger before the test data was downloaded; the battery file
-itself is not part of the tagged tree.
+document, the metric implementations, and the battery manifest itself,
+with a hash guard that refuses to run if the metric module drifts from the
+tagged version. Each battery member's model weights are anchored by the
+sha256 recorded in that tagged manifest and cross-checked against the
+experiment ledger's own commit history to confirm the artifact predates
+the test data; the weights are too large to version directly, so the tag
+binds their identity by hash rather than by including the bytes.
 There is one evaluation round. Any second round would require a new public
 tag and disclosure of the total number of rounds.
 

@@ -1,10 +1,17 @@
-# DraftFM Evaluation Protocol (eval-protocol-v1)
+# DraftFM Evaluation Protocol (eval-protocol-v1.1)
 
-**Status: FROZEN at git tag `eval-protocol-v1`.** This document pre-registers
+**Status: FROZEN at git tag `eval-protocol-v1.1`.** This document pre-registers
 the evaluation of DraftFM, a cross-set draft model evaluated zero-shot on a
 set whose human pick data it has never touched. After the tag: MSH numbers
 are what they are. Any second evaluation round requires a new tag
 (`eval-protocol-v2`) and public disclosure of the total number of rounds.
+`eval-protocol-v1.1` is not that: it is a pre-T0 hardening of the tagging
+mechanism itself (git-history-verified T0 gate, manifest-consistency check,
+corrected claims-band boundaries, portable artifact paths) over the original
+`eval-protocol-v1`, cut before any evaluation round has happened. The single
+evaluation round this document pre-registers has not occurred under either
+tag; `v2` remains reserved exclusively for the disclosure-triggering event
+described above, not for revisions like this one.
 The metric implementations live in `mtga/foundation/evalproto.py`
 (unit-tested in `tests/test_evalproto.py`); `scripts/run_frozen_eval.py`
 refuses to run if that file's content drifts from this tag.

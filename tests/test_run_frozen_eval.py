@@ -61,10 +61,10 @@ def test_tagged_blob_from_fabricated_git_object(tmp_path):
 
 
 def test_working_evalproto_matches_the_real_tag():
-    """The actual freeze guard: evalproto.py must equal eval-protocol-v1."""
+    """The actual freeze guard: evalproto.py must equal eval-protocol-v1.1."""
     tagged = rfe.tagged_protocol_bytes()
     if tagged is None:
-        pytest.skip("eval-protocol-v1 tag not reachable here")
+        pytest.skip("eval-protocol-v1.1 tag not reachable here")
     rfe.check_protocol((REPO / rfe.PROTOCOL_FILE).read_bytes(), tagged)
 
 

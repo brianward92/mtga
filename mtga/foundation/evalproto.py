@@ -1,4 +1,4 @@
-"""FROZEN evaluation protocol implementation (tag: eval-protocol-v1).
+"""FROZEN evaluation protocol implementation (tag: eval-protocol-v1.1).
 
 Every number in the DraftFM paper is computed by this module from cached
 per-pick predictions — models are never re-run during analysis. Once the

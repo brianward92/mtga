@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 """Execute the frozen DraftFM evaluation (docs/eval_protocol.md, tag
-eval-protocol-v1). This script IS the protocol enforcer: it refuses to run
+eval-protocol-v1.1). This script IS the protocol enforcer: it refuses to run
 unless every pre-registered condition holds.
 
 Real mode (default; the eval set is MSH, exactly once):
-  (a) mtga/foundation/evalproto.py must match the eval-protocol-v1 git tag
+  (a) mtga/foundation/evalproto.py must match the eval-protocol-v1.1 git tag
   (b) every battery artifact sha256 must verify AND have an
       experiments/ledger.jsonl entry that predates the snapshot's
       fetched_at (committed-before-T0); the frozen snapshot's sha256/ETag
@@ -31,7 +31,7 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-PROTOCOL_TAG = "eval-protocol-v1"
+PROTOCOL_TAG = "eval-protocol-v1.1"
 PROTOCOL_FILE = "mtga/foundation/evalproto.py"
 BATTERY_PATH = REPO_ROOT / "experiments" / "frozen_battery.json"
 LEDGER_PATH = REPO_ROOT / "experiments" / "ledger.jsonl"
