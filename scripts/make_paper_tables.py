@@ -244,10 +244,55 @@ def msh_expert(frozen, member):
     return None
 
 
-def rehearsal_baselines(frozen):
-    """{member_norm: {top1, ci, run_id, set, format}} from rehearsal passes."""
-    out = {}
+def msh_secondary(frozen, member):
+    """Secondary MSH metrics already sitting in the one completed frozen-eval
+    pass (no re-inference): deployment/expert top-3, log-loss, ECE; the
+    all-users slice (human-mode/all); and the skill-conditioning gap
+    (deployment's fixed top bucket vs. each drafter's own bucket, expert
+    slice). None of this touches MSH pick data a second time -- it is all
+    read out of the single cached summary.json the real run already wrote."""
+    want = norm_member(member)
     for sha, summary in frozen:
+        ctx = summary.get("context", {})
+        if ctx.get("rehearse") or ctx.get("set") != "MSH":
+            continue
+        for name, modes in summary.get("results", {}).items():
+            if norm_member(name) != want:
+                continue
+            deploy_expert = modes.get("deployment", {}).get("expert")
+            human_expert = modes.get("human", {}).get("expert")
+            human_all = modes.get("human", {}).get("all")
+            if not (deploy_expert and human_expert and human_all):
+                return None
+            return {
+                "run_id": f"frozen_eval/{sha[:12]}",
+                "top3": deploy_expert["top3"],
+                "log_loss": deploy_expert["log_loss"],
+                "ece": deploy_expert["ece"],
+                "all_users_top1": human_all["top1"],
+                "skill_gap_pp": 100 * (deploy_expert["top1"]
+                                       - human_expert["top1"]),
+            }
+    return None
+
+
+def rehearsal_baselines(frozen):
+    """{member_norm: {top1, ci, run_id, set, format}} from rehearsal passes.
+
+    Multiple rehearsal directories can exist (smoke tests of the export/eval
+    pipeline against scratch battery files leave minimal, baseline-only
+    summaries behind). Picking "whichever sorts first by sha" is an accident
+    of discovery order, not a choice -- prefer the richest rehearsal pass
+    (most battery members scored) so a throwaway smoke-test artifact can
+    never silently outrank the deliberate full-battery rehearsal a published
+    number was drawn from."""
+    by_sha_richness = sorted(
+        frozen,
+        key=lambda item: len((item[1].get("results") or {})),
+        reverse=True,
+    )
+    out = {}
+    for sha, summary in by_sha_richness:
         ctx = summary.get("context", {})
         if not ctx.get("rehearse"):
             continue
@@ -421,19 +466,40 @@ def table_ablations(by_name, frozen):
         ("A-noUB", None, "A-noUB"),
     ]
     # Ablation runs are discovered by config-name convention (case-insensitive
-    # -- a_noUB's embedded capitals must still match "noub").
+    # -- a_noUB's embedded capitals must still match "noub"). Matching is by
+    # EXACT canonical name first (e.g. "a_notext"), falling back to substring
+    # only when no exact match exists, and only ever preferring a candidate
+    # that actually has a zero-shot summary. A blind "token in lname" check
+    # here previously let a compound run like "a_noctx_notext" (both tokens
+    # present, no summary -- an unrelated combined ablation, not either single
+    # one) silently clobber the real A-notext/A-noctx numbers with pending
+    # cells; this bit a real regeneration once that run landed in the data
+    # root, so don't regress to the naive version.
+    TOKENS = {1: "notext", 2: "noctx", 3: "proportional", 4: "topfilter",
+             5: "noub"}
+    best = {}
     for name, entry in by_name.items():
         lname = name.lower()
-        if "notext" in lname:
-            members[1] = (members[1][0], name, members[1][2])
-        if "noctx" in lname and "seed" not in lname:
-            members[2] = (members[2][0], name, members[2][2])
-        if "proportional" in lname:
-            members[3] = (members[3][0], name, members[3][2])
-        if "topfilter" in lname:
-            members[4] = (members[4][0], name, members[4][2])
-        if "noub" in lname:
-            members[5] = (members[5][0], name, members[5][2])
+        if "seed" in lname:
+            continue
+        has_summary = entry.get("summary") is not None
+        for idx, token in TOKENS.items():
+            if token not in lname:
+                continue
+            # Exclude compound ablation names from a single-token bucket
+            # (e.g. "a_noctx_notext" is neither the plain notext nor the
+            # plain noctx run).
+            other_tokens_present = sum(
+                1 for t in TOKENS.values() if t != token and t in lname)
+            if other_tokens_present:
+                continue
+            exact = lname in (f"a_{token}", token)
+            priority = (exact, has_summary, name)
+            if idx not in best or priority > best[idx]:
+                best[idx] = priority
+                best.setdefault("_name", {})[idx] = name
+    for idx, name in best.get("_name", {}).items():
+        members[idx] = (members[idx][0], name, members[idx][2])
 
     rows = [
         r"\begin{tabular}{lccccc}",
@@ -599,6 +665,26 @@ def numbers_macros(anchors, fdev, ffull, a_noctx, frozen, calibration=None):
     macro("FfullMsh", pct(m["top1"]) if m
           else "\\pending{F-full MSH top-1}",
           m["run_id"] if m else None)
+
+    # Secondary MSH metrics (top-3, log-loss, ECE, all-users slice,
+    # skill-conditioning gap): all read from the single completed frozen-eval
+    # pass, no MSH re-inference. Normalized score vs. a per-set MSH ceiling
+    # and late-draft retention on MSH stay \pending -- they need a per-set
+    # ceiling model trained on MSH, deliberately not done yet.
+    ms = msh_secondary(frozen, "F-full")
+    if ms:
+        macro("FfullMshTopThree", pct(ms["top3"]), ms["run_id"])
+        macro("FfullMshLogLoss", f"{ms['log_loss']:.3f}", ms["run_id"])
+        macro("FfullMshEce", f"{ms['ece']:.3f}", ms["run_id"])
+        macro("FfullMshAllUsers", pct(ms["all_users_top1"]), ms["run_id"])
+        macro("FfullMshSkillGap", f"{ms['skill_gap_pp']:.2f}", ms["run_id"])
+    else:
+        for name, desc in [("FfullMshTopThree", "MSH top-3"),
+                           ("FfullMshLogLoss", "MSH log-loss"),
+                           ("FfullMshEce", "MSH ECE"),
+                           ("FfullMshAllUsers", "MSH all-users top-1"),
+                           ("FfullMshSkillGap", "MSH skill-conditioning gap")]:
+            macro(name, f"\\pending{{{desc}}}")
     macro("ProtocolTag", anchors["manifests"]["protocol_tag"])
     macro("DataManifestHash",
           anchors["manifests"]["data_manifest_content_hash"][:12])

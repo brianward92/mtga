@@ -20,11 +20,11 @@ count, and 24 regex flags over rules text for common functional categories
 Double-faced and split cards take numeric blocks from the front face.
 Subtype and keyword vocabularies are counted over \emph{training} sets
 only; a registry gate refuses to fit vocabularies on MSH, the frozen test
-set (\S\ref{sec:protocol}). This blindness is guaranteed for MSH
-specifically; it does not mean the dev trio's cards were excluded from
-every vocabulary in the release (\S\ref{sec:data}), so ``dev-trio
-zero-shot'' is a claim about training picks, not about vocabulary
-provenance. The resulting featurizer manifest is content-hashed
+set (\S\ref{sec:protocol}). That guarantee covers MSH specifically. It does
+not mean the dev trio's cards were excluded from every vocabulary in the
+release (\S\ref{sec:data}), so calling the dev trio ``zero-shot'' is a
+claim about training picks, not about where the vocabulary came from. The
+resulting featurizer manifest is content-hashed
 (\texttt{\FeaturizerHash}) and released; held-out cards featurize through
 the frozen manifest, with out-of-vocabulary subtypes and keywords absorbed
 by the unmatched counters. Scalars are clipped to $[0,1]$; parse failures
@@ -93,15 +93,16 @@ $[\,c;\; p;\; c \odot p;\; \mathrm{ctx}\,]$, where $p$ is the pool summary
 and $c \odot p$ the elementwise interaction; a softmax over the pack's
 real slots gives the pick distribution.
 
-The set-context tower's contribution is tested directly: the A-noctx
-ablation (Table~\ref{tab:ablations}, \S\ref{sec:analysis}) removes it and
-scores higher on all three dev sets, and that tower-free configuration --
-not the one just described -- is what F-full and the frozen MSH
-evaluation run. The first invariant holds either way, since no
-set-identity parameter exists in either configuration; dropping the tower
-only means the shipped model's sole route to set-relative signal is the
-pool tower, each candidate's own features, and the four set-shape
-scalars above, never a read of the rest of the card list.
+We test the set-context tower's contribution directly by removing it and
+retraining (we call this variant A-noctx, Table~\ref{tab:ablations},
+\S\ref{sec:analysis}). It scores higher on all three dev sets. That
+tower-free configuration, not the one just described, is what F-full and
+the frozen MSH evaluation actually run. The first invariant still holds
+either way, since neither configuration has a set-identity parameter.
+Dropping the tower simply means the shipped model's only route to
+set-relative signal is the pool tower, each candidate's own features, and
+the four set-shape scalars above; it never reads the rest of the card
+list.
 
 \subsection{Training}
 \label{sec:training}

@@ -3,15 +3,14 @@
 
 The evaluation is frozen at a public git tag (\texttt{\ProtocolTag}) that
 predates the existence of the test data. The tag fixes the protocol
-document, the metric implementations, and the battery manifest itself,
-with a hash guard that refuses to run if the metric module drifts from the
-tagged version. Each battery member's model weights are anchored by the
-sha256 recorded in that tagged manifest and cross-checked against the
-experiment ledger's own commit history to confirm the artifact predates
-the test data; the weights are too large to version directly, so the tag
-binds their identity by hash rather than by including the bytes.
-There is one evaluation round. Any second round would require a new public
-tag and disclosure of the total number of rounds.
+document, the metric implementations, and the battery manifest, and a hash
+guard refuses to run if the metric code has since drifted from the tagged
+version. Model weights are too large to version directly, so each battery
+member's weights are instead anchored by the sha256 recorded in that
+tagged manifest, cross-checked against the experiment ledger's commit
+history to confirm the artifact predates the test data. There is one
+evaluation round; a second round would require a new public tag and
+disclosure that a second round happened.
 
 \subsection{Test set: MSH, exactly once}
 
@@ -43,31 +42,36 @@ per-set ceilings and prior work; non-forced variants are secondary rows.
 
 \subsection{Development discipline}
 
-Every architecture, hyperparameter, text-encoder, and conditioning decision
-keys on one number: the unweighted mean over \{BRO, TMT, SOS\} of
-expert-slice deployment-mode top-1 (ties broken by mean log-loss),
-computed zero-shot from a single
-development run (\emph{F-dev}) trained on the universe minus those three
-sets and MSH. The trio is chosen for external validity: BRO is the same
-holdout as the only published multi-set feature-based zero-shot
-number~\citep{bertram2024cards}, SOS carries our most mature per-set
-ceiling, and TMT is a licensed-IP set:
-the rehearsal for MSH's distribution shift. Early stopping never sees dev
-metrics (\S\ref{sec:training}), so the scaling curve is not selected on its
-own y-axis.
+One number governs every architecture, hyperparameter, text-encoder, and
+conditioning decision in this paper: mean top-1 agreement, on the expert
+slice in deployment mode, averaged unweighted over three sets (BRO, TMT,
+SOS), with ties broken by mean log-loss. That number comes from a single
+development run, \emph{F-dev}, trained on every set except those three and
+MSH.
+
+We chose that trio for three separate reasons. BRO is the same holdout used
+by the only published multi-set, feature-based zero-shot
+number~\citep{bertram2024cards}, so our result is directly comparable to
+theirs. SOS is the set where our own per-set model is most mature, giving
+the strongest available ceiling to measure against. And TMT is a
+licensed-IP set, so it rehearses the same distribution shift MSH will
+present. Early stopping never looks at these dev metrics
+(\S\ref{sec:training}), so the curve reported later in \S\ref{sec:results}
+is not selected on the same axis it is plotted against.
 
 \subsection{Metrics and statistics}
 
-Primary: top-1 agreement with the human pick, expert slice, deployment
-mode. Secondary: top-3; all-users top-1 (human-model mode); the
-\emph{normalized score}---zero-shot top-1 divided by the per-set ceiling's
-top-1 on identical picks (aligned pick-by-pick on the ceiling's validation
-split); mean log-loss; top-label expected calibration error (15 equal-mass
-bins; a temperature is fit on the dev trio only and frozen into the
-battery before T0, never fit on the test set itself,
-\S\ref{sec:analysis}); per-(pack, pick) accuracy
-curves against the per-cell random floor; and \emph{late-draft retention},
-the model/ceiling ratio restricted to picks 8+ of each pack, where pool
+The primary metric is top-1 agreement with the human pick, expert slice,
+deployment mode. Several secondary metrics accompany it: top-3 agreement;
+all-users top-1 (human-model mode); the \emph{normalized score}, which
+divides the model's zero-shot top-1 by the per-set ceiling's top-1 on the
+same picks (a model trained directly on the target set, aligned pick-by-pick
+on its validation split); mean log-loss; top-label expected calibration
+error (15 equal-mass bins, with a temperature fit on the dev trio only,
+frozen into the battery before T0, and never fit on the test set itself,
+\S\ref{sec:analysis}); per-(pack, pick) accuracy curves against the
+per-cell random floor; and \emph{late-draft retention}, the same
+zero-shot-to-ceiling ratio restricted to picks 8+ of each pack, where pool
 context dominates.
 
 All intervals are cluster bootstraps over drafts, not picks

@@ -15,49 +15,59 @@ exist until roughly two weeks after release~\citep{brooks2024statistical}.
 On release day, the state of the art is a spreadsheet of hand-tuned expert
 ratings~\citep{draftsimratings}.
 
-This paper asks how far pure transfer can go. DraftFM is a single pick model
-trained across every public \seventeenlands{} draft set, in which a card is
-nothing but a frozen vector of public information: structured features
-parsed from its Scryfall record and a sentence embedding of its rules text.
-The model has no set-identity parameters and no per-card weights. Whatever
-it knows about a set it must infer from the cards in the pack and the
-drafter's accumulating pool, not from a memorized identity. That inference
-transfers to a set released tomorrow; a memorized card vocabulary cannot.
+This paper asks how far pure transfer can go. DraftFM is a single pick
+model trained across every public \seventeenlands{} draft set. To DraftFM,
+a card is nothing but a frozen vector of public information: structured
+features parsed from its Scryfall record, plus a sentence embedding of its
+rules text. The model has no set-identity parameters and no per-card
+weights. Whatever it knows about a set it must infer from the cards in the
+pack and the drafter's accumulating pool, not from a memorized identity.
+That inference transfers to a set released tomorrow. A memorized card
+vocabulary cannot.
 
-The evaluation is designed against a failure mode endemic to this setting:
-a ``zero-shot'' number quietly tuned on its own test set. Our protocol
-(\S\ref{sec:protocol}) was frozen, in a tagged public commit, before the
-test set existed. The test set is MSH, a licensed-IP set whose public draft
-data had not been published at the freeze; no training, tuning, or metric
-selection touches MSH pick data, and the headline number is produced by a
+A model like this invites an obvious failure mode: report a number that
+was quietly tuned on the very test set it claims never to have seen. We
+designed the evaluation against exactly that risk. The protocol
+(\S\ref{sec:protocol}) was frozen in a tagged public commit before the test
+set existed. That test set is MSH, a licensed-IP set whose public draft
+data had not yet been published at the freeze. No training, tuning, or
+metric choice touches MSH pick data; the headline number comes from a
 single pre-registered inference pass over the first public snapshot. All
-model selection happens on three development sets (BRO, TMT, SOS) held out
-of training, chosen so our numbers are directly comparable to the only
-published multi-set feature-based zero-shot benchmark~\citep{bertram2024cards}
-(same BRO holdout) and to our own strongest per-set ceilings.
+model-selection decisions instead happen on three development sets, BRO,
+TMT, and SOS, held out of training. We chose that trio so our numbers are
+directly comparable to the only published multi-set zero-shot benchmark
+built on public features~\citep{bertram2024cards} (same BRO holdout) and to
+our own strongest per-set models.
 
-Zero-shot on the development trio, DraftFM agrees with expert picks
-\FdevDevMean\% of the time (\FdevBro\% / \FdevTmt\% / \FdevSos\% on
-BRO / TMT / SOS): \NormScoreDevMean\% of what per-set models trained on
-each target achieve by the pre-registered normalized score (identical
-held-out picks, \S\ref{sec:protocol}), and above every published number
-attainable on release day
-that we could locate (expert-tuned ratings 44.5\%~\citep{ward2021drafting}
-on M19, an hour-zero rarity heuristic \BaseRarity\%, measured on SOS as a
-rehearsal stand-in rather than per dev set) as well as zero-shot GPT-4o
-(43\%~\citep{bertram2025urzagpt} on NEO) -- each on a different test set
-than DraftFM's, so these situate rather than compare head-to-head
-(Table~\ref{tab:baselines}); the one same-set comparison available is the
-rarity heuristic against DraftFM's own SOS number (\FdevSos\%). On MSH the
-frozen evaluation gives \FfullMsh\% expert top-1 agreement.
+On the development trio, DraftFM agrees with expert picks \FdevDevMean\%
+of the time (\FdevBro\% / \FdevTmt\% / \FdevSos\% on BRO / TMT / SOS). To
+read that number, it helps to know the best any model can do on one of
+these sets: train a model directly on the set, so it actually sees the
+set's own picks. That directly-trained model marks the ceiling. DraftFM,
+despite training on zero picks from the target set, reaches
+\NormScoreDevMean\% of that ceiling (the pre-registered normalized score,
+identical held-out picks, \S\ref{sec:protocol}).
+
+DraftFM also clears every published number we could find that a real
+deployment could have used on release day. Three reference points: an
+expert-tuned rating system at 44.5\%~\citep{ward2021drafting} on M19; an
+hour-zero rarity heuristic at \BaseRarity\% (measured on SOS as a rehearsal
+stand-in, not per dev set); and zero-shot GPT-4o at
+43\%~\citep{bertram2025urzagpt} on NEO. Each of these numbers comes from a
+different test set than DraftFM's, so Table~\ref{tab:baselines} presents
+them as reference points rather than a head-to-head ranking. The one
+comparison that does share a test set is the rarity heuristic against
+DraftFM's own SOS number (\FdevSos\%). On MSH itself, the frozen evaluation
+gives \FfullMsh\% expert top-1 agreement.
 
 Contributions:
 \begin{itemize}
   \item \textbf{A cross-set model and recipe.} A two-tower architecture
-  over frozen card features, refined by a pre-registered ablation from a
-  \FdevParams M-parameter design with a set-context tower to the
-  \FfullParams M-parameter tower-free recipe that ships (A-noctx,
-  \S\ref{sec:analysis}), training on \FdevPicks M picks in about
+  over frozen card features. A pre-registered comparison tests a
+  \FdevParams M-parameter design that also reads the full set's card list
+  against a simpler \FfullParams M-parameter version that drops that
+  component; the simpler version wins and is what ships (we call it
+  A-noctx, \S\ref{sec:analysis}). It trains on \FdevPicks M picks in about
   \FdevWallHours{} hours on a single consumer workstation
   (\S\ref{sec:method}).
   \item \textbf{A frozen zero-shot benchmark.} A pre-registered,
@@ -69,9 +79,9 @@ Contributions:
   probes and zero-shot seed bands at two rungs (\S\ref{sec:results}; the
   bands bound the curve's seed noise rather than fully characterize it,
   see caveat there).
-  \item \textbf{A licensed-IP shift analysis.} Pre-registered ablations
-  designed to isolate what text embeddings contribute when a set's names
-  and flavor come from a licensed universe rather than in-universe \mtg{}
+  \item \textbf{A licensed-IP shift analysis.} Pre-registered experiments
+  that isolate what text embeddings contribute when a set's names and
+  flavor come from a licensed universe rather than in-universe \mtg{}
   (\S\ref{sec:analysis}).
   \item \textbf{Release.} Code, the frozen protocol, data manifests, model
   weights, and per-pick prediction files for every number in this paper

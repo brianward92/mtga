@@ -48,20 +48,6 @@
 \newcommand{\seventeenlands}{17Lands}
 \newcommand{\mtg}{\emph{Magic: The Gathering}}
 
-% A highlighted headline number, for the callout row after the abstract and
-% for in-text emphasis. Never wraps a hand-typed value -- always a macro
-% from tables/numbers.tex.
-\newcommand{\statbox}[2]{%
-  \begin{minipage}[t]{0.31\linewidth}
-    \begin{tcolorbox}[enhanced, colback=paperaccent!5, colframe=paperaccent!55,
-        boxrule=0.5pt, arc=1.2mm, halign=center,
-        top=2mm, bottom=2mm, left=1mm, right=1mm]
-      \centering{\Large\bfseries\color{paperaccent}#1}\\[0.8mm]
-      {\footnotesize #2}
-    \end{tcolorbox}
-  \end{minipage}%
-}
-
 \title{\bfseries DraftFM: Zero-Shot Drafting of Unseen \emph{Magic: The
 Gathering} Sets from Public Card Features}
 
@@ -85,41 +71,36 @@ Gathering} Sets from Public Card Features}
 \maketitle
 
 \begin{abstract}
-Draft assistants for \mtg{} require weeks of post-release human pick data
-before they can model a new set; on release day they have nothing. We train
-DraftFM, a pick model that represents every card as a frozen vector of
-public information (structured Scryfall features plus a sentence embedding
-of rules text) and carries no set-identity parameters, so it can score a
-set the moment its card list is public. The \FdevParams M-parameter recipe
-used for architecture and hyperparameter selection, trained on
-\FdevPicks M human picks from \FdevSets{} sets of \seventeenlands{} public
-data, reaches \FdevDevMean\% expert-pick agreement zero-shot on three
-held-out sets (\FdevBro\% / \FdevTmt\% / \FdevSos\% on BRO / TMT / SOS),
-\NormScoreDevMean\% of the accuracy of per-set models trained directly on
-each target set by the pre-registered normalized score (identical
-held-out picks), and above every day-one-feasible published number we could
-locate, each measured on a different test set than DraftFM's, so these
-situate rather than compare head-to-head (Table~\ref{tab:baselines}).
-A pre-registered ablation on the same held-out trio found a smaller
-recipe that is no worse within seed noise: dropping the set-context tower
-cuts the model to \FfullParams{} M parameters, with zero-shot agreement
-of \ANoctxDevMean\% against \FdevDevMean\% for the with-tower recipe -- a
-gap smaller than the 0.5pp seed spread measured on this architecture
-(\S\ref{sec:analysis}). That tower-free recipe is F-full, the model whose one
-pre-registered inference pass over the first public snapshot of MSH -- a
-licensed-IP set whose pick data nothing in the pipeline has touched -- is
-the headline evaluation (\FfullMsh\% expert top-1). We release the code,
-the frozen protocol, model weights, and per-pick prediction files.
-\end{abstract}
+Draft assistants for \mtg{} need weeks of post-release human pick data
+before they can model a new set. We train DraftFM, a pick model that
+represents every card as a frozen vector of public information: structured
+Scryfall features plus a sentence embedding of its rules text. It holds no
+card- or set-specific parameters, so it can score a set the moment its card
+list goes public.
 
-\begin{center}
-\statbox{\FdevDevMean\%}{zero-shot expert-pick agreement, dev-selection recipe (\S\ref{sec:results})}
-\hfill
-\statbox{\NormScoreDevMean\%}{of a per-set-trained ceiling's accuracy (pre-registered normalized score), with zero picks from the target set}
-\hfill
-\statbox{\FfullParams M params}{the shipped recipe (A-noctx architecture); F-full trains from scratch in \FfullWallHours{} h on one workstation (\S\ref{sec:training})}
-\end{center}
-\vspace{1mm}
+We first train a model on \FdevPicks M human picks from \FdevSets{} sets of
+\seventeenlands{} public data to pick the architecture and hyperparameters.
+On three sets it never trained on, that model agrees with expert human
+picks \FdevDevMean\% of the time. To put that number in context: a model
+trained directly on one of those three sets, and so allowed to actually see
+it, marks the best any model can do there. DraftFM, trained on zero picks
+from the set it is scoring, still reaches \NormScoreDevMean\% of what that
+directly-trained model achieves (the pre-registered normalized score,
+\S\ref{sec:protocol}). It also beats every published number we could find
+that a real deployment could have used on release day. Each of those
+numbers comes from a different test set, so we treat them as reference
+points rather than a head-to-head ranking (Table~\ref{tab:baselines}).
+
+A follow-up experiment on the same three sets tried a simpler architecture:
+one without the added component that reads the whole set's card list. The
+simpler model scored no worse, within seed noise, so we deployed it
+instead. This deployed recipe, which we call F-full, has 1.6M parameters.
+It produces the paper's headline result: a single pre-registered pass over
+the first public snapshot of MSH, a licensed-IP set untouched by any
+training or tuning in this pipeline, reaching \FfullMsh\% expert top-1
+agreement. We release the code, the frozen evaluation protocol, model
+weights, and per-pick prediction files.
+\end{abstract}
 
 \input{sections/intro}
 \input{sections/related}

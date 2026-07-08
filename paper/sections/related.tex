@@ -3,44 +3,44 @@
 
 \paragraph{Generalised card representations.}
 Bertram, F\"urnkranz, and M\"uller~\citep{bertram2024cards} established the
-zero-shot drafting problem, and their paper remains the only published
-quantitative result on it from multi-set feature-based training (a
-separate zero-shot LLM number exists, discussed below under ``LLMs as
-drafters''). They replace one-hot card identities with
-concatenated feature vectors: hand-engineered attributes plus a
-Sentence-BERT embedding~\citep{reimers2019sbert} of card text (1306-d), a
-learned autoencoding of card images (1024-d), and 16 post-release usage
-statistics from \seventeenlands{}. This lives inside a
-contextual-preference-ranking model trained with a triplet loss. Two of
-their findings shape our design: feature
-representations match one-hot accuracy within a set (nothing is lost by
-generalising), and multi-set pretraining, not the representation alone, is
-what buys transfer. Pretrained on 13 sets and evaluated on held-out BRO,
-their best representation reaches 55.4\% pick agreement. That
-representation includes the usage-statistics block, which is computed from
-human play after a set's release; the number is therefore an anchor for
-zero-shot \emph{card generalisation} rather than for day-one deployment,
-where such statistics cannot exist. The same paper's day-one-feasible
-representation (features only) reaches 33.6--35.6\% on unseen sets under
-single-set training. No multi-set features-only number is published.
-Filling that gap (multi-set training, public card information only) is
-this paper's headline experiment, and we adopt their held-out BRO as a
-development set so the comparison is on the same holdout. A companion
-paper~\citep{bertram2024infonce} improves the within-set triplet objective
-with an adapted InfoNCE loss but reports no unseen-set results.
+problem of drafting a set the model never trained on. Their paper remains
+the only published quantitative result on it from multi-set,
+feature-based training (a separate LLM number exists, discussed below under
+``LLMs as drafters''). They replace one-hot card identities with
+concatenated feature vectors: hand-engineered attributes, a Sentence-BERT
+embedding~\citep{reimers2019sbert} of card text (1306-d), a learned
+autoencoding of card images (1024-d), and 16 post-release usage statistics
+from \seventeenlands{}. This lives inside a contextual-preference-ranking
+model trained with a triplet loss. Two of their findings shape our design.
+Feature representations match one-hot accuracy within a set, so nothing is
+lost by generalising. And multi-set pretraining, not the representation
+alone, is what buys transfer to an unseen set. Pretrained on 13 sets and
+evaluated on held-out BRO, their best representation reaches 55.4\% pick
+agreement. But that representation includes the usage-statistics block,
+which is computed from human play after a set's release. The 55.4\% number
+is therefore an anchor for generalising across \emph{cards}, not for
+day-one deployment, where those statistics cannot yet exist. The same
+paper's day-one-feasible representation, features only, reaches
+33.6--35.6\% on unseen sets under single-set training, and no multi-set,
+features-only number is published. Filling that gap, multi-set training on
+public card information only, is this paper's headline experiment; we
+adopt their held-out BRO as a development set so the comparison uses the
+same holdout. A companion paper~\citep{bertram2024infonce} improves the
+within-set triplet objective with an adapted InfoNCE loss but reports no
+unseen-set results.
 
 \paragraph{Within-set pick models.}
 Ward et al.~\citep{ward2021drafting} compare heuristic and neural drafters
-on M19 and report the two most useful reference points below the
-data-driven regime: an expert-tuned rating bot at 44.5\% top-1 agreement
-and a random agent at 22\%. Their neural drafter (48.7\%) and its
-successors, the statistical-drafting MLPs deployed at
+on M19. Two of their reference points matter most below the data-driven
+regime: an expert-tuned rating bot at 44.5\% top-1 agreement, and a random
+agent at 22\%. Their neural drafter (48.7\%) and its successors define the
+within-set state of the art: the statistical-drafting MLPs deployed at
 statisticaldrafting.com~\citep{brooks2024statistical} (${\sim}70\%$) and
-Czerner's puder transformer~\citep{czerner2025puder} (71\%), define the
-within-set state of the art, and the statistical-drafting architecture is
-the direct lineage of the per-set ceiling models we compare against.
-All are one-hot models over a fixed card vocabulary; none can score an
-unseen set. The deployment gap is explicit: statistical-drafting documents
+Czerner's puder transformer~\citep{czerner2025puder} (71\%). The
+statistical-drafting architecture is also the direct lineage of the
+per-set ceiling models we compare against. All of these are one-hot models
+over a fixed card vocabulary, so none can score an unseen set. The
+deployment gap is explicit in prior work: statistical-drafting documents
 that no model can ship until \seventeenlands{} data appears, roughly two
 weeks post-release~\citep{brooks2024statistical}, and Draftsim's day-one
 ratings are written by human experts~\citep{draftsimratings}.

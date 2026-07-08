@@ -16,11 +16,10 @@ platforms, and casual play are out of scope.
 
 \paragraph{One evaluation round.}
 Pre-registration buys credibility at the cost of adaptivity: the frozen
-battery cannot react to surprises in the test snapshot, and a single set
+battery cannot react to surprises in the test snapshot. And a single set
 is a sample of one from the distribution of future sets. The dev-trio
-spread and the composition probes bound, but do not eliminate,
-set-to-set variance in what the headline number would be on the
-\emph{next} set.
+spread and the composition probes bound, but do not eliminate, how much
+the headline number could vary on the \emph{next} set.
 
 \paragraph{Text and language.}
 The text encoder is English-only and frozen. Rules text is embedded as
@@ -37,13 +36,12 @@ classes; we gate on CPU parity and skip non-finite steps
 \section{Reproducibility}
 \label{sec:repro}
 
-Every result in this paper traces to a run id in an append-only ledger,
-and every table cell and prose number is emitted by a script from that
-ledger and cached evaluation outputs -- no result number here is typed
-by hand. The ledger schema, frozen identifiers (protocol tag, manifest
-hashes), release contents, and script-level pointers for reproducing any
-specific number are in the companion implementation reference, not
-repeated here.
+Every result in this paper traces to a run id in an append-only ledger.
+Every table cell and prose number is emitted by a script from that ledger
+and cached evaluation outputs; no result number here is typed by hand. The
+ledger schema, frozen identifiers (protocol tag, manifest hashes), release
+contents, and script-level pointers for reproducing any specific number
+are in the companion implementation reference, not repeated here.
 
 \section{Licensing and attribution}
 \label{sec:licensing}
@@ -71,10 +69,9 @@ Any score or label in a figure sits beside the image, never on top of
 it. Because the full card image is always used (never an art crop), the
 copyright and artist line Scryfall prints at the bottom of the card
 remains visible in every figure, and nothing here implies that Wizards
-of the Coast produced or endorses this work. The cards illustrated are
-drawn from BRO, SOS, TMT, LTR, LCI, and DMU -- all public, released
-sets (\S\ref{sec:data}) -- never from MSH, which remains untouched until
-the frozen evaluation of \S\ref{sec:protocol}.
+of the Coast produced or endorses this work. The cards illustrated are drawn from BRO, SOS, TMT, LTR, LCI, and DMU, all
+public, released sets (\S\ref{sec:data}), never from MSH, which remains
+untouched until the frozen evaluation of \S\ref{sec:protocol}.
 
 \paragraph{Wizards of the Coast intellectual property.}
 Portions of the materials used, including all card names, text, and art
