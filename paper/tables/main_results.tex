@@ -5,9 +5,9 @@
 \rowcolor{tblhead}
 Model & BRO & TMT & SOS & Dev mean & MSH \\
 \midrule
-DraftFM (F-dev, zero-shot) & 48.9 {\scriptsize(48.8, 49.0)} & 57.5 {\scriptsize(57.3, 57.7)} & 56.5 {\scriptsize(56.4, 56.6)} & 54.3 & \pendingcell \\  % run=20260704_135822_f_dev; run=20260704_135822_f_dev; run=20260704_135822_f_dev; run=20260704_135822_f_dev; pending: eval
+DraftFM (F-dev, zero-shot) & 48.9 {\scriptsize(48.8, 49.0)} & 57.5 {\scriptsize(57.3, 57.7)} & 56.5 {\scriptsize(56.4, 56.6)} & 54.3 & 56.1 {\scriptsize(55.9, 56.3)} \\  % run=20260704_135822_f_dev; run=20260704_135822_f_dev; run=20260704_135822_f_dev; run=20260704_135822_f_dev; run=frozen_eval/013df16b8994
 \quad DraftFM (A-noctx, selected dev recipe) & 50.0 {\scriptsize(49.9, 50.1)} & 57.7 {\scriptsize(57.5, 57.9)} & 56.6 {\scriptsize(56.5, 56.7)} & 54.8 & -- \\  % run=20260704_160422_a_noctx; run=20260704_160422_a_noctx; run=20260704_160422_a_noctx; run=20260704_160422_a_noctx
-DraftFM (F-full, zero-shot) & -- & -- & -- & -- & \pendingcell \\  % pending: eval
+DraftFM (F-full, zero-shot) & -- & -- & -- & -- & 57.0 {\scriptsize(56.8, 57.2)} \\  % run=frozen_eval/013df16b8994
 \midrule
 Per-set ceiling & 65.6 & 71.0 & 70.2 {\scriptsize(69.8, 70.6)} & 68.9 & \pendingcell \\  % run=perset-BRO-latest; run=perset-TMT-latest; run=perset-SOS-protocol-validation; pending: post-T0
 \quad F-dev / ceiling (unaligned) & 0.745 & 0.810 & 0.805 & 0.787 & \pendingcell \\  % pending: post-T0
