@@ -13,9 +13,9 @@
     "applied_to": ["deployment", "human"]
   },
   "frozen_snapshot": {
-    "path": null,
-    "sha256": null,
-    "etag": null
+    "path": "raw/draft_data_public.MSH.PremierDraft.csv.gz",
+    "sha256": "013df16b8994534f69ed63c87ab684acafc5f4cbe82982264b0fc111dbb2183a",
+    "etag": "\"252007adfbca6f026766527823ffa6d5-8\""
   },
   "models": [
     {
