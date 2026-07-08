@@ -92,7 +92,12 @@ val split so both models score identical picks (`evalproto.align_on_picks`).
   **measured ICC rho = 0.0099** on SOS per-set val (1,662 drafts, 69,803
   picks) => DEFF ~= 1.4 at ~42 picks/draft; the 2,500-expert-draft gate
   gives CI half-widths ~= +/-0.3pp at p~=0.5, tighter than the design
-  requirement.
+  requirement. This rho is a design-time estimate from one dev set (SOS,
+  not licensed-IP); it is not re-derived for MSH, and within-draft
+  correlation is plausibly set-dependent. It bounds the gate's target CI
+  width, not the CIs actually reported for MSH, which come from a direct
+  cluster bootstrap on the real MSH predictions regardless of how well
+  this estimate transfers.
 - Seed variance: 3 seeds at scaling rungs S1 and S4; set-composition
   variance via probe rungs S2b/S4b. Reported as bands.
 

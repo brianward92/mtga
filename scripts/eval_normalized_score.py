@@ -113,6 +113,20 @@ def normalized_score(zeroshot_dir, set_code, limited_type="PremierDraft",
     zs_expert = evalproto.expert_slice(zeroshot)
     ceil_expert = evalproto.expert_slice(ceiling)
 
+    # evalproto.align_on_picks (frozen, eval-protocol-v1.1) inner-joins on
+    # (draft_id, pack_number, pick_number) without asserting the key is
+    # unique per frame; a duplicate row on either side would silently
+    # cross-product instead of erroring, breaking the row-count parity
+    # ratio_cluster_bootstrap's shared-resample-index CI depends on. Guard
+    # here, outside the frozen file, rather than editing evalproto.py.
+    pick_keys = ["draft_id", "pack_number", "pick_number"]
+    assert not zs_expert.duplicated(pick_keys).any(), (
+        "zeroshot expert frame has duplicate (draft_id, pack, pick) rows -- "
+        "align_on_picks would silently cross-product")
+    assert not ceil_expert.duplicated(pick_keys).any(), (
+        "ceiling expert frame has duplicate (draft_id, pack, pick) rows -- "
+        "align_on_picks would silently cross-product")
+
     aligned_zs, aligned_ceil = evalproto.align_on_picks(zs_expert, ceil_expert)
 
     n_ceil_drafts = int(ceil_expert["draft_id"].nunique())
