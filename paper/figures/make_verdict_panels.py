@@ -20,7 +20,7 @@ family behind Table 1's "per-set ceiling" row), not the paper's frozen
 zero-shot checkpoint -- see the caption text in each figure. Running this
 script requires the local per-set model artifacts backing the live
 overlay (same requirement as make_paper_tables.py needing local run
-records); it is not run as part of `tectonic main.tex`.
+records); it is not run as part of `tectonic draftfm.tex`.
 
 Usage:
     python3 figures/make_verdict_panels.py
