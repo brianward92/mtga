@@ -1,0 +1,94 @@
+{
+  "context": {
+    "set": "MSH",
+    "format": "PremierDraft",
+    "rehearse": false,
+    "snapshot_sha": "013df16b8994534f69ed63c87ab684acafc5f4cbe82982264b0fc111dbb2183a",
+    "post_day_one": true,
+    "note": "Pre-registered post-day-one addendum (protocol section 4, item 6): per-set ceiling trained on the frozen snapshot with the stock recipe AFTER the zero-shot pass. Zero-shot frames are the canonical cached parquets; no battery member was re-run.",
+    "ceiling_model": "MSH/PremierDraft/msh_perset_ceiling",
+    "ceiling_trained_at": "2026-07-09T21:43:42",
+    "ceiling_data_etag": "\"252007adfbca6f026766527823ffa6d5-8\"",
+    "executed_at": "2026-07-09T21:48:11"
+  },
+  "results": {
+    "perset": {
+      "deployment": {
+        "all": {
+          "label": "perset/all",
+          "n_picks": 14238,
+          "n_drafts": 339,
+          "top1": 0.6656131479140329,
+          "top1_ci": [
+            0.6566196094957156,
+            0.6743942267172356
+          ],
+          "top3": 0.9388256777637308,
+          "top3_ci": [
+            0.9339794915016154,
+            0.9435313948588285
+          ],
+          "log_loss": 0.8713628742039369,
+          "log_loss_ci": [
+            0.8494189720516025,
+            0.8915003623112783
+          ],
+          "ece": 0.027602083548800886,
+          "top1_non_forced": 0.6398910823689585,
+          "log_loss_non_forced": 0.9383907876042398,
+          "ece_non_forced": 0.027633136512652343
+        },
+        "expert": {
+          "label": "perset/expert",
+          "n_picks": 14238,
+          "n_drafts": 339,
+          "top1": 0.6656131479140329,
+          "top1_ci": [
+            0.6566196094957156,
+            0.6743942267172356
+          ],
+          "top3": 0.9388256777637308,
+          "top3_ci": [
+            0.9339794915016154,
+            0.9435313948588285
+          ],
+          "log_loss": 0.8713628742039369,
+          "log_loss_ci": [
+            0.8494189720516025,
+            0.8915003623112783
+          ],
+          "ece": 0.027602083548800886,
+          "top1_non_forced": 0.6398910823689585,
+          "log_loss_non_forced": 0.9383907876042398,
+          "ece_non_forced": 0.027633136512652343
+        }
+      }
+    }
+  },
+  "ceiling_comparisons": {
+    "f-full": {
+      "n_shared_picks": 14238,
+      "zeroshot_top1": 0.5713583368450625,
+      "ceiling_top1": 0.6656131479140329,
+      "normalized_top1": 0.8583940065421547,
+      "top1_diff": -0.09425481106897038,
+      "top1_diff_ci": [
+        -0.1040191740412979,
+        -0.08484162101418737
+      ],
+      "late_draft_retention": 0.9375589511412941
+    },
+    "f-dev": {
+      "n_shared_picks": 14238,
+      "zeroshot_top1": 0.5580840005618767,
+      "ceiling_top1": 0.6656131479140329,
+      "normalized_top1": 0.8384509865991348,
+      "top1_diff": -0.10752914735215624,
+      "top1_diff_ci": [
+        -0.11750245821042282,
+        -0.09783501896333759
+      ],
+      "late_draft_retention": 0.9254857574042634
+    }
+  }
+}

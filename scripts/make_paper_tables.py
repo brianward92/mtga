@@ -276,6 +276,23 @@ def msh_secondary(frozen, member):
     return None
 
 
+def msh_ceiling_comparison(frozen, member):
+    """The pre-registered post-day-one ceiling comparison for a battery
+    member (normalized score + late-draft retention vs the per-set MSH
+    ceiling), from the addendum summary written by
+    eval_msh_ceiling_comparison.py after the zero-shot pass."""
+    want = norm_member(member)
+    for sha, summary in frozen:
+        ctx = summary.get("context", {})
+        if ctx.get("rehearse") or ctx.get("set") != "MSH":
+            continue
+        for name, comparison in (summary.get("ceiling_comparisons")
+                                 or {}).items():
+            if norm_member(name) == want and comparison:
+                return {**comparison, "run_id": f"frozen_eval/{sha[:12]}"}
+    return None
+
+
 def rehearsal_baselines(frozen):
     """{member_norm: {top1, ci, run_id, set, format}} from rehearsal passes.
 
@@ -400,7 +417,13 @@ def table_main(anchors, fdev, ffull, a_noctx, frozen, ledger):
         ratio_cells.append((f"{sum(ratios) / 3:.3f}", ""))
     else:
         ratio_cells += [pending("ratio")] * 4
-    ratio_cells.append(pending("post-T0"))
+    fdev_msh = msh_expert(frozen, "F-dev")
+    ceil_msh = msh_expert(frozen, "perset")
+    if fdev_msh and ceil_msh:
+        ratio_cells.append(
+            (f"{fdev_msh['top1'] / ceil_msh['top1']:.3f}", ""))
+    else:
+        ratio_cells.append(pending("post-T0"))
     rows.append(ratio_cells)
 
     rows += [r"\bottomrule", r"\end{tabular}"]
@@ -784,6 +807,23 @@ def numbers_macros(anchors, fdev, ffull, a_noctx, frozen, calibration=None):
     # pass, no MSH re-inference. Normalized score vs. a per-set MSH ceiling
     # and late-draft retention on MSH stay \pending -- they need a per-set
     # ceiling model trained on MSH, deliberately not done yet.
+    # Post-day-one rows: the per-set MSH ceiling and the pre-registered
+    # ceiling comparisons for the headline model, from the addendum summary.
+    cm = msh_expert(frozen, "perset")
+    macro("CeilMsh", pct(cm["top1"]) if cm else "\\pending{MSH ceiling}",
+          cm["run_id"] if cm else None)
+    cc = msh_ceiling_comparison(frozen, "f-full")
+    if cc:
+        macro("NormScoreMsh", f"{100 * cc['normalized_top1']:.1f}",
+              cc["run_id"])
+        macro("LateRetMsh", f"{100 * cc['late_draft_retention']:.1f}",
+              cc["run_id"])
+        macro("MshSharedPicks", f"{cc['n_shared_picks']:,}", cc["run_id"])
+    else:
+        macro("NormScoreMsh", "\\pending{MSH normalized score}")
+        macro("LateRetMsh", "\\pending{MSH late-draft retention}")
+        macro("MshSharedPicks", "\\pending{MSH shared picks}")
+
     ms = msh_secondary(frozen, "F-full")
     if ms:
         macro("FfullMshTopThree", pct(ms["top3"]), ms["run_id"])
