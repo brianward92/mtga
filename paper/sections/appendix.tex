@@ -2,24 +2,27 @@
 \label{sec:limitations}
 
 \paragraph{The target is agreement, not optimality.}
-Top-1 agreement with expert humans measures imitation. Experts disagree
-with each other (the within-set ceiling is ${\sim}70\%$, not 100\%), and
-agreeing with them is not the same as maximising win rate. A model could
-in principle draft better than its agreement suggests, or worse. Win-rate
-evaluation of zero-shot drafters is future work.
+Top-1 agreement with high-win-rate players measures imitation. Skilled
+drafters disagree with each other (the within-set ceiling is ${\sim}70\%$,
+not 100\%), and agreeing with them is not the same as maximising win rate.
+A model could in principle draft better than its agreement suggests, or
+worse. Win-rate evaluation of zero-shot drafters is future work. Training
+that weights picks by drafter outcome, imitating picks that correlate
+with winning and down-weighting or avoiding those that correlate with
+losing, is likewise a natural next step we leave to future work.
 
 \paragraph{Population.}
 \seventeenlands{} users are self-selected: they run a tracker, they draft
-on Arena, and the expert slice further conditions on volume and success.
-All numbers are relative to this population; paper drafting, other
-platforms, and casual play are out of scope.
+on Arena, and the high-win-rate slice further conditions on volume and
+success. All numbers are relative to this population; paper drafting,
+other platforms, and casual play are out of scope.
 
 \paragraph{One evaluation round.}
-Pre-registration buys credibility at the cost of adaptivity: the frozen
-battery cannot react to surprises in the test snapshot. And a single set
-is a sample of one from the distribution of future sets. The dev-trio
-spread and the composition probes bound, but do not eliminate, how much
-the headline number could vary on the \emph{next} set.
+Pre-registration buys credibility at the cost of adaptivity, since the
+frozen battery cannot react to surprises in the test snapshot. And a
+single set is a sample of one from the distribution of future sets. The
+dev-trio spread and the composition probes bound, but do not eliminate,
+how much the headline number could vary on the \emph{next} set.
 
 \paragraph{Text and language.}
 The text encoder is English-only and frozen. Rules text is embedded as

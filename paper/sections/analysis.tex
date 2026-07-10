@@ -4,19 +4,20 @@
 
 \begin{table}[t]
   \centering
-  \caption{Zero-shot expert top-1 (\%), point
-  estimates (per-cell 95\% CI half-widths are ${\sim}\pm0.1$--$0.2$pp on
-  the dev sets, Table~\ref{tab:main}; paired-difference CIs accompany the
-  deltas in the text). A-noctx, A-proportional, and A-topfilter are
-  architecture variants tested against the Full baseline before the
-  deployed architecture was fixed. A-notext and A-noUB are the two
-  pre-registered comparisons (\S\ref{sec:protocol}) analysed below:
-  A-notext drops the 384-d text embedding from the Full recipe, and A-noUB
-  removes the three licensed-IP training sets from A-noctx (the winning
-  architecture, \S\ref{sec:arch}), so its clean comparator is the A-noctx
-  row, not Full. The (variant $\times$ set) grid supplies the dev-side
-  numbers for the licensed-IP text penalty (per-set deltas below),
-  computed before MSH is seen.}
+  \caption{The variant grid: zero-shot top-1 (\%) with high-win-rate
+  players, point estimates (per-cell 95\% CI half-widths are
+  ${\sim}\pm0.1$--$0.2$pp on the dev sets, Table~\ref{tab:main};
+  paired-difference CIs accompany the deltas in the text). A-noctx,
+  A-proportional, and A-topfilter are architecture variants tested
+  against the Full baseline before the deployed architecture was fixed.
+  A-notext and A-noUB are the two pre-registered comparisons
+  (\S\ref{sec:protocol}) analysed below: A-notext drops the 384-d text
+  embedding from the Full recipe, and A-noUB removes the three
+  licensed-IP training sets from A-noctx (the winning architecture,
+  \S\ref{sec:arch}), so its clean comparator is the A-noctx row, not
+  Full. The (variant $\times$ set) grid supplies the dev-side measurement
+  of what the text embedding contributes on licensed-universe sets
+  (per-set deltas below), computed before MSH is seen.}
   \label{tab:ablations}
   \small
   \input{tables/ablations}
@@ -60,19 +61,19 @@ data, one by a pre-registered result that failed to show a gain and the
 other by an unmet data precondition, and the frozen recipe is exactly the
 31-set corpus described in \S\ref{sec:data}.
 
-\paragraph{The licensed-IP shift.}
+\paragraph{What the text embedding contributes on licensed universes.}
 MSH's names and flavor come from a comic universe, not from \mtg{}. Its
 text lives in the sentence encoder's pretraining as a different genre.
 This is the distribution shift most likely to break a text-dependent
-model on the day it matters, which is why the protocol makes a licensed-IP
-set (TMT) a development set: the rehearsal happens where it can still
-inform design. One mitigation is built in: card names are masked out of
-the text before embedding (\S\ref{sec:features}), so the encoder sees
-mechanics, not franchises. A second design choice does not reduce the
-shift but makes it measurable: the comparison grid of
-Table~\ref{tab:ablations} separates what the text embedding contributes on
-in-universe sets (SOS, BRO) from what it contributes on licensed sets
-(TMT, MSH).
+model on the day it matters, which is why the protocol makes a
+licensed-IP set (TMT) a development set: the rehearsal happens where it
+can still inform design. One mitigation is built in: card names are
+masked out of the text before embedding (\S\ref{sec:features}), so the
+encoder sees mechanics, not franchises. A second design choice does not
+reduce the shift but makes it measurable. The comparison grid of
+Table~\ref{tab:ablations} separates what the text embedding contributes
+on in-universe sets, SOS and BRO, from what it contributes on licensed
+sets, TMT and MSH.
 
 Zero-shot, the licensed dev set turns out not to be the hard one. TMT
 reaches \FdevTmt\% against SOS's \FdevSos\% (and \RatioTmt\% vs
@@ -164,14 +165,15 @@ anything else this grid does not cover, to account for.
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.55\linewidth]{figures/bro_diagnostics.pdf}
-\caption{BRO zero-shot expert top-1, split by whether the pack offered at
-least one of the 63 BRR retro-artifact bonus-sheet cards (\BonusPresentFrac\% of BRO's
-picks do). The raw \BonusRawGap pp gap is mostly a pick-depth confound (labeled
-above the bars): \emph{has\_bonus} tracks early-vs-late pick number by
-construction, and stratifying by pick number before comparing collapses
-the gap to \BonusStratGap pp (95\% CI). Error bars on the raw bars are 95\%
-cluster-bootstrap CIs over drafts. Generated from cached zero-shot
-predictions by \texttt{figures/bro\_diagnostics.py}; never MSH.}
+\caption{BRO zero-shot top-1 with high-win-rate players, split by whether
+the pack offered at least one of the 63 BRR retro-artifact bonus-sheet
+cards (\BonusPresentFrac\% of BRO's picks do). The raw \BonusRawGap pp
+gap is mostly a pick-depth confound (labeled above the bars):
+\emph{has\_bonus} tracks early-vs-late pick number by construction, and
+stratifying by pick number before comparing collapses the gap to
+\BonusStratGap pp (95\% CI). Error bars on the raw bars are 95\%
+cluster-bootstrap CIs over drafts, computed from cached zero-shot
+predictions.}
 \label{fig:bro-diagnostics}
 \end{figure}
 
@@ -179,12 +181,10 @@ predictions by \texttt{figures/bro\_diagnostics.py}; never MSH.}
 Conditioning is a scorer-side input (\S\ref{sec:arch}), so one model
 serves any audience. In human-model mode (\S\ref{sec:protocol}) the model
 scores \FdevBroAllUsers\% / \FdevTmtAllUsers\% /
-\FdevSosAllUsers\% on BRO / TMT / SOS: within a point of the expert-slice
-deployment numbers, consistent with skill moving picks less than card
-quality does. MSH shows the same pattern: deployment mode (conditioning on
-a fixed top skill bucket) and human mode (conditioning on each drafter's
-own bucket) differ by only \FfullMshSkillGap{}pp on the expert slice, so
-the choice of which bucket to condition on barely matters there either.
+\FdevSosAllUsers\% on BRO / TMT / SOS: within a point of the
+high-win-rate deployment numbers, consistent with skill moving picks
+less than card quality does. Whether MSH shows the same pattern is a
+question for the frozen pass (\S\ref{sec:msh}).
 
 \begin{figure}[t]
 \centering
@@ -197,8 +197,7 @@ tie (EV \VCCEvA{} vs.\ \VCCEvB, dominance split \VCCSplitA/\VCCSplitB) --
 the third candidate, \VCCRunnerName, trails at \VCCRunnerPct\% dominance
 against the pair. Ties this close are exactly the regime the top-label ECE
 below is measuring: the model's stated confidence and its actual
-reliability at low conviction. Computed by the deployed per-set model,
-never MSH.}
+reliability at low conviction. Computed by the deployed per-set model.}
 \label{fig:closecall}
 \end{figure}
 
@@ -229,13 +228,8 @@ model that still has the set-context tower (\S\ref{sec:arch}), and applied
 unchanged at test time to F-full, the tower-free recipe that actually
 scores MSH. F-full has no held-out set of its own to fit a temperature
 against without touching MSH, which is why the temperature crosses
-architectures this way. MSH ECE, at this same frozen temperature, is
-\FfullMshEce, tighter than any of the three dev-trio numbers above rather
-than in between them. We do not have a confirmed explanation for that on
-this evidence -- it is not simply forced picks inflating the count of
-trivially well-calibrated predictions, since MSH's non-forced ECE is close
-to its forced-inclusive figure -- so we report it without
-over-interpreting it.
+architectures this way. How that crossed-over temperature fares on MSH
+itself is reported with the frozen results (\S\ref{sec:msh}).
 
 \paragraph{Late-draft retention.}
 % scripts/eval_late_draft_retention.py, run=20260704_135822_f_dev, picks
@@ -268,8 +262,8 @@ vs.\ 7.3--8.0 overall). Restricting to genuine choices, pack size $\geq$
 all-pick figure on all three dev sets, the opposite direction from the
 retention ratio. The claim the data does support is narrower: the model
 does not collapse to chance late in the draft. The per-(pack, pick) curves
-against the per-cell random floor show this directly. Excluding forced
-picks, zero-shot top-1 never comes closer than 20.5 (BRO) / 32.5 (TMT) /
-28.4 (SOS) percentage points to chance at any point in the draft,
-including its latest picks.
-\pending{late-draft retention on MSH}
+against the per-cell random floor show this directly, and
+Figure~\ref{fig:pick-curves} in \S\ref{sec:msh} plots them for all four
+sets. Excluding forced picks, zero-shot top-1 never comes closer than
+20.5 (BRO) / 32.5 (TMT) / 28.4 (SOS) percentage points to chance at any
+point in the draft, including its latest picks.

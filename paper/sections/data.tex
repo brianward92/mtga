@@ -3,65 +3,81 @@
 
 \paragraph{Corpus.}
 Training data is the complete \seventeenlands{} public draft-data
-corpus~\citep{seventeenlands}, spanning every set the model has to
-generalise across: 31 expansions from STX (April 2021) through
-SOS (June 2026), Premier (best-of-one) and Traditional (best-of-three) draft
-where published, 59 (set, format) files, roughly 160M pick rows. Each row is
-one human pick: the pack contents, the drafter's pool, the card taken, and
-two coarse skill covariates (recent game-count bucket and win-rate bucket).
-Files were fetched once from the public S3 bucket, per the
-\seventeenlands{} usage guidelines (bulk downloads only), and frozen by
-sha256 and ETag in a data manifest (content hash
-\texttt{\DataManifestHash}); the manifest is released with the paper.
+corpus~\citep{seventeenlands}. It spans 31 expansions, from Strixhaven:
+School of Mages (STX, April 2021) through Secrets of Strixhaven (SOS, June
+2026), and covers Premier (best-of-one) and Traditional (best-of-three)
+draft where published: 59 (set, format) files, roughly 160M pick rows.
+Each row is one human pick. It records the pack contents, the drafter's
+pool, the card taken, and two skill covariates described below. Files were
+fetched once from the public S3 bucket, following the \seventeenlands{}
+usage guidelines for bulk downloads, and frozen by sha256 and ETag in a
+data manifest with content hash \texttt{\DataManifestHash}. The manifest
+is released with the paper.
 
-Two public files are structurally excluded from the corpus, recorded in the
-corpus registry: OM1 (a pick-two format whose rows carry two picks and whose
-pool columns undercount them, and whose digital-only cards largely do not
-exist on Scryfall) and the Powered Cube (a curated 545-card singleton pool
-with no expansion structure). A third, the VOW QuickDraft file (human picks
-inside bot pods, off-distribution pack dynamics), is held out of the
-default corpus for a distributional reason rather than a structural one: it
-is one of the two pre-registered flexibility-clause extras
-(\S\ref{sec:protocol}) that may join F-full's training data if a dev-trio
-ablation shows a gain. Everything else is kept, including digital-only and
-remaster sets.
+Two public files are structurally excluded from the corpus, and the
+exclusions are recorded in the corpus registry. Through the Omenpaths
+(OM1) is a pick-two format whose rows carry two picks while its pool
+columns undercount them, and most of its digital-only cards do not exist
+on Scryfall. The Powered Cube is a curated 545-card singleton pool with no
+expansion structure. A third file, the Innistrad: Crimson Vow (VOW)
+QuickDraft file, is held out of the default corpus for a distributional
+reason rather than a structural one: it contains human picks made inside
+bot pods, with off-distribution pack dynamics. It is one of the two
+pre-registered flexibility-clause extras (\S\ref{sec:protocol}) that may
+join F-full's training data if a dev-trio comparison shows a gain.
+Everything else is kept, including digital-only and remaster sets.
+
+\paragraph{Skill covariates.}
+\seventeenlands{} attaches two per-draft user covariates to every row,
+bucketed for privacy: the drafter's recent game count, in coarse buckets,
+and the drafter's win rate, in 2\% increments. \seventeenlands{} does not
+publicly document the precise computation window of these covariates, so
+we use them as given, as a per-event skill signal. Training filters no one
+out; every valid pick is retained and tagged with its drafter's covariates,
+and skill enters the model only as a conditioning input
+(\S\ref{sec:method}). The headline deployment conditioning uses a fixed
+skill bucket frozen before evaluation (\S\ref{sec:protocol}), so the
+deployed number does not depend on any individual drafter's covariate.
 
 \paragraph{Normalization.}
 The corpus spans three schema eras and several quirks, all normalised at
-ETL time: the 2021 files are gzipped tarballs rather than plain gzipped
+ETL time. The 2021 files are gzipped tarballs rather than plain gzipped
 CSVs, and the oldest era reports match-based rather than game-based skill
-buckets (harmonised; identical in best-of-one). Five sets are missing the
-first pick of each draft in the source logs (an annotation, not an
-exclusion), and packs are 13, 14, or 15 picks depending on the set (a model
-input, \S\ref{sec:method}). Card names are joined to Scryfall by
+buckets; we harmonise these, and the two are identical in best-of-one.
+Five sets are missing the first pick of each draft in the source logs,
+which we record as an annotation rather than an exclusion. Packs contain
+13, 14, or 15 picks depending on the set, and the pack size is a model
+input (\S\ref{sec:method}). Card names are joined to Scryfall by
 normalised name with an explicit alias table; unresolved names fail the
-build rather than featurizing as zeros. Per set we retain every valid pick
-and tag it with the drafter's skill covariates: training filters no one
-out. Skill is a conditioning input (``decision + tag by venue'').
+build rather than featurizing as zeros.
 
 \paragraph{Splits.}
 Within each (set, format) shard, drafts are split by a hash of the draft
 identifier (\texttt{crc32 \% 1000 < 50}, ${\sim}5\%$ validation). Early
-stopping uses only this within-training-set validation split. The \emph{expert slice} used for all headline evaluation
-is picks by drafters with win-rate bucket $\geq 0.55$ and game-count bucket
-$\geq 100$, the same filter the per-set ceiling models train and evaluate
-on, so ceiling comparisons are population-matched.
+stopping uses only this within-training-set validation split. All headline
+evaluation is on picks by \emph{high-win-rate players}: drafters whose
+win-rate bucket is at least $0.55$ and whose game-count bucket is at least
+$100$. We refer to this population as the \emph{high-win-rate slice}
+throughout. The per-set ceiling models train and evaluate on the same
+filter, so ceiling comparisons are population-matched.
 
 \paragraph{The held-out sets.}
-Four sets never contribute a pick to model selection. BRO, TMT, and SOS are
-the development trio (\S\ref{sec:protocol}): all model selection keys on
-zero-shot accuracy over these three, computed from \emph{F-dev}, which
-trains on none of them. Once selection is frozen, the headline model
-(\emph{F-full}) retrains on all 31 sets, dev trio included: only MSH stays
-unseen by every model in the battery. MSH, the test set, is stricter still:
-a registry-level gate (\texttt{EVAL\_ONLY}) makes every training and
-feature-fitting code path refuse MSH pick data outright, and at the
-protocol freeze its public data did not yet exist. MSH \emph{card} features
-from Scryfall are permitted. That is the zero-shot
-contract: public card information only, no human behavioral data of any
-kind. ``Unseen'' describes the set, not every card in it. BRO, TMT, and SOS
-packs include some ordinary reprints (mostly base-set staples and basic
-lands) that also appear in F-dev's training corpus under other sets. This
+Four sets never contribute a pick to model selection. The Brothers' War
+(BRO), Teenage Mutant Ninja Turtles (TMT), and SOS are the development
+trio (\S\ref{sec:protocol}). All model selection keys on zero-shot
+accuracy over these three, computed from \emph{F-dev}, which trains on
+none of them. Once selection is frozen, the headline model (\emph{F-full})
+retrains on all 31 sets, dev trio included; only Marvel Super Heroes
+(MSH) stays unseen by every model in the battery. MSH, the test set, is
+stricter still. A registry-level gate (\texttt{EVAL\_ONLY}) makes every
+training and feature-fitting code path refuse MSH pick data outright, and
+at the protocol freeze its public data did not yet exist. MSH \emph{card}
+features from Scryfall are permitted. That is the zero-shot contract:
+public card information only, no human behavioral data of any kind.
+
+``Unseen'' describes the set, not every card in it. BRO, TMT, and SOS
+packs include some ordinary reprints, mostly base-set staples and basic
+lands, that also appear in F-dev's training corpus under other sets. This
 confers no advantage under the contract above: a reprint has no memorized
 identity to exploit, only the same frozen feature vector any novel card
 with identical features would get. But it does mean set-level and

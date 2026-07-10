@@ -33,12 +33,12 @@ set a missing indicator, never a silent zero.
 \paragraph{Text embedding (384-d).}
 The card's type line and rules text, embedded with a frozen
 \texttt{bge-small-en-v1.5} sentence encoder~\citep{xiao2023bge}
-($L_2$-normalised). The card's own name (and, for legendary cards, its
-short name) is masked to a placeholder token before embedding, so the
-encoder cannot key on names it may know from pretraining, a deliberate
-handicap that matters for licensed-IP sets (\S\ref{sec:analysis}).
-Parenthetical reminder text is kept: for a brand-new mechanic it is the
-only definition the model will ever see. Back faces are appended for
+($L_2$-normalised). The card's own name, and for legendary cards its
+short name, is masked to a placeholder token before embedding, so the
+encoder cannot key on names it may know from pretraining. This is a
+deliberate handicap, and it matters for licensed-IP sets
+(\S\ref{sec:analysis}). Parenthetical reminder text is kept, since for a
+brand-new mechanic it is the only definition the model will ever see. Back faces are appended for
 double-faced cards.
 
 \subsection{Architecture}
@@ -93,11 +93,11 @@ $[\,c;\; p;\; c \odot p;\; \mathrm{ctx}\,]$, where $p$ is the pool summary
 and $c \odot p$ the elementwise interaction; a softmax over the pack's
 real slots gives the pick distribution.
 
-We test the set-context tower's contribution directly by removing it and
-retraining (we call this variant A-noctx, Table~\ref{tab:ablations},
-\S\ref{sec:analysis}). It scores higher on all three dev sets. That
-tower-free configuration, not the one just described, is what F-full and
-the frozen MSH evaluation actually run. The first invariant still holds
+We test the set-context tower's contribution directly with an experiment
+that removes it and retrains; we call this variant A-noctx
+(Table~\ref{tab:ablations}, \S\ref{sec:analysis}). It scores higher on all
+three dev sets. That tower-free configuration, not the one just described,
+is what F-full and the frozen MSH evaluation actually run. The first invariant still holds
 either way, since neither configuration has a set-identity parameter.
 Dropping the tower simply means the shipped model's only route to
 set-relative signal is the pool tower, each candidate's own features, and
@@ -107,15 +107,16 @@ list.
 \subsection{Training}
 \label{sec:training}
 
-One recipe for every run in the paper (fixed before the scaling and
-ablation studies, since the protocol forbids per-rung tuning). Batches of
-8{,}192 picks are drawn from one (set, format) shard at a time, shards
-sampled proportionally to $n_{\text{picks}}^{0.5}$, an interpolation
-between pick-uniform (which lets the largest sets dominate) and
-set-uniform (which oversamples tiny sets). AdamW ($\beta_1{=}0.9$,
-$\beta_2{=}0.98$, weight decay 0.01), peak learning rate $10^{-3}$,
-2{,}000-step linear warmup, cosine decay; cross-entropy with label
-smoothing 0.05 renormalised over real pack slots. The presentation budget
+One recipe governs every run in the paper. It was fixed before the
+scaling and variant studies, since the protocol forbids per-rung tuning.
+Batches of 8{,}192 picks are drawn from one (set, format) shard at a
+time. Shards are sampled proportionally to $n_{\text{picks}}^{0.5}$, an
+interpolation between pick-uniform sampling, which lets the largest sets
+dominate, and set-uniform sampling, which oversamples tiny sets. The
+optimizer is AdamW ($\beta_1{=}0.9$, $\beta_2{=}0.98$, weight decay 0.01)
+with peak learning rate $10^{-3}$, a 2{,}000-step linear warmup, and
+cosine decay; the loss is cross-entropy with label smoothing 0.05,
+renormalised over real pack slots. The presentation budget
 is four epochs. Within-training validation (never the dev sets) is
 evaluated every 2{,}000 steps and training stops after three
 non-improving evaluations. Seed 17 throughout. Seed variance is measured
@@ -125,7 +126,6 @@ Training runs on a single Apple M3 Ultra workstation (96\,GB unified
 memory) in PyTorch 2.12 eager mode on the MPS backend, at
 $\sim$\FdevExamplesPerSec{} picks/s. The full \FdevPicks M-pick run takes
 about \FdevWallHours{} hours, stopping at step 34{,}000. Training-backend
-correctness is not assumed and is actively gated rather than hoped for;
-specifics are in the companion reference. Inference
-exports to ONNX (opset 18) and runs on a consumer x86-64 machine,
-CPU-only, well under a millisecond per pick.
+correctness is gated rather than assumed; specifics are in the companion
+reference. Inference exports to ONNX (opset 18) and runs on a consumer
+x86-64 machine, CPU-only, well under a millisecond per pick.

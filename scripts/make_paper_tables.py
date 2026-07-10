@@ -408,8 +408,10 @@ def table_main(anchors, fdev, ffull, a_noctx, frozen, ledger):
 
 
 def table_baselines(anchors, frozen):
+    """Measured baselines only. Published prior numbers live in the intro's
+    prior-work table (table_prior_work); mixing the two blocks in one table
+    invited exactly the head-to-head misreading the caption had to disclaim."""
     reh = rehearsal_baselines(frozen)
-    pub = anchors["published"]
     rows = [
         r"\begin{tabular}{llll}",
         r"\toprule",
@@ -436,24 +438,124 @@ def table_baselines(anchors, frozen):
         c = cell(m["top1"], m["ci"], m["run_id"]) if m \
             else pending("post-T0")
         rows.append([label + r"$^{*}$", "post-release statistics", "MSH", c])
-    rows.append(r"\midrule")
+    rows += [r"\bottomrule", r"\end{tabular}"]
+    return emit_rows(rows)
 
-    def published(key):
+
+# Presentational metadata for the intro's prior-work summary (anchor key,
+# approach, scores-unseen-sets?, day-one-information-only?). Numbers still
+# flow from anchors.json; only the classification is declared here.
+PRIOR_WORK_ROWS = [
+    ("ward_draftsimbot", "Hand-tuned ratings", "no", "yes"),
+    ("ward_nnetbot", "One-hot MLP, per set", "no", "no"),
+    ("statistical_drafting_within_set", "One-hot MLP, per set", "no", "no"),
+    ("puder_within_set", "Transformer, per set", "no", "no"),
+    ("bertram_features_only_unseen", "Card features, one set", "yes", "yes"),
+    ("bertram_bro_zeroshot", "Features+stats+images, 13 sets", "yes", "no"),
+    ("urzagpt_gpt4o", "LLM, zero-shot", "yes", "no"),
+]
+
+
+def table_prior_work(anchors, frozen):
+    """Intro literature summary: every published pick-agreement number this
+    paper cites, its information regime, and whether it works on an unseen
+    set with day-one information -- closed by this paper's own frozen MSH
+    row so the reader sees where DraftFM lands in the same frame."""
+    pub = anchors["published"]
+    rows = [
+        r"\begin{tabular}{llccll}",
+        r"\toprule",
+        r"\rowcolor{tblhead}",
+        r"Reference & Approach & Unseen & Day 1 & Test set "
+        r"& Top-1 (\%) \\",
+        r"\midrule",
+    ]
+    for key, approach, unseen, dayone in PRIOR_WORK_ROWS:
         p = pub[key]
         star = "$^{*}$" if "asterisk" in p else ""
-        label = f"{p['label']}{star}~\\citep{{{p['cite']}}}"
         if "top1" in p:
             val = (pct(p["top1"]), "")
         else:
             val = (f"{pct(p['top1_lo'])}--{pct(p['top1_hi'])}", "")
-        return [label, p["info"], p["test_set"], val]
-
-    rows.append(published("ward_draftsimbot"))
-    rows.append(published("urzagpt_gpt4o"))
-    rows.append(published("bertram_features_only_unseen"))
-    rows.append(published("bertram_bro_zeroshot"))
+        rows.append([f"\\citet{{{p['cite']}}}{star}", approach, unseen,
+                     dayone, p["test_set"], val])
+    rows.append(r"\midrule")
+    m = msh_expert(frozen, "F-full")
+    msh_cell = cell(m["top1"], run_id=m["run_id"]) if m else pending("MSH")
+    rows.append(["DraftFM (this paper)", "Card features, 31 sets", "yes",
+                 "yes", "MSH (unseen)", msh_cell])
     rows += [r"\bottomrule", r"\end{tabular}"]
     return emit_rows(rows)
+
+
+SKILL_BAND_LABELS = {
+    "bottom": r"Bottom (win rate $<$ 0.50)",
+    "middle": r"Middle (0.50--0.55)",
+    "top": r"Top ($\geq$ 0.55)",
+}
+
+
+def table_skill_bands(breakdowns):
+    """Top-1 by drafter win-rate band (deployment mode) from cached
+    predictions: dev trio from F-dev, MSH from the frozen F-full pass."""
+    sets = ["BRO", "TMT", "SOS", "MSH.deployment"]
+    heads = ["BRO", "TMT", "SOS", "MSH"]
+    rows = [
+        r"\begin{tabular}{lcccc}",
+        r"\toprule",
+        r"\rowcolor{tblhead}",
+        r"Drafter band & " + " & ".join(heads) + r" \\",
+        r"\midrule",
+    ]
+    for band in ("bottom", "middle", "top"):
+        cells = [SKILL_BAND_LABELS[band]]
+        for s in sets:
+            entry = breakdowns["sets"].get(s) if breakdowns else None
+            rec = next((b for b in entry["skill_bands"]
+                        if b["band"] == band), None) if entry else None
+            cells.append(cell(rec["top1"], rec["top1_ci"],
+                              entry["source_run"]) if rec else pending(s))
+        rows.append(cells)
+    rows += [r"\bottomrule", r"\end{tabular}"]
+    return emit_rows(rows)
+
+
+def skill_band_macros(breakdowns):
+    """Prose macros for the band breakdown (LaTeX names cannot hold digits)."""
+    out = []
+
+    def macro(name, body, run_id=None):
+        comment = f" % run={run_id}" if run_id else ""
+        out.append(f"\\newcommand{{\\{name}}}{{{body}}}{comment}")
+
+    def band(set_key, band_name):
+        entry = breakdowns["sets"].get(set_key) if breakdowns else None
+        if not entry:
+            return None, None
+        rec = next((b for b in entry["skill_bands"]
+                    if b["band"] == band_name), None)
+        return (rec, entry["source_run"]) if rec else (None, None)
+
+    caps = {"bottom": "Bot", "middle": "Mid", "top": "Top"}
+    for set_key, suffix in [("BRO", "Bro"), ("TMT", "Tmt"), ("SOS", "Sos"),
+                            ("MSH.deployment", "Msh")]:
+        for band_name, cap in caps.items():
+            rec, run = band(set_key, band_name)
+            name = f"SkillBand{cap}{suffix}"
+            macro(name, pct(rec["top1"]) if rec
+                  else f"\\pending{{{name}}}", run)
+    for band_name, cap in [("bottom", "Bot"), ("top", "Top")]:
+        rec, run = band("MSH.human", band_name)
+        macro(f"SkillBand{cap}MshHuman",
+              pct(rec["top1"]) if rec else "\\pending{MSH human band}", run)
+    top, run = band("MSH.deployment", "top")
+    bot, _ = band("MSH.deployment", "bottom")
+    if top and bot:
+        macro("SkillBandGapMsh",
+              f"{100 * (top['top1'] - bot['top1']):.1f}", run)
+    else:
+        macro("SkillBandGapMsh", "\\pending{MSH band gap}")
+    return out
 
 
 def table_ablations(by_name, frozen):
@@ -652,6 +754,12 @@ def numbers_macros(anchors, fdev, ffull, a_noctx, frozen, calibration=None):
             macro(f"Ratio{s.title()}", f"{100 * r:.1f}")
         macro("RatioDevMean", f"{100 * sum(ratios) / 3:.1f}")
 
+    # Two macro families per baseline: the pre-freeze SOS-rehearsal value
+    # (\BaseRandom/\BaseRarity -- historical anchors quoted as such) and the
+    # frozen MSH value (\BaseRandomMsh/\BaseRarityMsh -- what the same
+    # pre-registered baseline scored in the real evaluation). The two differ
+    # sharply for the rarity heuristic (42.8 rehearsal vs 25.6 MSH), so prose
+    # must never quote one while describing the other.
     reh = rehearsal_baselines(frozen)
     for member, name in [("baseline-random", "BaseRandom"),
                          ("baseline-rarity", "BaseRarity")]:
@@ -660,6 +768,11 @@ def numbers_macros(anchors, fdev, ffull, a_noctx, frozen, calibration=None):
             macro(name, pct(b["top1"]), b["run_id"])
         else:
             macro(name, f"\\pending{{{member}}}")
+        m = msh_expert(frozen, member)
+        if m:
+            macro(f"{name}Msh", pct(m["top1"]), m["run_id"])
+        else:
+            macro(f"{name}Msh", f"\\pending{{{member} MSH}}")
 
     m = msh_expert(frozen, "F-full")
     macro("FfullMsh", pct(m["top1"]) if m
@@ -902,17 +1015,25 @@ def main(argv=None):
     ablation_deltas = load_json(deltas_path) if deltas_path.exists() else None
     seed_path = repo / "paper" / "data" / "seed_bands.json"
     seed_bands = load_json(seed_path) if seed_path.exists() else None
+    breakdown_path = repo / "paper" / "data" / "pick_breakdowns.json"
+    breakdowns = load_json(breakdown_path) if breakdown_path.exists() else None
 
     tables = repo / "paper" / "tables"
     write_table(tables / "main_results.tex",
                 table_main(anchors, fdev, ffull, a_noctx, frozen, ledger),
-                "Main results: expert-slice deployment-mode top-1 (95% "
-                "cluster-bootstrap CIs over drafts).")
+                "Main results: high-win-rate-slice deployment-mode top-1 "
+                "(95% cluster-bootstrap CIs over drafts).")
     write_table(tables / "baselines.tex", table_baselines(anchors, frozen),
-                "Hour-0/post-release baselines and published anchors. "
-                "* = post-release or non-day-1 information.")
+                "Measured baselines (hour-0 and asterisked post-release). "
+                "Published prior numbers are in prior_work.tex.")
+    write_table(tables / "prior_work.tex", table_prior_work(anchors, frozen),
+                "Published pick-agreement anchors + this paper's frozen MSH "
+                "row. * = caveat recorded in anchors.json.")
+    write_table(tables / "skill_bands.tex", table_skill_bands(breakdowns),
+                "Top-1 by drafter win-rate band, deployment mode, from "
+                "cached predictions (eval_pick_breakdowns.py).")
     write_table(tables / "ablations.tex", table_ablations(by_name, frozen),
-                "Pre-registered ablations (protocol section 5).")
+                "Pre-registered variant grid (protocol section 5).")
     scaling_rows, curve = table_scaling(by_name, frozen, ledger)
     write_table(tables / "scaling.tex", scaling_rows,
                 "Scaling ladder (protocol section 4.3). Rung labels are "
@@ -920,7 +1041,8 @@ def main(argv=None):
     write_table(tables / "numbers.tex",
                 numbers_macros(anchors, fdev, ffull, a_noctx, frozen,
                               calibration)
-                + analysis_macros(fdev, ablation_deltas, seed_bands),
+                + analysis_macros(fdev, ablation_deltas, seed_bands)
+                + skill_band_macros(breakdowns),
                 "Number macros used by the prose.")
 
     figures = repo / "paper" / "figures"

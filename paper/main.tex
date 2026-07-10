@@ -15,14 +15,25 @@
 \usepackage[table]{xcolor}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,fit,backgrounds,shapes.geometric,calc}
-\usepackage{tcolorbox}
-\tcbuselibrary{skins}
 \usepackage{titling}
 \usepackage{placeins}
-\usepackage[numbers,sort&compress]{natbib}
-\usepackage[hidelinks]{hyperref}
+\usepackage[authoryear,round]{natbib}
+% Default link borders (not colored text): green boxes around citations,
+% red around internal refs -- the classic arXiv/working-paper look.
+\usepackage{hyperref}
 \usepackage{caption}
 \captionsetup{font=small,labelfont=bf}
+% Dotted leaders for section entries in the table of contents (the article
+% class only dots subsections); done with the kernel's own \@dottedtocline
+% so no extra package is needed.
+\makeatletter
+\renewcommand*\l@section{\@dottedtocline{1}{0pt}{1.8em}}
+\makeatother
+\setcounter{tocdepth}{2}
+
+% Figures and tables numbered by section (Table 1.1, Figure 7.2, ...).
+\counterwithin{figure}{section}
+\counterwithin{table}{section}
 
 % Paper-wide accent (scaling curve, architecture diagram, stat callouts) and
 % a print-safe light table-header tint (colortbl, loaded by xcolor[table]).
@@ -55,7 +66,7 @@ Gathering} Sets from Public Card Features}
 % TODO(affiliation): placeholder — fill before submission.
 \normalsize Independent Researcher}
 
-\date{}
+\date{\today}
 
 % Title-block treatment: a centered accent rule under the title, set with
 % core LaTeX title hooks (no extra package). Kept plain enough to survive
@@ -72,43 +83,40 @@ Gathering} Sets from Public Card Features}
 
 \begin{abstract}
 Draft assistants for \mtg{} need weeks of post-release human pick data
-before they can model a new set. We train DraftFM, a pick model that
-represents every card as a frozen vector of public information: structured
-Scryfall features plus a sentence embedding of its rules text. It holds no
-card- or set-specific parameters, so it can score a set the moment its card
-list goes public.
-
-We first train a model on \FdevPicks M human picks from \FdevSets{} sets of
-\seventeenlands{} public data to pick the architecture and hyperparameters.
-On three sets it never trained on, that model agrees with expert human
-picks \FdevDevMean\% of the time. To put that number in context: a model
-trained directly on one of those three sets, and so allowed to actually see
-it, marks the best any model can do there. DraftFM, trained on zero picks
-from the set it is scoring, still reaches \NormScoreDevMean\% of what that
-directly-trained model achieves (the pre-registered normalized score,
-\S\ref{sec:protocol}). It also beats every published number we could find
-that a real deployment could have used on release day. Each of those
-numbers comes from a different test set, so we treat them as reference
-points rather than a head-to-head ranking (Table~\ref{tab:baselines}).
-
-A follow-up experiment on the same three sets tried a simpler architecture:
-one without the added component that reads the whole set's card list. The
-simpler model scored no worse, within seed noise, so we deployed it
-instead. This deployed recipe, which we call F-full, has 1.6M parameters.
-It produces the paper's headline result: a single pre-registered pass over
-the first public snapshot of MSH, a licensed-IP set untouched by any
-training or tuning in this pipeline, reaching \FfullMsh\% expert top-1
-agreement. We release the code, the frozen evaluation protocol, model
-weights, and per-pick prediction files.
+before they can model a new set, leaving them nothing to offer on release
+day. We train DraftFM, a pick model that represents every card as a frozen
+vector of public information, structured Scryfall features plus a sentence
+embedding of its rules text, with no card or set specific parameters, so
+it can score a set the moment its card list goes public. Trained on
+\FdevPicks M picks from \FdevSets{} \seventeenlands{} sets, DraftFM agrees
+with high-win-rate players' picks \FdevDevMean\% of the time on three sets
+it never trained on: \NormScoreDevMean\% of what a model trained directly
+on the same set achieves, by our pre-registered normalized score, and
+above every other published number we could find that a real day-one
+deployment could have used, each drawn from a different test set and so a
+reference point rather than a head-to-head
+comparison. A simpler architecture, dropping
+the component that reads the set's full card list, scored no worse within
+seed noise, so we deployed it instead: this recipe, F-full, has 1.6M
+parameters and produces the paper's headline result, a single
+pre-registered pass over the first public snapshot of MSH, a licensed-IP
+set untouched by any training or tuning in this pipeline, reaching
+\FfullMsh\% agreement with high-win-rate players' picks. We release the
+code, the frozen evaluation protocol, model weights, and per-pick
+prediction files.
 \end{abstract}
 
+\newpage
+\tableofcontents
+\newpage
+
 \input{sections/intro}
-\input{sections/related}
 \input{sections/data}
 \input{sections/method}
 \input{sections/protocol}
 \input{sections/results}
 \input{sections/analysis}
+\input{sections/msh}
 
 \section*{Acknowledgments}
 This work would not exist without \seventeenlands{}, whose public datasets

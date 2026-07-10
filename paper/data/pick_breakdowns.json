@@ -1,0 +1,1739 @@
+{
+  "_comment": "Post-hoc breakdowns of cached prediction parquets (no model re-runs; MSH never re-scored). Emitted by scripts/eval_pick_breakdowns.py; consumed by scripts/make_paper_tables.py and paper/figures/pick_curves.py.",
+  "bands": [
+    {
+      "band": "bottom",
+      "wr_lo": 0.0,
+      "wr_hi": 0.5
+    },
+    {
+      "band": "middle",
+      "wr_lo": 0.5,
+      "wr_hi": 0.55
+    },
+    {
+      "band": "top",
+      "wr_lo": 0.55,
+      "wr_hi": 1.01
+    }
+  ],
+  "sources": {
+    "dev": {
+      "run": "20260704_135822_f_dev",
+      "mode": "deployment",
+      "dir": "/opt/bward/dat/mtga/foundation/runs/20260704_135822_f_dev/zeroshot"
+    },
+    "msh": {
+      "member": "f-full",
+      "snapshot_sha": "013df16b8994534f69ed63c87ab684acafc5f4cbe82982264b0fc111dbb2183a",
+      "dir": "/opt/bward/dat/mtga/foundation/frozen_eval/013df16b8994534f69ed63c87ab684acafc5f4cbe82982264b0fc111dbb2183a"
+    }
+  },
+  "sets": {
+    "BRO": {
+      "mode": "deployment",
+      "source_run": "20260704_135822_f_dev",
+      "skill_bands": [
+        {
+          "band": "bottom",
+          "wr_lo": 0.0,
+          "wr_hi": 0.5,
+          "n_picks": 988061,
+          "n_drafts": 22244,
+          "top1": 0.4775170763748392,
+          "top1_ci": [
+            0.476466448485424,
+            0.4786295991558882
+          ]
+        },
+        {
+          "band": "middle",
+          "wr_lo": 0.5,
+          "wr_hi": 0.55,
+          "n_picks": 1191836,
+          "n_drafts": 26807,
+          "top1": 0.484183226551304,
+          "top1_ci": [
+            0.4832802066473944,
+            0.4851286634571836
+          ]
+        },
+        {
+          "band": "top",
+          "wr_lo": 0.55,
+          "wr_hi": 1.01,
+          "n_picks": 1832914,
+          "n_drafts": 41211,
+          "top1": 0.48777847733172425,
+          "top1_ci": [
+            0.48701203806931437,
+            0.4885491028911767
+          ]
+        }
+      ],
+      "per_pick_curve": [
+        {
+          "pack_number": 0,
+          "pick_number": 0,
+          "top1": 0.5276443637812355,
+          "random_floor": 0.06666666666666667,
+          "n": 90362
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 1,
+          "top1": 0.36146729967166563,
+          "random_floor": 0.07142857142857141,
+          "n": 90152
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 2,
+          "top1": 0.33066631106369737,
+          "random_floor": 0.07692307692307689,
+          "n": 89988
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 3,
+          "top1": 0.31909072710691966,
+          "random_floor": 0.0833333333333333,
+          "n": 89918
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 4,
+          "top1": 0.3178459346969663,
+          "random_floor": 0.09090909090909093,
+          "n": 89858
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 5,
+          "top1": 0.32411282781958234,
+          "random_floor": 0.1,
+          "n": 89836
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 6,
+          "top1": 0.3434827156094084,
+          "random_floor": 0.11111111111111113,
+          "n": 89792
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 7,
+          "top1": 0.3606162895625146,
+          "random_floor": 0.125,
+          "n": 89763
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 8,
+          "top1": 0.3834204397294316,
+          "random_floor": 0.1428571428571428,
+          "n": 89737
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 9,
+          "top1": 0.413173118723039,
+          "random_floor": 0.1666666666666666,
+          "n": 89713
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 10,
+          "top1": 0.45706831384004726,
+          "random_floor": 0.19999999999999998,
+          "n": 89689
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 11,
+          "top1": 0.5101731215420311,
+          "random_floor": 0.25,
+          "n": 89648
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 12,
+          "top1": 0.5871384574183182,
+          "random_floor": 0.3333333333333332,
+          "n": 89616
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 13,
+          "top1": 0.7079416821094465,
+          "random_floor": 0.5,
+          "n": 89578
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 14,
+          "top1": 1.0,
+          "random_floor": 1.0,
+          "n": 89528
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 0,
+          "top1": 0.4929769474025321,
+          "random_floor": 0.06666666666666667,
+          "n": 89491
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 1,
+          "top1": 0.3999418591650082,
+          "random_floor": 0.07142857142857141,
+          "n": 89438
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 2,
+          "top1": 0.36972787974364996,
+          "random_floor": 0.07692307692307689,
+          "n": 89409
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 3,
+          "top1": 0.3608468924151205,
+          "random_floor": 0.0833333333333333,
+          "n": 89362
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 4,
+          "top1": 0.3676516677859861,
+          "random_floor": 0.09090909090909091,
+          "n": 89340
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 5,
+          "top1": 0.3680928013973956,
+          "random_floor": 0.09999999999999999,
+          "n": 89309
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 6,
+          "top1": 0.38295084170558785,
+          "random_floor": 0.11111111111111113,
+          "n": 89283
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 7,
+          "top1": 0.40314159589486187,
+          "random_floor": 0.125,
+          "n": 89254
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 8,
+          "top1": 0.4198231120178457,
+          "random_floor": 0.14285714285714282,
+          "n": 89209
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 9,
+          "top1": 0.45232408186150824,
+          "random_floor": 0.1666666666666666,
+          "n": 89175
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 10,
+          "top1": 0.4929329414668073,
+          "random_floor": 0.2,
+          "n": 89146
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 11,
+          "top1": 0.5494165170556553,
+          "random_floor": 0.25,
+          "n": 89120
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 12,
+          "top1": 0.6284367106371036,
+          "random_floor": 0.3333333333333332,
+          "n": 89075
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 13,
+          "top1": 0.7328744048153805,
+          "random_floor": 0.5000056149492409,
+          "n": 89048
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 14,
+          "top1": 1.0,
+          "random_floor": 1.0,
+          "n": 89011
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 0,
+          "top1": 0.4725627914817104,
+          "random_floor": 0.06666666666666667,
+          "n": 88985
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 1,
+          "top1": 0.4045067635186039,
+          "random_floor": 0.07142857142857141,
+          "n": 88933
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 2,
+          "top1": 0.38879141642486,
+          "random_floor": 0.07692307692307689,
+          "n": 88914
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 3,
+          "top1": 0.37668898014288127,
+          "random_floor": 0.08333333333333331,
+          "n": 88885
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 4,
+          "top1": 0.37388720695981004,
+          "random_floor": 0.09090909090909091,
+          "n": 88853
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 5,
+          "top1": 0.3828529610448097,
+          "random_floor": 0.1,
+          "n": 88820
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 6,
+          "top1": 0.38601806591129234,
+          "random_floor": 0.11111111111111113,
+          "n": 88786
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 7,
+          "top1": 0.40533111015975304,
+          "random_floor": 0.125,
+          "n": 88762
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 8,
+          "top1": 0.41338893271723204,
+          "random_floor": 0.14285714285714282,
+          "n": 88730
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 9,
+          "top1": 0.44297874739275045,
+          "random_floor": 0.1666666666666666,
+          "n": 88695
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 10,
+          "top1": 0.48939793823735084,
+          "random_floor": 0.2,
+          "n": 88662
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 11,
+          "top1": 0.5482790130977764,
+          "random_floor": 0.25,
+          "n": 88641
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 12,
+          "top1": 0.626035436181018,
+          "random_floor": 0.3333333333333332,
+          "n": 88610
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 13,
+          "top1": 0.7244115820962918,
+          "random_floor": 0.5000056442964385,
+          "n": 88585
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 14,
+          "top1": 1.0,
+          "random_floor": 1.0,
+          "n": 88540
+        }
+      ]
+    },
+    "TMT": {
+      "mode": "deployment",
+      "source_run": "20260704_135822_f_dev",
+      "skill_bands": [
+        {
+          "band": "bottom",
+          "wr_lo": 0.0,
+          "wr_hi": 0.5,
+          "n_picks": 292494,
+          "n_drafts": 7134,
+          "top1": 0.5735399700506677,
+          "top1_ci": [
+            0.5714813808146492,
+            0.5755127455605926
+          ]
+        },
+        {
+          "band": "middle",
+          "wr_lo": 0.5,
+          "wr_hi": 0.55,
+          "n_picks": 391386,
+          "n_drafts": 9546,
+          "top1": 0.5810427557449679,
+          "top1_ci": [
+            0.5793460931152367,
+            0.5828161329224857
+          ]
+        },
+        {
+          "band": "top",
+          "wr_lo": 0.55,
+          "wr_hi": 1.01,
+          "n_picks": 631974,
+          "n_drafts": 15414,
+          "top1": 0.5783829714513572,
+          "top1_ci": [
+            0.5770283271147231,
+            0.5797802599474029
+          ]
+        }
+      ],
+      "per_pick_curve": [
+        {
+          "pack_number": 0,
+          "pick_number": 1,
+          "top1": 0.4187117041460608,
+          "random_floor": 0.0774332895495534,
+          "n": 32151
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 2,
+          "top1": 0.4328325713041585,
+          "random_floor": 0.08389484091639544,
+          "n": 32151
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 3,
+          "top1": 0.438617772386551,
+          "random_floor": 0.09155179677713968,
+          "n": 32151
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 4,
+          "top1": 0.44306553450903546,
+          "random_floor": 0.10070604335790492,
+          "n": 32151
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 5,
+          "top1": 0.45146340704799226,
+          "random_floor": 0.1118791881365363,
+          "n": 32151
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 6,
+          "top1": 0.46387359646667287,
+          "random_floor": 0.12586533633701685,
+          "n": 32151
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 7,
+          "top1": 0.4775279151503841,
+          "random_floor": 0.1438739223100518,
+          "n": 32151
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 8,
+          "top1": 0.5060184753195857,
+          "random_floor": 0.1677480223528558,
+          "n": 32151
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 9,
+          "top1": 0.5507760256290628,
+          "random_floor": 0.20135454573730216,
+          "n": 32151
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 10,
+          "top1": 0.6005411962302883,
+          "random_floor": 0.2516251438524463,
+          "n": 32151
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 11,
+          "top1": 0.68588846381139,
+          "random_floor": 0.3353394917731951,
+          "n": 32151
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 12,
+          "top1": 0.8402226991384405,
+          "random_floor": 0.5020528132873006,
+          "n": 32151
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 13,
+          "top1": 1.0,
+          "random_floor": 1.0,
+          "n": 32151
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 0,
+          "top1": 0.5132966315200149,
+          "random_floor": 0.07188606236847346,
+          "n": 32151
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 1,
+          "top1": 0.4867966781748624,
+          "random_floor": 0.07743348892924332,
+          "n": 32151
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 2,
+          "top1": 0.48508600043544525,
+          "random_floor": 0.08389036393608568,
+          "n": 32151
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 3,
+          "top1": 0.4834997356225312,
+          "random_floor": 0.09155094850718624,
+          "n": 32151
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 4,
+          "top1": 0.48154023203010793,
+          "random_floor": 0.10068807260185446,
+          "n": 32151
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 5,
+          "top1": 0.4860813038474697,
+          "random_floor": 0.11188437200847393,
+          "n": 32151
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 6,
+          "top1": 0.4924885695623775,
+          "random_floor": 0.12584311974299844,
+          "n": 32151
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 7,
+          "top1": 0.5108705794532052,
+          "random_floor": 0.14382430525007733,
+          "n": 32151
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 8,
+          "top1": 0.5317097446424683,
+          "random_floor": 0.16773765460898052,
+          "n": 32151
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 9,
+          "top1": 0.5779602500699823,
+          "random_floor": 0.20131411153618867,
+          "n": 32151
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 10,
+          "top1": 0.6311778793816678,
+          "random_floor": 0.25152924222160017,
+          "n": 32151
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 11,
+          "top1": 0.7100245715529844,
+          "random_floor": 0.3352254465905674,
+          "n": 32151
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 12,
+          "top1": 0.8518242045348512,
+          "random_floor": 0.5021150197505521,
+          "n": 32151
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 13,
+          "top1": 1.0,
+          "random_floor": 1.0,
+          "n": 32151
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 0,
+          "top1": 0.5140431090790333,
+          "random_floor": 0.07188093546216154,
+          "n": 32151
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 1,
+          "top1": 0.4917731952349849,
+          "random_floor": 0.07744505295125802,
+          "n": 32151
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 2,
+          "top1": 0.48468165842431027,
+          "random_floor": 0.08389766848290688,
+          "n": 32151
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 3,
+          "top1": 0.4795185219744331,
+          "random_floor": 0.09150768673956133,
+          "n": 32151
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 4,
+          "top1": 0.4721470560791266,
+          "random_floor": 0.10067839604090423,
+          "n": 32151
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 5,
+          "top1": 0.48091816739759263,
+          "random_floor": 0.11188609996578647,
+          "n": 32151
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 6,
+          "top1": 0.4872943298808746,
+          "random_floor": 0.12585922677366176,
+          "n": 32151
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 7,
+          "top1": 0.5030636683151379,
+          "random_floor": 0.1438598518005068,
+          "n": 32151
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 8,
+          "top1": 0.5246182078317937,
+          "random_floor": 0.16775631654795592,
+          "n": 32151
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 9,
+          "top1": 0.5650213057136636,
+          "random_floor": 0.20127212217349386,
+          "n": 32151
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 10,
+          "top1": 0.6144443407670057,
+          "random_floor": 0.2515940406208205,
+          "n": 32151
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 11,
+          "top1": 0.6917669745886598,
+          "random_floor": 0.3353809627486962,
+          "n": 32151
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 12,
+          "top1": 0.8402538023700663,
+          "random_floor": 0.502519361761687,
+          "n": 32151
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 13,
+          "top1": 1.0,
+          "random_floor": 1.0,
+          "n": 32151
+        }
+      ]
+    },
+    "SOS": {
+      "mode": "deployment",
+      "source_run": "20260704_135822_f_dev",
+      "skill_bands": [
+        {
+          "band": "bottom",
+          "wr_lo": 0.0,
+          "wr_hi": 0.5,
+          "n_picks": 1162884,
+          "n_drafts": 27688,
+          "top1": 0.5662903608614445,
+          "top1_ci": [
+            0.5652141431738437,
+            0.5673786745894908
+          ]
+        },
+        {
+          "band": "middle",
+          "wr_lo": 0.5,
+          "wr_hi": 0.55,
+          "n_picks": 1400477,
+          "n_drafts": 33345,
+          "top1": 0.5697651585852535,
+          "top1_ci": [
+            0.5688152459844001,
+            0.570753746626836
+          ]
+        },
+        {
+          "band": "top",
+          "wr_lo": 0.55,
+          "wr_hi": 1.01,
+          "n_picks": 1949454,
+          "n_drafts": 46416,
+          "top1": 0.568072906567685,
+          "top1_ci": [
+            0.5672443122211281,
+            0.5688915799055525
+          ]
+        }
+      ],
+      "per_pick_curve": [
+        {
+          "pack_number": 0,
+          "pick_number": 0,
+          "top1": 0.4886557084251947,
+          "random_floor": 0.0714285714285714,
+          "n": 107499
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 1,
+          "top1": 0.37749065133671933,
+          "random_floor": 0.07692307692307689,
+          "n": 107502
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 2,
+          "top1": 0.37709065877844133,
+          "random_floor": 0.0833333333333333,
+          "n": 107502
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 3,
+          "top1": 0.386792803854812,
+          "random_floor": 0.0909090909090909,
+          "n": 107502
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 4,
+          "top1": 0.3978809696563785,
+          "random_floor": 0.10000000000000002,
+          "n": 107502
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 5,
+          "top1": 0.4196201000911611,
+          "random_floor": 0.11111111111111113,
+          "n": 107502
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 6,
+          "top1": 0.4435359342151774,
+          "random_floor": 0.125,
+          "n": 107502
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 7,
+          "top1": 0.474809770981005,
+          "random_floor": 0.14285714285714282,
+          "n": 107502
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 8,
+          "top1": 0.513748581421741,
+          "random_floor": 0.1666666666666666,
+          "n": 107502
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 9,
+          "top1": 0.5591709921675876,
+          "random_floor": 0.20000000000000004,
+          "n": 107502
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 10,
+          "top1": 0.6128630165020186,
+          "random_floor": 0.25,
+          "n": 107502
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 11,
+          "top1": 0.686982567766181,
+          "random_floor": 0.3333333333333332,
+          "n": 107502
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 12,
+          "top1": 0.85066324347454,
+          "random_floor": 0.5,
+          "n": 107502
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 13,
+          "top1": 1.0,
+          "random_floor": 1.0,
+          "n": 107502
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 0,
+          "top1": 0.4792841063422076,
+          "random_floor": 0.07142857142857141,
+          "n": 107502
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 1,
+          "top1": 0.45454038064408103,
+          "random_floor": 0.07692307692307689,
+          "n": 107502
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 2,
+          "top1": 0.4455731056166397,
+          "random_floor": 0.0833333333333333,
+          "n": 107502
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 3,
+          "top1": 0.45072649811166304,
+          "random_floor": 0.0909090909090909,
+          "n": 107502
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 4,
+          "top1": 0.4576379974326059,
+          "random_floor": 0.10000000000000002,
+          "n": 107502
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 5,
+          "top1": 0.47214935536083047,
+          "random_floor": 0.11111111111111113,
+          "n": 107502
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 6,
+          "top1": 0.4946605644546148,
+          "random_floor": 0.125,
+          "n": 107502
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 7,
+          "top1": 0.521776339044855,
+          "random_floor": 0.14285714285714282,
+          "n": 107502
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 8,
+          "top1": 0.553087384420755,
+          "random_floor": 0.1666666666666666,
+          "n": 107502
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 9,
+          "top1": 0.586110025859984,
+          "random_floor": 0.20000000000000004,
+          "n": 107502
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 10,
+          "top1": 0.6331417089914606,
+          "random_floor": 0.25,
+          "n": 107502
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 11,
+          "top1": 0.707251958103105,
+          "random_floor": 0.3333333333333332,
+          "n": 107502
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 12,
+          "top1": 0.8577607858458447,
+          "random_floor": 0.5,
+          "n": 107502
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 13,
+          "top1": 1.0,
+          "random_floor": 1.0,
+          "n": 107502
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 0,
+          "top1": 0.4837119309408197,
+          "random_floor": 0.07142857142857141,
+          "n": 107502
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 1,
+          "top1": 0.4621216349463266,
+          "random_floor": 0.07692307692307689,
+          "n": 107502
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 2,
+          "top1": 0.4590984353779465,
+          "random_floor": 0.0833333333333333,
+          "n": 107502
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 3,
+          "top1": 0.4579635727707391,
+          "random_floor": 0.0909090909090909,
+          "n": 107502
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 4,
+          "top1": 0.46588900671615413,
+          "random_floor": 0.10000000000000002,
+          "n": 107502
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 5,
+          "top1": 0.48226079514799725,
+          "random_floor": 0.11111111111111113,
+          "n": 107502
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 6,
+          "top1": 0.5002790645755428,
+          "random_floor": 0.125,
+          "n": 107502
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 7,
+          "top1": 0.5236181652434373,
+          "random_floor": 0.14285714285714282,
+          "n": 107502
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 8,
+          "top1": 0.5487990921099143,
+          "random_floor": 0.1666666666666666,
+          "n": 107502
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 9,
+          "top1": 0.583905415713196,
+          "random_floor": 0.20000000000000004,
+          "n": 107502
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 10,
+          "top1": 0.631876616249,
+          "random_floor": 0.25,
+          "n": 107502
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 11,
+          "top1": 0.7005637104425965,
+          "random_floor": 0.3333333333333332,
+          "n": 107502
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 12,
+          "top1": 0.859593309891909,
+          "random_floor": 0.5000186043050362,
+          "n": 107502
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 13,
+          "top1": 1.0,
+          "random_floor": 1.0,
+          "n": 107462
+        }
+      ]
+    },
+    "MSH.deployment": {
+      "mode": "deployment",
+      "source_run": "frozen_eval/013df16b8994",
+      "skill_bands": [
+        {
+          "band": "bottom",
+          "wr_lo": 0.0,
+          "wr_hi": 0.5,
+          "n_picks": 427851,
+          "n_drafts": 10187,
+          "top1": 0.5636565065875737,
+          "top1_ci": [
+            0.5620471799674662,
+            0.5652685596917764
+          ]
+        },
+        {
+          "band": "middle",
+          "wr_lo": 0.5,
+          "wr_hi": 0.55,
+          "n_picks": 436667,
+          "n_drafts": 10397,
+          "top1": 0.5690354434843943,
+          "top1_ci": [
+            0.5674603458509277,
+            0.5705558116926663
+          ]
+        },
+        {
+          "band": "top",
+          "wr_lo": 0.55,
+          "wr_hi": 1.01,
+          "n_picks": 740286,
+          "n_drafts": 17626,
+          "top1": 0.5706091969860297,
+          "top1_ci": [
+            0.569457924090113,
+            0.5717730382064493
+          ]
+        }
+      ],
+      "per_pick_curve": [
+        {
+          "pack_number": 0,
+          "pick_number": 0,
+          "top1": 0.5321700060082025,
+          "random_floor": 0.07143603503416464,
+          "n": 38281
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 1,
+          "top1": 0.4002246545283561,
+          "random_floor": 0.07692676088224792,
+          "n": 38281
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 2,
+          "top1": 0.39870954259293123,
+          "random_floor": 0.08333669761009693,
+          "n": 38281
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 3,
+          "top1": 0.39957158903894885,
+          "random_floor": 0.09091194064940833,
+          "n": 38281
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 4,
+          "top1": 0.4037250855515791,
+          "random_floor": 0.10000261226195764,
+          "n": 38281
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 5,
+          "top1": 0.41310310597946764,
+          "random_floor": 0.11111183673943271,
+          "n": 38281
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 6,
+          "top1": 0.43212037303100753,
+          "random_floor": 0.12500139942604874,
+          "n": 38281
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 7,
+          "top1": 0.45858258666179047,
+          "random_floor": 0.14285838679140836,
+          "n": 38281
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 8,
+          "top1": 0.5029649173219091,
+          "random_floor": 0.16666753742065252,
+          "n": 38281
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 9,
+          "top1": 0.5533293278649983,
+          "random_floor": 0.20000522452391528,
+          "n": 38281
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 10,
+          "top1": 0.6185052637078446,
+          "random_floor": 0.2500065306548941,
+          "n": 38281
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 11,
+          "top1": 0.706303388103759,
+          "random_floor": 0.33333333333333326,
+          "n": 38281
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 12,
+          "top1": 0.8652072829863379,
+          "random_floor": 0.5,
+          "n": 38281
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 13,
+          "top1": 1.0,
+          "random_floor": 1.0,
+          "n": 38281
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 0,
+          "top1": 0.49559833860139496,
+          "random_floor": 0.07143617856504142,
+          "n": 38281
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 1,
+          "top1": 0.4546119484861942,
+          "random_floor": 0.07692776559838546,
+          "n": 38281
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 2,
+          "top1": 0.4454167863953397,
+          "random_floor": 0.0833388744950616,
+          "n": 38281
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 3,
+          "top1": 0.44089757320864137,
+          "random_floor": 0.09091502786808553,
+          "n": 38281
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 4,
+          "top1": 0.44332697682923644,
+          "random_floor": 0.10000522452391528,
+          "n": 38281
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 5,
+          "top1": 0.45445521276873646,
+          "random_floor": 0.11111401362439739,
+          "n": 38281
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 6,
+          "top1": 0.4721924714610381,
+          "random_floor": 0.12500466475349578,
+          "n": 38281
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 7,
+          "top1": 0.5038792090070793,
+          "random_floor": 0.1428596307256739,
+          "n": 38281
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 8,
+          "top1": 0.5371071811081215,
+          "random_floor": 0.16666927892862426,
+          "n": 38281
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 9,
+          "top1": 0.5907369190982472,
+          "random_floor": 0.20000130613097883,
+          "n": 38281
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 10,
+          "top1": 0.6531699798855829,
+          "random_floor": 0.25,
+          "n": 38281
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 11,
+          "top1": 0.732687233875813,
+          "random_floor": 0.33333333333333326,
+          "n": 38281
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 12,
+          "top1": 0.8703011938037146,
+          "random_floor": 0.5,
+          "n": 38281
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 13,
+          "top1": 1.0,
+          "random_floor": 1.0,
+          "n": 38281
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 0,
+          "top1": 0.49092238969723884,
+          "random_floor": 0.07143632209591821,
+          "n": 38281
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 1,
+          "top1": 0.4623703665003527,
+          "random_floor": 0.07692994248335015,
+          "n": 38281
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 2,
+          "top1": 0.4533841853661085,
+          "random_floor": 0.08333748920462954,
+          "n": 38281
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 3,
+          "top1": 0.44358820302499935,
+          "random_floor": 0.09091336551956704,
+          "n": 38281
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 4,
+          "top1": 0.44562576735195003,
+          "random_floor": 0.10000435376992939,
+          "n": 38281
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 5,
+          "top1": 0.455761343747551,
+          "random_floor": 0.11111401362439739,
+          "n": 38281
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 6,
+          "top1": 0.47394268697264963,
+          "random_floor": 0.1250037318027966,
+          "n": 38281
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 7,
+          "top1": 0.49873305295054987,
+          "random_floor": 0.1428596307256739,
+          "n": 38281
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 8,
+          "top1": 0.5310467333664219,
+          "random_floor": 0.16667014968261012,
+          "n": 38281
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 9,
+          "top1": 0.580940936757138,
+          "random_floor": 0.20000130613097883,
+          "n": 38281
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 10,
+          "top1": 0.6479454559703247,
+          "random_floor": 0.2500021768849647,
+          "n": 38281
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 11,
+          "top1": 0.7315378386144562,
+          "random_floor": 0.33333333333333326,
+          "n": 38281
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 12,
+          "top1": 0.8751077558057522,
+          "random_floor": 0.5000261226195762,
+          "n": 38281
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 13,
+          "top1": 1.0,
+          "random_floor": 1.0,
+          "n": 38265
+        }
+      ]
+    },
+    "MSH.human": {
+      "mode": "human",
+      "source_run": "frozen_eval/013df16b8994",
+      "skill_bands": [
+        {
+          "band": "bottom",
+          "wr_lo": 0.0,
+          "wr_hi": 0.5,
+          "n_picks": 427851,
+          "n_drafts": 10187,
+          "top1": 0.5732509682108958,
+          "top1_ci": [
+            0.5715504176414649,
+            0.5749289314791192
+          ]
+        },
+        {
+          "band": "middle",
+          "wr_lo": 0.5,
+          "wr_hi": 0.55,
+          "n_picks": 436667,
+          "n_drafts": 10397,
+          "top1": 0.5738926916849681,
+          "top1_ci": [
+            0.5723751677483477,
+            0.5754028804492199
+          ]
+        },
+        {
+          "band": "top",
+          "wr_lo": 0.55,
+          "wr_hi": 1.01,
+          "n_picks": 740286,
+          "n_drafts": 17626,
+          "top1": 0.5722639628467916,
+          "top1_ci": [
+            0.5710795152700763,
+            0.5734026955344379
+          ]
+        }
+      ],
+      "per_pick_curve": [
+        {
+          "pack_number": 0,
+          "pick_number": 0,
+          "top1": 0.5765000914291685,
+          "random_floor": 0.07143603503416464,
+          "n": 38281
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 1,
+          "top1": 0.4066508189441237,
+          "random_floor": 0.07692676088224792,
+          "n": 38281
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 2,
+          "top1": 0.39928424022360964,
+          "random_floor": 0.08333669761009693,
+          "n": 38281
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 3,
+          "top1": 0.4019748700399676,
+          "random_floor": 0.09091194064940833,
+          "n": 38281
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 4,
+          "top1": 0.40542305582403804,
+          "random_floor": 0.10000261226195764,
+          "n": 38281
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 5,
+          "top1": 0.4175700739270134,
+          "random_floor": 0.11111183673943271,
+          "n": 38281
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 6,
+          "top1": 0.44008777200177635,
+          "random_floor": 0.12500139942604874,
+          "n": 38281
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 7,
+          "top1": 0.4655050808495076,
+          "random_floor": 0.14285838679140836,
+          "n": 38281
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 8,
+          "top1": 0.5125257960868316,
+          "random_floor": 0.16666753742065252,
+          "n": 38281
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 9,
+          "top1": 0.5599122279982237,
+          "random_floor": 0.20000522452391528,
+          "n": 38281
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 10,
+          "top1": 0.6274130769833599,
+          "random_floor": 0.2500065306548941,
+          "n": 38281
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 11,
+          "top1": 0.7145058906507145,
+          "random_floor": 0.33333333333333326,
+          "n": 38281
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 12,
+          "top1": 0.8679501580418484,
+          "random_floor": 0.5,
+          "n": 38281
+        },
+        {
+          "pack_number": 0,
+          "pick_number": 13,
+          "top1": 1.0,
+          "random_floor": 1.0,
+          "n": 38281
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 0,
+          "top1": 0.5036179828113163,
+          "random_floor": 0.07143617856504142,
+          "n": 38281
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 1,
+          "top1": 0.45761604973746767,
+          "random_floor": 0.07692776559838546,
+          "n": 38281
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 2,
+          "top1": 0.4492829340926308,
+          "random_floor": 0.0833388744950616,
+          "n": 38281
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 3,
+          "top1": 0.4389906219795721,
+          "random_floor": 0.09091502786808553,
+          "n": 38281
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 4,
+          "top1": 0.4446853530472036,
+          "random_floor": 0.10000522452391528,
+          "n": 38281
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 5,
+          "top1": 0.4587654449988245,
+          "random_floor": 0.11111401362439739,
+          "n": 38281
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 6,
+          "top1": 0.47477861079909095,
+          "random_floor": 0.12500466475349578,
+          "n": 38281
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 7,
+          "top1": 0.5087641388678457,
+          "random_floor": 0.1428596307256739,
+          "n": 38281
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 8,
+          "top1": 0.541103941903294,
+          "random_floor": 0.16666927892862426,
+          "n": 38281
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 9,
+          "top1": 0.5973198192314725,
+          "random_floor": 0.20000130613097883,
+          "n": 38281
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 10,
+          "top1": 0.6592043050077062,
+          "random_floor": 0.25,
+          "n": 38281
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 11,
+          "top1": 0.737702776834461,
+          "random_floor": 0.33333333333333326,
+          "n": 38281
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 12,
+          "top1": 0.8726522295655809,
+          "random_floor": 0.5,
+          "n": 38281
+        },
+        {
+          "pack_number": 1,
+          "pick_number": 13,
+          "top1": 1.0,
+          "random_floor": 1.0,
+          "n": 38281
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 0,
+          "top1": 0.49805386484156633,
+          "random_floor": 0.07143632209591821,
+          "n": 38281
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 1,
+          "top1": 0.4629189415114548,
+          "random_floor": 0.07692994248335015,
+          "n": 38281
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 2,
+          "top1": 0.45239152582220943,
+          "random_floor": 0.08333748920462954,
+          "n": 38281
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 3,
+          "top1": 0.44319636373135496,
+          "random_floor": 0.09091336551956704,
+          "n": 38281
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 4,
+          "top1": 0.4458086256889841,
+          "random_floor": 0.10000435376992939,
+          "n": 38281
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 5,
+          "top1": 0.4546119484861942,
+          "random_floor": 0.11111401362439739,
+          "n": 38281
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 6,
+          "top1": 0.47767822157205925,
+          "random_floor": 0.1250037318027966,
+          "n": 38281
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 7,
+          "top1": 0.5040359447245369,
+          "random_floor": 0.1428596307256739,
+          "n": 38281
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 8,
+          "top1": 0.5357488048901544,
+          "random_floor": 0.16667014968261012,
+          "n": 38281
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 9,
+          "top1": 0.5880724119014655,
+          "random_floor": 0.20000130613097883,
+          "n": 38281
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 10,
+          "top1": 0.6523079334395653,
+          "random_floor": 0.2500021768849647,
+          "n": 38281
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 11,
+          "top1": 0.7343068362895431,
+          "random_floor": 0.33333333333333326,
+          "n": 38281
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 12,
+          "top1": 0.8757346986755832,
+          "random_floor": 0.5000261226195762,
+          "n": 38281
+        },
+        {
+          "pack_number": 2,
+          "pick_number": 13,
+          "top1": 1.0,
+          "random_floor": 1.0,
+          "n": 38265
+        }
+      ]
+    }
+  },
+  "executed_at": "2026-07-09T19:50:40"
+}

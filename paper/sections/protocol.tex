@@ -10,44 +10,50 @@ member's weights are instead anchored by the sha256 recorded in that
 tagged manifest, cross-checked against the experiment ledger's commit
 history to confirm the artifact predates the test data. There is one
 evaluation round; a second round would require a new public tag and
-disclosure that a second round happened.
+disclosure that a second round happened. One terminological note for
+auditors: the frozen protocol document at \texttt{\ProtocolTag} uses the
+name ``expert slice'' for the population this paper calls high-win-rate
+players (\S\ref{sec:data}); the filter is identical, so the two terms map
+one to one.
 
 \subsection{Test set: MSH, exactly once}
 
-MSH is the first \mtg{} set drafted on Arena after the protocol freeze: a
-licensed-IP (\emph{Universes Beyond}) set, which makes the test
-deliberately harder (\S\ref{sec:analysis}). The test snapshot is the first
-public \seventeenlands{} MSH Premier file successfully downloaded on or
-after its publication, frozen immediately by sha256 and ETag and never
-re-downloaded. Until the frozen evaluation has run, no training, tuning,
-metric-peeking, or feature-vocabulary fitting may read MSH pick data.
-MSH \emph{card} features alone are legal (the zero-shot contract,
-\S\ref{sec:data}). Quality gates at snapshot time: modern schema, Premier
-rows present, at least 2{,}500 expert-slice drafts, $\geq 99\%$ of pack
-card names joining to card features. On a volume failure the single
-pre-declared contingency is to wait exactly one snapshot cycle. The
-evaluation executes within 72 hours of the gates passing: one inference
-pass per battery member over the frozen snapshot, cached as per-pick
-prediction files from which every statistic is computed. Models are never
-re-run during analysis.
+MSH is the first \mtg{} set drafted on Arena after the protocol freeze. It
+is a licensed-IP (\emph{Universes Beyond}) set, which makes the test
+deliberately harder (\S\ref{sec:analysis}). The protocol defines the test
+snapshot as the first public \seventeenlands{} MSH Premier file
+successfully downloaded on or after its publication, frozen immediately by
+sha256 and ETag and never re-downloaded. Until the frozen evaluation has
+run, no training, tuning, metric-peeking, or feature-vocabulary fitting
+may read MSH pick data. MSH \emph{card} features alone are legal, per the
+zero-shot contract of \S\ref{sec:data}. The snapshot must pass quality
+gates: modern schema, Premier rows present, at least 2{,}500 drafts from
+the high-win-rate slice, and $\geq 99\%$ of pack card names joining to
+card features. On a volume failure the single pre-declared contingency is
+to wait exactly one snapshot cycle. The evaluation must execute within 72
+hours of the gates passing: one inference pass per battery member over the
+frozen snapshot, cached as per-pick prediction files from which every
+statistic is computed. Models are never re-run during analysis. The
+execution of this protocol, and its outcome, are reported in
+\S\ref{sec:msh}.
 
-Two populations are scored. The \emph{expert slice} (\S\ref{sec:data}) is
+Two populations are scored. The high-win-rate slice (\S\ref{sec:data}) is
 the headline; the all-users slice is secondary. Two conditioning
-configurations are pre-registered: \emph{deployment mode} (headline),
-conditioning on a fixed top skill bucket selected on the dev sets and
-frozen into the battery configuration; and \emph{human-model mode},
-conditioning on each drafter's true bucket, scored on all users. Forced
-picks (final pick of a pack) are included in headline numbers, matching the
-per-set ceilings and prior work; non-forced variants are secondary rows.
+configurations are pre-registered. \emph{Deployment mode}, the headline,
+conditions on a fixed top skill bucket selected on the dev sets and frozen
+into the battery configuration. \emph{Human-model mode} conditions on each
+drafter's true bucket and is scored on all users. Forced picks, the final
+pick of a pack, are included in headline numbers, matching the per-set
+ceilings and prior work; non-forced variants are secondary rows.
 
 \subsection{Development discipline}
 
 One number governs every architecture, hyperparameter, text-encoder, and
-conditioning decision in this paper: mean top-1 agreement, on the expert
-slice in deployment mode, averaged unweighted over three sets (BRO, TMT,
-SOS), with ties broken by mean log-loss. That number comes from a single
-development run, \emph{F-dev}, trained on every set except those three and
-MSH.
+conditioning decision in this paper: mean top-1 agreement, on the
+high-win-rate slice in deployment mode, averaged unweighted over three
+sets (BRO, TMT, SOS), with ties broken by mean log-loss. That number comes
+from a single development run, \emph{F-dev}, trained on every set except
+those three and MSH.
 
 We chose that trio for three separate reasons. BRO is the same holdout used
 by the only published multi-set, feature-based zero-shot
@@ -61,27 +67,28 @@ is not selected on the same axis it is plotted against.
 
 \subsection{Metrics and statistics}
 
-The primary metric is top-1 agreement with the human pick, expert slice,
-deployment mode. Several secondary metrics accompany it: top-3 agreement;
-all-users top-1 (human-model mode); the \emph{normalized score}, which
-divides the model's zero-shot top-1 by the per-set ceiling's top-1 on the
-same picks (a model trained directly on the target set, aligned pick-by-pick
-on its validation split); mean log-loss; top-label expected calibration
-error (15 equal-mass bins, with a temperature fit on the dev trio only,
-frozen into the battery before T0, and never fit on the test set itself,
-\S\ref{sec:analysis}); per-(pack, pick) accuracy curves against the
-per-cell random floor; and \emph{late-draft retention}, the same
-zero-shot-to-ceiling ratio restricted to picks 8+ of each pack, where pool
-context dominates.
+The primary metric is top-1 agreement with the human pick, on the
+high-win-rate slice in deployment mode. Several secondary metrics
+accompany it: top-3 agreement; all-users top-1 in human-model mode; the
+\emph{normalized score}, which divides the model's zero-shot top-1 by the
+per-set ceiling's top-1 on the same picks, where the ceiling is a model
+trained directly on the target set and aligned pick-by-pick on its
+validation split; mean log-loss; top-label expected calibration error,
+computed over 15 equal-mass bins with a temperature fit on the dev trio
+only, frozen into the battery before T0, and never fit on the test set
+itself (\S\ref{sec:analysis}); per-(pack, pick) accuracy curves against
+the per-cell random floor; and \emph{late-draft retention}, the same
+zero-shot-to-ceiling ratio restricted to picks 8 and later of each pack,
+where pool context dominates.
 
 All intervals are cluster bootstraps over drafts, not picks
 ($B{=}2{,}000$, fixed seed, percentile 95\% CIs); paired comparisons share
-resample indices. Clustering matters little but is grounded empirically:
-measured intraclass correlation of pick correctness within drafts is
-$\rho = 0.0099$ (per-set SOS validation; 1{,}662 drafts, 69{,}803 picks),
-a design effect of ${\sim}1.4$ at ${\sim}42$ picks per draft, giving CI
-half-widths ${\sim}\pm0.36$pp at the 2{,}500-expert-draft gate (binomial
-approximation at $p{=}0.5$). Seed
+resample indices. Clustering matters little, but the choice is grounded
+empirically. The measured intraclass correlation of pick correctness
+within drafts is $\rho = 0.0099$ (per-set SOS validation; 1{,}662 drafts,
+69{,}803 picks), a design effect of ${\sim}1.4$ at ${\sim}42$ picks per
+draft. That gives CI half-widths of about $\pm0.36$pp at the
+2{,}500-draft gate, under a binomial approximation at $p{=}0.5$. Seed
 variance is measured with three seeds at two scaling rungs, and
 set-composition variance with two probe rungs (\S\ref{sec:results}).
 
@@ -92,16 +99,17 @@ Frozen by artifact hash before the test snapshot:
 model; its dev-set numbers are meaningless (it trains on them) and are
 never quoted. A pre-registered flexibility clause lets two optional extras
 (the Powered Cube file and VOW QuickDraft) join F-full's training data if
-and only if a dev-trio ablation shows a gain; the decision is frozen with
-the battery and reported either way.
-(2)~\textbf{F-dev}, the development model (\S above), which doubles as the
-top scaling rung.
+and only if a dev-trio comparison shows a gain; the decision is frozen
+with the battery and reported either way.
+(2)~\textbf{F-dev}, the development model described above, which doubles
+as the top scaling rung.
 (3)~\textbf{Scaling rungs} at 1, 2, 4, 8, 16, and 28 training sets
 (nested, in release order) plus two composition probes, all with the fixed
 recipe and a shared step cap.
-(4)~\textbf{Ablations}: A-notext (structured features only, no text
-embedding) and A-noUB (the three licensed-IP training sets removed), for
-the shift analysis of \S\ref{sec:analysis}.
+(4)~\textbf{Variants}: A-notext, which removes the text embedding and
+keeps structured features only, and A-noUB, which removes the three
+licensed-IP training sets, both for the shift analysis of
+\S\ref{sec:analysis}.
 (5)~\textbf{Baselines}: random; an hour-zero rarity-color heuristic; and
 three asterisked post-release baselines (community site ratings at
 day~$\sim$2, and two \seventeenlands{}-statistics pickers) that bound what
@@ -117,7 +125,7 @@ To keep interpretation out of our own hands, three mutually exclusive
 claims paragraphs (for headline results below 45\%, between 45 and 55\%,
 and above 55\%) were drafted before any test number existed and are
 carried in the paper source; the matching one is selected verbatim when
-the frozen evaluation reports (\S\ref{sec:results}). In all bands the
+the frozen evaluation reports (\S\ref{sec:msh}). In all bands the
 secondary claims are the same: the normalized-vs-ceiling score, the shape
-of the scaling curve, the licensed-IP shift analysis, and the
-skill-conditioning effect.
+of the scaling curve, the analysis of what the text embedding contributes
+under the licensed-IP shift, and the skill-conditioning effect.
