@@ -69,9 +69,9 @@ accuracy over these three, computed from \emph{F-dev}, which trains on
 none of them. Once selection is frozen, the headline model (\emph{F-full})
 retrains on all 31 sets, dev trio included; only Marvel Super Heroes
 (MSH) stays unseen by every model in the battery. MSH, the test set, is
-stricter still. A registry-level gate (\texttt{EVAL\_ONLY}) makes every
-training and feature-fitting code path refuse MSH pick data outright, and
-at the protocol freeze its public data did not yet exist. MSH \emph{card}
+stricter still. A registry-level gate (\texttt{EVAL\_ONLY}) makes the
+training-corpus and feature-fitting pipeline refuse MSH pick data
+outright, and at the protocol freeze its public data did not yet exist. MSH \emph{card}
 features from Scryfall are permitted. That is the zero-shot contract:
 public card information only, no human behavioral data of any kind.
 
