@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MTGA Tracker</title>
+  <title>MTGA Draft Assistant</title>
   <link rel="stylesheet" href="./dashboard.css">
 </head>
 <body>
@@ -16,7 +16,7 @@
           <path d="M2 17l10 5 10-5"/>
           <path d="M2 12l10 5 10-5"/>
         </svg>
-        <span>MTGA Tracker</span>
+        <span>MTGA Draft<br>Assistant</span>
       </div>
 
       <nav class="nav">
@@ -87,7 +87,7 @@
           <span class="toggle-state" id="badgeToggleState">Off</span>
         </button>
         <label class="overlay-setting" title="Minimize this window when a draft starts so only the overlay is on screen (restored when the draft ends)">
-          <input type="checkbox" id="autoHideDashboard" checked>
+          <input type="checkbox" id="autoHideDashboard">
           <span>Hide dashboard during drafts</span>
         </label>
         <button class="calibrate-link" id="calibrateBadgesBtn" title="Show numbered ghost rectangles over Arena and nudge them onto the pack cards">Calibrate badges…</button>
@@ -112,7 +112,7 @@
         <div class="setup-card" id="badgeAccessCard" style="display: none;">
           <div class="setup-card-text">
             <strong>Badge overlay needs Accessibility access</strong>
-            <span>To anchor badges on the Arena window, allow MTGA Tracker in
+            <span>To anchor badges on the Arena window, allow MTGA Draft Assistant in
             System Settings → Privacy &amp; Security → Accessibility (in dev builds
             the app appears as "Electron"), then test again.</span>
           </div>
@@ -486,7 +486,7 @@
         <span class="footer-stat">Last sync: <span id="lastSyncTime">never</span></span>
       </div>
       <div class="footer-version">
-        <span>MTGA Tracker v1.0</span>
+        <span>MTGA Draft Assistant v0.1.0</span>
       </div>
     </footer>
   </div>

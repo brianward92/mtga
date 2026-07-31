@@ -1,5 +1,5 @@
 /**
- * Preload script for MTGA Tracker
+ * Preload script for MTGA Draft Assistant
  * Exposes IPC methods to renderer processes securely
  */
 
@@ -31,7 +31,7 @@ contextBridge.exposeInMainWorld('mtgaTracker', {
   getDraftState: () => ipcRenderer.invoke('get-draft-state'),
   dismissDraft: () => ipcRenderer.send('draft-dismiss'),
 
-  // Overlay window controls (manual drag/resize — the window is focusable:false)
+  // Overlay window controls (manual drag/resize for the frameless panel)
   overlayDragStart: () => ipcRenderer.invoke('overlay-drag-start'),
   overlayMove: (x: number, y: number) => ipcRenderer.send('overlay-move', { x, y }),
   overlayMoveEnd: () => ipcRenderer.send('overlay-move-end'),

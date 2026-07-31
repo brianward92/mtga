@@ -1,5 +1,5 @@
 /**
- * MTGA Tracker Overlay Styles
+ * MTGA Draft Assistant Overlay Styles
  *
  * Design system (single token block below):
  *   - dark glass panel: rgba(18,18,22,0.86) + blur(18px), 12px radius,
@@ -11,10 +11,9 @@
  *     tints; EV = one accent (#6ee7a8) at 3px tall
  *   - motion: 140ms ease-out; no flashing — highlights decay in ~400ms
  *
- * NOTE: no -webkit-app-region anywhere. The window is focusable:false, and
- * on macOS app-region:drag both swallows click events and fails to drag on
- * non-focusable windows (the original "can't click, can't move" bug).
- * Dragging is manual via the [data-grip] bars (see window-controls.ts).
+ * NOTE: no -webkit-app-region anywhere. On macOS app-region:drag swallows
+ * click events inside the grip. Dragging is manual via the [data-grip] bars
+ * (see window-controls.ts).
  */
 
 * {
@@ -31,6 +30,7 @@
   --panel-blur: 18px;
   --panel-radius: 12px;
   --panel-border: rgba(255, 255, 255, 0.08);
+  --panel-edge: rgba(0, 0, 0, 0.56);
   --panel-shadow:
     0 1px 2px rgba(0, 0, 0, 0.32),
     0 8px 24px rgba(0, 0, 0, 0.42),
@@ -85,13 +85,17 @@
   --rarity-mythic: #f8a858;
 
   /* MTG mana colors — pips (and the verdict pool strip) ONLY */
-  --mana-white: #ece5c8;
-  --mana-blue: #2f8bd6;
-  --mana-black: #2a2a2e;
-  --mana-black-strip: #6a6a74;
-  --mana-red: #d9534a;
-  --mana-green: #48a05c;
-  --mana-colorless: #9e9e9e;
+  --mana-white: #f1e7c5;
+  --mana-white-ink: #332f23;
+  --mana-blue: #55a7d9;
+  --mana-blue-ink: #102838;
+  --mana-black: #625d6b;
+  --mana-black-ink: #ffffff;
+  --mana-red: #e66a5d;
+  --mana-red-ink: #35100d;
+  --mana-green: #62ad72;
+  --mana-green-ink: #0b2812;
+  --mana-colorless: #aaaab2;
   --mana-generic: #62626e;
 
   /* Motion */
@@ -124,7 +128,7 @@ body {
   background: var(--panel-bg);
   backdrop-filter: blur(var(--panel-blur)) saturate(140%);
   -webkit-backdrop-filter: blur(var(--panel-blur)) saturate(140%);
-  border: 1px solid var(--panel-border);
+  border: 1px solid var(--panel-edge);
   border-radius: var(--panel-radius);
   overflow: hidden;
   box-shadow: var(--panel-shadow);
@@ -145,23 +149,6 @@ body {
 .overlay.density-verdict,
 .overlay.density-mini {
   height: auto;
-}
-
-.overlay::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(90deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.10) 30%,
-    rgba(255, 255, 255, 0.14) 50%,
-    rgba(255, 255, 255, 0.10) 70%,
-    transparent 100%
-  );
-  pointer-events: none;
 }
 
 /* ==========================================================================
@@ -483,19 +470,24 @@ body {
   width: 13px;
   height: 13px;
   border-radius: 50%;
+  font-family: 'SF Pro Rounded', -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: 8px;
-  font-weight: 700;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.24),
+    0 0 0 1px rgba(0, 0, 0, 0.18);
 }
 
-.mana-symbol.W { background: var(--mana-white); color: #5a5a48; }
-.mana-symbol.U { background: var(--mana-blue); color: #eaf4fc; }
-.mana-symbol.B { background: var(--mana-black); color: #b8b8c0; }
-.mana-symbol.R { background: var(--mana-red); color: #fdecea; }
-.mana-symbol.G { background: var(--mana-green); color: #eaf6ee; }
+.mana-symbol.W { background: var(--mana-white); color: var(--mana-white-ink); }
+.mana-symbol.U { background: var(--mana-blue); color: var(--mana-blue-ink); }
+.mana-symbol.B { background: var(--mana-black); color: var(--mana-black-ink); }
+.mana-symbol.R { background: var(--mana-red); color: var(--mana-red-ink); }
+.mana-symbol.G { background: var(--mana-green); color: var(--mana-green-ink); }
 .mana-symbol.C { background: var(--mana-colorless); color: #3a3a3a; }
 .mana-symbol.generic { background: var(--mana-generic); color: #d8d8e0; }
 
@@ -1017,7 +1009,7 @@ body {
   padding: 1px 6px;
 }
 
-/* EV bar: the single accent, 3px */
+/* Relative recommendation within the current pack, 3px */
 .verdict-bar {
   height: 3px;
   border-radius: 2px;
@@ -1102,8 +1094,9 @@ body {
   text-overflow: ellipsis;
 }
 
-.runner-ev {
+.runner-grade {
   font-size: var(--fs-11);
+  font-weight: 700;
   color: var(--text-secondary);
 }
 
@@ -1119,37 +1112,58 @@ body {
   font-style: italic;
 }
 
-/* Verdict pool strip: 12px; colored region grows with picks (progress) */
+/* Compact verdict pool summary: five precise pips + counts + progress */
 .verdict-pool {
   margin-top: 2px;
 }
 
-.pool-strip-bar {
-  height: 12px;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.05);
-  overflow: hidden;
+.pool-summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  min-height: 16px;
 }
 
-.strip-filled {
-  display: flex;
-  height: 100%;
-  transition: width 300ms var(--ease-out);
-}
-
-.strip-seg { min-width: 3px; }
-.strip-W { background: var(--mana-white); }
-.strip-U { background: var(--mana-blue); }
-.strip-B { background: var(--mana-black-strip); }
-.strip-R { background: var(--mana-red); }
-.strip-G { background: var(--mana-green); }
-
-.pool-strip-meta {
-  display: flex;
-  justify-content: flex-end;
+.pool-summary-title {
+  color: var(--text-muted);
   font-size: 9px;
-  color: var(--text-dim);
-  margin-top: 3px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.pool-summary-colors {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(24px, 1fr));
+  gap: 3px;
+  min-width: 0;
+}
+
+.pool-summary-color {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 0;
+}
+
+.pool-summary-color .mana-symbol {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 13px;
+}
+
+.pool-summary-count,
+.pool-summary-progress {
+  color: var(--text-secondary);
+  font-size: 9px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.pool-summary-progress {
+  color: var(--text-muted);
 }
 
 /* ---- Mini line ------------------------------------------------------------ */
@@ -1227,7 +1241,7 @@ body {
   padding: 5px var(--sp-2);
 }
 
-.pick-row-header .pick-ev,
+.pick-row-header .pick-grade,
 .pick-row-header .pick-gih,
 .pick-row-header .pick-alsa {
   display: block;
@@ -1277,6 +1291,20 @@ body {
   min-width: 0;
 }
 
+/* Card art thumbnail. Fixed box (MTG 63/88 crop) so rows keep their height
+   whether or not the art has finished caching. */
+.pick-art {
+  width: 15px;
+  height: 21px;
+  flex-shrink: 0;
+  border-radius: 2px;
+  object-fit: cover;
+  object-position: center 18%; /* the art window, below the title bar */
+  background: var(--bg-glass-darker);
+}
+
+.pick-art-empty { display: inline-block; }
+
 .pick-mana { display: flex; gap: 1px; flex-shrink: 0; }
 .pick-mana .mana-symbol { width: 11px; height: 11px; font-size: 7px; }
 
@@ -1292,33 +1320,39 @@ body {
 .rarity-rare { color: var(--rarity-rare); }
 .rarity-mythic { color: var(--rarity-mythic); }
 
-/* EV column: value + a 3px accent bar underneath */
-.pick-ev {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
-}
-
-.ev-val {
+.pick-grade {
   font-size: var(--fs-11);
-  font-weight: 600;
+  font-weight: 750;
+  text-align: right;
 }
 
-.ev-track {
-  width: 100%;
-  height: 3px;
-  border-radius: 1.5px;
-  background: rgba(255, 255, 255, 0.06);
-  overflow: hidden;
+.grade-value { font-weight: 700; }
+.grade-a { color: #efc968; }
+.grade-b { color: #72d3a2; }
+.grade-c { color: #d2d2da; }
+.grade-d { color: #dda06e; }
+.grade-f { color: #ed7a7a; }
+
+/* Top grades read as chips so bombs are findable without reading numbers.
+   C/D/F stay plain text — boxing every row would flatten the distinction. */
+.pick-grade.grade-a,
+.pick-grade.grade-b {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 4px;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
 }
 
-.ev-fill {
-  display: block;
-  height: 100%;
-  border-radius: 1.5px;
-  background: var(--accent-ev);
-  transition: width var(--transition-fast);
+.pick-grade.grade-a {
+  color: #1d1602;
+  background: linear-gradient(180deg, #f3d484, #e0b552);
+  box-shadow: 0 0 6px rgba(239, 201, 104, 0.35);
+}
+
+.pick-grade.grade-b {
+  color: #06231a;
+  background: linear-gradient(180deg, #86dcb0, #5fc492);
 }
 
 .pick-gih,
@@ -1344,10 +1378,10 @@ body {
 }
 
 .pool-title {
-  font-size: 9px;
+  font-size: var(--fs-11);
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
+  text-transform: none;
+  letter-spacing: 0;
   color: var(--text-secondary);
 }
 
@@ -1365,41 +1399,29 @@ body {
 
 .pool-colors {
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(28px, 1fr));
+  align-content: center;
+  gap: 6px;
   min-width: 0;
 }
 
 .pool-color {
   display: flex;
   align-items: center;
-  gap: 5px;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
 }
 
-.pool-color .mana-symbol { width: 11px; height: 11px; flex-shrink: 0; }
-
-/* Neutral fill — the pip carries the color */
-.pool-color-track {
-  flex: 1;
-  height: 3px;
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: 2px;
-  overflow: hidden;
-}
-
-.pool-color-fill {
-  height: 100%;
-  border-radius: 2px;
-  background: var(--text-secondary);
-  transition: width var(--transition-fast);
-}
+.pool-color .mana-symbol { width: 14px; height: 14px; flex: 0 0 14px; }
 
 .pool-color-count {
-  font-size: 9px;
-  color: var(--text-muted);
-  min-width: 14px;
-  text-align: right;
+  font-size: var(--fs-11);
+  font-weight: 600;
+  color: var(--text-secondary);
+  min-width: 1ch;
+  text-align: left;
 }
 
 .pool-curve {

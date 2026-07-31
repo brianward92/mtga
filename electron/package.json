@@ -1,13 +1,14 @@
 {
   "name": "mtga-tracker",
   "version": "0.1.0",
-  "description": "MTGA Log Parser and Overlay Tracker",
+  "description": "MTGA draft assistant, log parser, and overlay",
   "main": "dist/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "package": "electron-builder",
+    "deploy:mbp": "bash scripts/deploy-mbp.sh",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "e2e": "node tests/e2e/drive.mjs"
@@ -29,12 +30,19 @@
   },
   "build": {
     "appId": "com.mtga.tracker",
-    "productName": "MTGA Tracker",
+    "productName": "MTGA Draft Assistant",
     "files": [
       "dist/**/*"
     ],
+    "extraResources": [
+      {
+        "from": "build/icon.png",
+        "to": "icon.png"
+      }
+    ],
     "mac": {
       "category": "public.app-category.games",
+      "icon": "build/icon.icns",
       "target": [
         "dmg",
         "zip"

@@ -15,6 +15,43 @@ export function escapeHtml(text: string): string {
  * Render mana cost symbols
  * Parses mana cost like "{2}{W}{W}" into pip spans.
  */
+const MANA_SYMBOL_NAMES: Readonly<Record<string, string>> = {
+  W: 'White',
+  U: 'Blue',
+  B: 'Black',
+  R: 'Red',
+  G: 'Green',
+  C: 'Colorless'
+}
+
+function escapeManaText(text: string): string {
+  return text.replace(/[&<>"']/g, char => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  })[char]!)
+}
+
+/** A compact, text-precise mana pip that remains meaningful without color. */
+export function renderManaSymbol(symbol: string, options: { decorative?: boolean } = {}): string {
+  const upper = symbol.toUpperCase()
+  const safe = escapeManaText(upper)
+  const colorName = MANA_SYMBOL_NAMES[upper]
+  const generic = !colorName
+  const label = colorName
+    ? `${colorName} mana`
+    : /^\d+$/.test(upper)
+      ? `${upper} generic mana`
+      : `${upper} mana`
+  const accessibility = options.decorative
+    ? ' aria-hidden="true"'
+    : ` role="img" aria-label="${escapeManaText(label)}" title="${escapeManaText(label)}"`
+
+  return `<span class="mana-symbol ${generic ? 'generic' : upper}"${accessibility}>${safe}</span>`
+}
+
 export function renderManaCost(manaCost: string): string {
   if (!manaCost) return ''
 
@@ -26,22 +63,7 @@ export function renderManaCost(manaCost: string): string {
     symbols.push(match[1])
   }
 
-  return symbols.map(symbol => {
-    const upper = symbol.toUpperCase()
-
-    // Check for color symbols
-    if (['W', 'U', 'B', 'R', 'G', 'C'].includes(upper)) {
-      return `<span class="mana-symbol ${upper}"></span>`
-    }
-
-    // Check for generic mana (numbers)
-    if (/^\d+$/.test(upper)) {
-      return `<span class="mana-symbol generic">${upper}</span>`
-    }
-
-    // Hybrid or other
-    return `<span class="mana-symbol generic">${upper}</span>`
-  }).join('')
+  return symbols.map(symbol => renderManaSymbol(symbol)).join('')
 }
 
 /**

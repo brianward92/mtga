@@ -1,16 +1,21 @@
 /**
  * Standard application menu — makes the tracker behave like a plain Mac app:
- * About/Quit under the app menu (Cmd+Q works from anywhere), standard Edit
- * roles so copy/paste works in dashboard inputs, a View menu carrying the
- * badge-calibration entry (dev additionally gets the reload/devtools roles),
- * and the usual Window roles.
+ * About/Quit under the app menu, standard Edit
+ * roles, a View menu carrying the overlay and badge-calibration entries
+ * (dev additionally gets reload/devtools roles), and the usual Window roles.
  */
 
 import { Menu, MenuItemConstructorOptions } from 'electron'
 
 export interface MenuActions {
+  /** File -> Close Overlay (Cmd+W). */
+  onCloseOverlay?: () => void
+  /** View -> Show Draft Overlay (available in dev AND prod). */
+  onShowOverlay?: () => void
   /** View → Calibrate Badges (available in dev AND prod). */
   onCalibrateBadges?: () => void
+  /** View -> Cycle Overlay View (application-local Cmd+Shift+D). */
+  onCycleDensity?: () => void
 }
 
 export function installApplicationMenu(actions: MenuActions = {}): void {
@@ -27,6 +32,15 @@ export function installApplicationMenu(actions: MenuActions = {}): void {
         ] as MenuItemConstructorOptions[])
       : []),
     {
+      label: 'Show Draft Overlay',
+      click: () => actions.onShowOverlay?.()
+    },
+    {
+      label: 'Cycle Overlay View',
+      accelerator: 'CommandOrControl+Shift+D',
+      click: () => actions.onCycleDensity?.()
+    },
+    {
       label: 'Calibrate Badges',
       click: () => actions.onCalibrateBadges?.()
     }
@@ -34,6 +48,14 @@ export function installApplicationMenu(actions: MenuActions = {}): void {
 
   const template: MenuItemConstructorOptions[] = [
     ...(isMac ? [{ role: 'appMenu' as const }] : []),
+    {
+      label: 'File',
+      submenu: [{
+        label: 'Close Overlay',
+        accelerator: 'CommandOrControl+W',
+        click: () => actions.onCloseOverlay?.()
+      }]
+    },
     { role: 'editMenu' },
     { label: 'View', submenu: viewSubmenu },
     { role: 'windowMenu' },

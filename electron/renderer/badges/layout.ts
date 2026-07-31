@@ -41,6 +41,13 @@ export interface CalibrationConfig {
   /** Badge chip size in px (width additionally clamps to the card width). */
   badgeWidth: number
   badgeHeight: number
+  /**
+   * Cards in a FULL pack (P1P1). Card size is derived from this reference grid
+   * rather than the current pack's card count, because Arena keeps cards the
+   * same size as a pack is drafted down — only the grid shrinks. Without this,
+   * a 3-card pack would stretch its single row over the whole pack area.
+   */
+  refCount: number
 }
 
 /**
@@ -61,7 +68,8 @@ export const DEFAULT_CALIBRATION: CalibrationConfig = {
   cardAspect: 63 / 88,
   badgeOffsetY: 0.02,
   badgeWidth: 120,
-  badgeHeight: 28
+  badgeHeight: 28,
+  refCount: 14
 }
 
 /** Calibration nudge/scale steps (fractions of the window / multipliers). */
@@ -82,14 +90,15 @@ const LIMITS: Record<NumericKey, [number, number]> = {
   cardAspect: [0.3, 2],
   badgeOffsetY: [-0.5, 1],
   badgeWidth: [40, 240],
-  badgeHeight: [16, 64]
+  badgeHeight: [16, 64],
+  refCount: [1, 20]
 }
 
 function clampNum(key: NumericKey, value: unknown): number {
   const [lo, hi] = LIMITS[key]
   const n = typeof value === 'number' && Number.isFinite(value) ? value : DEFAULT_CALIBRATION[key]
   const clamped = Math.min(hi, Math.max(lo, n))
-  return key === 'maxCols' ? Math.round(clamped) : clamped
+  return key === 'maxCols' || key === 'refCount' ? Math.round(clamped) : clamped
 }
 
 /**
@@ -126,6 +135,45 @@ export function aspectBucketOf(width: number, height: number): string {
     return 'default'
   }
   return `aspect-${(width / height).toFixed(1)}`
+}
+
+/** Parse the numeric aspect out of a bucket key; null for "default"/garbage. */
+export function aspectOfBucket(bucket: string): number | null {
+  const m = /^aspect-(\d+(?:\.\d+)?)$/.exec(bucket)
+  if (!m) return null
+  const value = Number(m[1])
+  return Number.isFinite(value) && value > 0 ? value : null
+}
+
+/**
+ * Best stored calibration bucket for a window shape: the exact bucket when it
+ * exists, else the numerically nearest calibrated aspect. A user who tuned the
+ * overlay at one window size should not drop back to raw guesses after
+ * resizing Arena slightly — a 1.7 calibration is far closer to 1.8 than the
+ * built-in defaults are.
+ */
+export function nearestCalibrationBucket(
+  buckets: string[],
+  width: number,
+  height: number
+): string | null {
+  const exact = aspectBucketOf(width, height)
+  if (buckets.includes(exact)) return exact
+
+  const target = aspectOfBucket(exact)
+  if (target === null) return null
+
+  let best: { bucket: string; distance: number } | null = null
+  for (const bucket of buckets) {
+    const aspect = aspectOfBucket(bucket)
+    if (aspect === null) continue
+    const distance = Math.abs(aspect - target)
+    // Ties resolve to the lexically smaller key so the choice is deterministic.
+    if (!best || distance < best.distance || (distance === best.distance && bucket < best.bucket)) {
+      best = { bucket, distance }
+    }
+  }
+  return best?.bucket ?? null
 }
 
 /**
@@ -177,8 +225,15 @@ export function packLayout(
   const cards: CardSlot[] = []
   if (rows.length === 0) return { pack, cards }
 
-  const rowH = pack.height / rows.length
+  // Card geometry comes from the FULL-pack grid so cards keep their size as the
+  // pack is drafted down; the shrinking grid is then centered in the pack area.
+  const refRows = Math.max(
+    rows.length,
+    rowsForCount(Math.max(config.refCount, count), config.maxCols).length
+  )
+  const rowH = pack.height / refRows
   const cellW = pack.width / config.maxCols
+  const gridTop = pack.y + (pack.height - rows.length * rowH) / 2
 
   // Card size: fixed aspect, fitted to the cell minus the configured gaps.
   const maxCardH = rowH * (1 - config.rowGap)
@@ -187,7 +242,7 @@ export function packLayout(
   const cardW = cardH * config.cardAspect
 
   rows.forEach((cols, rowIndex) => {
-    const rowY = pack.y + rowIndex * rowH
+    const rowY = gridTop + rowIndex * rowH
     const isPartial = cols < config.maxCols
     const startX = isPartial && config.lastRowAlign === 'center'
       ? pack.x + (pack.width - cols * cellW) / 2

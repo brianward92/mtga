@@ -64,7 +64,7 @@ export function initCalibratePanel(): void {
   const updateStatus = (mode: CalibrateModePayload): void => {
     if (mode.accessibilityIssue) {
       status.textContent =
-        'No Accessibility permission — enable MTGA Tracker in System Settings → ' +
+        'No Accessibility permission — enable MTGA Draft Assistant in System Settings → ' +
         'Privacy & Security → Accessibility, then relaunch.'
       status.classList.add('cal-error')
     } else if (!mode.arenaFound) {

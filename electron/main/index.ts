@@ -1,10 +1,10 @@
 /**
- * MTGA Tracker - Main Process Entry Point
+ * MTGA Draft Assistant - Main Process Entry Point
  *
  * This is the Electron main process that coordinates:
  * - Log file watching and parsing
  * - Database operations for match history
- * - Window management (overlay and dashboard)
+ * - Overlay window management
  * - IPC communication with renderer processes
  */
 
@@ -18,6 +18,8 @@ import {
   createOverlayWindow,
   setOverlayMode,
   showOverlay,
+  activateOverlay,
+  isOverlayPresented,
   hideOverlay,
   moveOverlay,
   resizeOverlay,
@@ -27,7 +29,6 @@ import {
   setOverlayUiPrefs,
   getBadgeCalibrations,
   saveBadgeCalibration,
-  unregisterOverlayShortcuts,
   DraftDensity
 } from './windows/overlay'
 import {
@@ -41,11 +42,13 @@ import {
   normalizeCalibration,
   applyCalibrationOp,
   aspectBucketOf,
+  nearestCalibrationBucket,
   CalibrationConfig,
   CalibrationOp
 } from '../renderer/badges/layout'
-import { createRegistryWindow } from './windows/registry'
+import { initCardArtCache, cachedArtUrl } from './utils/card-art-cache'
 import { installApplicationMenu } from './windows/menu'
+import { StatusTray } from './status-tray'
 import {
   initDatabase,
   closeDatabase,
@@ -77,6 +80,7 @@ import {
   mergeServerCards
 } from './data/card-registry'
 import { formatEventId } from './utils/format-utils'
+import { backfillCompletedDraftPick } from './utils/draft-result-backfill'
 import { loadConfig } from './config'
 import { ServerClient, ServerCardRow, ModelInfo, ServerStatus } from './api/server-client'
 
@@ -90,8 +94,11 @@ if (process.env.MTGA_E2E_USER_DATA) {
 
 // Window references
 let overlayWindow: BrowserWindow | null = null
-let registryWindow: BrowserWindow | null = null
 let badgeWindow: BrowserWindow | null = null
+let statusTray: StatusTray | null = null
+let isQuitting = false
+let quitCommitted = false
+let quitCommitTimer: NodeJS.Timeout | null = null
 
 // Core services
 let logWatcher: LogWatcher | null = null
@@ -101,6 +108,22 @@ let serverClient: ServerClient | null = null
 // Current match state
 let currentMatchId: string | null = null
 let currentDeckName: string | null = null
+
+interface PendingMatch {
+  id: string
+  eventId: string
+  format: string
+  deckId: string | null
+  deckName: string | null
+  opponentName: string
+  startedAt: Date
+  onPlay: boolean
+  opponentPlatform: string | undefined
+}
+
+// Active matches stay in memory. Persisting only on MatchCompleted prevents a
+// crash or truncated startup replay from turning an unfinished match into a draw.
+let pendingMatch: PendingMatch | null = null
 
 // Track last game state for win condition derivation
 let lastTurnNumber = 0
@@ -174,9 +197,6 @@ const draftRuntime = {
   endTimer: null as NodeJS.Timeout | null
 }
 
-// True while the dashboard was auto-minimized for a draft (restore on draft-end)
-let dashboardMinimizedForDraft = false
-
 // ============================================================================
 // Badge overlay state (Arena-anchored flame badges)
 // ============================================================================
@@ -249,7 +269,12 @@ function resolveBadgeConfig(rect: { width: number; height: number } | null): Cal
     return badgeRuntime.calibrateConfig
   }
   const configs = getBadgeCalibrations()
-  const bucket = rect ? aspectBucketOf(rect.width, rect.height) : 'default'
+  if (!rect) return normalizeCalibration(configs['default'] ?? {})
+
+  // Exact bucket, else the nearest calibrated aspect, else the default bucket.
+  const bucket =
+    nearestCalibrationBucket(Object.keys(configs), rect.width, rect.height) ??
+    aspectBucketOf(rect.width, rect.height)
   return normalizeCalibration(configs[bucket] ?? configs['default'] ?? {})
 }
 
@@ -390,73 +415,54 @@ function setupArenaGeometry(): void {
   arenaPoller.on('accessibility-missing', () => {
     badgeRuntime.accessibilityIssue = true
     console.warn('[Badges] Accessibility permission missing — cannot locate the Arena window')
-    registryWindow?.webContents.send('badges-accessibility', { ok: false })
     if (badgeRuntime.calibrating) sendCalibrateState()
   })
 }
 
-/** Push the overlay's visibility to the dashboard so its toggle stays truthful. */
+/** Push the overlay's visibility into the menu-bar state. */
 function sendOverlayVisibility(): void {
-  const visible = !!overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.isVisible()
-  if (registryWindow && !registryWindow.isDestroyed()) {
-    registryWindow.webContents.send('overlay-visibility', { visible })
-  }
+  refreshStatusTray()
 }
 
-/**
- * Plain-app quit semantics: the app stays alive only while the dashboard is
- * open or the overlay is showing. Hiding the overlay with the dashboard
- * already closed quits.
- */
-function quitIfNothingShowing(): void {
-  const dashboardOpen = !!registryWindow && !registryWindow.isDestroyed()
-  const overlayShowing = !!overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.isVisible()
-  if (!dashboardOpen && !overlayShowing) {
-    app.quit()
-  }
-}
-
-/** Create (or re-create) the dashboard window and wire its lifecycle. */
-function ensureRegistryWindow(): BrowserWindow {
-  if (registryWindow && !registryWindow.isDestroyed()) {
-    registryWindow.show()
-    return registryWindow
-  }
-
-  registryWindow = createRegistryWindow()
-  registryWindow.on('closed', () => {
-    registryWindow = null
-    quitIfNothingShowing()
+function refreshStatusTray(): void {
+  if (!statusTray) return
+  const snapshot = draftRuntime.session
+  const pack = draftRuntime.lastPack
+  statusTray.update({
+    serverStatus: draftRuntime.serverStatus.status,
+    model: draftRuntime.serverStatus.model?.id ?? null,
+    draft: snapshot?.state === 'active'
+      ? {
+          set: snapshot.set,
+          format: snapshot.format,
+          pack: pack?.pack ?? null,
+          pick: pack?.pick ?? null
+        }
+      : null,
+    overlayVisible: isOverlayPresented(overlayWindow)
   })
-  registryWindow.webContents.on('did-finish-load', () => {
-    sendOverlayVisibility()
+}
+
+function toggleOverlayFromTray(): void {
+  if (!overlayWindow || overlayWindow.isDestroyed()) return
+  if (isOverlayPresented(overlayWindow)) hideOverlay(overlayWindow)
+  else activateOverlay(overlayWindow)
+  sendOverlayVisibility()
+}
+
+function showOverlayFromAppSurface(): void {
+  if (!overlayWindow || overlayWindow.isDestroyed()) return
+  activateOverlay(overlayWindow)
+  sendOverlayVisibility()
+}
+
+function setupStatusTray(): void {
+  statusTray = new StatusTray({
+    showOverlay: showOverlayFromAppSurface,
+    toggleOverlay: toggleOverlayFromTray,
+    calibrateBadges: startBadgeCalibration
   })
-  return registryWindow
-}
-
-/**
- * The Untapped flow: on draft-start, clear the desk — minimize the dashboard
- * (if the setting is on) so the user is left with only the overlay over Arena.
- */
-function hideDashboardForDraft(): void {
-  if (!getOverlayUiPrefs().autoHideDashboard) return
-  if (
-    registryWindow &&
-    !registryWindow.isDestroyed() &&
-    registryWindow.isVisible() &&
-    !registryWindow.isMinimized()
-  ) {
-    dashboardMinimizedForDraft = true
-    registryWindow.minimize()
-  }
-}
-
-function restoreDashboardAfterDraft(): void {
-  if (!dashboardMinimizedForDraft) return
-  dashboardMinimizedForDraft = false
-  if (registryWindow && !registryWindow.isDestroyed() && registryWindow.isMinimized()) {
-    registryWindow.restore()
-  }
+  refreshStatusTray()
 }
 
 /**
@@ -464,7 +470,18 @@ function restoreDashboardAfterDraft(): void {
  */
 async function createWindows(): Promise<void> {
   overlayWindow = createOverlayWindow()
-  ensureRegistryWindow()
+  // Initial launch is a deliberate app action: focus the panel so the native
+  // Cmd+W/Cmd+M/Cmd+Q menu commands work immediately. Later draft events use
+  // showOverlay/showInactive and never steal focus from Arena.
+  activateOverlay(overlayWindow)
+
+  const interactiveWindow = overlayWindow
+  interactiveWindow.on('close', event => {
+    if (isQuitting) return
+    event.preventDefault()
+    hideOverlay(interactiveWindow)
+    sendOverlayVisibility()
+  })
 
   // Badge overlay: hidden until a draft is live AND the Arena window is found
   badgeWindow = createBadgeWindow()
@@ -486,6 +503,8 @@ async function createWindows(): Promise<void> {
 
   overlayWindow.on('show', sendOverlayVisibility)
   overlayWindow.on('hide', sendOverlayVisibility)
+  overlayWindow.on('minimize', sendOverlayVisibility)
+  overlayWindow.on('restore', sendOverlayVisibility)
 
   // The startup log replay races window creation: if it already finished and
   // left us inside an active draft, surface it now that the window exists.
@@ -504,7 +523,6 @@ function setupLogParser(): void {
   // Inventory updates (gems, gold, wildcards)
   logParser.on('inventory', (data) => {
     overlayWindow?.webContents.send('inventory-update', data)
-    registryWindow?.webContents.send('inventory-update', data)
 
     console.log('[Parser] Inventory:', {
       gems: data.gems,
@@ -521,7 +539,6 @@ function setupLogParser(): void {
 
   // Collection updates
   logParser.on('collection', (data) => {
-    registryWindow?.webContents.send('collection-update', data)
     console.log('[Parser] Collection:', Object.keys(data).length, 'cards')
 
     try {
@@ -539,44 +556,47 @@ function setupLogParser(): void {
     lastOpponentLife = 20
     lastPlayerLife = 20
 
-    const deckName = currentDeckName || logParser?.getCurrentDeckName() || null
+    const previous = pendingMatch?.id === data.matchId ? pendingMatch : null
+    const deckName = currentDeckName || logParser?.getCurrentDeckName() || previous?.deckName || null
     console.log('[Parser] Match started:', data.matchId, 'vs', data.opponentName, `(${data.opponentPlatform || '?'})`, 'Deck:', deckName || 'Unknown')
 
-    try {
-      insertMatch({
-        id: data.matchId,
-        eventId: data.eventId,
-        format: data.gameMode || data.eventId,
-        deckId: null,
-        deckName: deckName,
-        opponentName: data.opponentName,
-        result: 'draw',
-        gameCount: 1,
-        startedAt: new Date(),
-        onPlay: data.seatId === 1,
-        opponentPlatform: data.opponentPlatform
-      })
-    } catch (error) {
-      console.error('[DB] Failed to insert match:', error)
+    pendingMatch = {
+      id: data.matchId,
+      eventId: data.eventId,
+      format: data.gameMode || data.eventId,
+      deckId: previous?.deckId ?? null,
+      deckName,
+      opponentName: data.opponentName,
+      startedAt: previous?.startedAt ?? new Date(),
+      onPlay: data.seatId === 1,
+      opponentPlatform: data.opponentPlatform || undefined
     }
   })
 
   // Match end
   logParser.on('match-end', (data) => {
     overlayWindow?.webContents.send('match-end', data)
-    registryWindow?.webContents.send('match-end', data)
 
     // Derive win condition from match reason and game state
     const winCondition = deriveWinCondition(data.result, data.reason, lastOpponentLife, lastPlayerLife)
     console.log('[Parser] Match ended:', data.matchId, 'Result:', data.result, `(${winCondition}) Turn ${lastTurnNumber}`)
 
     try {
+      const completedMatch = pendingMatch
+      if (completedMatch && completedMatch.id === data.matchId) {
+        insertMatch({
+          ...completedMatch,
+          result: data.result,
+          gameCount: data.gameCount
+        })
+      }
       updateMatchEnd(data.matchId, data.result, data.gameCount, winCondition, lastTurnNumber)
     } catch (error) {
       console.error('[DB] Failed to update match:', error)
     }
 
     currentMatchId = null
+    if (pendingMatch?.id === data.matchId) pendingMatch = null
   })
 
   // Game state updates (for deck tracker)
@@ -597,6 +617,10 @@ function setupLogParser(): void {
 
       // Update the database if we're in a match and got a valid deck name
       if (currentMatchId) {
+        if (pendingMatch?.id === currentMatchId) {
+          pendingMatch.deckName = data.deckName
+          pendingMatch.deckId = data.deckId || pendingMatch.deckId
+        }
         try {
           updateMatchDeckName(currentMatchId, data.deckName, data.deckId || null)
           console.log('[Parser] Updated match deck name:', data.deckName)
@@ -617,6 +641,10 @@ function setupLogParser(): void {
 
       // Update the database if we're in a match
       if (currentMatchId) {
+        if (pendingMatch?.id === currentMatchId) {
+          pendingMatch.deckName = data.deckName
+          pendingMatch.deckId = data.deckId || pendingMatch.deckId
+        }
         try {
           updateMatchDeckName(currentMatchId, data.deckName, data.deckId || null)
           console.log('[Parser] Updated match deck name from selection:', data.deckName)
@@ -747,7 +775,11 @@ function buildCardRows(grpIds: number[]): DraftCardRow[] {
       prob: null,
       tierPct: null,
       rank: null,
-      imageUrl: reg?.imageUrl ?? rating?.image_normal ?? rating?.image_small ?? null
+      // Local file:// URL once cached; null on a miss (a download is started).
+      imageUrl: cachedArtUrl(
+        grpId,
+        rating?.image_small ?? rating?.image_normal ?? reg?.imageUrl ?? null
+      )
     }
   })
 }
@@ -802,18 +834,24 @@ function updateServerStatus(status?: ServerStatus): void {
     fetchedAt: draftRuntime.ratingsMeta?.fetchedAt ?? null
   }
   if (!isReplaying) sendServerStatus()
+  refreshStatusTray()
 }
 
 /**
- * ev_p1p1 for every rated card in the set, sorted ascending. The renderer
- * caches this and computes set percentiles (conviction bands) client-side.
+ * One ev_p1p1 per unique card name, sorted ascending. Arena can expose
+ * multiple grpIds for alternate art; counting each alias would distort the
+ * set-relative grades and conviction percentiles shown by the renderer.
  */
 function setEvP1p1Sorted(): number[] | null {
   if (!draftRuntime.ratings || draftRuntime.ratings.size === 0) return null
-  const evs = Array.from(draftRuntime.ratings.values())
-    .map(card => card.ev_p1p1)
-    .filter((v): v is number => v !== null && v !== undefined && Number.isFinite(v))
-    .sort((a, b) => a - b)
+  const unique = new Map<string, number>()
+  for (const card of draftRuntime.ratings.values()) {
+    const score = card.ev_p1p1
+    if (score === null || score === undefined || !Number.isFinite(score)) continue
+    const key = card.name?.trim().toLocaleLowerCase() || `#${card.grp_id}`
+    if (!unique.has(key)) unique.set(key, score)
+  }
+  const evs = Array.from(unique.values()).sort((a, b) => a - b)
   return evs.length > 0 ? evs : null
 }
 
@@ -917,6 +955,7 @@ function handleDraftStart(snapshot: DraftSessionSnapshot): void {
   draftRuntime.lastPack = null
   draftRuntime.lastScores = null
   draftRuntime.scoresByPick.clear()
+  refreshStatusTray()
   if (draftRuntime.endTimer) {
     clearTimeout(draftRuntime.endTimer)
     draftRuntime.endTimer = null
@@ -939,7 +978,6 @@ function handleDraftStart(snapshot: DraftSessionSnapshot): void {
       setOverlayMode(overlayWindow, 'draft')
       sendOverlayVisibility()
     }
-    hideDashboardForDraft()
     sendDraftEvent('draft-start', draftStartPayload(snapshot))
     startBadgesForDraft()
     void ensureRatings(snapshot)
@@ -960,6 +998,7 @@ function handleDraftPack(snapshot: DraftSessionSnapshot): void {
     cards: buildCardRows(current.grpIds)
   }
   draftRuntime.lastPack = payload
+  refreshStatusTray()
 
   if (!isReplaying) {
     sendDraftEvent('draft-pack', payload)
@@ -1008,6 +1047,16 @@ async function requestScores(snapshot: DraftSessionSnapshot): Promise<void> {
   draftRuntime.lastScores = payload
   draftRuntime.scoresByPick.set(`${pack}-${pick}`, payload)
 
+  // A fast user can pick before /score returns. Re-upsert that pick now that
+  // model fields exist; recordDraftPick preserves the original timestamp.
+  backfillCompletedDraftPick(
+    draftRuntime.session,
+    pack,
+    pick,
+    grpIds,
+    persistDraftPick
+  )
+
   // Only surface if this is still the pack on screen
   const live = draftRuntime.session?.currentPack
   if (!isReplaying && live && live.pack === pack && live.pick === pick) {
@@ -1015,12 +1064,32 @@ async function requestScores(snapshot: DraftSessionSnapshot): Promise<void> {
   }
 }
 
-function handleDraftPick(snapshot: DraftSessionSnapshot, pick: DraftPickRecord): void {
-  draftRuntime.session = snapshot
+/**
+ * Card art arrives after the rows were already sent, so re-push the live scores
+ * with the now-local image URLs. Coalesced: a 14-card pack finishes downloading
+ * as 14 separate events and the renderer only needs one repaint.
+ */
+let artRepublishTimer: NodeJS.Timeout | null = null
 
-  // "My picks vs my model" review data. Human drafts only learn their
-  // draftId at the first pick/pack event: ensureDraftDbId migrates any rows
-  // written under the provisional id and guarantees the drafts row exists.
+function scheduleArtRepublish(): void {
+  if (artRepublishTimer) return
+  artRepublishTimer = setTimeout(() => {
+    artRepublishTimer = null
+    const payload = draftRuntime.lastScores
+    const live = draftRuntime.session?.currentPack
+    if (!payload || !live || live.pack !== payload.pack || live.pick !== payload.pick) return
+
+    sendDraftEvent('draft-scores', {
+      ...payload,
+      cards: payload.cards.map(card => ({
+        ...card,
+        imageUrl: cachedArtUrl(card.grpId, null) ?? card.imageUrl
+      }))
+    })
+  }, 400)
+}
+
+function persistDraftPick(snapshot: DraftSessionSnapshot, pick: DraftPickRecord): void {
   try {
     const dbId = ensureDraftDbId(snapshot)
     upsertDraft({
@@ -1049,6 +1118,16 @@ function handleDraftPick(snapshot: DraftSessionSnapshot, pick: DraftPickRecord):
   } catch (error) {
     console.error('[DB] Failed to record draft pick:', error)
   }
+}
+
+function handleDraftPick(snapshot: DraftSessionSnapshot, pick: DraftPickRecord): void {
+  draftRuntime.session = snapshot
+  refreshStatusTray()
+
+  // "My picks vs my model" review data. Human drafts only learn their
+  // draftId at the first pick/pack event: ensureDraftDbId migrates any rows
+  // written under the provisional id and guarantees the drafts row exists.
+  persistDraftPick(snapshot, pick)
 
   if (!isReplaying) {
     sendDraftEvent('draft-pick', draftPickPayload(snapshot, pick))
@@ -1058,6 +1137,7 @@ function handleDraftPick(snapshot: DraftSessionSnapshot, pick: DraftPickRecord):
 function handleDraftEnd(snapshot: DraftSessionSnapshot): void {
   console.log('[Draft] Complete:', snapshot.eventName ?? snapshot.draftId, `${snapshot.pool.length} cards`)
   draftRuntime.session = snapshot
+  refreshStatusTray()
 
   try {
     completeDraft(ensureDraftDbId(snapshot), snapshot.pool)
@@ -1068,7 +1148,6 @@ function handleDraftEnd(snapshot: DraftSessionSnapshot): void {
   if (!isReplaying) {
     sendDraftEvent('draft-end', draftEndPayload(snapshot))
     stopBadgesAfterDraft()
-    restoreDashboardAfterDraft()
     // The renderer shows a dismissible "draft complete" card and sends
     // 'draft-dismiss' (button or its own 10s timeout). This is only a
     // safety net in case the renderer never does.
@@ -1096,7 +1175,6 @@ function surfaceActiveDraft(): void {
     setOverlayMode(overlayWindow, 'draft')
     sendOverlayVisibility()
   }
-  hideDashboardForDraft()
   sendDraftEvent('draft-start', draftStartPayload(snapshot))
   sendDraftEvent('draft-pick', draftPickPayload(snapshot, null))
   startBadgesForDraft()
@@ -1170,6 +1248,10 @@ function setupServerClient(): void {
   } catch {
     // best-effort migration — worst case is one re-fetch from the server
   }
+  // Card art lives in its own directory for the same reason as ratings-cache:
+  // Chromium clears foreign files out of userData/cache on startup.
+  initCardArtCache(join(app.getPath('userData'), 'card-art'), scheduleArtRepublish)
+
   serverClient = new ServerClient(config, cacheDir)
 
   serverClient.on('status', () => updateServerStatus())
@@ -1432,28 +1514,26 @@ ipcMain.on('overlay-set-prefs', (_, patch: { autoHideDashboard?: boolean }) => {
   }
 })
 
-// The ✕ on the grip: hide the overlay (not quit) — unless the dashboard is
-// gone too, in which case hiding the last surface quits like a plain app.
+// The X on the grip hides the overlay; the Dock or menu-bar item reopens it.
 ipcMain.on('overlay-hide', () => {
   if (overlayWindow && !overlayWindow.isDestroyed()) {
     hideOverlay(overlayWindow)
   }
-  quitIfNothingShowing()
 })
 
-// Dashboard's "Draft Overlay" toggle
+// Overlay visibility toggle retained for the preload API and test harness.
 ipcMain.handle('overlay-toggle', () => {
   if (!overlayWindow || overlayWindow.isDestroyed()) return false
-  if (overlayWindow.isVisible()) {
+  if (isOverlayPresented(overlayWindow)) {
     hideOverlay(overlayWindow)
     return false
   }
-  showOverlay(overlayWindow)
+  activateOverlay(overlayWindow)
   return true
 })
 
 ipcMain.handle('overlay-visible', () => {
-  return !!overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.isVisible()
+  return isOverlayPresented(overlayWindow)
 })
 
 // ============================================================================
@@ -1465,11 +1545,10 @@ ipcMain.handle('badges-state', () => ({
   accessibilityIssue: badgeRuntime.accessibilityIssue
 }))
 
-// Dashboard's "Badge Overlay" toggle (both overlays can be on together)
+// Badge overlay toggle retained for future in-overlay controls.
 ipcMain.handle('badges-toggle', () => {
   const enabled = !badgesEnabled()
   setOverlayUiPrefs({ badgesEnabled: enabled })
-  registryWindow?.webContents.send('badges-enabled', { enabled })
 
   const draftActive = draftRuntime.session?.state === 'active'
   if (enabled && draftActive && !isReplaying) {
@@ -1533,6 +1612,22 @@ ipcMain.on('draft-dismiss', () => {
 // ============================================================================
 
 app.whenReady().then(async () => {
+  if (process.platform === 'darwin') {
+    // Remain a normal foreground Mac application. The packaged app deliberately
+    // does not call dock.show() or dock.setIcon(): AppKit owns one stable bundle
+    // icon for both running and stopped states, so launch/quit cannot swap or
+    // rescale the pinned Dock item.
+    app.setActivationPolicy('regular')
+    if (!app.isPackaged) {
+      const dockIconPath = join(app.getAppPath(), 'build', 'icon.png')
+      try {
+        await app.dock.setIcon(dockIconPath)
+      } catch (error) {
+        console.error('[App] Failed to set development Dock icon:', error)
+      }
+    }
+  }
+
   // Initialize database
   try {
     initDatabase()
@@ -1551,7 +1646,15 @@ app.whenReady().then(async () => {
 
   // Standard menu bar: About/Quit (Cmd+Q), Edit roles for copy/paste,
   // View → Calibrate Badges, Window roles — plain Mac app behavior.
-  installApplicationMenu({ onCalibrateBadges: startBadgeCalibration })
+  installApplicationMenu({
+    onShowOverlay: showOverlayFromAppSurface,
+    onCloseOverlay: () => {
+      if (overlayWindow && !overlayWindow.isDestroyed()) hideOverlay(overlayWindow)
+    },
+    onCalibrateBadges: startBadgeCalibration,
+    onCycleDensity: () => overlayWindow?.webContents.send('density-cycle')
+  })
+  setupStatusTray()
 
   // Start services
   setupServerClient()
@@ -1560,27 +1663,39 @@ app.whenReady().then(async () => {
   setupArenaGeometry()
   await createWindows()
 
-  // macOS: Dock icon click re-opens (or re-focuses) the dashboard —
-  // the app's face — even if it was closed while the overlay kept running.
+  // macOS: Dock icon click reopens the overlay without stealing Arena focus.
   app.on('activate', () => {
-    const win = ensureRegistryWindow()
-    win.focus()
+    showOverlayFromAppSurface()
   })
 })
 
-// Plain quit semantics on every platform: no windows -> quit. (The overlay
-// window only ever *hides*, so the dashboard 'closed' handler and the
-// 'overlay-hide' channel call quitIfNothingShowing() for the hidden case.)
+// The menu-bar item keeps the app alive while the overlay is hidden.
 app.on('window-all-closed', () => {
-  app.quit()
+  if (!statusTray) app.quit()
 })
 
-app.on('before-quit', () => {
+app.on('before-quit', event => {
+  if (!quitCommitted) {
+    event.preventDefault()
+    if (quitCommitTimer) return
+
+    isQuitting = true
+    // Make transparent windows fully invisible, then give WindowServer time
+    // to commit that frame before Electron destroys their renderer surfaces.
+    for (const window of [overlayWindow, badgeWindow]) {
+      if (!window || window.isDestroyed()) continue
+      window.setOpacity(0)
+      window.hide()
+    }
+
+    quitCommitTimer = setTimeout(() => {
+      quitCommitted = true
+      app.quit()
+    }, 120)
+    return
+  }
+
   cleanup()
-})
-
-app.on('will-quit', () => {
-  unregisterOverlayShortcuts()
 })
 
 /**
@@ -1590,12 +1705,19 @@ app.on('will-quit', () => {
  * app.quit() itself.
  */
 function cleanup(): void {
+  if (overlayWindow && !overlayWindow.isDestroyed()) saveOverlayBounds(overlayWindow)
   logWatcher?.stop()
   serverClient?.stop()
   arenaPoller.stop()
+  statusTray?.destroy()
+  statusTray = null
   if (draftRuntime.endTimer) {
     clearTimeout(draftRuntime.endTimer)
     draftRuntime.endTimer = null
+  }
+  if (quitCommitTimer) {
+    clearTimeout(quitCommitTimer)
+    quitCommitTimer = null
   }
   closeDatabase()
 }

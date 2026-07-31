@@ -1,5 +1,5 @@
 /**
- * MTGA Tracker Overlay
+ * MTGA Draft Assistant Overlay
  * Displays deck tracking information during matches
  */
 
@@ -160,18 +160,14 @@ function setupEventListeners(): void {
   minimizeBtn.addEventListener('click', toggleMinimize)
   sideboardToggle.addEventListener('click', toggleSideboard)
 
-  // ✕ on the grip bars: hide the overlay (reopen from the dashboard).
-  // Main process quits if the dashboard is closed too (plain-app semantics).
+  // X on the grip bars hides the overlay; Dock/menu-bar clicks reopen it.
   document.querySelectorAll<HTMLElement>('.hide-btn').forEach(btn => {
     btn.addEventListener('click', () => window.mtgaTracker?.hideOverlay())
   })
 
   setupTooltips()
 
-  // NOTE: no document-level keyboard shortcuts here — the overlay window is
-  // focusable:false (it must never steal keystrokes from Arena), so local
-  // keydown events can never fire. Cmd+M arrives via a main-process global
-  // shortcut ('density-cycle'), registered only while a draft is live.
+  // No keyboard shortcuts: the overlay never intercepts Arena or macOS keys.
 }
 
 /**

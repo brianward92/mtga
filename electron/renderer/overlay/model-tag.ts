@@ -47,7 +47,7 @@ export function convictionCapped(
 export function modelTag(model: ModelInfoLike | null | undefined): ModelTag | null {
   if (!model) return null
   if (isHeuristicModel(model)) {
-    return { text: 'HEURISTIC', title: 'heuristic EV (z-scores, not a trained model)' }
+    return { text: 'HEURISTIC', title: 'heuristic score (z-scores, not a trained model)' }
   }
   if (model.fallback === true) {
     return { text: 'PREMIER MODEL', title: 'trained on Premier drafts, serving Quick' }

@@ -1,4 +1,4 @@
-import { BrowserWindow, screen, globalShortcut } from 'electron'
+import { BrowserWindow, screen } from 'electron'
 import { join } from 'path'
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
 import { homedir } from 'os'
@@ -39,8 +39,8 @@ interface StoredPositions {
   badgeCalibrations?: Record<string, Record<string, unknown>>
 }
 
-// Manual drag/resize limits (the window is focusable:false, so the renderer
-// drives moves/resizes through IPC — clamp whatever it asks for).
+// Manual drag/resize limits. The renderer drives moves/resizes through IPC so
+// the frameless panel has predictable grips — clamp whatever it asks for.
 const MIN_WIDTH = 240
 const MIN_HEIGHT = 36
 const MAX_WIDTH = 720
@@ -50,8 +50,6 @@ const MAX_HEIGHT = 1200
 export const COMPACT_DRAFT_WIDTH = 300
 const DEFAULT_VERDICT_HEIGHT = 300
 const DEFAULT_MINI_HEIGHT = 64
-
-const DENSITY_ACCELERATOR = 'CommandOrControl+M'
 
 let currentMode: OverlayMode = 'match'
 let draftDensity: DraftDensity = 'verdict'
@@ -123,7 +121,7 @@ export function getOverlayUiPrefs(): OverlayUiPrefs {
   const ui = loadStoredPositions().ui ?? {}
   return {
     draftDensity: normalizeDensity(ui.draftDensity),
-    autoHideDashboard: ui.autoHideDashboard !== false,
+    autoHideDashboard: ui.autoHideDashboard === true,
     badgesEnabled: ui.badgesEnabled === true
   }
 }
@@ -255,31 +253,6 @@ export function applyDraftDensity(window: BrowserWindow | null, density: DraftDe
   window.setBounds({ x: bounds.x, y: bounds.y, ...size }, true)
 }
 
-/**
- * Cmd+M cycles draft densities. The overlay window is focusable:false (it
- * must never steal keystrokes from Arena) so document-level shortcuts can't
- * fire — a global shortcut, registered ONLY while the draft panel is up, is
- * the sole way to offer a keyboard toggle.
- */
-function updateDensityShortcut(window: BrowserWindow, mode: OverlayMode): void {
-  if (mode === 'draft') {
-    if (globalShortcut.isRegistered(DENSITY_ACCELERATOR)) return
-    try {
-      globalShortcut.register(DENSITY_ACCELERATOR, () => {
-        if (!window.isDestroyed()) window.webContents.send('density-cycle')
-      })
-    } catch {
-      // Another app owns the accelerator — the grip button still works
-    }
-  } else {
-    globalShortcut.unregister(DENSITY_ACCELERATOR)
-  }
-}
-
-export function unregisterOverlayShortcuts(): void {
-  globalShortcut.unregister(DENSITY_ACCELERATOR)
-}
-
 export function createOverlayWindow(): BrowserWindow {
   const initial = boundsForMode('match')
   currentMode = 'match'
@@ -293,15 +266,22 @@ export function createOverlayWindow(): BrowserWindow {
     minWidth: MIN_WIDTH,
     minHeight: MIN_HEIGHT,
     transparent: true,
+    backgroundColor: '#00000000',
     frame: false,
+    // CSS owns the panel silhouette. Electron's native corner treatment can
+    // expose a bright compositor rim while a transparent window is closing.
+    roundedCorners: false,
     alwaysOnTop: true,
     skipTaskbar: true,
     hasShadow: false,
     resizable: true,
-    minimizable: false,
+    minimizable: true,
     maximizable: false,
     closable: true,
-    focusable: false,  // Don't steal focus from MTGA
+    // Passive appearances use showInactive(), so draft updates never steal
+    // focus from Arena. A deliberate click can focus the panel, which gives
+    // Cmd+M/Cmd+Q their normal native macOS behavior.
+    focusable: true,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -345,7 +325,6 @@ export function createOverlayWindow(): BrowserWindow {
     if (saveTimeout) {
       clearTimeout(saveTimeout)
     }
-    unregisterOverlayShortcuts()
   })
 
   return overlayWindow
@@ -358,10 +337,7 @@ export function createOverlayWindow(): BrowserWindow {
  */
 export function setOverlayMode(window: BrowserWindow, mode: OverlayMode): void {
   if (window.isDestroyed()) return
-  if (mode === currentMode) {
-    updateDensityShortcut(window, mode)
-    return
-  }
+  if (mode === currentMode) return
 
   saveOverlayBounds(window)
   currentMode = mode
@@ -371,7 +347,6 @@ export function setOverlayMode(window: BrowserWindow, mode: OverlayMode): void {
 
   // Mode transitions always land interactive — belt and braces
   window.setIgnoreMouseEvents(false)
-  updateDensityShortcut(window, mode)
 }
 
 export function getOverlayMode(): OverlayMode {
@@ -380,11 +355,27 @@ export function getOverlayMode(): OverlayMode {
 
 export function showOverlay(window: BrowserWindow): void {
   if (window.isDestroyed()) return
+  // A passive draft update must respect an explicit Cmd+M.
+  if (window.isMinimized()) return
   if (!window.isVisible()) {
     // showInactive: never steal focus from Arena
     window.showInactive()
   }
   window.setIgnoreMouseEvents(false)
+}
+
+/** Restore and focus the panel after an explicit Dock/menu-bar action. */
+export function activateOverlay(window: BrowserWindow): void {
+  if (window.isDestroyed()) return
+  if (window.isMinimized()) window.restore()
+  if (!window.isVisible()) window.show()
+  window.setIgnoreMouseEvents(false)
+  window.focus()
+}
+
+/** Whether the panel is presently on screen (minimized is not presented). */
+export function isOverlayPresented(window: BrowserWindow | null): boolean {
+  return !!window && !window.isDestroyed() && window.isVisible() && !window.isMinimized()
 }
 
 export function hideOverlay(window: BrowserWindow): void {

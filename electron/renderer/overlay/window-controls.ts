@@ -1,11 +1,10 @@
 /**
  * Manual window drag + resize for the overlay.
  *
- * The overlay window is focusable:false so it can never steal focus or
- * keystrokes from Arena — but on macOS that also disables native dragging
- * and `-webkit-app-region: drag` (which additionally swallows click events
- * inside the region: the original "can't click, can't move" bug). So the
- * grip bars drive the window explicitly:
+ * The frameless overlay uses explicit drag grips instead of
+ * `-webkit-app-region: drag`, which swallows click events inside the region.
+ * Passive appearances still use showInactive(), so draft updates do not pull
+ * focus from Arena; a deliberate panel click may focus the app normally.
  *
  *   pointerdown on a grip  -> invoke overlay-drag-start (window bounds)
  *   pointermove            -> absolute setPosition via IPC, rAF-throttled
@@ -35,6 +34,9 @@ function beginDrag(grip: HTMLElement, down: PointerEvent): void {
 
   const startScreenX = down.screenX
   const startScreenY = down.screenY
+  let latestScreenX = startScreenX
+  let latestScreenY = startScreenY
+  let active = true
   let origin: WindowBounds | null = null
   let pending: { x: number; y: number } | null = null
   let raf = 0
@@ -47,16 +49,23 @@ function beginDrag(grip: HTMLElement, down: PointerEvent): void {
     }
   }
 
-  const onMove = (e: PointerEvent) => {
+  const queueLatest = () => {
     if (!origin) return
     pending = {
-      x: origin.x + (e.screenX - startScreenX),
-      y: origin.y + (e.screenY - startScreenY)
+      x: origin.x + (latestScreenX - startScreenX),
+      y: origin.y + (latestScreenY - startScreenY)
     }
     if (!raf) raf = requestAnimationFrame(flush)
   }
 
+  const onMove = (e: PointerEvent) => {
+    latestScreenX = e.screenX
+    latestScreenY = e.screenY
+    queueLatest()
+  }
+
   const onUp = () => {
+    active = false
     grip.removeEventListener('pointermove', onMove)
     grip.removeEventListener('pointerup', onUp)
     grip.removeEventListener('pointercancel', onUp)
@@ -71,7 +80,9 @@ function beginDrag(grip: HTMLElement, down: PointerEvent): void {
   grip.addEventListener('pointercancel', onUp)
 
   void window.mtgaTracker.overlayDragStart().then(bounds => {
+    if (!active || !bounds) return
     origin = bounds
+    queueLatest()
   })
 }
 
@@ -85,6 +96,9 @@ function beginResize(handle: HTMLElement, down: PointerEvent): void {
 
   const startScreenX = down.screenX
   const startScreenY = down.screenY
+  let latestScreenX = startScreenX
+  let latestScreenY = startScreenY
+  let active = true
   let origin: WindowBounds | null = null
   let pending: { width: number; height: number } | null = null
   let raf = 0
@@ -97,16 +111,23 @@ function beginResize(handle: HTMLElement, down: PointerEvent): void {
     }
   }
 
-  const onMove = (e: PointerEvent) => {
+  const queueLatest = () => {
     if (!origin) return
     pending = {
-      width: origin.width + (e.screenX - startScreenX),
-      height: origin.height + (e.screenY - startScreenY)
+      width: origin.width + (latestScreenX - startScreenX),
+      height: origin.height + (latestScreenY - startScreenY)
     }
     if (!raf) raf = requestAnimationFrame(flush)
   }
 
+  const onMove = (e: PointerEvent) => {
+    latestScreenX = e.screenX
+    latestScreenY = e.screenY
+    queueLatest()
+  }
+
   const onUp = () => {
+    active = false
     handle.removeEventListener('pointermove', onMove)
     handle.removeEventListener('pointerup', onUp)
     handle.removeEventListener('pointercancel', onUp)
@@ -120,7 +141,9 @@ function beginResize(handle: HTMLElement, down: PointerEvent): void {
   handle.addEventListener('pointercancel', onUp)
 
   void window.mtgaTracker.overlayResizeStart().then(bounds => {
+    if (!active || !bounds) return
     origin = bounds
+    queueLatest()
   })
 }
 

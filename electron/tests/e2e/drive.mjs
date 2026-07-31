@@ -9,8 +9,8 @@
  *      symlinked in read-only so real card names resolve) and an empty fake
  *      Player.log, then launches the packaged app binary with
  *      MTGA_LOG_PATH=<tmp>/Player.log and --remote-debugging-port.
- *   2. Connects puppeteer-core over CDP and finds the three renderer pages
- *      (dashboard / overlay / badges).
+ *   2. Connects puppeteer-core over CDP and finds the two renderer pages
+ *      (overlay / badges), asserting that no dashboard is created.
  *   3. Streams tests/e2e/fixtures/quickdraft_sos.log into the fake log
  *      line-by-line with pacing (the JS port of scripts/replay_player_log.py),
  *      pausing at checkpoints to wait for the overlay DOM to settle and
@@ -27,7 +27,7 @@
  *   npm run e2e                                  # live scores (real server)
  *   npm run e2e -- --scores-mode offline         # dead server: amber/red UI
  *   node tests/e2e/drive.mjs \
- *     [--app "/Applications/MTGA Tracker.app/Contents/MacOS/MTGA Tracker"] \
+ *     [--app "/Applications/MTGA Draft Assistant.app/Contents/MacOS/MTGA Draft Assistant"] \
  *     [--scores-mode live|offline] [--server http://192.168.4.25:8100] \
  *     [--port 9222] [--speed 12] [--out tests/e2e/shots] [--keep-tmp]
  *
@@ -55,7 +55,7 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 
 function parseArgs(argv) {
   const args = {
-    app: '/Applications/MTGA Tracker.app/Contents/MacOS/MTGA Tracker',
+    app: '/Applications/MTGA Draft Assistant.app/Contents/MacOS/MTGA Draft Assistant',
     fixture: join(HERE, 'fixtures/quickdraft_sos.log'),
     scoresMode: 'live',
     server: 'http://192.168.4.25:8100',
@@ -109,8 +109,7 @@ function buildSandbox(args) {
     watchLegacyLogs: false
   }, null, 2))
 
-  // UI prefs: keep the dashboard up during the draft (screenshots of a
-  // minimized window are blank), start at verdict density, badges off.
+  // UI prefs: start at verdict density, badges off.
   writeFileSync(join(trackerDir, 'overlay-position.json'), JSON.stringify({
     ui: { draftDensity: 'verdict', autoHideDashboard: false, badgesEnabled: false }
   }, null, 2))
@@ -152,7 +151,7 @@ async function seedRatingsCache(args, sandbox) {
   const staleFetchedAt = new Date(Date.now() - 3 * 24 * 3600 * 1000).toISOString()
   const payload = JSON.stringify({ ...data, fetched_at: staleFetchedAt })
   // userData dir name = productName; cover the plain package name too
-  for (const appName of ['MTGA Tracker', 'mtga-tracker']) {
+  for (const appName of ['MTGA Draft Assistant', 'MTGA Tracker', 'mtga-tracker']) {
     const cacheDir = join(sandbox.appSupport, appName, 'ratings-cache')
     mkdirSync(cacheDir, { recursive: true })
     writeFileSync(join(cacheDir, 'ratings-SOS-QuickDraft.json'), payload)
@@ -171,7 +170,7 @@ class Harness {
     this.notes = []
     this.captured = []
     this.failedSteps = []
-    this.consoleLogs = { dashboard: [], overlay: [], badges: [] }
+    this.consoleLogs = { overlay: [], badges: [] }
     this.pages = {}
     this.lines = readFileSync(args.fixture, 'utf-8').split('\n').filter((l) => l.length > 0)
     this.lineIndex = 0
@@ -202,7 +201,7 @@ class Harness {
         MTGA_LOG_PATH: sandbox.logPath,
         // macOS ignores $HOME for appData — the app's MTGA_E2E hook moves
         // userData (DB, caches) into the sandbox explicitly.
-        MTGA_E2E_USER_DATA: join(sandbox.appSupport, 'MTGA Tracker')
+        MTGA_E2E_USER_DATA: join(sandbox.appSupport, 'MTGA Draft Assistant')
       },
       stdio: ['ignore', 'pipe', 'pipe']
     })
@@ -229,7 +228,8 @@ class Harness {
 
     // The sandbox HOME must have taken: userData (DB, caches) lives there.
     const userDataDeadline = Date.now() + 15_000
-    const candidates = ['MTGA Tracker', 'mtga-tracker'].map((n) => join(sandbox.appSupport, n, 'data'))
+    const candidates = ['MTGA Draft Assistant', 'MTGA Tracker', 'mtga-tracker']
+      .map((n) => join(sandbox.appSupport, n, 'data'))
     while (!candidates.some((p) => existsSync(p))) {
       if (Date.now() > userDataDeadline) {
         throw new Error(
@@ -242,9 +242,9 @@ class Harness {
   }
 
   async findPages() {
-    const wanted = { dashboard: '/dashboard/', overlay: '/overlay/', badges: '/badges/' }
+    const wanted = { overlay: '/overlay/', badges: '/badges/' }
     const deadline = Date.now() + 20_000
-    while (Object.keys(this.pages).length < 3) {
+    while (Object.keys(this.pages).length < 2) {
       for (const page of await this.browser.pages()) {
         const url = page.url()
         for (const [name, marker] of Object.entries(wanted)) {
@@ -256,13 +256,16 @@ class Harness {
           }
         }
       }
-      if (Object.keys(this.pages).length === 3) break
+      if (Object.keys(this.pages).length === 2) break
       if (Date.now() > deadline) {
         throw new Error(`only found pages: ${Object.keys(this.pages).join(', ') || 'none'}`)
       }
       await sleep(300)
     }
-    console.log('* found renderer pages: dashboard, overlay, badges')
+    await sleep(500)
+    const dashboard = (await this.browser.pages()).find((page) => page.url().includes('/dashboard/'))
+    if (dashboard) throw new Error('dashboard renderer should not exist in overlay-only mode')
+    console.log('* found renderer pages: overlay, badges (no dashboard)')
   }
 
   async shutdown(sandbox) {
@@ -340,37 +343,10 @@ class Harness {
       el.click()
     }, id)
 
-    // -- boot: match-mode overlay + dashboard, no draft yet
+    // -- boot: match-mode overlay only, no draft yet
     await this.step('boot', async () => {
       await this.waitOverlay('overlay DOM ready', () => !!document.getElementById('overlay'))
       await this.shoot('01_boot', { settleMs: 1200 })
-    })
-
-    // -- dashboard-alive: regression check for the packaged-dashboard bug
-    // (registry.ts once loaded the raw source HTML, shipping a dashboard
-    // with no working JS). The Draft Overlay toggle must really flip the
-    // overlay window over IPC and the pill must track it.
-    await this.step('dashboard-alive', async () => {
-      const page = this.pages.dashboard
-      const read = () => page.evaluate(async () => ({
-        pill: document.getElementById('overlayToggleState').textContent,
-        visible: await window.mtgaTracker.getOverlayVisible()
-      }))
-      const before = await read()
-      await page.evaluate(() => document.getElementById('overlayToggle').click())
-      await sleep(500)
-      const after = await read()
-      if (after.pill === before.pill || after.visible === before.visible) {
-        throw new Error(
-          `dashboard toggle inert (pill "${before.pill}"->"${after.pill}", ` +
-          `visible ${before.visible}->${after.visible}) — dashboard bundle not running?`
-        )
-      }
-      if ((after.pill === 'On') !== after.visible) {
-        throw new Error(`pill "${after.pill}" disagrees with overlay visibility ${after.visible}`)
-      }
-      await page.evaluate(() => document.getElementById('overlayToggle').click())
-      await sleep(500)
     })
 
     // -- draft-start: EventJoin only — panel flips to draft mode, no pack yet

@@ -1,5 +1,5 @@
 /**
- * Database module for MTGA Tracker
+ * Database module for MTGA Draft Assistant
  *
  * Handles all SQLite database operations including:
  * - Match history storage and retrieval
@@ -213,6 +213,7 @@ export function insertMatch(match: Omit<Match, 'endedAt'>): void {
       result = @result,
       game_count = @gameCount,
       opponent_platform = COALESCE(@opponentPlatform, opponent_platform)
+    WHERE matches.ended_at IS NULL
   `)
 
   stmt.run({
@@ -245,7 +246,7 @@ export function updateMatchEnd(
   const stmt = db.prepare(`
     UPDATE matches SET result = @result, game_count = @gameCount, ended_at = @endedAt,
       win_condition = @winCondition, final_turn = @finalTurn
-    WHERE id = @matchId
+    WHERE id = @matchId AND ended_at IS NULL
   `)
 
   stmt.run({
@@ -351,21 +352,21 @@ export function getPlayDrawStats(deckId?: string): {
 } {
   const db = initDatabase()
 
-  let whereClause = ''
+  let whereClause = ' WHERE'
   const params: unknown[] = []
 
   if (deckId) {
-    whereClause = ' WHERE deck_id = ?'
+    whereClause += ' deck_id = ? AND'
     params.push(deckId)
   }
 
   // Query for on_play matches
-  const playQuery = `SELECT result, COUNT(*) as count FROM matches${whereClause} AND on_play = 1 GROUP BY result`
+  const playQuery = `SELECT result, COUNT(*) as count FROM matches${whereClause} on_play = 1 GROUP BY result`
   const playStmt = db.prepare(playQuery)
   const playRows = playStmt.all(...params) as Array<{ result: string; count: number }>
 
   // Query for on_draw matches
-  const drawQuery = `SELECT result, COUNT(*) as count FROM matches${whereClause} AND on_play = 0 GROUP BY result`
+  const drawQuery = `SELECT result, COUNT(*) as count FROM matches${whereClause} on_play = 0 GROUP BY result`
   const drawStmt = db.prepare(drawQuery)
   const drawRows = drawStmt.all(...params) as Array<{ result: string; count: number }>
 

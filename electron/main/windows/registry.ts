@@ -12,7 +12,7 @@ export function createRegistryWindow(): BrowserWindow {
     height: 800,
     minWidth: 900,
     minHeight: 600,
-    title: 'MTGA Tracker',
+    title: 'MTGA Draft Assistant',
     backgroundColor: '#0a0a0f',
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 16, y: 16 },

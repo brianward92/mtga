@@ -1,4 +1,4 @@
-# MTGA Tracker
+# MTGA Draft Assistant
 
 A lightweight deck tracker and overlay for Magic: The Gathering Arena on macOS.
 
@@ -57,15 +57,50 @@ The packaged app will be in `electron/release/`.
 
 ## Usage
 
-1. Start MTGA Tracker before or during a MTGA session
-2. The overlay appears in the top-right corner of your screen
-3. Start a match in MTGA - the deck tracker will populate automatically
-4. Cards drawn will be marked and counts updated in real-time
+1. Start MTGA Draft Assistant before or during a MTGA session
+2. The overlay opens as the app's only window
+3. Drag its top grip to position it over Arena
+4. Start a match in MTGA - the deck tracker will populate automatically
+5. Cards drawn will be marked and counts updated in real-time
+
+The menu-bar item shows the draft server, active model, and current draft
+position. The Dock icon and menu-bar item reopen a hidden overlay; badge
+calibration and Quit remain available from the menu bar.
 
 ### Overlay Controls
 
-- **Minimize button (−)**: Collapse the overlay to just the header
-- **Drag header**: Reposition the overlay (when expanded)
+- **Cmd+W**: Hide the overlay while the tracker keeps running
+- **Cmd+M**: Minimize the overlay normally
+- **Cmd+Q**: Quit the app and stop the tracker cleanly
+- **Cmd+Shift+D**: Cycle Verdict, Full, and Mini draft views
+- **Three-line button**: Cycle the same draft views without a shortcut
+- **Drag header**: Reposition the overlay
+
+Automatic draft updates use `showInactive()` and do not take focus from Arena.
+An intentional launch, Dock click, menu-bar click, or overlay click focuses the
+assistant so its standard Mac shortcuts work.
+
+### Deploy to the MacBook
+
+Use the checked deployment path from `electron/`:
+
+```bash
+npm run deploy:mbp
+```
+
+The command refuses to update a running app, runs typecheck/tests/build, stages
+and verifies the arm64 `better-sqlite3` binary, updates the existing
+`/Applications/MTGA Draft Assistant.app` bundle in place, and preserves its
+Dock identity. It leaves the app closed by default. For an intentional
+interactive smoke test only:
+
+```bash
+npm run deploy:mbp -- --launch
+```
+
+Do not deploy only `app.asar`: the packaged native SQLite binary must be
+updated and architecture-checked with it. The bundle PNG and ICNS are deployed
+together; packaged builds never replace the Dock icon at runtime.
 
 ## Data Storage
 
@@ -99,7 +134,7 @@ electron/
 
 ### Overlay not appearing over MTGA
 - Grant Screen Recording permission: **System Preferences > Security & Privacy > Privacy > Screen Recording**
-- Add the MTGA Tracker app to the allowed list
+- Add the MTGA Draft Assistant app to the allowed list
 
 ### No match data showing
 - Verify "Detailed Logs" is enabled in MTGA settings

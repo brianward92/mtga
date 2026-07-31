@@ -15,6 +15,8 @@ import {
   rowsForCount,
   packLayout,
   applyCalibrationOp,
+  aspectOfBucket,
+  nearestCalibrationBucket,
   CalibrationConfig
 } from '../renderer/badges/layout'
 
@@ -237,5 +239,95 @@ describe('applyCalibrationOp', () => {
   it('reset restores the defaults', () => {
     const mangled = mergeCalibration(base, { packLeft: 0.5, maxCols: 3 })
     expect(applyCalibrationOp(mangled, { type: 'reset' })).toEqual(DEFAULT_CALIBRATION)
+  })
+})
+
+describe('nearestCalibrationBucket', () => {
+  it('prefers the exact bucket when it is stored', () => {
+    const stored = ['aspect-1.6', 'aspect-1.8', 'default']
+    expect(nearestCalibrationBucket(stored, 1600, 900)).toBe('aspect-1.8')
+  })
+
+  it('falls back to the numerically nearest calibrated aspect', () => {
+    // 2560x1080 is 2.4 — nearer 1.8 than 1.3, and "default" is not an aspect.
+    const stored = ['aspect-1.3', 'aspect-1.8', 'default']
+    expect(nearestCalibrationBucket(stored, 2560, 1080)).toBe('aspect-1.8')
+  })
+
+  it('returns null when nothing usable is stored', () => {
+    expect(nearestCalibrationBucket([], 1600, 900)).toBeNull()
+    expect(nearestCalibrationBucket(['default'], 1600, 900)).toBeNull()
+  })
+
+  it('returns null for a degenerate window size', () => {
+    expect(nearestCalibrationBucket(['aspect-1.8'], 0, 0)).toBeNull()
+  })
+
+  it('resolves ties deterministically', () => {
+    // 1.5 is equidistant from 1.4 and 1.6; the lexically smaller key wins.
+    const stored = ['aspect-1.6', 'aspect-1.4']
+    expect(nearestCalibrationBucket(stored, 1500, 1000)).toBe('aspect-1.4')
+  })
+
+  it('aspectOfBucket parses aspects and rejects non-aspect keys', () => {
+    expect(aspectOfBucket('aspect-1.8')).toBeCloseTo(1.8, 6)
+    expect(aspectOfBucket('default')).toBeNull()
+    expect(aspectOfBucket('aspect-junk')).toBeNull()
+  })
+})
+
+describe('packLayout keeps card size constant as a pack is drafted down', () => {
+  const config = DEFAULT_CALIBRATION
+  const view = { width: 1600, height: 900 }
+
+  // Arena does not grow the cards as the pack empties; only the grid shrinks.
+  // Before refCount existed, a 3-card pack stretched one row over the whole
+  // pack area and drew badges several times too large.
+  it('card width/height are identical for every pack size', () => {
+    const full = packLayout(view, 14, config).cards[0].card
+    for (const count of [13, 8, 7, 3, 2, 1]) {
+      const slot = packLayout(view, count, config).cards[0].card
+      expect(slot.width).toBeCloseTo(full.width, 6)
+      expect(slot.height).toBeCloseTo(full.height, 6)
+    }
+  })
+
+  it('badge height stays fixed and width stays clamped to the card', () => {
+    for (const count of [14, 8, 3, 1]) {
+      const badge = packLayout(view, count, config).cards[0].badge
+      expect(badge.height).toBe(config.badgeHeight)
+      expect(badge.width).toBeLessThanOrEqual(
+        packLayout(view, count, config).cards[0].card.width + 1e-6
+      )
+    }
+  })
+
+  it('a single-row pack is centered vertically in the pack area', () => {
+    const layout = packLayout(view, 3, config)
+    const packMid = layout.pack.y + layout.pack.height / 2
+    const card = layout.cards[0].card
+    expect(card.y + card.height / 2).toBeCloseTo(packMid, 6)
+  })
+
+  it('rows stay inside the pack area at every pack size', () => {
+    for (const count of [14, 13, 8, 3, 1]) {
+      const layout = packLayout(view, count, config)
+      for (const slot of layout.cards) {
+        expect(slot.card.y).toBeGreaterThanOrEqual(layout.pack.y - 1e-6)
+        expect(slot.card.y + slot.card.height).toBeLessThanOrEqual(
+          layout.pack.y + layout.pack.height + 1e-6
+        )
+      }
+    }
+  })
+
+  it('a pack larger than refCount still lays out without overflowing', () => {
+    const layout = packLayout(view, 20, { ...config, refCount: 14 })
+    expect(layout.cards).toHaveLength(20)
+    for (const slot of layout.cards) {
+      expect(slot.card.y + slot.card.height).toBeLessThanOrEqual(
+        layout.pack.y + layout.pack.height + 1e-6
+      )
+    }
   })
 })

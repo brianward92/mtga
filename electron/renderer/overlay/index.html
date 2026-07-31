@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MTGA Tracker Overlay</title>
+  <title>MTGA Draft Assistant Overlay</title>
   <link rel="stylesheet" href="./overlay.css">
 </head>
 <body>
@@ -18,7 +18,7 @@
         </span>
       </div>
       <button class="grip-btn minimize-btn" id="minimizeBtn" title="Minimize">−</button>
-      <button class="grip-btn hide-btn" title="Hide overlay (reopen from dashboard)">✕</button>
+      <button class="grip-btn hide-btn" title="Hide overlay (reopen from the Dock or menu bar)">✕</button>
     </header>
 
     <!-- Detailed-logs warning banner -->
@@ -35,12 +35,12 @@
         <span class="grip-chip" id="draftEventChip">—</span>
         <span class="grip-pickpos" id="draftPickPos"></span>
         <span class="server-dot red" id="serverDot" title="Server offline"></span>
-        <button class="grip-btn" id="densityBtn" title="Cycle view (⌘M)">
+        <button class="grip-btn" id="densityBtn" title="Cycle view">
           <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
             <path d="M4 7h16M4 12h10M4 17h5"/>
           </svg>
         </button>
-        <button class="grip-btn hide-btn" title="Hide overlay (reopen from dashboard)">✕</button>
+        <button class="grip-btn hide-btn" title="Hide overlay (reopen from the Dock or menu bar)">✕</button>
       </div>
 
       <div class="draft-note" id="draftNote" style="display: none;"></div>

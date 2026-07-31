@@ -2,12 +2,11 @@
  * Draft overlay view.
  *
  * Takes over the panel between draft-start and draft-end. Three densities
- * (see density.ts), cycled by the grip button and Cmd+M (global shortcut —
- * the window is focusable:false so local key events can never arrive):
+ * (see density.ts), cycled by the grip button:
  *
- *   verdict — THE PICK: name + flame rating (model conviction) + EV bar,
- *             two runner-ups, 12px pool color strip (doubles as progress)
- *   full    — verdict + ranked pack table (EV/GIH/ALSA) + pool curve +
+ *   verdict — THE PICK: name + flame rating (model conviction), model grade,
+ *             two runner-ups, and a compact pool color summary
+ *   full    — verdict + ranked pack table (grade/GIH/ALSA) + pool curve +
  *             collapsible pick history
  *   mini    — grip + one line: top pick name only
  *
@@ -15,7 +14,7 @@
  * (license requirement).
  */
 
-import { escapeHtml, renderManaCost, formatWinRate, formatRelativeAge } from './shared'
+import { escapeHtml, renderManaCost, renderManaSymbol, formatWinRate, formatRelativeAge } from './shared'
 import { Density, nextDensity, normalizeDensity, densityClass, densityTitle, DENSITY_CYCLE } from './density'
 import { FlameRating, flamesFromPercentile } from './flames'
 import { convictionCapped, modelTag, modelVersionTag } from './model-tag'
@@ -28,6 +27,13 @@ import {
   formatDominancePct,
   formatSplit
 } from './conviction'
+import {
+  ModelGradeResult,
+  modelGradeForScore,
+  modelGradeFromPercentile,
+  modelGradeTitle,
+  modelGradeClass
+} from './grades'
 
 // ---------------------------------------------------------------------------
 // Payload types (mirror main/index.ts)
@@ -212,8 +218,7 @@ export function initDraftView(): void {
 
   densityBtn.addEventListener('click', cycleDraftDensity)
 
-  // Cmd+M arrives as a global shortcut from the main process (the window is
-  // focusable:false, so document-level key events can never fire here).
+  // Main may request a density cycle when Arena-anchored badges turn on.
   window.mtgaTracker.onDensityCycle(() => cycleDraftDensity())
 
   // Restore the last chosen density (defaults to verdict)
@@ -507,6 +512,21 @@ function rankedRows(): DraftCardRow[] {
   return sortRows(scored && scored.length > 0 ? scored : currentPack.cards)
 }
 
+/**
+ * Card art thumbnail. `imageUrl` is a local file:// URL written by the main
+ * process's art cache — never a remote URL, so a row never triggers a network
+ * fetch while rendering. Renders an empty placeholder until the art lands so
+ * rows do not reflow when it does.
+ */
+function cardArtHtml(row: DraftCardRow): string {
+  if (!row.imageUrl) return '<span class="pick-art pick-art-empty" aria-hidden="true"></span>'
+  const alt = row.name ? `${escapeHtml(row.name)} card art` : 'Card art'
+  return (
+    `<img class="pick-art" src="${escapeHtml(row.imageUrl)}" alt="${alt}" ` +
+    `loading="lazy" decoding="async">`
+  )
+}
+
 function rarityClass(rarity: string | null): string {
   switch ((rarity ?? '').toLowerCase()) {
     case 'mythic': return 'rarity-mythic'
@@ -516,15 +536,19 @@ function rarityClass(rarity: string | null): string {
   }
 }
 
-function formatEv(value: number | null): string {
-  if (value === null || !Number.isFinite(value)) return '—'
-  return Math.abs(value) < 10 ? value.toFixed(2) : value.toFixed(1)
-}
-
 /** setPct: the row's ev_p1p1 percentile (0..1) within the whole set. */
 function setPctFor(row: DraftCardRow): number | null {
   if (row.evP1p1 === null || !Number.isFinite(row.evP1p1) || !setEvSorted) return null
   return percentileOfSortedAsc(row.evP1p1, setEvSorted)
+}
+
+/** Stable intrinsic grade; current pool-conditioned logits only rank the pack. */
+function gradeFor(row: DraftCardRow): ModelGradeResult | null {
+  const fromScore = modelGradeForScore(row.evP1p1, setEvSorted)
+  if (fromScore) return fromScore
+  return currentPack?.isTierList && row.tierPct !== null
+    ? modelGradeFromPercentile(row.tierPct / 100)
+    : null
 }
 
 /**
@@ -646,14 +670,16 @@ function renderPickViews(): void {
 
 function verdictWhyHtml(row: DraftCardRow): string {
   const parts: string[] = []
-  const ev = row.ev ?? row.evP1p1
-  if (ev !== null && Number.isFinite(ev)) parts.push(`EV ${formatEv(ev)}`)
+  const grade = gradeFor(row)
+  if (grade) {
+    parts.push(`<span class="grade-value ${modelGradeClass(grade.grade)}" title="${modelGradeTitle(grade)}">Model grade ${grade.grade}</span>`)
+  }
   if (row.gihWr !== null) parts.push(`GIH ${formatWinRate(row.gihWr)}`)
   if (row.alsa !== null && Number.isFinite(row.alsa)) parts.push(`ALSA ${row.alsa.toFixed(1)}`)
   return parts.length > 0 ? parts.join(' · ') : ''
 }
 
-/** Normalized 0..100 EV bar width for a row within this pack. */
+/** Normalized 0..100 recommendation bar within this pack. */
 function evBarPct(row: DraftCardRow, rows: DraftCardRow[]): number {
   const metrics = rows
     .map(r => sortMetric(r, rows))
@@ -668,23 +694,26 @@ function evBarPct(row: DraftCardRow, rows: DraftCardRow[]): number {
 
 /**
  * One runner-up line: rank, name, and its own head-to-head vs the card
- * ranked directly above it (sigmoid of the adjacent EV gap). Tier-list rows
- * keep percentile flames; rows without EVs fall back to the raw metric.
+ * ranked directly above it (sigmoid of the adjacent score gap). Tier-list
+ * rows keep percentile flames; other fallbacks show the intrinsic grade.
  */
 function runnerHtml(rows: DraftCardRow[], index: number): string {
   const row = rows[index]
   const name = row.name ?? 'Unknown card'
-  const evFallback = `<span class="runner-ev">${formatEv(row.ev ?? row.evP1p1 ?? row.gihWr)}</span>`
+  const grade = gradeFor(row)
+  const gradeFallback = grade
+    ? `<span class="runner-grade ${modelGradeClass(grade.grade)}" title="${modelGradeTitle(grade)}">${grade.grade}</span>`
+    : `<span class="runner-grade">—</span>`
 
   let right: string
   if (currentPack?.isTierList) {
     const rating = percentileFlamesFor(row)
-    right = rating ? flameRowHtml(rating, { small: true }) : evFallback
+    right = rating ? flameRowHtml(rating, { small: true }) : gradeFallback
   } else {
     const headToHead = runnerDominance(row.ev, rows[index - 1]?.ev)
     right = headToHead !== null
-      ? `<span class="runner-pct" title="head-to-head vs. the card above">${formatDominancePct(headToHead)}</span>`
-      : evFallback
+      ? `<span class="runner-pct" title="Pairwise model preference vs. the card above; not game win rate">${formatDominancePct(headToHead)}</span>`
+      : gradeFallback
   }
 
   return `
@@ -696,7 +725,7 @@ function runnerHtml(rows: DraftCardRow[], index: number): string {
   `
 }
 
-/** THE PICK: name large, flames + dominance %, EV bar, why-line, runner-ups. */
+/** THE PICK: name large, conviction, model grade, and runner-ups. */
 function renderVerdict(rows: DraftCardRow[]): void {
   if (rows.length === 0) {
     verdictView.innerHTML = '<div class="draft-empty">No cards in pack</div>'
@@ -721,7 +750,7 @@ function renderVerdict(rows: DraftCardRow[]): void {
   if (rating) {
     const label = rating.label ? `<span class="flame-label">${rating.label}</span>` : ''
     const pct = conviction?.showPct
-      ? `<span class="conviction-pct" title="vs. next-best card">${formatDominancePct(conviction.dominance)}</span>`
+      ? `<span class="conviction-pct" title="Pairwise model preference vs. next-best card; not game win rate">${formatDominancePct(conviction.dominance)}</span>`
       : ''
     flameArea = `<div class="verdict-flames">${flameRowHtml(rating, { animate: animateFlames })}${label}${pct}${tagHtml}</div>`
   } else if (serverStatus.status === 'red') {
@@ -745,8 +774,8 @@ function renderVerdict(rows: DraftCardRow[]): void {
         ${[rows[0], rows[1]].map((row, i) => `
           <div class="verdict-duo-card">
             <div class="verdict-name small ${rarityClass(row.rarity)}">${escapeHtml(row.name ?? 'Unknown card')}</div>
-            <div class="verdict-bar"><span style="width: ${evBarPct(row, rows).toFixed(0)}%"></span></div>
-            <div class="verdict-duo-pct" title="head-to-head vs. the other card">${split[i]}%</div>
+            <div class="verdict-bar" title="Relative recommendation within this pack"><span style="width: ${evBarPct(row, rows).toFixed(0)}%"></span></div>
+            <div class="verdict-duo-pct" title="Pairwise model preference vs. the other card; not game win rate">${split[i]}%</div>
           </div>
         `).join('')}
       </div>
@@ -759,7 +788,7 @@ function renderVerdict(rows: DraftCardRow[]): void {
         <span class="verdict-mana">${renderManaCost(top.manaCost)}</span>
       </div>
       ${flameArea}
-      <div class="verdict-bar"><span style="width: ${evBarPct(top, rows).toFixed(0)}%"></span></div>
+      <div class="verdict-bar" title="Relative recommendation within this pack"><span style="width: ${evBarPct(top, rows).toFixed(0)}%"></span></div>
       <div class="verdict-why">${verdictWhyHtml(top)}</div>
     `
   }
@@ -805,40 +834,39 @@ function renderPackTable(rows: DraftCardRow[]): void {
   })
 
   const header = `
-    <div class="pick-row pick-row-header">
-      <span class="pick-rank">#</span>
-      <span class="pick-card">Card</span>
-      <span class="pick-ev">EV</span>
-      <span class="pick-gih">GIH</span>
-      <span class="pick-alsa">ALSA</span>
+    <div class="pick-row pick-row-header" role="row">
+      <span class="pick-rank" role="columnheader">#</span>
+      <span class="pick-card" role="columnheader">Card</span>
+      <span class="pick-grade" role="columnheader" aria-label="Set-relative P1P1 model grade" title="Set-relative P1P1 model grade; live rank also considers this pack and your pool">Grade</span>
+      <span class="pick-gih" role="columnheader">GIH</span>
+      <span class="pick-alsa" role="columnheader">ALSA</span>
     </div>
   `
 
   const body = rows.map((row, index) => {
-    const barPct = evBarPct(row, rows)
-    const evShown = row.ev ?? row.evP1p1
+    const grade = gradeFor(row)
     const name = row.name ?? 'Unknown card'
     const classes = ['pick-row', index === 0 ? 'top-pick' : '', row.name ? '' : 'unknown-card']
       .filter(Boolean)
       .join(' ')
 
     return `
-      <div class="${classes}" data-grpid="${row.grpId}">
-        <span class="pick-rank">${index + 1}</span>
-        <span class="pick-card">
+      <div class="${classes}" data-grpid="${row.grpId}" role="row">
+        <span class="pick-rank" role="cell">${index + 1}</span>
+        <span class="pick-card" role="cell">
+          ${cardArtHtml(row)}
           <span class="pick-mana">${renderManaCost(row.manaCost)}</span>
           <span class="pick-name ${rarityClass(row.rarity)}">${escapeHtml(name)}</span>
         </span>
-        <span class="pick-ev">
-          <span class="ev-val">${formatEv(evShown)}</span>
-          <span class="ev-track"><span class="ev-fill" style="width: ${barPct.toFixed(0)}%"></span></span>
-        </span>
-        <span class="pick-gih">${formatWinRate(row.gihWr)}</span>
-        <span class="pick-alsa">${row.alsa !== null && Number.isFinite(row.alsa) ? row.alsa.toFixed(1) : '—'}</span>
+        <span class="pick-grade ${grade ? modelGradeClass(grade.grade) : ''}" role="cell"${grade ? ` title="${modelGradeTitle(grade)}"` : ''}>${grade?.grade ?? '—'}</span>
+        <span class="pick-gih" role="cell">${formatWinRate(row.gihWr)}</span>
+        <span class="pick-alsa" role="cell">${row.alsa !== null && Number.isFinite(row.alsa) ? row.alsa.toFixed(1) : '—'}</span>
       </div>
     `
   }).join('')
 
+  packTable.setAttribute('role', 'table')
+  packTable.setAttribute('aria-label', 'Ranked cards in this pack')
   packTable.innerHTML = header + body
 
   // FLIP: play each surviving row from its old position to its new one
@@ -865,6 +893,13 @@ function renderPackTable(rows: DraftCardRow[]): void {
 }
 
 const POOL_COLORS = ['W', 'U', 'B', 'R', 'G'] as const
+const POOL_COLOR_NAMES: Readonly<Record<(typeof POOL_COLORS)[number], string>> = {
+  W: 'White',
+  U: 'Blue',
+  B: 'Black',
+  R: 'Red',
+  G: 'Green'
+}
 
 function poolColorCounts(): { counts: Record<string, number>; nonLands: DraftCardRow[] } {
   const nonLands = pool.filter(row => !(row.type || '').toLowerCase().includes('land'))
@@ -878,37 +913,33 @@ function poolColorCounts(): { counts: Record<string, number>; nonLands: DraftCar
 }
 
 /**
- * Verdict-density pool strip: a 12px bar whose colored region grows with
- * draft progress (picks/42) and splits by color commitment. Doubles as a
- * progress bar without a second element.
+ * Compact verdict pool summary: canonical color pips plus exact counts.
+ * Multicolor cards contribute to each of their colors.
  */
 function poolStripHtml(): string {
   const { counts } = poolColorCounts()
-  const totalColored = Object.values(counts).reduce((a, b) => a + b, 0)
-  const progress = Math.min(1, picksCount / TOTAL_PICKS)
-
-  const segments = totalColored > 0
-    ? POOL_COLORS.filter(c => counts[c] > 0).map(c =>
-        `<span class="strip-seg strip-${c}" style="flex-grow: ${counts[c]}"></span>`
-      ).join('')
-    : ''
-
-  const title = POOL_COLORS.filter(c => counts[c] > 0)
-    .map(c => `${c} ${counts[c]}`)
-    .join(' · ')
+  const label = `Pool: ${picksCount} of ${TOTAL_PICKS} picks; ${POOL_COLORS
+    .map(color => `${POOL_COLOR_NAMES[color]} ${counts[color]}`)
+    .join(', ')}`
+  const colors = POOL_COLORS.map(color => `
+    <span class="pool-summary-color" title="${POOL_COLOR_NAMES[color]}: ${counts[color]}">
+      ${renderManaSymbol(color, { decorative: true })}
+      <span class="pool-summary-count">${counts[color]}</span>
+    </span>
+  `).join('')
 
   return `
-    <div class="pool-strip-bar" title="${title || 'No picks yet'}">
-      <div class="strip-filled" style="width: ${(progress * 100).toFixed(1)}%">${segments}</div>
+    <div class="pool-summary" role="group" aria-label="${label}">
+      <span class="pool-summary-title">Pool</span>
+      <div class="pool-summary-colors">${colors}</div>
+      <span class="pool-summary-progress">${picksCount}/${TOTAL_PICKS}</span>
     </div>
-    <div class="pool-strip-meta"><span>${picksCount}/${TOTAL_PICKS}</span></div>
   `
 }
 
 /** Full-density pool block: color rows (pip + neutral bar + count) and curve. */
 function renderPool(): void {
   const { counts, nonLands } = poolColorCounts()
-  const maxColor = Math.max(1, ...Object.values(counts))
 
   // Mana curve 1-7+
   const curve = [0, 0, 0, 0, 0, 0, 0] // bins for 1..6, 7+
@@ -920,13 +951,10 @@ function renderPool(): void {
   const maxCurve = Math.max(1, ...curve)
 
   const colorBars = POOL_COLORS.map(color => `
-    <div class="pool-color">
-      <span class="mana-symbol ${color}"></span>
-      <div class="pool-color-track">
-        <div class="pool-color-fill" style="width: ${(counts[color] / maxColor) * 100}%"></div>
-      </div>
-      <span class="pool-color-count">${counts[color]}</span>
-    </div>
+    <span class="pool-color" role="img" aria-label="${POOL_COLOR_NAMES[color]}: ${counts[color]} cards" title="${POOL_COLOR_NAMES[color]}: ${counts[color]} cards">
+      ${renderManaSymbol(color, { decorative: true })}
+      <span class="pool-color-count" aria-hidden="true">${counts[color]}</span>
+    </span>
   `).join('')
 
   const curveBars = curve.map((count, index) => `
@@ -942,7 +970,7 @@ function renderPool(): void {
       <span class="pool-count">${picksCount || pool.length}/${TOTAL_PICKS} picks</span>
     </div>
     <div class="pool-body">
-      <div class="pool-colors">${colorBars}</div>
+      <div class="pool-colors" aria-label="Pool colors">${colorBars}</div>
       <div class="pool-curve">${curveBars}</div>
     </div>
   `

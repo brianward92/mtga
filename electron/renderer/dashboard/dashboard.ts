@@ -1,5 +1,5 @@
 /**
- * MTGA Tracker Dashboard
+ * MTGA Draft Assistant Dashboard
  * Main dashboard for viewing match history, stats, and inventory
  */
 
@@ -194,7 +194,7 @@ async function setupOverlayControls(): Promise<void> {
       const prefs = await window.mtgaTracker.getOverlayPrefs()
       autoHide.checked = prefs.autoHideDashboard
     } catch {
-      // keep the default (checked)
+      // Keep the opt-in default (unchecked).
     }
     autoHide.addEventListener('change', () => {
       window.mtgaTracker.setOverlayPrefs({ autoHideDashboard: autoHide.checked })

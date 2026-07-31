@@ -1,7 +1,7 @@
 /**
  * Draft panel density state (pure logic — unit tested).
  *
- * Three densities, cycled by the grip button and Cmd+M:
+ * Three densities, cycled by the grip button:
  *   verdict — THE PICK with flame rating + two runner-ups + pool strip
  *   full    — verdict + complete ranked pack table + pool curve + history
  *   mini    — one line: top pick name only
@@ -34,5 +34,5 @@ export function densityTitle(density: Density): string {
     full: 'Full',
     mini: 'Mini'
   }
-  return `${labels[density]} view — click for ${labels[nextDensity(density)]} (⌘M)`
+  return `${labels[density]} view — click for ${labels[nextDensity(density)]}`
 }
