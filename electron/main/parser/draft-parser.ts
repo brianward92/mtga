@@ -194,6 +194,27 @@ class DraftSession {
     return true
   }
 
+  /**
+   * Accept an "authoritative" pool only when it is at least as large as what
+   * the pick stream already told us. Arena sometimes reports a partial
+   * CardPool at completion (observed: 4 ids for a finished 42-pick draft),
+   * which would otherwise silently replace a correct pool with a truncated
+   * one. Returns true if the override was applied.
+   */
+  applyPoolOverride(candidate: number[] | null): boolean {
+    if (!candidate || candidate.length === 0) return false
+    const known = this.pool().length
+    if (candidate.length < known) {
+      console.warn(
+        `[DraftParser] Ignoring authoritative pool of ${candidate.length} card(s); ` +
+          `${known} already known from the pick stream.`
+      )
+      return false
+    }
+    this.poolOverride = candidate
+    return true
+  }
+
   private sortedPickEntries(): Array<{ pack: number; pick: number; grpIds: number[] }> {
     return Array.from(this.picks.entries())
       .map(([key, grpIds]) => {
@@ -355,9 +376,7 @@ export class DraftParser extends EventEmitter {
 
   private completeSession(session: DraftSession, finalPool: number[] | null): void {
     const poolBefore = JSON.stringify(session.pool())
-    if (finalPool && finalPool.length > 0) {
-      session.poolOverride = finalPool
-    }
+    session.applyPoolOverride(finalPool)
     const changedPool = JSON.stringify(session.pool()) !== poolBefore
 
     if (session.state !== 'complete') {
@@ -483,7 +502,7 @@ export class DraftParser extends EventEmitter {
       if (!Number.isFinite(pack) || !Number.isFinite(pick)) return
 
       const session = this.ensureSession({ eventName, isBot: true })
-      if (picked !== null) session.poolOverride = picked
+      session.applyPoolOverride(picked)
       session.recordPackContents(pack, pick, grpIds)
       session.currentPack = { pack, pick, grpIds }
       this.emit('draft-pack', session.snapshot())

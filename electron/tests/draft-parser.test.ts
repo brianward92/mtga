@@ -290,6 +290,71 @@ describe('DraftParser — edge cases', () => {
     expect(parser.getSnapshot()).toBeNull()
   })
 
+  it('a truncated completion CardPool does not clobber the accumulated pool', () => {
+    // Observed live (MSH 2026-07-30): a finished 42-pick draft whose completion
+    // payload carried only 4 ids, which overwrote the real pool in the DB.
+    const parser = new DraftParser()
+    const events = capture(parser)
+    const draftId = 'a0c955f3-e726-4f74-8384-3d6edc5df92b'
+
+    parser.handleLine(
+      '[UnityCrossThreadLogger]==> EventJoin {"request":"{\\"EventName\\":\\"PremierDraft_MSH_20260623\\"}"}'
+    )
+
+    const picked: number[] = []
+    for (let pack = 1; pack <= 3; pack++) {
+      for (let pick = 1; pick <= 14; pick++) {
+        const grpId = 105000 + pack * 100 + pick
+        picked.push(grpId)
+        const packCards = Array.from({ length: 15 - pick }, (_, i) => grpId + i).join(',')
+        parser.handleLine(
+          `[UnityCrossThreadLogger]Draft.Notify {"draftId":"${draftId}","SelfPick":${pick},` +
+            `"SelfPack":${pack},"PackCards":"${packCards}"}`
+        )
+        parser.handleLine(
+          `[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"m${pack}-${pick}",` +
+            `"request":"{\\"DraftId\\":\\"${draftId}\\",\\"GrpIds\\":[${grpId}],` +
+            `\\"Pack\\":${pack},\\"Pick\\":${pick}}"}`
+        )
+      }
+    }
+
+    expect(parser.getSnapshot()!.pool.length).toBe(42)
+
+    // Completion arrives carrying a partial CardPool (last pack's leftovers).
+    parser.handleLine(
+      `[UnityCrossThreadLogger]<== DraftCompleteDraft {"CourseId":"c1",` +
+        `"InternalEventName":"PremierDraft_MSH_20260623","CardPool":[104980,105068,105057,105074],` +
+        `"DraftId":"${draftId}"}`
+    )
+
+    const final = parser.getSnapshot()!
+    expect(final.state).toBe('complete')
+    expect(final.pool).toEqual(picked)
+    expect(final.pool.length).toBe(42)
+    expect(events.ends.length).toBe(1)
+  })
+
+  it('a completion CardPool at least as large as the pick stream is authoritative', () => {
+    const parser = new DraftParser()
+    const draftId = 'b1111111-2222-3333-4444-555555555555'
+    parser.handleLine(
+      '[UnityCrossThreadLogger]==> EventJoin {"request":"{\\"EventName\\":\\"PremierDraft_MSH_20260623\\"}"}'
+    )
+    parser.handleLine(
+      `[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"m1",` +
+        `"request":"{\\"DraftId\\":\\"${draftId}\\",\\"GrpIds\\":[105101],\\"Pack\\":1,\\"Pick\\":1}"}`
+    )
+    // Arena's pool includes cards the pick stream missed (e.g. mid-draft attach).
+    parser.handleLine(
+      `[UnityCrossThreadLogger]<== DraftCompleteDraft {"CourseId":"c1",` +
+        `"InternalEventName":"PremierDraft_MSH_20260623","CardPool":[105101,105102,105103],` +
+        `"DraftId":"${draftId}"}`
+    )
+
+    expect(parser.getSnapshot()!.pool).toEqual([105101, 105102, 105103])
+  })
+
   it('a second EventJoin for the same completed event does not restart the draft', () => {
     const parser = new DraftParser()
     const events = capture(parser)
