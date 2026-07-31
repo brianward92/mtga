@@ -78,6 +78,24 @@ def test_handle_score_empty_pack_is_400(api_env):
     assert _score({"set": SET})[1] == 400  # missing pack entirely
 
 
+@pytest.mark.parametrize("payload", [
+    None,
+    [],
+    {"pack": 7},
+    {"pack": ["not-an-int"]},
+    {"pack": [True]},
+    {"pack": [1.5]},
+    {"pack": [-1]},
+    {"pack": [101], "pool": {}},
+    {"pack": [101], "set": 7},
+    {"pack": [101], "format": []},
+])
+def test_handle_score_malformed_payload_is_400(api_env, payload):
+    body, status = _score(payload)
+    assert status == 400
+    assert body["error"]
+
+
 def test_infer_set_majority_rule(api_env):
     # A clear majority (here: half or more) of the pack must belong to a set.
     assert draft_api._infer_set([101, 104]) == SET

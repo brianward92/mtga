@@ -8,6 +8,8 @@ Endpoints (all JSON, all carrying 17Lands attribution):
   GET  /api/v1/models
   POST /api/v1/score   {"set"?, "format", "pack": [grpId], "pool": [grpId],
                         "pack_number"?, "pick_number"?}
+  POST /api/v1/deck    {"set"?, "format"?, "deck": [grpId], "deck_size"?,
+                        "land_slots"?}  -> land split, curve, cuts, synergies
 
 Card identity merges the card store (Scryfall-joined) with the cached
 card_ratings JSON — the latter covers brand-new sets (MSH) whose grpIds
@@ -32,6 +34,7 @@ class DataHub:
         self._cards = {}
         self._ratings = {}
         self._p1p1 = {}
+        self._text = {}
         self._global = None
 
     # -- card identity ----------------------------------------------------
@@ -93,6 +96,61 @@ class DataHub:
             break
         self._cards = {key: cards}
         return cards
+
+    def card_text(self, set_code):
+        """grp_id -> {mana_cost, type_line, oracle_text} for one set.
+
+        The card store carries costs but no rules text, so this joins it to the
+        nightly Scryfall parquet on scryfall_id. Deck advice needs the text: it
+        is what distinguishes a hybrid cost from a gold one and a landcycler
+        from a clunky five-drop. Missing parquet degrades to {} rather than
+        failing the request — advice without synergy still beats no advice.
+        """
+        if not (paths.CARD_STORE_PARQUET.exists()
+                and paths.SCRYFALL_CARDS_PARQUET.exists()):
+            return {}
+
+        store_mtime = paths.CARD_STORE_PARQUET.stat().st_mtime
+        scry_mtime = paths.SCRYFALL_CARDS_PARQUET.stat().st_mtime
+        key = (set_code, store_mtime, scry_mtime)
+        cached = self._text.get(key)
+        if cached is not None:
+            return cached
+
+        import duckdb
+
+        from mtga.lands import cardstore
+
+        store = cardstore.load_card_store()
+        rows = store[store["expansion"] == set_code]
+        by_scryfall = {}
+        for row in rows.itertuples():
+            if row.scryfall_id:
+                by_scryfall.setdefault(str(row.scryfall_id), []).append(row)
+        if not by_scryfall:
+            self._text = {key: {}}
+            return {}
+
+        con = duckdb.connect()
+        query = (
+            "select id, mana_cost, type_line, oracle_text "
+            f"from read_parquet('{paths.SCRYFALL_CARDS_PARQUET}') "
+            "where id in (select unnest($ids))"
+        )
+        text = {}
+        try:
+            fetched = con.execute(query, {"ids": list(by_scryfall)}).fetchall()
+        finally:
+            con.close()
+        for scryfall_id, mana_cost, type_line, oracle_text in fetched:
+            for row in by_scryfall.get(str(scryfall_id), []):
+                text[int(row.grp_id)] = {
+                    "mana_cost": mana_cost or row.mana_cost or "",
+                    "type_line": type_line or row.type_line or "",
+                    "oracle_text": oracle_text or "",
+                }
+        self._text = {key: text}
+        return text
 
     def global_cards(self):
         """grp_id -> info across every expansion (bonus sheets, alt arts)."""
@@ -297,17 +355,145 @@ def handle_ratings(params):
     }
 
 
+def handle_deck(body):
+    """POST /api/v1/deck — build advice for a submitted limited deck.
+
+    {"set"?, "format"?, "deck": [grpId, ...], "deck_size"?, "land_slots"?}
+
+    grpIds may repeat (a deck runs multiples); repeats are preserved because
+    quantity matters to the curve and the land split. Basic lands in the list
+    are ignored on purpose — recommending the split is the point.
+    """
+    from mtga import deck_advisor
+
+    try:
+        payload = json.loads(body)
+    except (TypeError, json.JSONDecodeError):
+        return {"error": "invalid JSON body"}, 400
+    if not isinstance(payload, dict):
+        return {"error": "JSON body must be an object"}, 400
+    try:
+        deck = _grp_id_list(payload, "deck", required=True)
+    except ValueError as exc:
+        return {"error": str(exc)}, 400
+
+    def _positive_int(key, default):
+        value = payload.get(key)
+        if value is None:
+            return default, None
+        if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+            return None, f"{key} must be a positive integer"
+        return value, None
+
+    deck_size, err = _positive_int("deck_size", 40)
+    if err:
+        return {"error": err}, 400
+    land_slots, err = _positive_int("land_slots", 17)
+    if err:
+        return {"error": err}, 400
+    if land_slots >= deck_size:
+        return {"error": "land_slots must be less than deck_size"}, 400
+
+    raw_format = payload.get("format")
+    if raw_format is not None and not isinstance(raw_format, str):
+        return {"error": "format must be a string"}, 400
+    fmt = raw_format or "PremierDraft"
+
+    raw_set = payload.get("set")
+    if raw_set is not None and not isinstance(raw_set, str):
+        return {"error": "set must be a string"}, 400
+    set_code = (raw_set or _infer_set(deck) or "").upper()
+    if not set_code:
+        return {"error": "set not provided and could not be inferred"}, 400
+
+    identity = HUB.cards(set_code)
+    text = HUB.card_text(set_code)
+    stats = {row["grp_id"]: row
+             for row in HUB.card_payload(set_code, fmt, sorted(set(deck)))}
+
+    cards = []
+    unknown = []
+    for grp_id in deck:
+        info = identity.get(grp_id)
+        card_text = text.get(grp_id, {})
+        if info is None and not card_text:
+            unknown.append(grp_id)
+            continue
+        stat = stats.get(grp_id, {})
+        cards.append({
+            "grp_id": grp_id,
+            "name": (info or {}).get("name") or stat.get("name"),
+            "mana_cost": card_text.get("mana_cost", ""),
+            "type_line": card_text.get("type_line", ""),
+            "oracle_text": card_text.get("oracle_text", ""),
+            "gih_wr": stat.get("gih_wr_shrunk") or stat.get("gih_wr"),
+            "alsa": stat.get("alsa"),
+        })
+
+    advice = deck_advisor.advise(cards, deck_size=deck_size,
+                                 land_slots=land_slots)
+    advice.update({
+        "set": set_code,
+        "format": fmt,
+        "deck_size": deck_size,
+        "land_slots": land_slots,
+        "unknown_grp_ids": unknown,
+        "has_card_text": bool(text),
+        "attribution": config.ATTRIBUTION,
+    })
+    return advice
+
+
+MAX_REQUEST_BODY = 1_000_000
+
+
+def _grp_id_list(payload, key, *, required=False):
+    value = payload.get(key)
+    if value is None:
+        value = []
+    if not isinstance(value, list):
+        raise ValueError(f"{key} must be a list of grpIds")
+    result = []
+    for item in value:
+        if isinstance(item, int) and not isinstance(item, bool):
+            grp_id = item
+        elif isinstance(item, str) and item.isdecimal():
+            grp_id = int(item)
+        else:
+            raise ValueError(f"{key} must contain integer grpIds")
+        if grp_id <= 0:
+            raise ValueError(f"{key} must contain positive grpIds")
+        result.append(grp_id)
+    if required and not result:
+        raise ValueError(f"{key} must be a non-empty list of grpIds")
+    return result
+
+
 def handle_score(body):
     try:
         payload = json.loads(body)
     except (TypeError, json.JSONDecodeError):
         return {"error": "invalid JSON body"}, 400
-    pack = [int(g) for g in payload.get("pack") or []]
-    pool = [int(g) for g in payload.get("pool") or []]
-    if not pack:
-        return {"error": "pack must be a non-empty list of grpIds"}, 400
-    fmt = payload.get("format") or "PremierDraft"
-    set_code = (payload.get("set") or _infer_set(pack) or "").upper()
+    if not isinstance(payload, dict):
+        return {"error": "JSON body must be an object"}, 400
+    try:
+        pack = _grp_id_list(payload, "pack", required=True)
+        pool = _grp_id_list(payload, "pool")
+    except ValueError as exc:
+        return {"error": str(exc)}, 400
+    raw_format = payload.get("format")
+    if raw_format is None or raw_format == "":
+        fmt = "PremierDraft"
+    elif not isinstance(raw_format, str):
+        return {"error": "format must be a string"}, 400
+    else:
+        fmt = raw_format
+    raw_set = payload.get("set")
+    if raw_set is None or raw_set == "":
+        raw_set = _infer_set(pack) or ""
+    elif not isinstance(raw_set, str):
+        return {"error": "set must be a string"}, 400
+    set_code = raw_set.upper()
     if not set_code:
         return {"error": "set not provided and could not be inferred"}, 400
 
@@ -384,15 +570,29 @@ class DraftApiHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         parsed = urlparse(self.path)
-        if parsed.path != "/api/v1/score":
+        handlers = {"/api/v1/score": handle_score, "/api/v1/deck": handle_deck}
+        handler = handlers.get(parsed.path)
+        if handler is None:
             self._send({"error": "not found"}, 404)
             return
-        length = int(self.headers.get("Content-Length") or 0)
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            self._send({"error": "invalid Content-Length"}, 400)
+            return
+        if length < 0:
+            self._send({"error": "invalid Content-Length"}, 400)
+            return
+        if length > MAX_REQUEST_BODY:
+            self.close_connection = True
+            self._send({"error": "request body too large"}, 413)
+            return
         body = self.rfile.read(length) if length else b""
         try:
-            result = handle_score(body)
+            result = handler(body)
         except Exception as e:  # noqa: BLE001
-            self._send({"error": f"{type(e).__name__}: {e}"}, 500)
+            print(f"{parsed.path} request failed: {type(e).__name__}: {e}")
+            self._send({"error": "internal server error"}, 500)
             return
         if isinstance(result, tuple):
             self._send(result[0], result[1])
