@@ -765,27 +765,34 @@
   function saveExactCount() {
     const card = state.filteredCards[state.index];
     if (!card) return;
-    const parsed = parseInt(setCountInput.value, 10);
-    if (Number.isNaN(parsed)) return;
+    const parsed = setCountInput.valueAsNumber;
+    if (!Number.isSafeInteger(parsed)) return;
     persistCount(card, parsed);
   }
 
   function adjustCount(mode) {
     const card = state.filteredCards[state.index];
     if (!card) return;
-    const delta = parseInt(deltaInput.value, 10);
-    if (Number.isNaN(delta)) return;
+    const delta = deltaInput.valueAsNumber;
+    if (!Number.isSafeInteger(delta)) return;
     const inv = getInventoryForSet(state.currentSet.setCode);
-    const current = inv[card.id] ?? 0;
+    const current = Number.isSafeInteger(inv[card.id]) ? inv[card.id] : 0;
     const next = mode === "add" ? current + delta : current - delta;
+    if (!Number.isSafeInteger(next)) return;
     persistCount(card, next);
   }
 
   function persistCount(card, value) {
+    if (!Number.isSafeInteger(value)) return;
     const setCode = state.currentSet.setCode;
     const inv = getInventoryForSet(setCode);
     inv[card.id] = value;
-    localStorage.setItem(storageKey(setCode), JSON.stringify(inv));
+    try {
+      localStorage.setItem(storageKey(setCode), JSON.stringify(inv));
+    } catch (error) {
+      console.error("Unable to persist inventory count", error);
+      return;
+    }
     renderCard();
   }
 

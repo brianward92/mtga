@@ -5,8 +5,9 @@ them as LaTeX macros -- same "no hand-typed numbers" discipline as
 scripts/make_paper_tables.py.
 
 These panels illustrate the deployed pick-scoring *interface*
-(electron/renderer/overlay/) on real, public development-set cards (BRO and
-SOS -- never MSH). The numbers are produced by the same code path the live
+(electron/renderer/overlay/) on public development-set cards (BRO and SOS
+-- never MSH). Example packs are illustrative card lists; the script does
+not recover their provenance from draft logs. The numbers use the same code path the live
 overlay uses: mtga.models.registry.resolve() to get the per-set scoring
 model, then model.score_pack() for a live pack score, or
 mtga.draft_api.HUB.p1p1() for the tier-list (whole-set) percentile view.
@@ -16,7 +17,7 @@ since that logic is TypeScript; see conviction.ts / flames.ts for the
 canonical version this mirrors.
 
 This is a display of the shipped per-set scoring model (the same model
-family behind Table 1's "per-set ceiling" row), not the paper's frozen
+family behind Table 1's within-set supervised-reference row), not the paper's frozen
 zero-shot checkpoint -- see the caption text in each figure. Running this
 script requires the local per-set model artifacts backing the live
 overlay (same requirement as make_paper_tables.py needing local run
@@ -77,8 +78,7 @@ def p1p1_percentile(table, ev):
 
 
 def hero_panel(lines):
-    """SOS P1P1, empty pool: Emeritus of Ideation vs. the rest of a real
-    13-card pack (teaser figure)."""
+    """SOS P1P1, empty pool: Emeritus against an illustrative 13-card pack."""
     model = registry.resolve("SOS", "PremierDraft")
     cards = HUB.cards("SOS")
     name_to_grp = rank_by_name(cards)
@@ -147,8 +147,7 @@ def bro_tierlist_panel(lines):
 
 
 def close_call_panel(lines):
-    """SOS P1P1, empty pool: a real 13-card pack whose top two cards are
-    (almost exactly) tied -- the close-call / duo view."""
+    """SOS P1P1 in an illustrative 13-card pack whose top two are tied."""
     model = registry.resolve("SOS", "PremierDraft")
     cards = HUB.cards("SOS")
     name_to_grp = rank_by_name(cards)

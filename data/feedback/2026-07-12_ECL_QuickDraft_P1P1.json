@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-07-12T19:30:00-04:00",
+  "event": {
+    "name": "QuickDraft_ECL_20260712",
+    "set": "ECL",
+    "format": "QuickDraft",
+    "pack": 1,
+    "pick": 1
+  },
+  "evidence": {
+    "screenshot_remote_path": "/Users/brianward/Desktop/model_feedback_20260712_1918.png",
+    "screenshot_sha256": "15f8c49716199097dd5558a182434d9bf3977e6828d1d1653ee99e5b79868a37",
+    "screenshot_dimensions": [3024, 1964],
+    "player_log_identified_pack": true,
+    "pack_size": 13
+  },
+  "pack": [
+    {"grp_id": 101460, "name": "Brigid, Clachan's Heart", "untapped_visible": "3.5 / 4.5"},
+    {"grp_id": 98380, "name": "Omni-Changeling", "untapped_visible": "3.2"},
+    {"grp_id": 98402, "name": "Wanderwine Farewell", "untapped_visible": "3.5"},
+    {"grp_id": 98484, "name": "Warren Torchmaster", "untapped_visible": "3.0"},
+    {"grp_id": 98493, "name": "Chomping Changeling", "untapped_visible": "3.0"},
+    {"grp_id": 101524, "name": "Boggart Cursecrafter", "untapped_visible": "4.0"},
+    {"grp_id": 98354, "name": "Sun-Dappled Celebrant", "untapped_visible": "3.5"},
+    {"grp_id": 98358, "name": "Wanderbrine Preacher", "untapped_visible": "3.0"},
+    {"grp_id": 98361, "name": "Aquitect's Defenses", "untapped_visible": "1.7"},
+    {"grp_id": 98429, "name": "Moonglove Extractor", "untapped_visible": "2.5"},
+    {"grp_id": 98449, "name": "Brambleback Brute", "untapped_visible": "2.0"},
+    {"grp_id": 98498, "name": "Gilt-Leaf's Embrace", "untapped_visible": "1.5"},
+    {"grp_id": 98557, "name": "Mischievous Sneakling", "untapped_visible": "3.0"}
+  ],
+  "observed_app_output": {
+    "model": {
+      "id": "ECL/*/heuristic-rarity",
+      "kind": "heuristic-rarity",
+      "fallback": true
+    },
+    "problem": "The installed app cached a cold-start rarity heuristic before ECL serving assets existed.",
+    "ordering": [
+      "Brigid, Clachan's Heart",
+      "Boggart Cursecrafter",
+      "Chomping Changeling",
+      "Omni-Changeling",
+      "Wanderwine Farewell",
+      "Warren Torchmaster",
+      "Aquitect's Defenses",
+      "Brambleback Brute",
+      "Gilt-Leaf's Embrace",
+      "Mischievous Sneakling",
+      "Moonglove Extractor",
+      "Sun-Dappled Celebrant",
+      "Wanderbrine Preacher"
+    ],
+    "interpretation": "Ranks two through six were equal-rarity ties, not learned preferences."
+  },
+  "foundation_rescore": {
+    "model": {
+      "id": "_foundation/f-full-20260705",
+      "kind": "draftfm-zeroshot",
+      "fallback": false
+    },
+    "ordering": [
+      {"rank": 1, "name": "Brigid, Clachan's Heart", "ev": 4.8718, "prob": 0.878},
+      {"rank": 2, "name": "Omni-Changeling", "ev": 2.3310, "prob": 0.069},
+      {"rank": 3, "name": "Boggart Cursecrafter", "ev": 1.5244, "prob": 0.031},
+      {"rank": 4, "name": "Wanderwine Farewell", "ev": 0.5699, "prob": 0.012},
+      {"rank": 5, "name": "Wanderbrine Preacher", "ev": -1.3185, "prob": 0.002},
+      {"rank": 6, "name": "Chomping Changeling", "ev": -1.4579, "prob": 0.002},
+      {"rank": 7, "name": "Mischievous Sneakling", "ev": -1.7406, "prob": 0.001},
+      {"rank": 8, "name": "Warren Torchmaster", "ev": -1.7788, "prob": 0.001},
+      {"rank": 9, "name": "Brambleback Brute", "ev": -1.9638, "prob": 0.001},
+      {"rank": 10, "name": "Sun-Dappled Celebrant", "ev": -2.0149, "prob": 0.001},
+      {"rank": 11, "name": "Gilt-Leaf's Embrace", "ev": -2.0346, "prob": 0.001},
+      {"rank": 12, "name": "Aquitect's Defenses", "ev": -2.2197, "prob": 0.001},
+      {"rank": 13, "name": "Moonglove Extractor", "ev": -2.2378, "prob": 0.001}
+    ]
+  },
+  "human_feedback": {
+    "preferred_pick": "Brigid, Clachan's Heart",
+    "partial_preferences": [
+      "Warren Torchmaster should be materially higher than sixth in this weak pack.",
+      "The observed heuristic positions two and three (Boggart Cursecrafter and Chomping Changeling) were not credible."
+    ],
+    "verbatim": [
+      "I like Warren Torchmaster much more here than at 6th. But this pack also kind of sucks.",
+      "I guess take the rare is better than all the others, but it's number two and three I don't agree with."
+    ],
+    "full_corrected_order_provided": false
+  },
+  "external_baseline": {
+    "snapshot": "../external/untapped/ECL_PremierDraft_2026-07-12.json",
+    "source_url": "https://mtga.untapped.gg/limited/draft/lorwyn-eclipsed/pick-order",
+    "caveat": "Public Untapped tiers aggregate Premier Draft results; the numerical Draftsmith labels visible in the Arena screenshot are recorded separately and their semantics are not inferred."
+  }
+}

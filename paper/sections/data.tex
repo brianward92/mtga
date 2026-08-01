@@ -58,8 +58,8 @@ stopping uses only this within-training-set validation split. All headline
 evaluation is on picks by \emph{high-win-rate players}: drafters whose
 win-rate bucket is at least $0.55$ and whose game-count bucket is at least
 $100$. We refer to this population as the \emph{high-win-rate slice}
-throughout. The per-set ceiling models train and evaluate on the same
-filter, so ceiling comparisons are population-matched.
+throughout. The within-set supervised reference models train and evaluate
+on the same filter, so relative-agreement comparisons are population-matched.
 
 \paragraph{The held-out sets.}
 Four sets never contribute a pick to model selection. The Brothers' War
@@ -71,9 +71,10 @@ retrains on all 31 sets, dev trio included; only Marvel Super Heroes
 (MSH) stays unseen by every model in the battery. MSH, the test set, is
 stricter still. A registry-level gate (\texttt{EVAL\_ONLY}) makes the
 training-corpus and feature-fitting pipeline refuse MSH pick data
-outright, and at the protocol freeze its public data did not yet exist. MSH \emph{card}
-features from Scryfall are permitted. That is the zero-shot contract:
-public card information only, no human behavioral data of any kind.
+outright, and at the original \texttt{eval-protocol-v1} design freeze its
+public data did not yet exist. MSH \emph{card} features from Scryfall are
+permitted. That is the zero-shot contract for every frozen battery member:
+public card information only, no MSH human behavioral data.
 
 ``Unseen'' describes the set, not every card in it. BRO, TMT, and SOS
 packs include some ordinary reprints, mostly base-set staples and basic

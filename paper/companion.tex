@@ -44,30 +44,31 @@ mechanics behind every number in the main paper, and the frozen
 identifiers that pin the evaluation. Read the main paper first.
 \end{abstract}
 
-\section{What's released}
+\section{Release contents and status}
 \label{sec:released}
 
-Training and evaluation code, the frozen protocol document and metric
-implementations, data and featurizer manifests, model weights for every
-battery member, and the per-pick prediction files from which every
-statistic in the main paper is computed (archived on Zenodo). Raw
-\seventeenlands{} bytes for the MSH test snapshot are deposited only
-after a courtesy note to \seventeenlands{}; every other input is
-re-derivable from public sources via the manifests below.
+The repository contains the training and evaluation code, the frozen
+protocol and metric implementations, the experiment ledger, selected
+summary artifacts, and generated paper outputs. The publication archive
+is intended to add the exact model weights and cached per-pick prediction
+files used by the paper. No archive DOI is assigned yet, so this document
+does not claim those large artifacts are already public. Raw
+\seventeenlands{} bytes for the MSH test snapshot will be considered for
+deposit only after a courtesy note to \seventeenlands{}; other inputs are
+re-derivable from their public sources and manifests.
 
 \section{Provenance mechanics}
 \label{sec:ledger}
 
-Every training and evaluation run appends one record to an append-only
-ledger: run id, git sha, protocol tag, seed, framework version, full
-config, data-manifest hash, wall clock, throughput, artifact sha256s, and
-dev metrics. Every table cell in the main paper carries its source run
-id as a comment in the generated table file; tables and the scaling
-figure are emitted by a script from run records and cached evaluation
-outputs. Primary table and headline numbers read from generated macros;
-secondary analysis numbers (per-set deltas, diagnostic slices) are cited
-in prose with the exact producing script and run id in a source comment
--- no number anywhere is typed by hand without that trail, macro or not.
+Training runs append records to an experiment ledger whose fields vary by
+run family; the DraftFM records include the run id, git sha, seed,
+framework version, config, counters, timing, and artifact hash. Frozen
+evaluation summaries are stored separately rather than appended to that
+ledger. A release manifest pins the exact run ids consumed by the table
+generator, and generated result cells carry source comments where a single
+run supplies the value. Primary table and headline numbers read from
+generated macros; secondary analysis numbers are produced by the cited
+scripts and cached machine-readable outputs.
 
 Training's MPS backend is not trusted by default: every launch runs a
 CPU-vs-accelerator parity check on losses and gradient norms before
@@ -104,8 +105,16 @@ F-full run id & \texttt{\FfullRunId} \\
 \bottomrule
 \end{tabular}
 
-The MSH snapshot sha256 and ETag are recorded at freeze time and
-reported here: \pending{MSH snapshot sha256, ETag, download timestamp,
-gate report}.
+The MSH snapshot was fetched at 2026-07-07 02:30:04 EDT. Its identifiers
+are:
+\begin{quote}
+\small\ttfamily
+sha256: 013df16b8994534f69ed63c87ab684ac\newline
+\phantom{sha256: }afc5f4cbe82982264b0fc111dbb2183a\newline
+ETag: "252007adfbca6f026766527823ffa6d5-8"
+\end{quote}
+The frozen pass recorded
+1,607,786 rows, 6,286 high-win-rate-slice drafts, a modern schema, complete
+first picks, and a 100\% pack-name join rate; every declared gate passed.
 
 \end{document}

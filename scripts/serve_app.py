@@ -120,11 +120,6 @@ class RegistryHandler(SimpleHTTPRequestHandler):
                 "Cache-Control",
                 "public, max-age=31536000, immutable",
             )
-        elif suffix in {".js", ".css"} and parsed.query:
-            self.send_header(
-                "Cache-Control",
-                "public, max-age=31536000, immutable",
-            )
         elif (
             parsed.path in {"", "/"}
             or parsed.path == "/data/manifest.json"

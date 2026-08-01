@@ -16,6 +16,18 @@ The metric implementations live in `mtga/foundation/evalproto.py`
 (unit-tested in `tests/test_evalproto.py`); `scripts/run_frozen_eval.py`
 refuses to run if that file's content drifts from this tag.
 
+**Post-evaluation chronology note (2026-07-12):** The substantive design
+was tagged as `eval-protocol-v1` before MSH data was public. The first MSH
+snapshot was fetched automatically at 02:30 EDT on 2026-07-07;
+`eval-protocol-v1.1` was cut at 20:20 EDT, before the frozen inference pass
+but after those bytes existed locally. A separate nightly serving pipeline
+also trained a per-set MSH model before the frozen pass, contrary to the
+broad quarantine sentence below. Every frozen-battery weight hash predates
+the first download, the serving model shares no parameters with the
+battery, and the battery was run once at 23:59 EDT. The paper reports this
+deviation and distinguishes the original design freeze from the later
+enforcement-hardening tag.
+
 All analysis is computed from cached per-pick **predictions parquets**
 (contract at the top of `evalproto.py`) — models are never re-run during
 analysis. Every model in the battery gets exactly one inference pass over
@@ -34,7 +46,7 @@ the frozen test data.
   legal — that is the zero-shot contract: public card information only.
 - **Populations:**
   - *Expert slice (headline):* `wr_bucket >= 0.55 AND n_games_bucket >= 100`
-    — identical to the per-set model's filter, so ceiling comparisons are
+    — identical to the per-set model's filter, so reference comparisons are
     apples-to-apples.
   - *All-users slice (secondary):* every valid pick.
 - **Conditioning (two pre-registered forward configs):**
@@ -63,25 +75,25 @@ hyperparameter, text-encoder, and conditioning decision keys on the
 top-1** (tie-break: mean log-loss). Rationale for the trio: BRO is the same
 holdout as the only published zero-shot number (Bertram 55.44%,
 features+meta+image — meta being post-release stats); SOS has our mature
-per-set ceiling (0.70215 reproduced below); TMT is the Universes Beyond
+within-set supervised reference (0.70215 reproduced below); TMT is the Universes Beyond
 rehearsal for Marvel (licensed names, flavor-heavy text, P1P1-missing).
 Early stopping uses within-training-set validation splits only — never dev
 metrics — so the scaling curve stays honest.
 
 Within-set splits: `zlib.crc32(draft_id) % 1000 < 50` -> val (the existing,
 tested convention). Zero-shot models are scored on the full slice of a
-held-out set; head-to-head rows against a per-set ceiling use the ceiling's
+held-out set; head-to-head rows against a within-set reference use the reference's
 val split so both models score identical picks (`evalproto.align_on_picks`).
 
 ## 3. Metrics (all from `evalproto.py`)
 
 - **Primary:** top-1 agreement, expert slice, deployment mode.
 - Secondary: top-3; all-users top-1 (human-model mode); **normalized score**
-  = zero-shot top-1 / per-set-ceiling top-1 on identical picks; mean
+  = zero-shot top-1 / within-set-reference top-1 on identical picks; mean
   log-loss (nats/pick); top-label **ECE, 15 equal-mass bins** (no post-hoc
   temperature on MSH; optional temperature fit on dev only, frozen into the
   battery config); per-(pack, pick) curves vs the per-cell random floor;
-  **late-draft retention** = zero-shot/ceiling top-1 on picks 8+ of each
+  **late-draft retention** = zero-shot/reference top-1 on picks 8+ of each
   pack; non-forced (`pack_size >= 2`) top-1, log-loss, and ECE variants
   (forced picks are scored trivially and deflate calibration).
 - **Statistics:** cluster bootstrap over `draft_id` (B=2000,
@@ -150,7 +162,7 @@ Frozen (sha256s in `experiments/frozen_battery.json`, committed pre-T0):
    GPT-4o 43% (UrzaGPT), Bertram 55.44% (features+meta+image, unseen BRO —
    compared against our F-dev BRO row).
 6. **Post-day-1 rows (recipes frozen now, executed after the zero-shot
-   eval, never iterated):** per-set DraftNet ceiling on the frozen MSH
+   eval, never iterated):** within-set DraftNet reference on the frozen MSH
    snapshot (stock recipe: hidden=[512,512], dropout 0.3, seed 17); F-full
    fine-tuned on the MSH train split (LR/steps/freezing pinned from dev-trio
    rehearsals before T0).
@@ -185,7 +197,7 @@ zone where the selected band's own cited-number claim would be false.
   the prior best, on a harder (UB) test set; BRO dev row as the
   same-holdout receipt.
 
-Secondary claims in all bands: normalized-vs-ceiling score, scaling-curve
+Secondary claims in all bands: relative agreement to the within-set reference, scaling-curve
 shape, UB-shift analysis, skill-conditioning effect.
 
 ## 7. Reproducibility & licensing

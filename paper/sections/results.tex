@@ -35,16 +35,17 @@ paragraph is a dev-trio rehearsal by the protocol's own design; the
 paper's headline is the frozen MSH result of \S\ref{sec:msh}. Broken out
 per set, DraftFM reaches \FdevBro\% / \FdevTmt\% / \FdevSos\% on BRO /
 TMT / SOS. For comparison, a model trained directly on each of those
-sets, the ceiling, reaches \CeilBro\% / \CeilTmt\% / \CeilSos\%.
+sets, the within-set supervised reference, reaches \CeilBro\% /
+\CeilTmt\% / \CeilSos\%.
 DraftFM's pre-registered normalized score, its accuracy as a fraction of
-that ceiling on identical held-out picks per \S\ref{sec:protocol}, is
+that reference on identical held-out picks per \S\ref{sec:protocol}, is
 \NormScoreBro\% / \NormScoreTmt\% / \NormScoreSos\%, with dev-mean
 \NormScoreDevMean\%. A simpler, unaligned version of the same ratio,
 taken over the full slice rather than the smaller aligned subset,
 corroborates this on a much larger sample: \RatioBro\% / \RatioTmt\% /
 \RatioSos\%, dev-mean \RatioDevMean\%. That unaligned ratio is not
 itself the pre-registered metric, since the aligned version is capped by
-the size of the ceiling model's own held-out split. Excluding forced
+the size of the reference model's own held-out split. Excluding forced
 picks lowers the three numbers to \FdevBroNonForced\% /
 \FdevTmtNonForced\% / \FdevSosNonForced\%. The deployment-mode skill
 bucket selected on dev is the \DeployBucket{} win-rate bucket.
@@ -56,11 +57,10 @@ learned image embeddings, and 16 usage statistics computed from human
 play after the set's release, scored on all players rather than a
 win-rate-filtered population. Our \FdevBro\% on the high-win-rate slice,
 \FdevBroAllUsers\% on all players as the population-matched comparator,
-is below that number, but the two are not a fair fight: their number
-assumes information that does not exist on release day. The fair
-comparison is against what the same paper achieves without post-release
-usage statistics, 33.6--35.6\% on a single set, and every other
-day-one-feasible baseline in Table~\ref{tab:baselines}. Against that
+is below that number, but the two use different information regimes: their
+number assumes information that does not exist on release day. The same
+paper's 33.6--35.6\% features-only result, under single-set training, is a
+relevant release-day reference rather than a controlled comparison. Against that
 day-one bar, multi-set training on public card features closes most of
 the distance to the usage-statistics number while using only release-day
 information.
@@ -69,8 +69,8 @@ BRO is also the hardest set in the trio for transfer: its packs mix in a
 63-card retro-artifact bonus sheet, examined directly in
 \S\ref{sec:analysis}. Why TMT, the trio's licensed-IP set, nonetheless
 transfers as well as SOS, and why BRO lags both, is analysed there too.
-Figure~\ref{fig:tmt-tierlist} shows a real P1P1 bomb from TMT scored the
-same way. For sets that are in the training corpus but have no dedicated
+Figure~\ref{fig:tmt-tierlist} shows the whole-set P1P1 ranking for a TMT
+card. For sets that are in the training corpus but have no dedicated
 per-set model, the deployed system falls back to F-full's scoring;
 Figure~\ref{fig:gallery} shows what that fallback looks like today for
 LTR, LCI, and DMU.
@@ -79,13 +79,12 @@ LTR, LCI, and DMU.
 \centering
 \includegraphics[width=0.24\linewidth]{figures/cards/steel-seraph.jpg}
 \caption{Steel Seraph, BRO, the dev trio's hardest transfer set
-(\S\ref{sec:analysis}). Real P1P1 expected value \VBroEv, the
+(\S\ref{sec:analysis}). Whole-set P1P1 expected value \VBroEv, the
 \VBroPercentile{}th percentile of BRO's card pool by the deployed per-set
-model's own ranking; the next two candidates in the pack,
+model's own ranking. Two selected comparison cards,
 \VBroRunnerOneName{} and \VBroRunnerTwoName{}, rank at the
-\VBroRunnerOnePercentile{}th and \VBroRunnerTwoPercentile{}th. Percentile,
-not a head-to-head split: Arena hides the pack between picks in this mode
-(\S\ref{sec:arch}).}
+\VBroRunnerOnePercentile{}th and \VBroRunnerTwoPercentile{}th. These are
+whole-set percentiles, not candidates recovered from a logged pack.}
 \label{fig:bro-tierlist}
 \end{figure}
 
@@ -94,7 +93,7 @@ not a head-to-head split: Arena hides the pack between picks in this mode
 \includegraphics[width=0.24\linewidth]{figures/cards/april-oneil-hacktivist.jpg}
 \caption{April O'Neil, Hacktivist, TMT, the dev trio's licensed-IP set
 (\S\ref{sec:analysis}), a comic-book bomb the text encoder never saw
-described in \mtg{} rules-text style. Real P1P1 expected value \VTmtEv,
+described in \mtg{} rules-text style. Whole-set P1P1 expected value \VTmtEv,
 the \VTmtPercentile{}th percentile of TMT's card pool.}
 \label{fig:tmt-tierlist}
 \end{figure}
@@ -132,9 +131,9 @@ exists for it; it is not a zero-shot accuracy claim.}
 \begin{table}[t]
   \centering
   \caption{Measured baselines: top-1 agreement (\%) with high-win-rate
-  players, deployment mode. Rows marked $^{*}$ use post-release
-  information and bound what cheap human data buys within days of a
-  set's release. Published numbers from prior work, which differ in test
+  players, deployment mode. Rows marked $^{*}$ were named in the protocol
+  but not evaluated because their exact recipes were not frozen before
+  the snapshot. Published numbers from prior work, which differ in test
   set, information regime, and pick population, appear in
   Table~\ref{tab:prior-work}.}
   \label{tab:baselines}
@@ -158,9 +157,9 @@ regularity. The same heuristic does far worse on MSH itself
 (\BaseRarityMsh\%, discussed in \S\ref{sec:msh}), so that caution cuts
 both ways. DraftFM's zero-shot numbers clear every day-one-feasible
 baseline on each of the three dev sets. The three asterisked
-post-release baseline rows remain pending; their recipes were never
+post-release baseline rows remain unevaluated; their recipes were never
 frozen before the snapshot arrived, and \S\ref{sec:msh} explains why we
-leave them open rather than define them after the fact.
+do not define them after the fact.
 
 \begin{figure}[t]
   \centering
@@ -168,7 +167,7 @@ leave them open rather than define them after the fact.
   \caption{Zero-shot dev-trio-mean top-1 agreement with high-win-rate
   players vs.\ training picks (log scale). Filled points: the nested
   scaling ladder; open points: set-composition probes. Horizontal rules
-  mark published anchors and the per-set ceiling mean.}
+  mark published anchors and the within-set supervised-reference mean.}
   \label{fig:scaling}
 \end{figure}
 

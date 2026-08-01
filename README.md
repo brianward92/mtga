@@ -1,7 +1,32 @@
-# MTGA Repo
+# MTGA / DraftFM
 
-This repo contains the live MTG Registry card database and inventory tracker
-plus supporting Magic card data tools.
+This repository contains DraftFM research code and paper artifacts, plus the
+MTG Registry web app and MTGA Draft Assistant desktop app.
+
+## DraftFM Research
+
+DraftFM is a cross-set draft model that scores unseen Magic sets from public
+card features. Its frozen MSH evaluation reached 57.0% top-1 agreement with
+high-win-rate players. Start here:
+
+- Main paper: [`paper/draftfm.pdf`](paper/draftfm.pdf)
+- Reproducibility companion: [`paper/companion.pdf`](paper/companion.pdf)
+- Frozen protocol and post-evaluation chronology: [`docs/eval_protocol.md`](docs/eval_protocol.md)
+- Exact paper run pins and checkpoint hashes: [`paper/data/run_manifest.json`](paper/data/run_manifest.json)
+- Experiment ledger: [`experiments/ledger.jsonl`](experiments/ledger.jsonl)
+
+The repository currently includes code, frozen summaries, and generated paper
+outputs. The model weights and per-pick prediction archive are not published
+yet, so this is not yet a clean-clone reproduction release. With the pinned run
+artifacts available under `$MTGA_DATA_ROOT/foundation`, regenerate the tables
+with:
+
+```bash
+.venv-ml/bin/python scripts/make_paper_tables.py
+```
+
+The generator refuses missing or mismatched pinned runs instead of silently
+selecting a newer local experiment.
 
 ## Live Product: MTG Registry
 
@@ -110,16 +135,16 @@ Restart:
 /Users/bward/src/mtga/scripts/run_app.sh
 ```
 
-## Secondary App: MTGA Tracker
+## Secondary App: MTGA Draft Assistant
 
-`electron/` contains a separate Electron desktop app named MTGA Tracker. It is
+`electron/` contains a separate Electron desktop app named MTGA Draft Assistant. It is
 for MTG Arena log parsing, overlay display, match history, and Arena inventory
 snapshots. It is not the web inventory app served on port `8000`.
 
 ## Draft Assistant
 
 A self-hosted draft advisor (free untapped.gg replacement): this box holds the
-data, trains the models, and serves an EV-per-card API; the MTGA Tracker
+data, trains the models, and serves an EV-per-card API; the MTGA Draft Assistant
 overlay on the gaming machine tails `Player.log` locally and calls the API.
 Card stats come from 17Lands public data (CC BY 4.0) — anything user-facing
 must display "Data from 17Lands.com".

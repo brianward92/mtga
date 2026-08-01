@@ -69,7 +69,7 @@ def main():
                     ha=place["ha"], va=place["va"], fontsize=6.5, color=MUTED)
     ceiling = 100 * data["ceiling_dev_mean"]
     ax.axhline(ceiling, color=CEILING, lw=1.0, linestyle=(0, (7, 2)), zorder=1)
-    ax.annotate("per-set ceiling (dev mean, trained on target)",
+    ax.annotate("within-set supervised reference (dev mean)",
                 xy=(1.0, ceiling), xycoords=("axes fraction", "data"),
                 xytext=(-4, 3), textcoords="offset points",
                 ha="right", va="bottom", fontsize=6.5, color=MUTED)
@@ -112,7 +112,7 @@ def main():
 
     fig.tight_layout()
     out = HERE / "scaling_curve.pdf"
-    fig.savefig(out)
+    fig.savefig(out, metadata={"CreationDate": None, "ModDate": None})
     print(f"wrote {out} ({len(ladder)} ladder + {len(probes)} probe points)")
 
 

@@ -65,7 +65,8 @@ def main():
     axes[0].legend(fontsize=7, frameon=False, loc="upper center")
     fig.tight_layout()
     out = HERE / "pick_curves.pdf"
-    fig.savefig(out, bbox_inches="tight")
+    fig.savefig(out, bbox_inches="tight",
+                metadata={"CreationDate": None, "ModDate": None})
     print(f"wrote {out}")
 
 

@@ -3,6 +3,7 @@
 
 Machine-readable sources (never hand-typed numbers):
   experiments/ledger.jsonl                      run registry (run_id -> record)
+  paper/data/run_manifest.json                  paper role -> exact run_id
   <runs root>/<run_id>/record.json              training config/counters
   <runs root>/<run_id>/zeroshot/summary.json    dev-trio zero-shot eval (eval_draftfm.py)
   <frozen root>/<sha>/summary.json              frozen-eval outputs (run_frozen_eval.py);
@@ -13,10 +14,11 @@ Machine-readable sources (never hand-typed numbers):
 
 Run discovery scans, in order, $MTGA_DATA_ROOT/foundation/{runs,frozen_eval}
 and the in-repo mirror paper/data/{runs,frozen_eval}; live data wins on
-run_id collision. Every emitted cell carries its run_id in a LaTeX comment
-(the ledger-to-cell mapping). Missing numbers are emitted as \\pending{...}
--- this script NEVER invents a value. Scaling rungs appear automatically
-once their zeroshot/summary.json lands.
+exact run_id collision. Config roles are resolved only through the tracked
+run manifest, never by choosing the newest run with a matching config name.
+Every emitted cell carries its run_id in a LaTeX comment (the ledger-to-cell
+mapping). Missing non-run numbers are emitted as \\pending{...}; a missing or
+mismatched pinned run is an error. This script NEVER invents a value.
 
 Usage: python3 scripts/make_paper_tables.py [--repo PATH]
 """
@@ -46,6 +48,26 @@ RUNGS = [
                     "AFR", "SNC", "ONE", "LTR", "WOE", "MKM", "OTJ", "EOE"]),
     ("S27", "f_dev", None),  # full F-dev universe
 ]
+
+ABLATION_RUNS = [
+    ("Full (F-dev recipe)", "f_dev", "F-dev"),
+    ("A-notext", "a_notext", "A-notext"),
+    ("A-noctx (winning)", "a_noctx", "A-noctx"),
+    ("A-proportional", "a_proportional", "A-proportional"),
+    ("A-topfilter", "a_topfilter", "A-topfilter"),
+    ("A-noUB", "a_noUB", "A-noUB"),
+]
+
+PAPER_RUN_ROLES = (
+    {"f_full"}
+    | {config_name for _, config_name, _ in RUNGS}
+    | {role for _, role, _ in ABLATION_RUNS}
+)
+
+
+class PaperSourceError(RuntimeError):
+    """A tracked paper run cannot be resolved to its declared source."""
+
 
 # Frozen post-release baselines (recipes in experiments/frozen_battery.json;
 # executed on the frozen MSH snapshot only, per protocol section 4.5).
@@ -138,26 +160,65 @@ def load_ledger(repo):
     return entries
 
 
-def runs_by_config_name(runs):
-    """{config_name: entry}, preferring entries with a zeroshot summary,
-    then the latest run_id."""
-    best = {}
-    for entry in runs.values():
-        rec = entry["record"]
-        if not rec:
-            continue
-        name = rec.get("config", {}).get("name")
-        if not name:
-            continue
-        cur = best.get(name)
-        if cur is None:
-            best[name] = entry
-            continue
-        key = (entry["summary"] is not None, entry["run_id"])
-        cur_key = (cur["summary"] is not None, cur["run_id"])
-        if key > cur_key:
-            best[name] = entry
-    return best
+def runs_by_manifest(runs, manifest, required_roles=PAPER_RUN_ROLES):
+    """Resolve paper roles to exact run ids declared in the tracked manifest."""
+    if manifest.get("schema_version") != 1:
+        raise PaperSourceError(
+            "paper run manifest must have schema_version 1")
+    specs = manifest.get("runs")
+    if not isinstance(specs, dict):
+        raise PaperSourceError("paper run manifest must contain a 'runs' object")
+
+    missing_roles = sorted(set(required_roles) - set(specs))
+    if missing_roles:
+        raise PaperSourceError(
+            "paper run manifest is missing required roles: "
+            + ", ".join(missing_roles))
+
+    pinned = {}
+    for role in sorted(required_roles):
+        spec = specs[role]
+        if not isinstance(spec, dict):
+            raise PaperSourceError(f"paper run role {role!r} must be an object")
+        run_id = spec.get("run_id")
+        config_name = spec.get("config_name")
+        best_sha256 = spec.get("best_sha256")
+        if not run_id or not config_name or not best_sha256:
+            raise PaperSourceError(
+                f"paper run role {role!r} requires run_id, config_name, and "
+                "best_sha256")
+
+        entry = runs.get(run_id)
+        if entry is None:
+            raise PaperSourceError(
+                f"paper run role {role!r} pins {run_id!r}, but that run was "
+                "not found in any live or mirrored data root")
+        record = entry.get("record")
+        if record is None:
+            raise PaperSourceError(
+                f"paper run role {role!r} pins {run_id!r}, but record.json "
+                "is missing")
+        recorded_run_id = record.get("run_id")
+        if recorded_run_id != run_id:
+            raise PaperSourceError(
+                f"paper run role {role!r} pins {run_id!r}, but record.json "
+                f"declares run_id {recorded_run_id!r}")
+        recorded_config = record.get("config", {}).get("name")
+        if recorded_config != config_name:
+            raise PaperSourceError(
+                f"paper run role {role!r} pins config {config_name!r}, but "
+                f"run {run_id!r} declares config {recorded_config!r}")
+        recorded_sha256 = (record.get("artifacts") or {}).get("best_sha256")
+        if recorded_sha256 != best_sha256:
+            raise PaperSourceError(
+                f"paper run role {role!r} pins best_sha256 {best_sha256!r}, "
+                f"but run {run_id!r} declares {recorded_sha256!r}")
+        if spec.get("require_summary") and entry.get("summary") is None:
+            raise PaperSourceError(
+                f"paper run role {role!r} pins {run_id!r}, but "
+                "zeroshot/summary.json is missing")
+        pinned[role] = entry
+    return pinned
 
 
 # --- formatting -------------------------------------------------------------
@@ -394,8 +455,8 @@ def table_main(anchors, fdev, ffull, a_noctx, frozen, ledger):
     rows.append(ffull_cells)
     rows.append(r"\midrule")
 
-    # Ceiling row (per-set models trained on the target set).
-    ceil_cells = [r"Per-set ceiling"]
+    # Within-set supervised reference row (models trained on the target set).
+    ceil_cells = [r"Within-set supervised reference"]
     ceil_vals = []
     for s in DEV_SETS:
         c = ceil[s]
@@ -409,7 +470,7 @@ def table_main(anchors, fdev, ffull, a_noctx, frozen, ledger):
 
     # Unaligned ratio row (arithmetic on the two rows above; the
     # pre-registered normalized score on identical picks is separate).
-    ratio_cells = [r"\quad F-dev / ceiling (unaligned)"]
+    ratio_cells = [r"\quad F-dev / reference (unaligned)"]
     if len(dev_vals) == 3:
         ratios = [d / c for d, c in zip(dev_vals, ceil_vals)]
         for r in ratios:
@@ -459,7 +520,8 @@ def table_baselines(anchors, frozen):
     for member, label in ASTERISKED_BASELINES:
         m = msh_expert(frozen, member)
         c = cell(m["top1"], m["ci"], m["run_id"]) if m \
-            else pending("post-T0")
+            else (r"\textit{not evaluated}",
+                  " % recipe not frozen before T0")
         rows.append([label + r"$^{*}$", "post-release statistics", "MSH", c])
     rows += [r"\bottomrule", r"\end{tabular}"]
     return emit_rows(rows)
@@ -475,7 +537,7 @@ PRIOR_WORK_ROWS = [
     ("puder_within_set", "Transformer, per set", "no", "no"),
     ("bertram_features_only_unseen", "Card features, one set", "yes", "yes"),
     ("bertram_bro_zeroshot", "Features+stats+images, 13 sets", "yes", "no"),
-    ("urzagpt_gpt4o", "LLM, zero-shot", "yes", "no"),
+    ("urzagpt_gpt4o", "LLM, zero-shot", "yes", "yes"),
 ]
 
 
@@ -581,51 +643,7 @@ def skill_band_macros(breakdowns):
     return out
 
 
-def table_ablations(by_name, frozen):
-    members = [
-        ("Full (F-dev recipe)", "f_dev", "F-dev"),
-        ("A-notext", None, "A-notext"),
-        ("A-noctx (winning)", None, "A-noctx"),
-        ("A-proportional", None, "A-proportional"),
-        ("A-topfilter", None, "A-topfilter"),
-        ("A-noUB", None, "A-noUB"),
-    ]
-    # Ablation runs are discovered by config-name convention (case-insensitive
-    # -- a_noUB's embedded capitals must still match "noub"). Matching is by
-    # EXACT canonical name first (e.g. "a_notext"), falling back to substring
-    # only when no exact match exists, and only ever preferring a candidate
-    # that actually has a zero-shot summary. A blind "token in lname" check
-    # here previously let a compound run like "a_noctx_notext" (both tokens
-    # present, no summary -- an unrelated combined ablation, not either single
-    # one) silently clobber the real A-notext/A-noctx numbers with pending
-    # cells; this bit a real regeneration once that run landed in the data
-    # root, so don't regress to the naive version.
-    TOKENS = {1: "notext", 2: "noctx", 3: "proportional", 4: "topfilter",
-             5: "noub"}
-    best = {}
-    for name, entry in by_name.items():
-        lname = name.lower()
-        if "seed" in lname:
-            continue
-        has_summary = entry.get("summary") is not None
-        for idx, token in TOKENS.items():
-            if token not in lname:
-                continue
-            # Exclude compound ablation names from a single-token bucket
-            # (e.g. "a_noctx_notext" is neither the plain notext nor the
-            # plain noctx run).
-            other_tokens_present = sum(
-                1 for t in TOKENS.values() if t != token and t in lname)
-            if other_tokens_present:
-                continue
-            exact = lname in (f"a_{token}", token)
-            priority = (exact, has_summary, name)
-            if idx not in best or priority > best[idx]:
-                best[idx] = priority
-                best.setdefault("_name", {})[idx] = name
-    for idx, name in best.get("_name", {}).items():
-        members[idx] = (members[idx][0], name, members[idx][2])
-
+def table_ablations(by_role, frozen):
     rows = [
         r"\begin{tabular}{lccccc}",
         r"\toprule",
@@ -633,8 +651,8 @@ def table_ablations(by_name, frozen):
         r"Variant & BRO & TMT & SOS & Dev mean & MSH \\",
         r"\midrule",
     ]
-    for label, cfg_name, member in members:
-        entry = by_name.get(cfg_name) if cfg_name else None
+    for label, cfg_name, member in ABLATION_RUNS:
+        entry = by_role.get(cfg_name) if cfg_name else None
         run_id = entry["run_id"] if entry else None
         cells = [label]
         vals = []
@@ -673,7 +691,7 @@ RUNG_LABELS = {  # incremental descriptions keep the column narrow
 }
 
 
-def table_scaling(by_name, frozen, ledger):
+def table_scaling(by_role, frozen, ledger):
     rows = [
         r"\begin{tabular}{l p{4.8cm} rrrc}",
         r"\toprule",
@@ -684,7 +702,7 @@ def table_scaling(by_name, frozen, ledger):
     ]
     curve = []
     for rung, cfg_name, sets in RUNGS:
-        entry = by_name.get(cfg_name)
+        entry = by_role.get(cfg_name)
         rec = entry["record"] if entry else None
         run_id = entry["run_id"] if entry else None
         if rec:
@@ -1044,10 +1062,14 @@ def main(argv=None):
     ledger = load_ledger(repo)
     runs = discover_runs(repo)
     frozen = discover_frozen(repo)
-    by_name = runs_by_config_name(runs)
-    fdev = by_name.get("f_dev")
-    ffull = by_name.get("f_full")
-    a_noctx = by_name.get("a_noctx")
+    run_manifest = load_json(repo / "paper" / "data" / "run_manifest.json")
+    try:
+        by_role = runs_by_manifest(runs, run_manifest)
+    except PaperSourceError as exc:
+        ap.error(str(exc))
+    fdev = by_role["f_dev"]
+    ffull = by_role["f_full"]
+    a_noctx = by_role["a_noctx"]
     battery_path = repo / "experiments" / "frozen_battery.json"
     battery = load_json(battery_path) if battery_path.exists() else {}
     calibration = battery.get("calibration")
@@ -1072,9 +1094,9 @@ def main(argv=None):
     write_table(tables / "skill_bands.tex", table_skill_bands(breakdowns),
                 "Top-1 by drafter win-rate band, deployment mode, from "
                 "cached predictions (eval_pick_breakdowns.py).")
-    write_table(tables / "ablations.tex", table_ablations(by_name, frozen),
+    write_table(tables / "ablations.tex", table_ablations(by_role, frozen),
                 "Pre-registered variant grid (protocol section 5).")
-    scaling_rows, curve = table_scaling(by_name, frozen, ledger)
+    scaling_rows, curve = table_scaling(by_role, frozen, ledger)
     write_table(tables / "scaling.tex", scaling_rows,
                 "Scaling ladder (protocol section 4.3). Rung labels are "
                 "frozen identifiers; counts come from run records.")

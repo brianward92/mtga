@@ -77,10 +77,12 @@ sets, TMT and MSH.
 
 Zero-shot, the licensed dev set turns out not to be the hard one. TMT
 reaches \FdevTmt\% against SOS's \FdevSos\% (and \RatioTmt\% vs
-\RatioSos\% of their respective ceilings), which suggests masking plus
-structured features are carrying most of the load. That could mean text
-simply adds little on licensed sets, or it could just mean TMT is an
-easier format. The grid distinguishes between the two:
+\RatioSos\% of their respective supervised references), which is
+consistent with structured features carrying much of the load. The study
+has no unmasked-text control, so it does not isolate name masking's effect.
+The pattern could mean text adds little on licensed sets, or it could just
+mean TMT is an easier format. The ablations provide association checks,
+not a clean separation of those explanations:
 % Arithmetic on Table~\ref{tab:ablations}'s own cells, both already
 % run-tagged there: A-notext vs. Full (its comparator): BRO 48.9-45.8=3.1pp,
 % TMT 57.5-55.9=1.6pp, SOS 56.5-53.1=3.4pp. A-noUB vs. A-noctx (its
@@ -99,16 +101,15 @@ easier format. The grid distinguishes between the two:
 dropping text costs TMT only \TextPenTmt pp (CI \TextPenTmtCi pp) against
 its Full comparator, less than BRO's \TextPenBro pp (CI \TextPenBroCi pp)
 or SOS's \TextPenSos pp (CI \TextPenSosCi pp). Text contributes least on
-the licensed-IP set, which favors the masking-plus-structured-features
-explanation over TMT simply being an easier format. The UB-penalty
-(removing the three licensed-IP training sets from A-noctx) tells a
-consistent story: \UbPenBro pp on BRO (CI \UbPenBroCi pp), \UbPenTmt pp on
-TMT (CI \UbPenTmtCi pp), \UbPenSos pp on SOS (CI \UbPenSosCi pp). Losing
-licensed-IP training data costs the licensed-IP dev set least, not most,
-and even TMT's small penalty is a real, paired-CI-supported effect, not
-noise dressed up as a trend. If the test set is harder than the trio
-average, the pre-registered framing stands: a licensed-IP test makes the
-zero-shot claim more credible, not less.
+the sole licensed-IP development set, but that does not identify why.
+Removing the three licensed-IP training sets from A-noctx changes BRO by
+\UbPenBro pp (CI \UbPenBroCi pp), TMT by \UbPenTmt pp (CI \UbPenTmtCi pp),
+and SOS by \UbPenSos pp (CI \UbPenSosCi pp). These paired differences are
+statistically distinguishable from zero, but the ablation simultaneously
+removes training volume, mechanics, and set composition. It therefore does
+not identify a causal benefit of licensed-IP training. With one licensed
+development set, the defensible conclusion is only that TMT did not expose
+a transfer failure before the frozen MSH test.
 
 \paragraph{Why BRO transfers worst.}
 % scripts/eval_bro_transfer_analysis.py, run=20260704_135822_f_dev.
@@ -132,7 +133,7 @@ zero-shot claim more credible, not less.
 % TMT/SOS's 14-card pack (pick_number 14 is a genuine BRO-only forced slot)
 % rather than a real late-draft effect -- see Figure~\ref{fig:bro-diagnostics}.
 BRO sits \BroTrioShortfall pp below the mean of TMT and SOS, at only
-\RatioBro\% of its ceiling. Of three candidate explanations, the bonus
+\RatioBro\% of its supervised reference. Of three candidate explanations, the bonus
 sheet looked, at first pass, like the most direct: packs offering at
 least one of the 63-card retro-artifact bonus sheet score
 \BonusPresentTopOne\% zero-shot, while packs that don't score
@@ -191,8 +192,8 @@ question for the frozen pass (\S\ref{sec:msh}).
 \includegraphics[width=0.12\linewidth]{figures/cards/sundering-archaic.jpg}%
 \hspace{2mm}%
 \includegraphics[width=0.12\linewidth]{figures/cards/flow-state.jpg}
-\caption{The low-conviction end of the model's output: a real thirteen-card
-SOS pack (empty pool) where \VCCNameA{} and \VCCNameB{} score a near-exact
+\caption{The low-conviction end of the model's output: an illustrative
+thirteen-card SOS pack (empty pool) where \VCCNameA{} and \VCCNameB{} score a near-exact
 tie (EV \VCCEvA{} vs.\ \VCCEvB, dominance split \VCCSplitA/\VCCSplitB) --
 the third candidate, \VCCRunnerName, trails at \VCCRunnerPct\% dominance
 against the pair. Ties this close are exactly the regime the top-label ECE
@@ -215,7 +216,7 @@ reliability at low conviction. Computed by the deployed per-set model.}
 % to both deployment and human mode.
 Zero-shot confidence falls well short of within-set calibration. Top-label
 ECE is \FdevBroEce{} / \FdevTmtEce{} / \FdevSosEce{} on the dev trio,
-against \CeilSosEce{} for the within-set SOS ceiling: roughly a five- to
+against \CeilSosEce{} for the within-set SOS reference: roughly a five- to
 seven-and-a-half-fold gap. The protocol permits one calibration decision: a
 temperature fitted on dev only and frozen into the battery, never fitted
 on MSH. That temperature is \FrozenTemperature, chosen by minimizing mean

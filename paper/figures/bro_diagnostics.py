@@ -2,9 +2,10 @@
 """BRO bonus-sheet diagnostic: zero-shot top-1 with vs. without a bonus-sheet
 card in the pack.
 
-Reads <f_dev run>/zeroshot/bro_transfer_analysis.json (emitted by
-scripts/eval_bro_transfer_analysis.py) and writes bro_diagnostics.pdf next to
-this script. Headless by construction (Agg backend). No hand-typed numbers.
+Reads the tracked paper/data/bro_diagnostics.json mirror (emitted from
+scripts/eval_bro_transfer_analysis.py output) and writes bro_diagnostics.pdf
+next to this script. Headless by construction (Agg backend). No hand-typed
+numbers.
 
 Usage: python3 paper/figures/bro_diagnostics.py [--report PATH]
 """
@@ -19,10 +20,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
-DEFAULT_REPORT = (
-    "/opt/bward/dat/mtga/foundation/runs/20260704_135822_f_dev/"
-    "zeroshot/bro_transfer_analysis.json"
-)
+DEFAULT_REPORT = HERE.parent / "data" / "bro_diagnostics.json"
 
 BAR = "#2563b0"
 INK = "#1f2430"
@@ -31,7 +29,7 @@ MUTED = "#6b7280"
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--report", default=DEFAULT_REPORT)
+    ap.add_argument("--report", type=Path, default=DEFAULT_REPORT)
     args = ap.parse_args()
 
     report = json.loads(Path(args.report).read_text())
@@ -76,7 +74,7 @@ def main():
 
     fig.tight_layout()
     out = HERE / "bro_diagnostics.pdf"
-    fig.savefig(out)
+    fig.savefig(out, metadata={"CreationDate": None, "ModDate": None})
     print(f"wrote {out}")
 
 

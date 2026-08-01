@@ -1,0 +1,33 @@
+{
+  "source_run": "20260704_135822_f_dev",
+  "source_script": "scripts/eval_bro_transfer_analysis.py",
+  "bonus_slice": {
+    "bonus_present": {
+      "top1": 0.4062065508152291,
+      "ci": [
+        0.40478834350258314,
+        0.40770704017801807
+      ],
+      "n_picks": 510654,
+      "n_drafts": 25864,
+      "frac_of_picks": 0.44334916349050624
+    },
+    "bonus_absent": {
+      "top1": 0.5547011959647886,
+      "ci": [
+        0.5534562697406988,
+        0.5558781277598676
+      ],
+      "n_picks": 641156,
+      "n_drafts": 25754,
+      "frac_of_picks": 0.5566508365094938
+    }
+  },
+  "bonus_slice_stratified_gap": {
+    "point": 0.03067916833784118,
+    "ci": [
+      0.027807476031180587,
+      0.03360412902628577
+    ]
+  }
+}

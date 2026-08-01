@@ -22,7 +22,7 @@ deployed state of the art. The statistical-drafting models of
 \citet{brooks2024statistical}, multilayer perceptrons trained per set,
 reach roughly 70\% pick agreement, and the puder transformer of
 \citet{czerner2025puder} reports 71\%. The statistical-drafting
-architecture is also the direct ancestor of the per-set ceiling models we
+architecture is also the direct ancestor of the within-set supervised reference models we
 measure against in Section~\ref{sec:results}. All of these models encode
 cards as vocabulary indices. Each learns from picks made in the one set it
 serves, so none can score an unseen set, and none can exist until the
@@ -97,22 +97,23 @@ transfer, applied to gameplay rather than drafting.
 
 A claim of zero-shot transfer is only as strong as the discipline behind
 it, so we designed the evaluation to be checkable rather than trusted. The
-protocol of Section~\ref{sec:protocol} was frozen in a tagged public
-commit before the test data existed. The test set is Marvel Super Heroes
-(MSH), a licensed-IP set whose public draft logs had not been published at
-the freeze. No training, tuning, or metric choice touches MSH pick data;
-the headline number comes from a single pre-registered inference pass over
-the first public snapshot. Every model-selection decision is made instead
-on three development sets that the development model never trains on.
+substantive protocol of Section~\ref{sec:protocol} was frozen in a public
+tag before the test data existed; a later enforcement-hardening tag and a
+separate serving-pipeline deviation are reported with their exact
+chronology in Section~\ref{sec:msh}. No frozen-battery member is trained or
+tuned on MSH pick data, and the headline number comes from a single
+pre-registered inference pass over the first public snapshot. Every
+model-selection decision is made instead on three development sets that
+the development model never trains on.
 
 On that development trio, DraftFM agrees with high-win-rate players' picks
 \FdevDevMean\% of the time.\footnote{The unweighted mean over the three
 sets: \FdevBro\% on BRO, \FdevTmt\% on Teenage Mutant Ninja Turtles (TMT),
 and \FdevSos\% on Secrets of Strixhaven (SOS).} To put that number in
-context, consider BRO. A model trained directly on BRO's own picks reaches
-\CeilBro\%, in effect a ceiling for a draft assistant on that set.
-DraftFM, which has never seen a BRO pick, reaches \NormScoreBro\% of that
-ceiling on identical held-out picks. DraftFM also clears every published
+context, consider BRO. A supervised reference trained directly on BRO's
+own picks reaches \CeilBro\%. DraftFM, which has never seen a BRO pick,
+reaches \NormScoreBro\% of that reference's agreement on identical
+held-out picks. DraftFM also clears every published
 number we could find that a real deployment could have used on release
 day, including the expert-tuned ratings at 44.5\%, zero-shot GPT-4o at
 43\%, and an hour-zero rarity heuristic we measure at \BaseRarity\% in a
@@ -138,10 +139,10 @@ reports a scaling study of zero-shot accuracy as a function of
 training-set count, from one set to \FdevSets{}, with set-composition
 probes and zero-shot seed bands at two rungs. It measures what the text
 embedding contributes when a set's names and flavor come from a licensed
-universe, such as Marvel, rather than from \mtg{}'s own. And it releases
-code, the frozen protocol, data manifests, model weights, and the per-pick
-prediction files behind every number in this paper
-(Appendix~\ref{sec:repro}).
+universe, such as Marvel, rather than from \mtg{}'s own. The repository
+includes the code, frozen protocol, and summary artifacts; the release
+archive will add the model weights and per-pick prediction files behind
+the reported numbers (Appendix~\ref{sec:repro}).
 
 The rest of the paper is organized as follows. Section~\ref{sec:data}
 describes the corpus, the skill covariates, and the held-out sets.
@@ -156,9 +157,9 @@ licensing.
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.24\linewidth]{figures/cards/emeritus-of-ideation.jpg}
-\caption{Emeritus of Ideation, an actual first pick from a real
-thirteen-card Secrets of Strixhaven (SOS) pack with an empty pool. The
-per-set ceiling model (Table~\ref{tab:main}) ranks it above every other
+\caption{Emeritus of Ideation, scored in an illustrative thirteen-card
+Secrets of Strixhaven (SOS) pack with an empty pool. The
+within-set supervised model (Table~\ref{tab:main}) ranks it above every other
 card in the pack by a wide margin: expected
 value\protect\footnotemark{} \VHeroEv, seen in \VHeroGih{} of games it
 appears in, average last-seen-at pick \VHeroAlsa, and \VHeroDominance{}

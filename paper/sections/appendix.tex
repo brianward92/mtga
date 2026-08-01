@@ -3,10 +3,12 @@
 
 \paragraph{The target is agreement, not optimality.}
 Top-1 agreement with high-win-rate players measures imitation. Skilled
-drafters disagree with each other (the within-set ceiling is ${\sim}70\%$,
-not 100\%), and agreeing with them is not the same as maximising win rate.
-A model could in principle draft better than its agreement suggests, or
-worse. Win-rate evaluation of zero-shot drafters is future work. Training
+drafters can disagree, but this study does not measure their pairwise
+agreement. The within-set supervised reference reaches ${\sim}70\%$; that
+is a model score, not an upper bound on attainable agreement. Agreeing with
+players is also not the same as maximising win rate: a model could in
+principle draft better than its agreement suggests, or worse. Win-rate
+evaluation of zero-shot drafters is future work. Training
 that weights picks by drafter outcome, imitating picks that correlate
 with winning and down-weighting or avoiding those that correlate with
 losing, is likewise a natural next step we leave to future work.
@@ -39,12 +41,12 @@ classes; we gate on CPU parity and skip non-finite steps
 \section{Reproducibility}
 \label{sec:repro}
 
-Every result in this paper traces to a run id in an append-only ledger.
-Every table cell and prose number is emitted by a script from that ledger
-and cached evaluation outputs; no result number here is typed by hand. The
-ledger schema, frozen identifiers (protocol tag, manifest hashes), release
-contents, and script-level pointers for reproducing any specific number
-are in the companion implementation reference, not repeated here.
+Every result in this paper traces to a pinned run or frozen-evaluation
+summary. Tables and prose macros are emitted from those records and cached
+analysis outputs. The release manifest, frozen identifiers (protocol tag
+and manifest hashes), planned archive contents, and script-level pointers
+for reproducing specific numbers are in the companion implementation
+reference, not repeated here.
 
 \section{Licensing and attribution}
 \label{sec:licensing}
