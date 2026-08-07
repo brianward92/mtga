@@ -15,18 +15,29 @@ high-win-rate players. Start here:
 - Exact paper run pins and checkpoint hashes: [`paper/data/run_manifest.json`](paper/data/run_manifest.json)
 - Experiment ledger: [`experiments/ledger.jsonl`](experiments/ledger.jsonl)
 
-The repository currently includes code, frozen summaries, and generated paper
-outputs. The model weights and per-pick prediction archive are not published
-yet, so this is not yet a clean-clone reproduction release. With the pinned run
-artifacts available under `$MTGA_DATA_ROOT/foundation`, regenerate the tables
-with:
+### Release (2026-08)
+
+All artifacts needed for a clean-clone reproduction are published:
+
+- Model weights, ONNX exports, and pinned manifests:
+  [huggingface.co/brianward92/draftfm](https://huggingface.co/brianward92/draftfm)
+  (14 checkpoints, sha256-pinned in `paper/data/run_manifest.json`)
+- Per-pick prediction archive (recompute every paper table without a GPU):
+  [huggingface.co/datasets/brianward92/draftfm-frozen-eval](https://huggingface.co/datasets/brianward92/draftfm-frozen-eval)
+
+To rebuild the paper tables from a fresh clone:
 
 ```bash
-.venv-ml/bin/python scripts/make_paper_tables.py
+python -m venv .venv && .venv/bin/pip install -r requirements-foundation.txt
+hf download brianward92/draftfm --include "paper-data/runs/*" --local-dir /tmp/draftfm
+cp -R /tmp/draftfm/paper-data/runs paper/data/runs
+.venv/bin/python scripts/make_paper_tables.py
 ```
 
 The generator refuses missing or mismatched pinned runs instead of silently
-selecting a newer local experiment.
+selecting a newer local experiment. To run models, download the checkpoints
+from the Hugging Face model repo and verify each `best.pt` sha256 against
+`paper/data/run_manifest.json`.
 
 ## Live Product: MTG Registry
 
