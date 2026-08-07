@@ -1,0 +1,24 @@
+DraftFM / mtga
+Copyright 2026 Brian Ward
+
+The source code in this repository is licensed under the Apache License,
+Version 2.0 (see LICENSE). The following materials are NOT covered by the
+code license:
+
+1. The paper (paper/ directory: LaTeX sources, compiled PDFs, and figures)
+   is copyright Brian Ward. All rights reserved.
+
+2. Card images under paper/figures/cards/ are copyright Wizards of the
+   Coast LLC, obtained via Scryfall's image CDN, and are used under
+   Wizards of the Coast's Fan Content Policy with per-card attribution
+   recorded in paper/figures/cards/manifest.json. This project is
+   unofficial Fan Content, not approved or endorsed by Wizards.
+   Magic: The Gathering and its card images are trademarks and
+   copyrights of Wizards of the Coast LLC.
+
+3. Third-party data fetched by the scripts in this repository remains
+   the property of its respective owners: 17Lands.com public datasets
+   (CC BY 4.0; user-facing uses must display "Data from 17Lands.com"),
+   Scryfall bulk data (per Scryfall's terms), and MTG Arena client logs
+   (per Wizards' terms). No raw third-party datasets are redistributed
+   in this repository; only self-generated aggregates and manifests.

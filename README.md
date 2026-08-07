@@ -143,7 +143,7 @@ snapshots. It is not the web inventory app served on port `8000`.
 
 ## Draft Assistant
 
-A self-hosted draft advisor (free untapped.gg replacement): this box holds the
+A self-hosted draft advisor: this box holds the
 data, trains the models, and serves an EV-per-card API; the MTGA Draft Assistant
 overlay on the gaming machine tails `Player.log` locally and calls the API.
 Card stats come from 17Lands public data (CC BY 4.0) — anything user-facing
