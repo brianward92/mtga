@@ -6,7 +6,12 @@ per (set, format) and must be cached (see mtga/lands/download.py guards).
 Attribution requirement: anything user-facing shows "Data from 17Lands.com".
 """
 
-TRACKED_SETS = ["MSH", "SOS"]
+# Serving list: sets currently draftable on Arena (ratings refresh + nightly
+# retrain). NOT the training corpus (see corpus.CORPUS, 31 sets) and not a
+# constructed format. MSH stays here because it is draftable and needs live
+# ratings; it is corpus.EVAL_ONLY, so training is gated in corpus.corpus_jobs
+# and scripts/train_pick_model.py. Reviewed 2026-08-08; add HOB on release.
+TRACKED_SETS = ["MSH", "SOS", "ECL", "TMT"]
 
 FORMATS = ["PremierDraft", "TradDraft"]
 

@@ -8,7 +8,7 @@ curated draft data's source ETag differs from the latest model's data_etag.
 import argparse
 import json
 
-from mtga.lands import config, paths
+from mtga.lands import config, corpus, paths
 from mtga.models import draftnet
 
 
@@ -75,6 +75,12 @@ def main():
     args = create_parser().parse_args()
     if args.all_tracked:
         for set_code in config.TRACKED_SETS:
+            # corpus.EVAL_ONLY sets are held out of training by protocol; the
+            # serving list may still carry them (they are draftable), so the
+            # gate lives here too, not only in corpus.corpus_jobs.
+            if set_code.upper() in corpus.EVAL_ONLY:
+                print(f"skip {set_code}: EVAL_ONLY holdout (never train)")
+                continue
             run_one(args, set_code, "PremierDraft")
     else:
         if not args.set_code:
