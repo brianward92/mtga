@@ -25,7 +25,7 @@ if __name__ == "__main__":
 
     # Write
     try:
-        parsed = json.loads(data.decode("utf-8"))
+        parsed = scryfall.parse_cards_payload(data)
     except Exception as exc:
         raise ValueError("Failed to decode Scryfall data as JSON.") from exc
     with open(path, "w", encoding="utf-8") as f:
