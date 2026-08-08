@@ -1,27 +1,39 @@
-#!/usr/bin/env python
-"""Sync 17Lands public data (bulk S3 dumps + once-daily site ratings cache)."""
-
 import argparse
 
 from mtga.lands import config, corpus, download
 
 
+def csv_values(value):
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def set_values(value):
+    return [item.upper() for item in csv_values(value)]
+
+
 def create_parser():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--sets", default=",".join(config.TRACKED_SETS),
-                        help="comma-separated set codes")
-    parser.add_argument("--formats", default=",".join(config.FORMATS),
-                        help="comma-separated limited formats")
-    parser.add_argument("--types", default=",".join(config.DATA_TYPES),
-                        help="comma-separated data types (draft,game)")
-    parser.add_argument("--corpus", action="store_true",
-                        help="sync the DraftFM training corpus: corpus.TRAINING_SETS "
-                             "with per-set draft formats, draft data only, no site "
-                             "ratings (--sets may narrow it; eval-only sets refused)")
-    parser.add_argument("--include-sealed", action="store_true",
-                        help="also sync Sealed game data (metrics only, no picks)")
-    parser.add_argument("--no-ratings", dest="ratings", action="store_false",
-                        help="skip the once-daily card/color ratings cache")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--sets", type=set_values, help="comma-separated set codes")
+    parser.add_argument("--formats", type=csv_values, default=config.FORMATS)
+    parser.add_argument("--types", type=csv_values, default=config.DATA_TYPES)
+    parser.add_argument(
+        "--corpus",
+        action="store_true",
+        help="sync the DraftFM training corpus: corpus.TRAINING_SETS "
+        "with per-set draft formats, draft data only, no site "
+        "ratings (--sets may narrow it; eval-only sets refused)",
+    )
+    parser.add_argument(
+        "--include-sealed",
+        action="store_true",
+        help="also sync Sealed game data (metrics only, no picks)",
+    )
+    parser.add_argument(
+        "--no-ratings",
+        dest="ratings",
+        action="store_false",
+        help="skip the once-daily card/color ratings cache",
+    )
     parser.add_argument("--force", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     return parser
@@ -30,21 +42,18 @@ def create_parser():
 def main():
     parser = create_parser()
     args = parser.parse_args()
-    sets = [s.strip().upper() for s in args.sets.split(",") if s.strip()]
-    formats = [f.strip() for f in args.formats.split(",") if f.strip()]
-    data_types = [t.strip() for t in args.types.split(",") if t.strip()]
+    sets = config.TRACKED_SETS if args.sets is None else args.sets
 
     ratings = args.ratings
     if args.corpus:
-        explicit = sets if args.sets != parser.get_default("sets") else None
         try:
-            pairs = corpus.corpus_jobs(explicit)
+            pairs = corpus.corpus_jobs(args.sets)
         except ValueError as error:
             parser.error(str(error))
         jobs = [(s, f, "draft") for s, f in pairs]
         ratings = False  # bulk S3 only — never site JSON for historical sets
     else:
-        jobs = [(s, f, t) for s in sets for f in formats for t in data_types]
+        jobs = [(s, f, t) for s in sets for f in args.formats for t in args.types]
         if args.include_sealed:
             jobs += [(s, "Sealed", "game") for s in sets]
 
@@ -61,11 +70,21 @@ def main():
         results.append((f"{dtype}_data {set_code}", fmt, status))
     if ratings:
         for set_code in sets:
-            for fmt in formats:
-                results.append((f"card_ratings {set_code}", fmt,
-                                download.fetch_card_ratings(set_code, fmt)))
-                results.append((f"color_ratings {set_code}", fmt,
-                                download.fetch_color_ratings(set_code, fmt)))
+            for fmt in args.formats:
+                results.append(
+                    (
+                        f"card_ratings {set_code}",
+                        fmt,
+                        download.fetch_card_ratings(set_code, fmt),
+                    )
+                )
+                results.append(
+                    (
+                        f"color_ratings {set_code}",
+                        fmt,
+                        download.fetch_color_ratings(set_code, fmt),
+                    )
+                )
 
     width = max(len(f"{n} {f}") for n, f, _ in results)
     for name, fmt, status in results:
