@@ -10,8 +10,10 @@ Attribution requirement: anything user-facing shows "Data from 17Lands.com".
 # retrain). NOT the training corpus (see corpus.CORPUS, 31 sets) and not a
 # constructed format. MSH stays here because it is draftable and needs live
 # ratings; it is corpus.EVAL_ONLY, so training is gated in corpus.corpus_jobs
-# and scripts/train_pick_model.py. Reviewed 2026-08-08; add HOB on release.
-TRACKED_SETS = ["MSH", "SOS", "ECL", "TMT"]
+# and scripts/train_pick_model.py. HOB is listed ahead of its 2026-08-14
+# release so ratings and retrain start the moment data exists (both stages
+# no-op safely while 17Lands has nothing). Reviewed 2026-08-08.
+TRACKED_SETS = ["MSH", "SOS", "ECL", "TMT", "HOB"]
 
 FORMATS = ["PremierDraft", "TradDraft"]
 
