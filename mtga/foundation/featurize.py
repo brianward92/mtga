@@ -43,7 +43,7 @@ from mtga.lands import corpus, names, paths
 MANIFEST_VERSION = "cardfeats_v1"
 N_FEATURES = 391
 SUBTYPE_SLOTS = 128     # top-128 subtypes by unique-card frequency
-KEYWORD_SLOTS = 166     # keywords on >= KEYWORD_MIN_CARDS cards (166 in the 31-set universe)
+KEYWORD_SLOTS = 166     # fixed capacity; a manifest may populate fewer slots
 KEYWORD_MIN_CARDS = 8
 UNMATCHED_SCALE = 4.0   # count-of-unmatched subtypes/keywords, /4 clipped
 
