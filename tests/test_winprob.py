@@ -42,8 +42,9 @@ def winprob_hand_data(replay_raw):
 def winprob_training_data(data_root):
     """Curated multi-turn fixture with a healthy crc32 split at permille 500."""
     dest = paths.raw_dataset_path("replay", _synth.SET, _synth.FMT)
-    _synth.write_replay_csv(dest, games=_synth.winprob_training_games(),
-                            turn_cols=_synth.WINPROB_TURN_COLS)
+    _synth.write_replay_csv(
+        dest, games=_synth.winprob_training_games(), turn_cols=_synth.WINPROB_TURN_COLS
+    )
     from mtga.replay import etl
 
     assert etl.curate_turn_states(_synth.SET, _synth.FMT)["status"] == "CURATED"
@@ -64,8 +65,11 @@ def winprob_multiset_raw(data_root):
     sets = [_synth.SET, SET2]
     for set_code in sets:
         dest = paths.raw_dataset_path("replay", set_code, _synth.FMT)
-        _synth.write_replay_csv(dest, games=_synth.winprob_training_games(),
-                                turn_cols=_synth.WINPROB_TURN_COLS)
+        _synth.write_replay_csv(
+            dest,
+            games=_synth.winprob_training_games(),
+            turn_cols=_synth.WINPROB_TURN_COLS,
+        )
         assert etl.curate_turn_states(set_code, _synth.FMT)["status"] == "CURATED"
     return sets
 
@@ -76,8 +80,15 @@ def winprob_multiset_raw(data_root):
 
 def test_features_layout():
     assert len(wdata.FEATURES) == 25
-    for needed in ["turn", "life_diff", "user_hand_count", "user_drawn_cum",
-                   "library_approx", "user_wr_bucket", "num_mulligans"]:
+    for needed in [
+        "turn",
+        "life_diff",
+        "user_hand_count",
+        "user_drawn_cum",
+        "library_approx",
+        "user_wr_bucket",
+        "num_mulligans",
+    ]:
         assert needed in wdata.FEATURES
 
 
@@ -112,14 +123,23 @@ def test_load_dataset_hand_computed(winprob_hand_data):
     row = dict(zip(wdata.FEATURES, data.X[idx]))
     assert row["turn"] == 2 and row["on_play"] == 1.0
     assert (row["user_life"], row["oppo_life"], row["life_diff"]) == (20, 18, 2)
-    assert (row["user_hand_count"], row["oppo_hand_count"],
-            row["hand_diff"]) == (4, 5, -1)
-    assert (row["user_lands_count"], row["oppo_lands_count"],
-            row["lands_diff"]) == (2, 1, 1)
-    assert (row["user_creatures_count"], row["oppo_creatures_count"],
-            row["creatures_diff"]) == (1, 1, 0)
+    assert (row["user_hand_count"], row["oppo_hand_count"], row["hand_diff"]) == (
+        4,
+        5,
+        -1,
+    )
+    assert (row["user_lands_count"], row["oppo_lands_count"], row["lands_diff"]) == (
+        2,
+        1,
+        1,
+    )
+    assert (
+        row["user_creatures_count"],
+        row["oppo_creatures_count"],
+        row["creatures_diff"],
+    ) == (1, 1, 0)
     assert (row["user_mana_spent"], row["oppo_mana_spent"]) == (2, 2)
-    assert row["user_drawn_cum"] == 1                     # t1 draw 0, t2 draw 1
+    assert row["user_drawn_cum"] == 1  # t1 draw 0, t2 draw 1
     assert (row["num_mulligans"], row["opp_num_mulligans"]) == (0, 1)
     assert row["user_n_games_bucket"] == 500
     # library approx = deck_size(5) - 7 + num_mulligans(0) - drawn_cum(1)
@@ -138,22 +158,22 @@ def test_load_dataset_hand_computed(winprob_hand_data):
 
 def test_state_anchors_and_verify(winprob_hand_data):
     anchors = wdata.state_anchors(winprob_hand_data)
-    assert anchors["mean_turns"] == pytest.approx(2.0)   # 12 rows / 6 games
-    assert anchors["ahead"]["n"] == 0                    # no turn-7 rows here
+    assert anchors["mean_turns"] == pytest.approx(2.0)  # 12 rows / 6 games
+    assert anchors["ahead"]["n"] == 0  # no turn-7 rows here
     assert anchors["ahead"]["win_rate"] is None
 
     wdata.verify_anchors(anchors, {"mean_turns": 2.0})
     with pytest.raises(ValueError, match="anchor mismatch"):
         wdata.verify_anchors(anchors, {"mean_turns": 3.0})
     with pytest.raises(ValueError, match="anchor mismatch"):
-        wdata.verify_anchors(anchors, {"ahead": 0.5})    # got None
+        wdata.verify_anchors(anchors, {"ahead": 0.5})  # got None
 
 
 def test_scaler_roundtrip():
     X = np.array([[0.0, 10.0], [2.0, 10.0], [4.0, 10.0]], dtype=np.float32)
     mean, std = wdata.fit_scaler(X, np.arange(3))
     assert mean.tolist() == pytest.approx([2.0, 10.0])
-    assert std[1] == pytest.approx(wdata.SCALE_FLOOR)    # constant col floors
+    assert std[1] == pytest.approx(wdata.SCALE_FLOOR)  # constant col floors
     Xs = wdata.standardize(X, mean, std)
     assert Xs[:, 0].tolist() == pytest.approx([-1.2247449, 0.0, 1.2247449])
 
@@ -170,11 +190,18 @@ def test_ece_equal_mass():
 
 def test_evaluate_and_buckets():
     y = np.array([0, 0, 1, 1])
-    p = np.array([0.1, 0.2, 0.8, 0.9])          # perfectly separable
+    p = np.array([0.1, 0.2, 0.8, 0.9])  # perfectly separable
     block = wtrain.evaluate(y, p)
     assert block["auc"] == 1.0 and block["n"] == 4
-    assert set(block) >= {"auc", "log_loss", "brier", "ece", "base_rate",
-                          "mean_pred", "reliability"}
+    assert set(block) >= {
+        "auc",
+        "log_loss",
+        "brier",
+        "ece",
+        "base_rate",
+        "mean_pred",
+        "reliability",
+    }
 
     turn = np.array([2, 5, 8, 11])
     by = wtrain.evaluate_by_bucket(y, p, turn)
@@ -193,8 +220,8 @@ def test_nonlinearity_gap():
 def test_model_forward_and_predict():
     import torch
 
-    net = WinProbNet(1, hidden=())               # logistic
-    assert sum(p.numel() for p in net.parameters()) == 2   # weight + bias
+    net = WinProbNet(1, hidden=())  # logistic
+    assert sum(p.numel() for p in net.parameters()) == 2  # weight + bias
     logits = net(torch.zeros(3, 1))
     assert logits.shape == (3,)
 
@@ -210,8 +237,17 @@ def test_model_forward_and_predict():
 
 def test_train_smoke_all_three_heads(winprob_training_data):
     models, report, context = wtrain.train(
-        _synth.SET, _synth.FMT, epochs=3, batch_size=64, lr=1e-2, seed=3,
-        patience=3, val_permille=500, subsample=None, progress=lambda *_: None)
+        _synth.SET,
+        _synth.FMT,
+        epochs=3,
+        batch_size=64,
+        lr=1e-2,
+        seed=3,
+        patience=3,
+        val_permille=500,
+        subsample=None,
+        progress=lambda *_: None,
+    )
 
     assert set(models) == {"life_diff", "full", "mlp"}
     assert report["n_train"] + report["n_val"] == report["n_rows"]
@@ -222,24 +258,38 @@ def test_train_smoke_all_three_heads(winprob_training_data):
     assert "pooled" in report["nonlinearity_gap"]
     # life_diff head consumes exactly one feature.
     assert context["models"]["life_diff"]["columns"] == [
-        wdata.FEATURES.index("life_diff")]
+        wdata.FEATURES.index("life_diff")
+    ]
     assert len(context["scaler_mean"]) == 25
 
 
-def test_save_version_and_economics(winprob_training_data, tmp_path,
-                                    monkeypatch):
+def test_save_version_and_economics(winprob_training_data, tmp_path, monkeypatch):
     import torch
 
     from mtga.foundation import runlog
 
     models, report, context = wtrain.train(
-        _synth.SET, _synth.FMT, epochs=2, batch_size=64, lr=1e-2, seed=3,
-        patience=3, val_permille=500, subsample=None, progress=lambda *_: None)
+        _synth.SET,
+        _synth.FMT,
+        epochs=2,
+        batch_size=64,
+        lr=1e-2,
+        seed=3,
+        patience=3,
+        val_permille=500,
+        subsample=None,
+        progress=lambda *_: None,
+    )
 
     out_dir = wtrain.save_version(models, report, context, tag="v1-test")
     assert out_dir == paths.MODELS_DIR / "_winprob" / "v1-test"
-    for artifact in ["checkpoint_life_diff.pt", "checkpoint_full.pt",
-                     "checkpoint_mlp.pt", "meta.json", "metrics.json"]:
+    for artifact in [
+        "checkpoint_life_diff.pt",
+        "checkpoint_full.pt",
+        "checkpoint_mlp.pt",
+        "meta.json",
+        "metrics.json",
+    ]:
         assert (out_dir / artifact).exists()
     with open(out_dir / "meta.json") as fh:
         meta = json.load(fh)
@@ -249,21 +299,29 @@ def test_save_version_and_economics(winprob_training_data, tmp_path,
 
     # The MLP checkpoint round-trips into a fresh net.
     checkpoint = torch.load(out_dir / "checkpoint_mlp.pt", weights_only=False)
-    fresh = WinProbNet(checkpoint["config"]["input_dim"],
-                       hidden=tuple(checkpoint["config"]["hidden"]))
+    fresh = WinProbNet(
+        checkpoint["config"]["input_dim"], hidden=tuple(checkpoint["config"]["hidden"])
+    )
     fresh.load_state_dict(checkpoint["model"])
 
     # Economics from the trained MLP.
     mean, std = context["_scaler"]
-    econ = economics.compute(models["mlp"], mean, std, context["_data"],
-                             context["_val_idx"], seed=3)
+    econ = economics.compute(
+        models["mlp"], mean, std, context["_data"], context["_val_idx"], seed=3
+    )
     assert econ["kind"] == "winprob-economics-v1"
     assert "NOT causal" in econ["framing"]
-    for key in ["headline", "pooled_typical", "life_curve_at_t7",
-                "parity_curve", "exchange_rate_table"]:
+    for key in [
+        "headline",
+        "pooled_typical",
+        "life_curve_at_t7",
+        "parity_curve",
+        "exchange_rate_table",
+    ]:
         assert key in econ
     assert len(econ["exchange_rate_table"]) == len(economics.REF_TURNS) * len(
-        economics.REF_LIVES)
+        economics.REF_LIVES
+    )
     assert isinstance(economics.render_table(econ), str)
 
     json_path, fig_path = economics.save(econ, out_dir)
@@ -312,7 +370,8 @@ def test_load_many_concatenates_and_tags_sets(winprob_multiset_raw):
     single = {s: wdata.load_dataset(s, _synth.FMT) for s in sets}
 
     combined, report, wr_fills = wdata.load_many(
-        sets, _synth.FMT, per_set_row_cap=None, progress=lambda *_: None)
+        sets, _synth.FMT, per_set_row_cap=None, progress=lambda *_: None
+    )
 
     assert combined.n_rows == sum(d.n_rows for d in single.values())
     assert combined.n_games == sum(d.n_games for d in single.values())
@@ -342,7 +401,8 @@ def test_load_many_row_cap_keeps_full_game_metadata(winprob_multiset_raw):
     sets = winprob_multiset_raw
     cap = 10
     combined, report, _ = wdata.load_many(
-        sets, _synth.FMT, per_set_row_cap=cap, seed=5, progress=lambda *_: None)
+        sets, _synth.FMT, per_set_row_cap=cap, seed=5, progress=lambda *_: None
+    )
 
     for s in sets:
         assert report[s]["rows_total"] > cap
@@ -362,17 +422,21 @@ def test_load_many_anchor_check(winprob_multiset_raw):
     anchors = wdata.state_anchors(single)
     key = (sets[0], _synth.FMT)
 
-    ok = {key: {"mean_turns": anchors["mean_turns"],
-               "ahead": anchors["ahead"]["win_rate"],
-               "behind": anchors["behind"]["win_rate"]}}
+    ok = {
+        key: {
+            "mean_turns": anchors["mean_turns"],
+            "ahead": anchors["ahead"]["win_rate"],
+            "behind": anchors["behind"]["win_rate"],
+        }
+    }
     combined, report, _ = wdata.load_many(
-        sets, _synth.FMT, anchor_checks=ok, progress=lambda *_: None)
+        sets, _synth.FMT, anchor_checks=ok, progress=lambda *_: None
+    )
     assert combined.n_rows == sum(r["rows_kept"] for r in report.values())
 
     bad = {key: {"mean_turns": anchors["mean_turns"] + 5.0}}
     with pytest.raises(ValueError, match="anchor mismatch"):
-        wdata.load_many(sets, _synth.FMT, anchor_checks=bad,
-                        progress=lambda *_: None)
+        wdata.load_many(sets, _synth.FMT, anchor_checks=bad, progress=lambda *_: None)
 
 
 def test_train_multiset_smoke_zero_shot(winprob_multiset_raw):
@@ -380,9 +444,18 @@ def test_train_multiset_smoke_zero_shot(winprob_multiset_raw):
     holdout_sets = [winprob_multiset_raw[1]]
 
     models, report, context = wtrain.train_multiset(
-        train_sets, holdout_sets, limited_type=_synth.FMT,
-        per_set_row_cap=None, epochs=2, batch_size=64, lr=1e-2, seed=3,
-        patience=3, val_permille=500, progress=lambda *_: None)
+        train_sets,
+        holdout_sets,
+        limited_type=_synth.FMT,
+        per_set_row_cap=None,
+        epochs=2,
+        batch_size=64,
+        lr=1e-2,
+        seed=3,
+        patience=3,
+        val_permille=500,
+        progress=lambda *_: None,
+    )
 
     assert set(models) == {"life_diff", "full", "mlp"}
     assert context["train_sets"] == train_sets
@@ -400,28 +473,44 @@ def test_train_multiset_smoke_zero_shot(winprob_multiset_raw):
         assert "pooled" in z["models"][name]
         assert 0.0 <= z["models"][name]["pooled"]["auc"] <= 1.0
     assert report["zero_shot_mlp_auc_mean"] == pytest.approx(
-        z["models"]["mlp"]["pooled"]["auc"])
+        z["models"]["mlp"]["pooled"]["auc"]
+    )
     assert "pooled" in z["nonlinearity_gap"]
 
 
-def test_save_version_multiset_and_economics_by_set(winprob_multiset_raw,
-                                                     tmp_path, monkeypatch):
+def test_save_version_multiset_and_economics_by_set(
+    winprob_multiset_raw, tmp_path, monkeypatch
+):
     import torch
 
     from mtga.foundation import runlog
 
     train_sets = list(winprob_multiset_raw)  # both sets train, no holdout
     models, report, context = wtrain.train_multiset(
-        train_sets, [], limited_type=_synth.FMT, per_set_row_cap=None,
-        epochs=2, batch_size=64, lr=1e-2, seed=3, patience=3,
-        val_permille=500, progress=lambda *_: None)
+        train_sets,
+        [],
+        limited_type=_synth.FMT,
+        per_set_row_cap=None,
+        epochs=2,
+        batch_size=64,
+        lr=1e-2,
+        seed=3,
+        patience=3,
+        val_permille=500,
+        progress=lambda *_: None,
+    )
     assert report["zero_shot"] == {}
     assert report["zero_shot_mlp_auc_mean"] is None
 
     out_dir = wtrain.save_version_multiset(models, report, context, tag="v2-test")
     assert out_dir == paths.MODELS_DIR / "_winprob" / "v2-test"
-    for artifact in ["checkpoint_life_diff.pt", "checkpoint_full.pt",
-                     "checkpoint_mlp.pt", "meta.json", "metrics.json"]:
+    for artifact in [
+        "checkpoint_life_diff.pt",
+        "checkpoint_full.pt",
+        "checkpoint_mlp.pt",
+        "meta.json",
+        "metrics.json",
+    ]:
         assert (out_dir / artifact).exists()
     with open(out_dir / "meta.json") as fh:
         meta = json.load(fh)
@@ -431,8 +520,9 @@ def test_save_version_multiset_and_economics_by_set(winprob_multiset_raw,
 
     # The MLP checkpoint round-trips into a fresh net, same as v1.
     checkpoint = torch.load(out_dir / "checkpoint_mlp.pt", weights_only=False)
-    fresh = WinProbNet(checkpoint["config"]["input_dim"],
-                       hidden=tuple(checkpoint["config"]["hidden"]))
+    fresh = WinProbNet(
+        checkpoint["config"]["input_dim"], hidden=tuple(checkpoint["config"]["hidden"])
+    )
     fresh.load_state_dict(checkpoint["model"])
 
     mean, std = context["_scaler"]
@@ -441,8 +531,11 @@ def test_save_version_multiset_and_economics_by_set(winprob_multiset_raw,
 
     econ = economics.compute(models["mlp"], mean, std, data, val_idx, seed=3)
     by_set = economics.compute_by_set(
-        models["mlp"], mean, std, data, val_idx, train_sets, seed=3)
-    assert set(by_set) == set(train_sets)  # both sets have val rows at n=60/permille=500
+        models["mlp"], mean, std, data, val_idx, train_sets, seed=3
+    )
+    assert set(by_set) == set(
+        train_sets
+    )  # both sets have val rows at n=60/permille=500
     table = economics.render_by_set_table(by_set)
     assert isinstance(table, str)
     for s in train_sets:

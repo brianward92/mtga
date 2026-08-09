@@ -9,33 +9,41 @@ from scripts.fetch_untapped_pick_order import (
 
 def fixture_html():
     page = {
-        "props": {"pageProps": {
-            "clientProps": {"setCode": "TST"},
-            "ssrProps": {
-                "minifiedMtgaJsonData": {
-                    "localeData": [[1001, "Alpha"], [1002, "Beta"]],
-                    "cardData": [[11, 1001], [12, 1002]],
+        "props": {
+            "pageProps": {
+                "clientProps": {"setCode": "TST"},
+                "ssrProps": {
+                    "minifiedMtgaJsonData": {
+                        "localeData": [[1001, "Alpha"], [1002, "Beta"]],
+                        "cardData": [[11, 1001], [12, 1002]],
+                    },
+                    "limitedCardStatsResp": {
+                        "lastModified": 1_700_000_000_000,
+                        "data": {
+                            "data": {
+                                "1001": {
+                                    "ALL": {
+                                        "b": [[10], [8, 5], [4, 3]],
+                                        "p": [[20], [12, 7], [6, 4]],
+                                    }
+                                }
+                            }
+                        },
+                    },
+                    "limitedDraftInfo": {
+                        "lastModified": 1_700_000_100_000,
+                        "data": [
+                            {
+                                "title_id": 1001,
+                                "offered_qty": {"bronze": 1, "platinum": 3},
+                                "avg_pick_chosen": {"bronze": 2, "platinum": 4},
+                                "avg_last_pick_offered": {"bronze": 3, "platinum": 5},
+                            }
+                        ],
+                    },
                 },
-                "limitedCardStatsResp": {
-                    "lastModified": 1_700_000_000_000,
-                    "data": {"data": {
-                        "1001": {"ALL": {
-                            "b": [[10], [8, 5], [4, 3]],
-                            "p": [[20], [12, 7], [6, 4]],
-                        }}
-                    }},
-                },
-                "limitedDraftInfo": {
-                    "lastModified": 1_700_000_100_000,
-                    "data": [{
-                        "title_id": 1001,
-                        "offered_qty": {"bronze": 1, "platinum": 3},
-                        "avg_pick_chosen": {"bronze": 2, "platinum": 4},
-                        "avg_last_pick_offered": {"bronze": 3, "platinum": 5},
-                    }],
-                },
-            },
-        }},
+            }
+        },
     }
     return f"""
       <span>Tier</span><span>A<span>+</span></span>
@@ -53,12 +61,14 @@ def test_parse_page_extracts_visible_tier_order_and_next_data():
 
 
 def test_aggregate_card_stats_sums_rank_blocks():
-    result = aggregate_card_stats({
-        "ALL": {
-            "b": [[10], [8, 5], [4, 3]],
-            "p": [[20], [12, 7], [6, 4]],
+    result = aggregate_card_stats(
+        {
+            "ALL": {
+                "b": [[10], [8, 5], [4, 3]],
+                "p": [[20], [12, 7], [6, 4]],
+            }
         }
-    })
+    )
     assert result["games"] == 30
     assert result["in_hand_games"] == 20
     assert result["in_hand_wins"] == 12

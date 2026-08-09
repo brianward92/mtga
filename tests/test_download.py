@@ -18,8 +18,11 @@ from mtga.lands import download, paths
 def _head_response(status=200, etag='"abc123"'):
     response = mock.Mock()
     response.status_code = status
-    response.headers = {"ETag": etag, "Last-Modified": "Mon, 01 Jan 2026",
-                        "Content-Length": "12"}
+    response.headers = {
+        "ETag": etag,
+        "Last-Modified": "Mon, 01 Jan 2026",
+        "Content-Length": "12",
+    }
     return response
 
 
@@ -109,9 +112,7 @@ def test_fetch_card_ratings_once_per_day(data_root):
     today = datetime.date.today().isoformat()
 
     with mock.patch.object(download, "requests", requests):
-        assert download.fetch_card_ratings(SET, "PremierDraft") == (
-            download.DOWNLOADED
-        )
+        assert download.fetch_card_ratings(SET, "PremierDraft") == (download.DOWNLOADED)
         # Today's file now exists: the endpoint must NOT be hit again.
         assert download.fetch_card_ratings(SET, "PremierDraft") == (
             download.CACHED_TODAY
@@ -141,9 +142,7 @@ def test_fetch_color_ratings_params_and_release_date(data_root):
     requests = mock.Mock()
     requests.get.return_value.json.return_value = []
     with mock.patch.object(download, "requests", requests):
-        assert download.fetch_color_ratings(SET, "TradDraft") == (
-            download.DOWNLOADED
-        )
+        assert download.fetch_color_ratings(SET, "TradDraft") == (download.DOWNLOADED)
     params = requests.get.call_args.kwargs["params"]
     assert params["event_type"] == "TradDraft"
     assert "format" not in params

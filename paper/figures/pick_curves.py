@@ -36,13 +36,11 @@ PANELS = [
 
 def main():
     data = json.loads(DATA.read_text())
-    fig, axes = plt.subplots(1, 4, figsize=(9.6, 2.6), dpi=200,
-                             sharey=True)
+    fig, axes = plt.subplots(1, 4, figsize=(9.6, 2.6), dpi=200, sharey=True)
     for ax, (key, title) in zip(axes, PANELS):
         curve = data["sets"][key]["per_pick_curve"]
         picks_per_pack = max(r["pick_number"] for r in curve) + 1
-        xs = [r["pack_number"] * picks_per_pack + r["pick_number"] + 1
-              for r in curve]
+        xs = [r["pack_number"] * picks_per_pack + r["pick_number"] + 1 for r in curve]
         order = sorted(range(len(xs)), key=lambda i: xs[i])
         xs = [xs[i] for i in order]
         top1 = [100 * curve[i]["top1"] for i in order]
@@ -65,8 +63,9 @@ def main():
     axes[0].legend(fontsize=7, frameon=False, loc="upper center")
     fig.tight_layout()
     out = HERE / "pick_curves.pdf"
-    fig.savefig(out, bbox_inches="tight",
-                metadata={"CreationDate": None, "ModDate": None})
+    fig.savefig(
+        out, bbox_inches="tight", metadata={"CreationDate": None, "ModDate": None}
+    )
     print(f"wrote {out}")
 
 

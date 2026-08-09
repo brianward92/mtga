@@ -30,9 +30,10 @@ def _curated_meta(set_code):
 def test_detect_schema_era():
     assert etl.detect_schema_era(["expansion", "rank", "pick"]) == "modern"
     assert etl.detect_schema_era(["user_n_matches_bucket", "pick"]) == "match_buckets"
-    assert etl.detect_schema_era(
-        ["user_n_matches_bucket", "user_rank", "pick"]
-    ) == "match_buckets_rank"
+    assert (
+        etl.detect_schema_era(["user_n_matches_bucket", "user_rank", "pick"])
+        == "match_buckets_rank"
+    )
 
 
 def test_old_schema_curates_to_identical_columns(data_root):
@@ -74,7 +75,8 @@ def test_old_schema_curates_to_identical_columns(data_root):
 def test_mid_era_user_rank_maps_to_rank(data_root):
     rows = _synth.hand_draft_rows()
     _synth.write_old_draft_csv(
-        paths.raw_dataset_path("draft", "OLDR", FMT), rows,
+        paths.raw_dataset_path("draft", "OLDR", FMT),
+        rows,
         era="match_buckets_rank",
     )
     frame = _curate("OLDR")
@@ -87,9 +89,16 @@ def test_mid_era_user_rank_maps_to_rank(data_root):
 def test_meta_records_empirical_pack_shape(data_root):
     # Drafts that include pack 0 pick 0 -> P1P1 present, 4 picks per pack.
     rows = [
-        dict(draft_id="d1", pack_number=pack, pick_number=i,
-             pick=VOCAB[i], pack={VOCAB[i]: 1}, pool={})
-        for pack in (0, 1) for i in range(4)
+        dict(
+            draft_id="d1",
+            pack_number=pack,
+            pick_number=i,
+            pick=VOCAB[i],
+            pack={VOCAB[i]: 1},
+            pool={},
+        )
+        for pack in (0, 1)
+        for i in range(4)
     ]
     _synth.write_draft_csv(paths.raw_dataset_path("draft", SET, FMT), rows)
     etl.curate_draft(SET, FMT)

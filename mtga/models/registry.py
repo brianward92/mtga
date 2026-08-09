@@ -53,7 +53,9 @@ class OnnxEVModel:
             str(version_dir / "model.onnx"), providers=["CPUExecutionProvider"]
         )
 
-    def score_pack(self, pack_grp_ids, pool_grp_ids, pack_number=None, pick_number=None):
+    def score_pack(
+        self, pack_grp_ids, pool_grp_ids, pack_number=None, pick_number=None
+    ):
         pool = np.zeros((1, self.n_cards), dtype=np.float32)
         for grp_id in pool_grp_ids:
             index = self.grp_to_index.get(grp_id)
@@ -130,8 +132,10 @@ def resolve(set_code, limited_type):
             try:
                 model = OnnxDraftFMModel(foundation, set_code, limited_type)
             except Exception as err:  # noqa: BLE001 — degrade, never 500
-                print(f"draftfm unavailable for {set_code} {limited_type}: "
-                      f"{type(err).__name__}: {err}")
+                print(
+                    f"draftfm unavailable for {set_code} {limited_type}: "
+                    f"{type(err).__name__}: {err}"
+                )
 
     if model is None:
         for fmt in [limited_type, "PremierDraft"]:

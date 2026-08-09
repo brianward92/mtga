@@ -18,11 +18,14 @@ def create_parser():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--fixture", required=True)
     parser.add_argument("--out", default="/tmp/fake_player.log")
-    parser.add_argument("--speed", type=float, default=20.0,
-                        help="lines per second")
-    parser.add_argument("--truncate-at", type=float, default=None,
-                        help="fraction (0-1) of the way through, truncate the "
-                             "file and restart from 0 — exercises reopen logic")
+    parser.add_argument("--speed", type=float, default=20.0, help="lines per second")
+    parser.add_argument(
+        "--truncate-at",
+        type=float,
+        default=None,
+        help="fraction (0-1) of the way through, truncate the "
+        "file and restart from 0 — exercises reopen logic",
+    )
     return parser
 
 

@@ -29,20 +29,25 @@ def _pick_meta(set_code, limited_type):
 
     parquet = paths.curated_path("draft", set_code, limited_type)
     con = duckdb.connect()
-    frame = con.execute(
-        f"""
+    frame = con.execute(f"""
         SELECT draft_id, pack_number, pick_number,
                user_game_win_rate_bucket, user_n_games_bucket
         FROM '{parquet}' WHERE pick_index >= 0
-        """
-    ).df()
+        """).df()
     con.close()
     return frame
 
 
-def foundation_predictions(model, set_code, limited_type, device="cpu",
-                           condition_wr_id=None, condition_games_id=None,
-                           batch_size=BATCH, temperature=1.0):
+def foundation_predictions(
+    model,
+    set_code,
+    limited_type,
+    device="cpu",
+    condition_wr_id=None,
+    condition_games_id=None,
+    batch_size=BATCH,
+    temperature=1.0,
+):
     """Predictions parquet rows for a DraftFM model on one (set, format).
 
     Zero-shot evaluation: the shard may cover a set the model never trained
@@ -84,20 +89,24 @@ def foundation_predictions(model, set_code, limited_type, device="cpu",
                 f"{expected}, and the difference is not the {TEXT_EMB_DIM}-d "
                 f"text block: the shard for {set_code}.{limited_type} was "
                 f"featurized through a different manifest than this model "
-                f"trained on. Refusing to score a mismatched feature space")
+                f"trained on. Refusing to score a mismatched feature space"
+            )
     features = torch.from_numpy(matrix)
     shard = Shard(set_code, limited_type, features)
     shard.rarity_ids = torch.from_numpy(assets["rarity_ids"].astype(np.int64))
-    shard.set_scalars = torch.tensor([
-        shard.meta["vocab_size"] / 400.0,
-        float(shard.meta.get("picks_per_pack") == 13),
-        float(shard.meta.get("picks_per_pack") == 14),
-        float(shard.meta.get("picks_per_pack") == 15),
-    ])
+    shard.set_scalars = torch.tensor(
+        [
+            shard.meta["vocab_size"] / 400.0,
+            float(shard.meta.get("picks_per_pack") == 13),
+            float(shard.meta.get("picks_per_pack") == 14),
+            float(shard.meta.get("picks_per_pack") == 15),
+        ]
+    )
     meta = _pick_meta(set_code, limited_type)
     if len(meta) != shard.meta["rows"]:
         raise RuntimeError(
-            f"shard/parquet row mismatch: {shard.meta['rows']} vs {len(meta)}")
+            f"shard/parquet row mismatch: {shard.meta['rows']} vs {len(meta)}"
+        )
 
     model = model.to(device).eval()
     feats = shard.features.to(device)
@@ -116,8 +125,9 @@ def foundation_predictions(model, set_code, limited_type, device="cpu",
             if condition_wr_id is not None:
                 batch["wr_id"] = torch.full_like(batch["wr_id"], condition_wr_id)
             if condition_games_id is not None:
-                batch["games_id"] = torch.full_like(batch["games_id"],
-                                                    condition_games_id)
+                batch["games_id"] = torch.full_like(
+                    batch["games_id"], condition_games_id
+                )
             logits = model(table, summary, batch)
             valid = torch.isfinite(logits)
             # Rank from the unscaled logits: dividing by a positive
@@ -129,21 +139,25 @@ def foundation_predictions(model, set_code, limited_type, device="cpu",
             rank = (logits > target_logit).sum(dim=1) + 1
             probs = torch.softmax(logits / temperature, dim=1)
             ranks[rows] = rank.cpu().numpy()
-            pick_probs[rows] = probs.gather(1, target.unsqueeze(1)).squeeze(1).cpu().numpy()
+            pick_probs[rows] = (
+                probs.gather(1, target.unsqueeze(1)).squeeze(1).cpu().numpy()
+            )
             top_probs[rows] = probs.max(dim=1).values.cpu().numpy()
             sizes[rows] = valid.sum(dim=1).cpu().numpy()
 
-    return pd.DataFrame({
-        "draft_id": meta["draft_id"],
-        "pack_number": meta["pack_number"].astype(int),
-        "pick_number": meta["pick_number"].astype(int),
-        "pack_size": sizes,
-        "wr_bucket": meta["user_game_win_rate_bucket"].astype(float),
-        "n_games_bucket": meta["user_n_games_bucket"].astype(int),
-        "target_rank": ranks,
-        "pick_prob": pick_probs,
-        "top_prob": top_probs,
-    })
+    return pd.DataFrame(
+        {
+            "draft_id": meta["draft_id"],
+            "pack_number": meta["pack_number"].astype(int),
+            "pick_number": meta["pick_number"].astype(int),
+            "pack_size": sizes,
+            "wr_bucket": meta["user_game_win_rate_bucket"].astype(float),
+            "n_games_bucket": meta["user_n_games_bucket"].astype(int),
+            "target_rank": ranks,
+            "pick_prob": pick_probs,
+            "top_prob": top_probs,
+        }
+    )
 
 
 def _softmax(logits):
@@ -177,8 +191,7 @@ def baseline_predictions(set_code, limited_type, kind, seed=BASELINE_SEED):
     meta = _pick_meta(set_code, limited_type)
     n = shard.meta["rows"]
     if len(meta) != n:
-        raise RuntimeError(
-            f"shard/parquet row mismatch: {n} vs {len(meta)}")
+        raise RuntimeError(f"shard/parquet row mismatch: {n} vs {len(meta)}")
 
     pack_slots = np.asarray(shard.pack_slots)
     sizes = (pack_slots != PAD).sum(axis=1).astype(np.int32)
@@ -197,8 +210,10 @@ def baseline_predictions(set_code, limited_type, kind, seed=BASELINE_SEED):
         canonical, _, _ = cardstore.name_resolution(set_code)
         # Unique negative sentinel per unmapped slot: never in the heuristic's
         # card table, so it scores ev None deterministically.
-        grp_of = np.array([canonical.get(name, -(i + 1))
-                           for i, name in enumerate(vocab)], dtype=np.int64)
+        grp_of = np.array(
+            [canonical.get(name, -(i + 1)) for i, name in enumerate(vocab)],
+            dtype=np.int64,
+        )
         model = RarityColorHeuristic(set_code)
 
         pool_slots = np.asarray(shard.pool_slots)
@@ -209,15 +224,16 @@ def baseline_predictions(set_code, limited_type, kind, seed=BASELINE_SEED):
         pick_probs = np.empty(n, dtype=np.float32)
         top_probs = np.empty(n, dtype=np.float32)
         for i in range(n):
-            real = pack_slots[i, :sizes[i]]
+            real = pack_slots[i, : sizes[i]]
             pack_grps = [int(grp_of[s]) for s in real]
             pool_grps = []
             for slot, count in zip(pool_slots[i], pool_counts[i]):
                 if slot == PAD:
                     break
                 pool_grps.extend([int(grp_of[slot])] * int(count))
-            scores = model.score_pack(pack_grps, pool_grps,
-                                      int(context[i, 0]), int(context[i, 1]))
+            scores = model.score_pack(
+                pack_grps, pool_grps, int(context[i, 0]), int(context[i, 1])
+            )
             target = int(grp_of[pack_slots[i, pick_pos[i]]])
             by_grp = {s.grp_id: s for s in scores}
             ranks[i] = by_grp[target].rank
@@ -226,22 +242,29 @@ def baseline_predictions(set_code, limited_type, kind, seed=BASELINE_SEED):
     else:
         raise ValueError(f"unknown baseline kind: {kind!r}")
 
-    return pd.DataFrame({
-        "draft_id": meta["draft_id"],
-        "pack_number": meta["pack_number"].astype(int),
-        "pick_number": meta["pick_number"].astype(int),
-        "pack_size": sizes,
-        "wr_bucket": meta["user_game_win_rate_bucket"].astype(float),
-        "n_games_bucket": meta["user_n_games_bucket"].astype(int),
-        "target_rank": ranks,
-        "pick_prob": pick_probs,
-        "top_prob": top_probs,
-    })
+    return pd.DataFrame(
+        {
+            "draft_id": meta["draft_id"],
+            "pack_number": meta["pack_number"].astype(int),
+            "pick_number": meta["pick_number"].astype(int),
+            "pack_size": sizes,
+            "wr_bucket": meta["user_game_win_rate_bucket"].astype(float),
+            "n_games_bucket": meta["user_n_games_bucket"].astype(int),
+            "target_rank": ranks,
+            "pick_prob": pick_probs,
+            "top_prob": top_probs,
+        }
+    )
 
 
-def per_set_model_predictions(set_code, limited_type, version="latest",
-                              split="val", min_wr_bucket=0.55,
-                              min_games_bucket=100):
+def per_set_model_predictions(
+    set_code,
+    limited_type,
+    version="latest",
+    split="val",
+    min_wr_bucket=0.55,
+    min_games_bucket=100,
+):
     """Predictions parquet rows for a trained per-set ONNX model.
 
     split: "val" (the model's held-out drafts), "train", or "all".
@@ -259,8 +282,11 @@ def per_set_model_predictions(set_code, limited_type, version="latest",
         set_code, limited_type, min_wr_bucket, min_games_bucket
     )
     train_mask, val_mask = split_by_draft(meta["draft_id"])
-    keep = {"val": val_mask, "train": train_mask,
-            "all": np.ones(len(picks), dtype=bool)}[split]
+    keep = {
+        "val": val_mask,
+        "train": train_mask,
+        "all": np.ones(len(picks), dtype=bool),
+    }[split]
     pool, pack, picks = pool[keep], pack[keep], picks[keep]
     meta = meta[keep].reset_index(drop=True)
 
@@ -278,18 +304,21 @@ def per_set_model_predictions(set_code, limited_type, version="latest",
             rank = int(np.flatnonzero(order == target)[0]) + 1
             probs = _softmax(cand_logits)
             target_pos = int(np.flatnonzero(candidates == target)[0])
-            rows.append((rank, float(probs[target_pos]), float(probs.max()),
-                         len(candidates)))
+            rows.append(
+                (rank, float(probs[target_pos]), float(probs.max()), len(candidates))
+            )
 
     ranks, pick_probs, top_probs, sizes = map(np.array, zip(*rows))
-    return pd.DataFrame({
-        "draft_id": meta["draft_id"],
-        "pack_number": meta["pack_number"].astype(int),
-        "pick_number": meta["pick_number"].astype(int),
-        "pack_size": sizes,
-        "wr_bucket": meta["user_game_win_rate_bucket"].astype(float),
-        "n_games_bucket": meta["user_n_games_bucket"].astype(int),
-        "target_rank": ranks,
-        "pick_prob": pick_probs,
-        "top_prob": top_probs,
-    })
+    return pd.DataFrame(
+        {
+            "draft_id": meta["draft_id"],
+            "pack_number": meta["pack_number"].astype(int),
+            "pick_number": meta["pick_number"].astype(int),
+            "pack_size": sizes,
+            "wr_bucket": meta["user_game_win_rate_bucket"].astype(float),
+            "n_games_bucket": meta["user_n_games_bucket"].astype(int),
+            "target_rank": ranks,
+            "pick_prob": pick_probs,
+            "top_prob": top_probs,
+        }
+    )

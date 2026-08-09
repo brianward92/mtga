@@ -32,7 +32,7 @@ def is_tar_in_gzip(path):
     """True if gunzipping `path` yields a ustar tarball, not a bare CSV."""
     with gzip.open(path, "rb") as file:
         head = file.read(TAR_MAGIC_OFFSET + 8)
-    return head[TAR_MAGIC_OFFSET:TAR_MAGIC_OFFSET + 5] == b"ustar"
+    return head[TAR_MAGIC_OFFSET : TAR_MAGIC_OFFSET + 5] == b"ustar"
 
 
 def decoded_path(raw_path):
@@ -93,8 +93,9 @@ def ensure_decoded(raw_path):
                 raise ValueError(
                     f"{raw_path.name}: multiple files inside tarball; expected a single CSV"
                 )
-            with tar.extractfile(member) as src, \
-                    gzip.open(part, "wb", compresslevel=GZIP_LEVEL) as out:
+            with tar.extractfile(member) as src, gzip.open(
+                part, "wb", compresslevel=GZIP_LEVEL
+            ) as out:
                 shutil.copyfileobj(src, out, CHUNK_BYTES)
             extracted = True
     if not extracted:
@@ -103,8 +104,12 @@ def ensure_decoded(raw_path):
 
     with open(dest_meta, "w") as file:
         json.dump(
-            {"source_etag": source_etag, "source": raw_path.name,
-             "decoded_from": "tar_in_gzip"},
-            file, indent=2,
+            {
+                "source_etag": source_etag,
+                "source": raw_path.name,
+                "decoded_from": "tar_in_gzip",
+            },
+            file,
+            indent=2,
         )
     return dest

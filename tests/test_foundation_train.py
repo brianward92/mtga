@@ -55,17 +55,30 @@ def synthetic_shard(data_root):
     np.save(out / "pick_pos.npy", pick_pos)
     np.save(out / "context.npy", context)
     np.save(out / "split.npy", split)
-    (out / "meta.json").write_text(json.dumps({
-        "set": "TST", "format": "PremierDraft", "rows": ROWS,
-        "vocab_size": VOCAB, "source_etag": "tst", "picks_per_pack": 14,
-        "p1p1_missing": False, "val_permille": 50,
-    }))
+    (out / "meta.json").write_text(
+        json.dumps(
+            {
+                "set": "TST",
+                "format": "PremierDraft",
+                "rows": ROWS,
+                "vocab_size": VOCAB,
+                "source_etag": "tst",
+                "picks_per_pack": 14,
+                "p1p1_missing": False,
+                "val_permille": 50,
+            }
+        )
+    )
 
     features = rng.normal(size=(VOCAB, FEAT)).astype(np.float16)
     rarity_ids = rng.integers(0, 5, size=VOCAB).astype(np.uint8)
-    np.savez(out / "features.npz", features=features, rarity_ids=rarity_ids,
-             names=np.array([f"c{i}" for i in range(VOCAB)], dtype=object),
-             manifest_hash="tst")
+    np.savez(
+        out / "features.npz",
+        features=features,
+        rarity_ids=rarity_ids,
+        names=np.array([f"c{i}" for i in range(VOCAB)], dtype=object),
+        manifest_hash="tst",
+    )
     return out
 
 
@@ -84,9 +97,18 @@ def test_shard_loads_and_splits(synthetic_shard):
 
 def test_train_learns_planted_signal(synthetic_shard):
     config = TrainConfig(
-        name="smoke", sets=[("TST", "PremierDraft")], seed=17, batch_size=256,
-        lr=3e-3, max_steps=120, d_model=32, val_every=60, patience=10,
-        device="cpu", parity_check=False, warmup_steps=10,
+        name="smoke",
+        sets=[("TST", "PremierDraft")],
+        seed=17,
+        batch_size=256,
+        lr=3e-3,
+        max_steps=120,
+        d_model=32,
+        val_every=60,
+        patience=10,
+        device="cpu",
+        parity_check=False,
+        warmup_steps=10,
     )
     record = train(config)
     # 'Always take the bomb' is trivially learnable; random = 1/5.
@@ -94,5 +116,6 @@ def test_train_learns_planted_signal(synthetic_shard):
     assert record["n_params"] > 0
     # Ledger row exists for the run
     from mtga.foundation.runlog import LEDGER
+
     lines = [json.loads(l) for l in open(LEDGER)]
     assert any(l["run_id"] == record["run_id"] for l in lines)

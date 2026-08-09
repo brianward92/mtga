@@ -9,7 +9,9 @@ import os
 from pathlib import Path
 
 DATA_ROOT = Path(
-    os.environ.get("MTGA_DATA_ROOT", f"/opt/{os.environ.get('USER', 'unknown')}/dat/mtga")
+    os.environ.get(
+        "MTGA_DATA_ROOT", f"/opt/{os.environ.get('USER', 'unknown')}/dat/mtga"
+    )
 )
 
 LANDS_DIR = DATA_ROOT / "17lands"

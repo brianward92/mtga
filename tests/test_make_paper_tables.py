@@ -3,7 +3,6 @@ from pathlib import Path
 
 import pytest
 
-
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "make_paper_tables.py"
 SPEC = importlib.util.spec_from_file_location("make_paper_tables", SCRIPT)
 mpt = importlib.util.module_from_spec(SPEC)
@@ -22,8 +21,9 @@ def entry(run_id, config_name, summary=None, best_sha256="best-hash"):
     }
 
 
-def manifest(run_id="pinned", config_name="f_dev", require_summary=False,
-             best_sha256="best-hash"):
+def manifest(
+    run_id="pinned", config_name="f_dev", require_summary=False, best_sha256="best-hash"
+):
     return {
         "schema_version": 1,
         "runs": {
@@ -44,7 +44,8 @@ def test_manifest_selects_exact_run_not_newest_matching_config():
     }
 
     selected = mpt.runs_by_manifest(
-        runs, manifest(require_summary=True), required_roles={"f_dev"})
+        runs, manifest(require_summary=True), required_roles={"f_dev"}
+    )
 
     assert selected["f_dev"]["run_id"] == "pinned"
     assert selected["f_dev"]["summary"] == {"value": "pinned"}

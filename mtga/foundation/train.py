@@ -18,8 +18,7 @@ import torch
 
 from mtga.foundation import runlog
 from mtga.foundation.dataset import PAD, Shard, shard_dir
-from mtga.foundation.model import (DraftFM, masked_cross_entropy,
-                                   position_features)
+from mtga.foundation.model import DraftFM, masked_cross_entropy, position_features
 from mtga.lands import paths
 
 LOG_EVERY = 50
@@ -29,13 +28,13 @@ SPIKE_FACTOR = 3.0
 @dataclass
 class TrainConfig:
     name: str = "v1_base"
-    sets: list = field(default_factory=list)        # (set_code, format) pairs
+    sets: list = field(default_factory=list)  # (set_code, format) pairs
     seed: int = 17
     batch_size: int = 8192
     lr: float = 1e-3
     warmup_steps: int = 2000
-    epochs: float = 4.0                              # presentation budget
-    max_steps: int = 0                               # 0 = derive from epochs
+    epochs: float = 4.0  # presentation budget
+    max_steps: int = 0  # 0 = derive from epochs
     d_model: int = 256
     dropout: float = 0.1
     set_ctx: bool = True
@@ -51,7 +50,7 @@ class TrainConfig:
     init_from: str = ""  # checkpoint path: fine-tune mode (loads weights first)
 
 
-EXPERT_WR_ID = 28    # round(0.55 * 50)
+EXPERT_WR_ID = 28  # round(0.55 * 50)
 EXPERT_GAMES_ID = 4  # index of 100 in GAMES_BUCKETS
 
 
@@ -67,17 +66,22 @@ def load_shards(pairs, no_text=False, skill_filter=False):
         shard = Shard(set_code, limited_type, features)
         if skill_filter:
             ctx = shard.context[:]
-            expert = ((ctx[:, 2] >= EXPERT_WR_ID) & (ctx[:, 2] != 255)
-                      & (ctx[:, 3] >= EXPERT_GAMES_ID))
+            expert = (
+                (ctx[:, 2] >= EXPERT_WR_ID)
+                & (ctx[:, 2] != 255)
+                & (ctx[:, 3] >= EXPERT_GAMES_ID)
+            )
             shard.train_idx = shard.train_idx[expert[shard.train_idx]]
             shard.val_idx = shard.val_idx[expert[shard.val_idx]]
         shard.rarity_ids = torch.from_numpy(assets["rarity_ids"].astype(np.int64))
-        shard.set_scalars = torch.tensor([
-            shard.meta["vocab_size"] / 400.0,
-            float(shard.meta.get("picks_per_pack") == 13),
-            float(shard.meta.get("picks_per_pack") == 14),
-            float(shard.meta.get("picks_per_pack") == 15),
-        ])
+        shard.set_scalars = torch.tensor(
+            [
+                shard.meta["vocab_size"] / 400.0,
+                float(shard.meta.get("picks_per_pack") == 13),
+                float(shard.meta.get("picks_per_pack") == 14),
+                float(shard.meta.get("picks_per_pack") == 15),
+            ]
+        )
         shards.append(shard)
     return shards
 
@@ -99,12 +103,23 @@ def make_batch(shard, rows, device):
     return {k: v.to(device) for k, v in batch.items()}
 
 
-def run_steps(model, shards, config, n_steps, device, rng, optimizer=None,
-              scheduler=None, watchdog=True, progress=None, state=None):
+def run_steps(
+    model,
+    shards,
+    config,
+    n_steps,
+    device,
+    rng,
+    optimizer=None,
+    scheduler=None,
+    watchdog=True,
+    progress=None,
+    state=None,
+):
     """The core loop; returns trailing loss history. state carries counters
     across resumed segments."""
     weights = np.array([len(s.train_idx) for s in shards], dtype=np.float64)
-    weights = weights ** config.sampling_alpha
+    weights = weights**config.sampling_alpha
     weights /= weights.sum()
 
     features = {id(s): s.features.to(device) for s in shards}
@@ -114,13 +129,17 @@ def run_steps(model, shards, config, n_steps, device, rng, optimizer=None,
     skipped = []
     for step in range(n_steps):
         shard = shards[rng.choice(len(shards), p=weights)]
-        rows = np.sort(rng.choice(shard.train_idx, size=min(
-            config.batch_size, len(shard.train_idx)), replace=False))
+        rows = np.sort(
+            rng.choice(
+                shard.train_idx,
+                size=min(config.batch_size, len(shard.train_idx)),
+                replace=False,
+            )
+        )
         batch = make_batch(shard, rows, device)
         table, summary = model.encode_set(features[id(shard)], rarities[id(shard)])
         logits = model(table, summary, batch)
-        loss = masked_cross_entropy(logits, batch["pick_pos"],
-                                    config.label_smoothing)
+        loss = masked_cross_entropy(logits, batch["pick_pos"], config.label_smoothing)
         if optimizer is not None:
             optimizer.zero_grad(set_to_none=True)
             loss.backward()
@@ -134,12 +153,16 @@ def run_steps(model, shards, config, n_steps, device, rng, optimizer=None,
                 # corruption -> halt.
                 skipped.append(step)
                 optimizer.zero_grad(set_to_none=True)
-                print(f"WARNING: non-finite grad norm at step {step}; "
-                      f"update skipped ({len(skipped)} total)", flush=True)
+                print(
+                    f"WARNING: non-finite grad norm at step {step}; "
+                    f"update skipped ({len(skipped)} total)",
+                    flush=True,
+                )
                 recent = [s for s in skipped if s > step - 500]
                 if len(recent) > 5:
                     raise RuntimeError(
-                        f"{len(recent)} non-finite grads in 500 steps — halting")
+                        f"{len(recent)} non-finite grads in 500 steps — halting"
+                    )
             if scheduler is not None:
                 scheduler.step()
 
@@ -149,7 +172,8 @@ def run_steps(model, shards, config, n_steps, device, rng, optimizer=None,
                 trailing = np.median(losses[-10:]) if losses else value
                 if len(losses) > 10 and value > SPIKE_FACTOR * trailing:
                     raise RuntimeError(
-                        f"loss spike at step {step}: {value:.3f} vs median {trailing:.3f}")
+                        f"loss spike at step {step}: {value:.3f} vs median {trailing:.3f}"
+                    )
             if math.isfinite(value):
                 losses.append(value)
             # Non-finite loss falls through: backward yields non-finite grads
@@ -170,15 +194,18 @@ def parity_check(config, shards, batch_size=512):
     randomly on phantom flakes blocks launches without adding safety.
     """
     shard = shards[0]
-    rows = np.sort(np.random.default_rng(config.seed).choice(
-        shard.train_idx, size=min(batch_size, len(shard.train_idx)),
-        replace=False))
+    rows = np.sort(
+        np.random.default_rng(config.seed).choice(
+            shard.train_idx, size=min(batch_size, len(shard.train_idx)), replace=False
+        )
+    )
     report = {}
 
     def build(device):
         torch.manual_seed(config.seed)
-        model = DraftFM(shard.features.shape[1], config.d_model,
-                        dropout=0.0, set_ctx=config.set_ctx).to(device)
+        model = DraftFM(
+            shard.features.shape[1], config.d_model, dropout=0.0, set_ctx=config.set_ctx
+        ).to(device)
         return model
 
     for device in ["cpu", config.device]:
@@ -188,25 +215,29 @@ def parity_check(config, shards, batch_size=512):
         batch = make_batch(shard, rows, device)
 
         table, summary = model.encode_set(features, rarities)
-        loss = masked_cross_entropy(model(table, summary, batch),
-                                    batch["pick_pos"], config.label_smoothing)
+        loss = masked_cross_entropy(
+            model(table, summary, batch), batch["pick_pos"], config.label_smoothing
+        )
         loss.backward()
-        grad_norm = torch.sqrt(sum(
-            (p.grad ** 2).sum() for p in model.parameters()
-            if p.grad is not None)).item()
+        grad_norm = torch.sqrt(
+            sum((p.grad**2).sum() for p in model.parameters() if p.grad is not None)
+        ).item()
 
         report[device] = {"loss": loss.item(), "grad_norm": grad_norm}
 
     cpu, dev = report["cpu"], report[config.device]
     checks = {
         "forward": (abs(cpu["loss"] - dev["loss"]) / max(abs(cpu["loss"]), 1e-9), 1e-4),
-        "grad_norm": (abs(cpu["grad_norm"] - dev["grad_norm"])
-                      / max(abs(cpu["grad_norm"]), 1e-9), 1e-3),
+        "grad_norm": (
+            abs(cpu["grad_norm"] - dev["grad_norm"]) / max(abs(cpu["grad_norm"]), 1e-9),
+            1e-3,
+        ),
     }
     report["checks"] = {k: {"rel": rel, "tol": tol} for k, (rel, tol) in checks.items()}
     # A NaN rel must FAIL, not silently pass a > comparison.
-    failed = {k for k, (rel, tol) in checks.items()
-              if not math.isfinite(rel) or rel > tol}
+    failed = {
+        k for k, (rel, tol) in checks.items() if not math.isfinite(rel) or rel > tol
+    }
     if failed:
         raise RuntimeError(f"CPU/{config.device} parity FAILED ({failed}): {report}")
     return report
@@ -226,7 +257,7 @@ def evaluate_val(model, shards, config, device, rng):
         features = shard.features.to(device)
         rarities = shard.rarity_ids.to(device)
         for start in range(0, take, config.batch_size):
-            chunk = rows[start:start + config.batch_size]
+            chunk = rows[start : start + config.batch_size]
             batch = make_batch(shard, chunk, device)
             table, summary = model.encode_set(features, rarities)
             logits = model(table, summary, batch)
@@ -250,8 +281,9 @@ def train(config):
     if device == "mps" and not torch.backends.mps.is_available():
         raise RuntimeError("MPS not available")
 
-    shards = load_shards(config.sets, no_text=config.no_text,
-                         skill_filter=config.skill_filter)
+    shards = load_shards(
+        config.sets, no_text=config.no_text, skill_filter=config.skill_filter
+    )
     total_train = sum(len(s.train_idx) for s in shards)
     steps = config.max_steps or int(config.epochs * total_train / config.batch_size)
     run_id = runlog.new_run_id(config.name)
@@ -264,15 +296,21 @@ def train(config):
     # featurize -> shard -> train, so the on-disk manifest is the one the
     # shards carry.
     try:
-        manifest_sha = json.loads(
-            paths.FEATURIZER_MANIFEST.read_text()).get("content_hash")
+        manifest_sha = json.loads(paths.FEATURIZER_MANIFEST.read_text()).get(
+            "content_hash"
+        )
     except (OSError, ValueError):
         manifest_sha = None
 
-    record = {"run_id": run_id, "config": asdict(config),
-              "n_train_picks": total_train, "n_shards": len(shards),
-              "planned_steps": steps, "torch_version": torch.__version__,
-              "featurizer_manifest_sha": manifest_sha}
+    record = {
+        "run_id": run_id,
+        "config": asdict(config),
+        "n_train_picks": total_train,
+        "n_shards": len(shards),
+        "planned_steps": steps,
+        "torch_version": torch.__version__,
+        "featurizer_manifest_sha": manifest_sha,
+    }
 
     if config.parity_check:
         record["parity"] = parity_check(config, shards)
@@ -282,17 +320,22 @@ def train(config):
 
     torch.manual_seed(config.seed)
     rng = np.random.default_rng(config.seed)
-    model = DraftFM(shards[0].features.shape[1], config.d_model,
-                    config.dropout, config.set_ctx).to(device)
+    model = DraftFM(
+        shards[0].features.shape[1], config.d_model, config.dropout, config.set_ctx
+    ).to(device)
     if config.init_from:
-        checkpoint = torch.load(config.init_from, map_location=device,
-                                weights_only=False)
+        checkpoint = torch.load(
+            config.init_from, map_location=device, weights_only=False
+        )
         model.load_state_dict(checkpoint["model"])
-        record["init_from"] = {"path": config.init_from,
-                               "sha256": runlog.file_sha256(config.init_from)}
+        record["init_from"] = {
+            "path": config.init_from,
+            "sha256": runlog.file_sha256(config.init_from),
+        }
     record["n_params"] = sum(p.numel() for p in model.parameters())
     optimizer = torch.optim.AdamW(
-        model.parameters(), lr=config.lr, betas=(0.9, 0.98), weight_decay=0.01)
+        model.parameters(), lr=config.lr, betas=(0.9, 0.98), weight_decay=0.01
+    )
     assert all(p.is_contiguous() for p in model.parameters())
 
     def lr_lambda(step):
@@ -300,6 +343,7 @@ def train(config):
             return step / max(config.warmup_steps, 1)
         progress = (step - config.warmup_steps) / max(steps - config.warmup_steps, 1)
         return 0.01 + 0.99 * 0.5 * (1 + math.cos(math.pi * min(progress, 1.0)))
+
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
 
     best = {"val_top1": -1.0, "step": 0}
@@ -311,44 +355,74 @@ def train(config):
     def progress(step_in_segment, loss_value, state):
         done = state["base"] + step_in_segment
         rate = done * config.batch_size / max(time.time() - started, 1)
-        print(f"step {done}/{steps} loss {loss_value:.4f} "
-              f"({rate:,.0f} ex/s)", flush=True)
+        print(
+            f"step {done}/{steps} loss {loss_value:.4f} " f"({rate:,.0f} ex/s)",
+            flush=True,
+        )
 
     for segment in range(segments):
         state = {"base": segment * config.val_every}
-        run_steps(model, shards, config,
-                  min(config.val_every, steps - state["base"]), device, rng,
-                  optimizer=optimizer, scheduler=scheduler,
-                  progress=progress, state=state)
+        run_steps(
+            model,
+            shards,
+            config,
+            min(config.val_every, steps - state["base"]),
+            device,
+            rng,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            progress=progress,
+            state=state,
+        )
         val_top1 = evaluate_val(model, shards, config, device, val_rng)
         elapsed = time.time() - started
-        print(f"[val] step {(segment+1)*config.val_every} top1 {val_top1:.4f} "
-              f"({elapsed/60:.0f} min)", flush=True)
-        torch.save({"model": model.state_dict(), "config": asdict(config),
-                    "step": (segment + 1) * config.val_every,
-                    "val_top1": val_top1,
-                    "featurizer_manifest_sha": manifest_sha},
-                   out_dir / "last.pt")
+        print(
+            f"[val] step {(segment+1)*config.val_every} top1 {val_top1:.4f} "
+            f"({elapsed/60:.0f} min)",
+            flush=True,
+        )
+        torch.save(
+            {
+                "model": model.state_dict(),
+                "config": asdict(config),
+                "step": (segment + 1) * config.val_every,
+                "val_top1": val_top1,
+                "featurizer_manifest_sha": manifest_sha,
+            },
+            out_dir / "last.pt",
+        )
         if val_top1 > best["val_top1"]:
             best = {"val_top1": val_top1, "step": (segment + 1) * config.val_every}
             stale = 0
-            torch.save({"model": model.state_dict(), "config": asdict(config),
-                        "featurizer_manifest_sha": manifest_sha, **best},
-                       out_dir / "best.pt")
+            torch.save(
+                {
+                    "model": model.state_dict(),
+                    "config": asdict(config),
+                    "featurizer_manifest_sha": manifest_sha,
+                    **best,
+                },
+                out_dir / "best.pt",
+            )
         else:
             stale += 1
             if stale >= config.patience:
                 print(f"early stop after segment {segment + 1}")
                 break
 
-    record.update({
-        "best_val_top1": best["val_top1"], "best_step": best["step"],
-        "wall_clock_s": round(time.time() - started, 1),
-        "examples_per_s": round(best["step"] * config.batch_size
-                                / max(time.time() - started, 1)),
-        "artifacts": {"best": str(out_dir / "best.pt"),
-                      "best_sha256": runlog.file_sha256(out_dir / "best.pt")},
-    })
+    record.update(
+        {
+            "best_val_top1": best["val_top1"],
+            "best_step": best["step"],
+            "wall_clock_s": round(time.time() - started, 1),
+            "examples_per_s": round(
+                best["step"] * config.batch_size / max(time.time() - started, 1)
+            ),
+            "artifacts": {
+                "best": str(out_dir / "best.pt"),
+                "best_sha256": runlog.file_sha256(out_dir / "best.pt"),
+            },
+        }
+    )
     (out_dir / "record.json").write_text(json.dumps(record, indent=2, default=str))
     runlog.append(record)
     return record

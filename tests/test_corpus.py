@@ -5,9 +5,36 @@ import pytest
 from mtga.lands import corpus
 
 RELEASE_ORDER = [
-    "STX", "AFR", "MID", "VOW", "NEO", "SNC", "HBG", "DMU", "BRO", "ONE",
-    "SIR", "MOM", "LTR", "WOE", "LCI", "KTK", "MKM", "OTJ", "MH3", "BLB",
-    "DSK", "FDN", "PIO", "DFT", "TDM", "FIN", "EOE", "TLA", "ECL", "TMT",
+    "STX",
+    "AFR",
+    "MID",
+    "VOW",
+    "NEO",
+    "SNC",
+    "HBG",
+    "DMU",
+    "BRO",
+    "ONE",
+    "SIR",
+    "MOM",
+    "LTR",
+    "WOE",
+    "LCI",
+    "KTK",
+    "MKM",
+    "OTJ",
+    "MH3",
+    "BLB",
+    "DSK",
+    "FDN",
+    "PIO",
+    "DFT",
+    "TDM",
+    "FIN",
+    "EOE",
+    "TLA",
+    "ECL",
+    "TMT",
     "SOS",
 ]
 
@@ -27,21 +54,24 @@ def test_specs_are_self_consistent():
 
 
 def test_premier_only_sets():
-    premier_only = {c for c, s in corpus.CORPUS.items()
-                    if s.formats == ("PremierDraft",)}
+    premier_only = {
+        c for c, s in corpus.CORPUS.items() if s.formats == ("PremierDraft",)
+    }
     assert premier_only == {"AFR", "MID", "VOW"}  # no TradDraft file on S3
 
 
 def test_tar_in_gzip_and_schema_eras():
     tar_sets = {c for c, s in corpus.CORPUS.items() if s.tar_in_gzip}
     assert tar_sets == {"STX", "AFR", "MID", "VOW"}
-    assert {c for c, s in corpus.CORPUS.items()
-            if s.schema_era == "match_buckets"} == {"STX", "AFR"}
-    assert {c for c, s in corpus.CORPUS.items()
-            if s.schema_era == "match_buckets_rank"} == {"MID", "VOW"}
+    assert {c for c, s in corpus.CORPUS.items() if s.schema_era == "match_buckets"} == {
+        "STX",
+        "AFR",
+    }
+    assert {
+        c for c, s in corpus.CORPUS.items() if s.schema_era == "match_buckets_rank"
+    } == {"MID", "VOW"}
     # Everything else is modern (NEO onward).
-    assert all(corpus.CORPUS[c].schema_era == "modern"
-               for c in RELEASE_ORDER[4:])
+    assert all(corpus.CORPUS[c].schema_era == "modern" for c in RELEASE_ORDER[4:])
 
 
 def test_p1p1_missing_sets():
@@ -52,8 +82,9 @@ def test_p1p1_missing_sets():
 def test_picks_per_pack():
     fifteens = {c for c, s in corpus.CORPUS.items() if s.picks_per_pack == 15}
     assert fifteens == {"STX", "KTK"}
-    assert all(s.picks_per_pack == 14 for c, s in corpus.CORPUS.items()
-               if c not in fifteens)
+    assert all(
+        s.picks_per_pack == 14 for c, s in corpus.CORPUS.items() if c not in fifteens
+    )
 
 
 def test_bonus_sheets_spot_checks():
@@ -91,7 +122,8 @@ def test_corpus_jobs_expands_to_59_shards():
 def test_corpus_jobs_narrows_to_requested_sets():
     assert corpus.corpus_jobs(["afr", "SOS"]) == [
         ("AFR", "PremierDraft"),
-        ("SOS", "PremierDraft"), ("SOS", "TradDraft"),
+        ("SOS", "PremierDraft"),
+        ("SOS", "TradDraft"),
     ]
 
 

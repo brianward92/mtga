@@ -21,13 +21,15 @@ from mtga.models.heuristic import (
 
 
 def test_pool_color_weights_splits_multicolor():
-    weights = pool_color_weights([
-        {"colors": "WU"},   # split 0.5 / 0.5
-        {"colors": "W"},
-        {"colors": "WUB"},  # split 1/3 each
-        {"colors": ""},     # colorless: contributes nothing
-        {"colors": None},
-    ])
+    weights = pool_color_weights(
+        [
+            {"colors": "WU"},  # split 0.5 / 0.5
+            {"colors": "W"},
+            {"colors": "WUB"},  # split 1/3 each
+            {"colors": ""},  # colorless: contributes nothing
+            {"colors": None},
+        ]
+    )
     assert weights["W"] == pytest.approx(0.5 + 1 + 1 / 3)
     assert weights["U"] == pytest.approx(0.5 + 1 / 3)
     assert weights["B"] == pytest.approx(1 / 3)
@@ -35,11 +37,11 @@ def test_pool_color_weights_splits_multicolor():
 
 
 def test_color_fit():
-    assert color_fit("", "WU") == 0.7    # colorless: playable anywhere
+    assert color_fit("", "WU") == 0.7  # colorless: playable anywhere
     assert color_fit(None, "WU") == 0.7
-    assert color_fit("W", "WU") == 1.0   # on lane
+    assert color_fit("W", "WU") == 1.0  # on lane
     assert color_fit("WB", "WU") == 0.5  # half on lane
-    assert color_fit("R", "WU") == 0.0   # off lane
+    assert color_fit("R", "WU") == 0.0  # off lane
     assert color_fit("XR", "WU") == 0.0  # junk letters ignored
 
 
@@ -87,14 +89,16 @@ def test_ratings_model_raises_without_any_source(data_root):
 def metrics_cache(card_store):
     """Own-metrics parquet (+ latest symlink) with the same numbers as the
     ratings fixture, so the quality hand-math above carries over."""
-    frame = pd.DataFrame({
-        "name": [CARD_A, CARD_B, CARD_C, CARD_D, "No Grp"],
-        "grp_id": [101.0, 102.0, 103.0, 104.0, None],
-        "color_identity": ["R", "W", "U", "G", "W"],
-        "rarity": ["common"] * 5,
-        "gih_wr_shrunk": [0.62, 0.60, 0.59, 0.55, 0.50],
-        "gih_games": [5000.0, 5000.0, 5000.0, 5000.0, 10.0],
-    })
+    frame = pd.DataFrame(
+        {
+            "name": [CARD_A, CARD_B, CARD_C, CARD_D, "No Grp"],
+            "grp_id": [101.0, 102.0, 103.0, 104.0, None],
+            "color_identity": ["R", "W", "U", "G", "W"],
+            "rarity": ["common"] * 5,
+            "gih_wr_shrunk": [0.62, 0.60, 0.59, 0.55, 0.50],
+            "gih_games": [5000.0, 5000.0, 5000.0, 5000.0, 10.0],
+        }
+    )
     dated = paths.metrics_cards_path(SET, FMT, "2026-01-01")
     dated.parent.mkdir(parents=True, exist_ok=True)
     frame.to_parquet(dated, index=False)
@@ -102,9 +106,7 @@ def metrics_cache(card_store):
     return dated
 
 
-def test_metrics_model_preferred_and_aliases_share_record(
-    metrics_cache, ratings_cache
-):
+def test_metrics_model_preferred_and_aliases_share_record(metrics_cache, ratings_cache):
     model = HeuristicRatingsModel(SET, FMT)
     assert model.source == "own-metrics"  # metrics beat the site cache
     # Every alias grpId of Lightning Bolt keys the same record: real packs

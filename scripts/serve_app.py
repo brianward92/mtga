@@ -8,7 +8,6 @@ from http import HTTPStatus
 from pathlib import Path
 from urllib.parse import urlparse
 
-
 NO_CACHE_SUFFIXES = {".html", ".js", ".css"}
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".avif"}
 PRECOMPRESSED_SUFFIXES = {".json", ".js"}

@@ -38,8 +38,7 @@ from mtga.foundation import evalproto
 REPO = Path(__file__).resolve().parents[1]
 
 FDEV_RUN = "20260704_135822_f_dev"
-FDEV_ZEROSHOT = Path(
-    f"/opt/bward/dat/mtga/foundation/runs/{FDEV_RUN}/zeroshot")
+FDEV_ZEROSHOT = Path(f"/opt/bward/dat/mtga/foundation/runs/{FDEV_RUN}/zeroshot")
 MSH_SHA = "013df16b8994534f69ed63c87ab684acafc5f4cbe82982264b0fc111dbb2183a"
 MSH_DIR = Path(f"/opt/bward/dat/mtga/foundation/frozen_eval/{MSH_SHA}")
 
@@ -63,12 +62,17 @@ def band_rows(frame):
     for name, lo, hi in BANDS:
         sub = known[(known["wr_bucket"] >= lo) & (known["wr_bucket"] < hi)]
         point, ci_lo, ci_hi = evalproto.cluster_bootstrap(sub, evalproto.top1)
-        out.append({
-            "band": name, "wr_lo": lo, "wr_hi": hi,
-            "n_picks": int(len(sub)),
-            "n_drafts": int(sub["draft_id"].nunique()),
-            "top1": point, "top1_ci": [ci_lo, ci_hi],
-        })
+        out.append(
+            {
+                "band": name,
+                "wr_lo": lo,
+                "wr_hi": hi,
+                "n_picks": int(len(sub)),
+                "n_drafts": int(sub["draft_id"].nunique()),
+                "top1": point,
+                "top1_ci": [ci_lo, ci_hi],
+            }
+        )
     return out
 
 
@@ -76,24 +80,28 @@ def curve_rows(frame):
     """evalproto.per_pick_curve as plain records (pack/pick 0-indexed)."""
     curve = evalproto.per_pick_curve(frame)
     return [
-        {"pack_number": int(r.pack_number), "pick_number": int(r.pick_number),
-         "top1": float(r.top1), "random_floor": float(r.random_floor),
-         "n": int(r.n)}
+        {
+            "pack_number": int(r.pack_number),
+            "pick_number": int(r.pick_number),
+            "top1": float(r.top1),
+            "random_floor": float(r.random_floor),
+            "n": int(r.n),
+        }
         for r in curve.itertuples()
     ]
 
 
 def analyze(frame, label):
     evalproto.validate(frame)
-    print(f"{label}: {len(frame):,} picks, "
-          f"{frame['draft_id'].nunique():,} drafts")
+    print(f"{label}: {len(frame):,} picks, " f"{frame['draft_id'].nunique():,} drafts")
     return {"skill_bands": band_rows(frame), "per_pick_curve": curve_rows(frame)}
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--out", default=str(
-        REPO / "paper" / "data" / "pick_breakdowns.json"))
+    parser.add_argument(
+        "--out", default=str(REPO / "paper" / "data" / "pick_breakdowns.json")
+    )
     args = parser.parse_args()
 
     result = {
@@ -101,31 +109,30 @@ def main():
             "Post-hoc breakdowns of cached prediction parquets (no model "
             "re-runs; MSH never re-scored). Emitted by "
             "scripts/eval_pick_breakdowns.py; consumed by "
-            "scripts/make_paper_tables.py and paper/figures/pick_curves.py."),
-        "bands": [
-            {"band": n, "wr_lo": lo, "wr_hi": hi} for n, lo, hi in BANDS],
+            "scripts/make_paper_tables.py and paper/figures/pick_curves.py."
+        ),
+        "bands": [{"band": n, "wr_lo": lo, "wr_hi": hi} for n, lo, hi in BANDS],
         "sources": {
-            "dev": {"run": FDEV_RUN, "mode": "deployment",
-                    "dir": str(FDEV_ZEROSHOT)},
-            "msh": {"member": "f-full", "snapshot_sha": MSH_SHA,
-                    "dir": str(MSH_DIR)},
+            "dev": {"run": FDEV_RUN, "mode": "deployment", "dir": str(FDEV_ZEROSHOT)},
+            "msh": {"member": "f-full", "snapshot_sha": MSH_SHA, "dir": str(MSH_DIR)},
         },
         "sets": {},
         "executed_at": datetime.datetime.now().isoformat(timespec="seconds"),
     }
 
     for set_code in DEV_SETS:
-        frame = pd.read_parquet(
-            FDEV_ZEROSHOT / f"{set_code}.PremierDraft.parquet")
+        frame = pd.read_parquet(FDEV_ZEROSHOT / f"{set_code}.PremierDraft.parquet")
         result["sets"][set_code] = {
-            "mode": "deployment", "source_run": FDEV_RUN,
+            "mode": "deployment",
+            "source_run": FDEV_RUN,
             **analyze(frame, f"{set_code} (F-dev deployment)"),
         }
 
     for mode in ("deployment", "human"):
         frame = pd.read_parquet(MSH_DIR / f"f-full.{mode}.parquet")
         result["sets"][f"MSH.{mode}"] = {
-            "mode": mode, "source_run": f"frozen_eval/{MSH_SHA[:12]}",
+            "mode": mode,
+            "source_run": f"frozen_eval/{MSH_SHA[:12]}",
             **analyze(frame, f"MSH (F-full {mode})"),
         }
 

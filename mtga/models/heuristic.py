@@ -61,9 +61,7 @@ def _load_from_metrics(set_code, limited_type):
 
 
 def _load_from_ratings(set_code, limited_type):
-    link = paths.latest_symlink(
-        paths.card_ratings_path(set_code, limited_type, "x")
-    )
+    link = paths.latest_symlink(paths.card_ratings_path(set_code, limited_type, "x"))
     if not link.exists():
         return None
     with open(link) as file:
@@ -144,7 +142,9 @@ class HeuristicRatingsModel:
         self.quality = _quality_z(cards)
         self.model_id = f"{set_code}/{limited_type}/heuristic-{source}"
 
-    def score_pack(self, pack_grp_ids, pool_grp_ids, pack_number=None, pick_number=None):
+    def score_pack(
+        self, pack_grp_ids, pool_grp_ids, pack_number=None, pick_number=None
+    ):
         pool_cards = [self.cards[g] for g in pool_grp_ids if g in self.cards]
         weights = pool_color_weights(pool_cards)
         lane = "".join(sorted(weights, key=weights.get, reverse=True)[:2])
@@ -182,7 +182,9 @@ class RarityColorHeuristic:
         }
         self.model_id = f"{set_code}/*/heuristic-rarity"
 
-    def score_pack(self, pack_grp_ids, pool_grp_ids, pack_number=None, pick_number=None):
+    def score_pack(
+        self, pack_grp_ids, pool_grp_ids, pack_number=None, pick_number=None
+    ):
         pool_cards = [self.cards[g] for g in pool_grp_ids if g in self.cards]
         weights = pool_color_weights(pool_cards)
         lane = "".join(sorted(weights, key=weights.get, reverse=True)[:2])

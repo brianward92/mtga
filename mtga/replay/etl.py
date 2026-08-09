@@ -78,41 +78,56 @@ _FLOAT_TURN = re.compile(
 )
 
 REQUIRED_MULL_COLUMNS = (
-    "draft_id", "on_play", "won", "num_mulligans", "candidate_hand_1", "opening_hand",
+    "draft_id",
+    "on_play",
+    "won",
+    "num_mulligans",
+    "candidate_hand_1",
+    "opening_hand",
 )
 REQUIRED_TURNS_COLUMNS = ("draft_id", "on_play", "won", "num_turns")
 
 # Per-turn columns curate_turn_states consumes (suffixes of user_turn_N_).
 TURN_FIELDS = (
-    "cards_drawn", "lands_played",
-    "user_mana_spent", "oppo_mana_spent",
-    "user_combat_damage_taken", "oppo_combat_damage_taken",
-    "eot_user_cards_in_hand", "eot_oppo_cards_in_hand",
-    "eot_user_lands_in_play", "eot_oppo_lands_in_play",
-    "eot_user_creatures_in_play", "eot_oppo_creatures_in_play",
-    "eot_user_non_creatures_in_play", "eot_oppo_non_creatures_in_play",
-    "eot_user_life", "eot_oppo_life",
+    "cards_drawn",
+    "lands_played",
+    "user_mana_spent",
+    "oppo_mana_spent",
+    "user_combat_damage_taken",
+    "oppo_combat_damage_taken",
+    "eot_user_cards_in_hand",
+    "eot_oppo_cards_in_hand",
+    "eot_user_lands_in_play",
+    "eot_oppo_lands_in_play",
+    "eot_user_creatures_in_play",
+    "eot_oppo_creatures_in_play",
+    "eot_user_non_creatures_in_play",
+    "eot_oppo_non_creatures_in_play",
+    "eot_user_life",
+    "eot_oppo_life",
 )
 
-MULL_SCHEMA = pa.schema([
-    ("draft_id", pa.string()),
-    ("game_seq", pa.int64()),
-    ("match_number", pa.int8()),
-    ("game_number", pa.int8()),
-    ("game_time", pa.string()),
-    ("decision_index", pa.int8()),      # k, 1-based
-    ("hand_card_ids", pa.list_(pa.int32())),
-    ("hand_size_if_kept", pa.int8()),   # 7 - (k-1)
-    ("on_play", pa.bool_()),
-    ("kept", pa.bool_()),               # k == num_mulligans + 1
-    ("won", pa.bool_()),
-    ("kept_card_ids", pa.list_(pa.int32())),      # kept row only, else NULL
-    ("bottomed_card_ids", pa.list_(pa.int32())),  # kept row only, else NULL
-    ("num_mulligans", pa.int8()),
-    ("opp_num_mulligans", pa.int8()),
-    ("user_n_games_bucket", pa.int32()),
-    ("user_game_win_rate_bucket", pa.float32()),
-])
+MULL_SCHEMA = pa.schema(
+    [
+        ("draft_id", pa.string()),
+        ("game_seq", pa.int64()),
+        ("match_number", pa.int8()),
+        ("game_number", pa.int8()),
+        ("game_time", pa.string()),
+        ("decision_index", pa.int8()),  # k, 1-based
+        ("hand_card_ids", pa.list_(pa.int32())),
+        ("hand_size_if_kept", pa.int8()),  # 7 - (k-1)
+        ("on_play", pa.bool_()),
+        ("kept", pa.bool_()),  # k == num_mulligans + 1
+        ("won", pa.bool_()),
+        ("kept_card_ids", pa.list_(pa.int32())),  # kept row only, else NULL
+        ("bottomed_card_ids", pa.list_(pa.int32())),  # kept row only, else NULL
+        ("num_mulligans", pa.int8()),
+        ("opp_num_mulligans", pa.int8()),
+        ("user_n_games_bucket", pa.int32()),
+        ("user_game_win_rate_bucket", pa.float32()),
+    ]
+)
 
 
 def replay_columns(header):
@@ -171,8 +186,10 @@ def _connect(workdir):
 def _ids_expr(column):
     """Pipe-list VARCHAR -> INTEGER[]; NULL (empty within range) -> []."""
     q = _quote(column)
-    return (f"coalesce(TRY_CAST(string_split({q}, '|') AS INTEGER[]), "
-            f"CAST([] AS INTEGER[]))")
+    return (
+        f"coalesce(TRY_CAST(string_split({q}, '|') AS INTEGER[]), "
+        f"CAST([] AS INTEGER[]))"
+    )
 
 
 def _len_expr(column):
@@ -186,6 +203,7 @@ def _count_expr(column):
 
 def _turn_struct(t):
     """struct_pack of one user turn's state (field order = output order)."""
+
     def col(field):
         return f"user_turn_{t}_{field}"
 
@@ -199,7 +217,8 @@ def _turn_struct(t):
         return f"coalesce(TRY_CAST({_quote(col(field))} AS SMALLINT), 0)"
 
     lands_cum = " + ".join(
-        _len_expr(f"user_turn_{i}_lands_played") for i in range(1, t + 1))
+        _len_expr(f"user_turn_{i}_lands_played") for i in range(1, t + 1)
+    )
     fields = [
         f"turn := CAST({t} AS TINYINT)",
         f"user_life := {life('eot_user_life')}",
@@ -226,13 +245,26 @@ def _turn_struct(t):
 
 
 _TURN_STATE_FIELDS = (
-    "turn", "user_life", "oppo_life", "user_hand_ids", "user_hand_count",
-    "oppo_hand_count", "user_lands_count", "oppo_lands_count",
-    "user_creatures_count", "oppo_creatures_count",
-    "user_noncreatures_count", "oppo_noncreatures_count",
-    "user_creatures_ids", "oppo_creatures_ids", "user_lands_played_cum",
-    "user_cards_drawn_ids", "user_mana_spent", "oppo_mana_spent",
-    "user_combat_damage_taken", "oppo_combat_damage_taken",
+    "turn",
+    "user_life",
+    "oppo_life",
+    "user_hand_ids",
+    "user_hand_count",
+    "oppo_hand_count",
+    "user_lands_count",
+    "oppo_lands_count",
+    "user_creatures_count",
+    "oppo_creatures_count",
+    "user_noncreatures_count",
+    "oppo_noncreatures_count",
+    "user_creatures_ids",
+    "oppo_creatures_ids",
+    "user_lands_played_cum",
+    "user_cards_drawn_ids",
+    "user_mana_spent",
+    "oppo_mana_spent",
+    "user_combat_damage_taken",
+    "oppo_combat_damage_taken",
 )
 
 # Meta layout of the per-game sidecar (canonical order; deck_* follow).
@@ -247,15 +279,22 @@ def curate_turn_states(set_code, limited_type, force=False):
     if not raw.exists():
         return {"status": "MISSING_RAW", "path": str(raw)}
     raw_etag = _source_etag(raw)
-    if not force and _is_current(out_turns, raw_etag) and _is_current(out_games, raw_etag):
+    if (
+        not force
+        and _is_current(out_turns, raw_etag)
+        and _is_current(out_games, raw_etag)
+    ):
         return {"status": "SKIPPED", "path": str(out_turns)}
     source = decode.ensure_decoded(raw)
 
     header = read_header(source)
     _require(header, REQUIRED_TURNS_COLUMNS, source)
     max_turn = user_turn_count(header)
-    _require(header, [f"user_turn_{t}_{f}" for t in range(1, max_turn + 1)
-                      for f in TURN_FIELDS], source)
+    _require(
+        header,
+        [f"user_turn_{t}_{f}" for t in range(1, max_turn + 1) for f in TURN_FIELDS],
+        source,
+    )
     present = set(header)
     columns_arg = _columns_struct(replay_columns(header))
     deck_cols = [c for c in header if c.startswith(DECK_PREFIX)]
@@ -268,7 +307,8 @@ def curate_turn_states(set_code, limited_type, force=False):
     games_select = ", ".join(
         ["row_number() OVER () - 1 AS game_seq"]
         + [_meta_expr(name, present) for name in GAMES_META]
-        + [_quote(c) for c in deck_cols])
+        + [_quote(c) for c in deck_cols]
+    )
     con.execute(
         f"""
         COPY (SELECT {games_select} FROM read_csv(?, header=true, columns={columns_arg}))
@@ -278,8 +318,13 @@ def curate_turn_states(set_code, limited_type, force=False):
     )
 
     structs = ", ".join(_turn_struct(t) for t in range(1, max_turn + 1))
-    scalars = ["on_play", "won", "num_turns",
-               "user_n_games_bucket", "user_game_win_rate_bucket"]
+    scalars = [
+        "on_play",
+        "won",
+        "num_turns",
+        "user_n_games_bucket",
+        "user_game_win_rate_bucket",
+    ]
     scalar_select = ", ".join(_meta_expr(name, present) for name in scalars)
     state_select = ", ".join(f"s.{f} AS {f}" for f in _TURN_STATE_FIELDS)
     con.execute(
@@ -303,29 +348,23 @@ def curate_turn_states(set_code, limited_type, force=False):
     )
 
     # game_seq is the cross-output join key: verify the two scans agreed.
-    mismatched = con.execute(
-        f"""
+    mismatched = con.execute(f"""
         SELECT count(*) FROM read_parquet('{turns_tmp}') t
         JOIN read_parquet('{games_tmp}') g USING (game_seq)
         WHERE t.draft_id <> g.draft_id
-        """
-    ).fetchone()[0]
-    game_rows, want_turn_rows, truncated = con.execute(
-        f"""
+        """).fetchone()[0]
+    game_rows, want_turn_rows, truncated = con.execute(f"""
         SELECT count(*),
                coalesce(sum(least(greatest(coalesce(num_turns, 0), 0), {max_turn})), 0),
                coalesce(sum(CASE WHEN num_turns > {max_turn} THEN 1 ELSE 0 END), 0)
         FROM read_parquet('{games_tmp}')
-        """
-    ).fetchone()
-    turn_rows, null_state = con.execute(
-        f"""
+        """).fetchone()
+    turn_rows, null_state = con.execute(f"""
         SELECT count(*),
                coalesce(sum(CASE WHEN user_life IS NULL OR oppo_life IS NULL
                                    OR oppo_hand_count IS NULL THEN 1 ELSE 0 END), 0)
         FROM read_parquet('{turns_tmp}')
-        """
-    ).fetchone()
+        """).fetchone()
     con.close()
     if mismatched or turn_rows != want_turn_rows:
         games_tmp.unlink(missing_ok=True)
@@ -333,21 +372,37 @@ def curate_turn_states(set_code, limited_type, force=False):
         raise RuntimeError(
             f"game_seq mismatch between turn and game outputs for "
             f"{set_code}.{limited_type}: {mismatched} conflicting rows, "
-            f"{turn_rows} turn rows vs {want_turn_rows} expected")
+            f"{turn_rows} turn rows vs {want_turn_rows} expected"
+        )
 
     turns_tmp.replace(out_turns)
     games_tmp.replace(out_games)
     _write_curated_meta(
-        out_turns, raw_etag, int(turn_rows),
-        set=set_code, format=limited_type, games=int(game_rows),
-        max_turn_columns=max_turn, games_truncated_at_max_turn=int(truncated),
-        null_state_rows=int(null_state))
+        out_turns,
+        raw_etag,
+        int(turn_rows),
+        set=set_code,
+        format=limited_type,
+        games=int(game_rows),
+        max_turn_columns=max_turn,
+        games_truncated_at_max_turn=int(truncated),
+        null_state_rows=int(null_state),
+    )
     _write_curated_meta(
-        out_games, raw_etag, int(game_rows),
-        set=set_code, format=limited_type, deck_columns=len(deck_cols))
-    return {"status": "CURATED", "path": str(out_turns),
-            "games_path": str(out_games), "rows": int(turn_rows),
-            "games": int(game_rows)}
+        out_games,
+        raw_etag,
+        int(game_rows),
+        set=set_code,
+        format=limited_type,
+        deck_columns=len(deck_cols),
+    )
+    return {
+        "status": "CURATED",
+        "path": str(out_turns),
+        "games_path": str(out_games),
+        "rows": int(turn_rows),
+        "games": int(game_rows),
+    }
 
 
 # --------------------------------------------------------------------------
@@ -416,14 +471,28 @@ def curate_mulligans(set_code, limited_type, force=False):
     _require(header, REQUIRED_MULL_COLUMNS, source)
     present = set(header)
     columns_arg = _columns_struct(replay_columns(header))
-    cand_cols = sorted((c for c in header if _CANDIDATE.match(c)),
-                       key=lambda c: int(_CANDIDATE.match(c).group(1)))
+    cand_cols = sorted(
+        (c for c in header if _CANDIDATE.match(c)),
+        key=lambda c: int(_CANDIDATE.match(c).group(1)),
+    )
 
-    meta_cols = ["draft_id", "match_number", "game_number", "game_time",
-                 "on_play", "won", "num_mulligans", "opp_num_mulligans",
-                 "user_n_games_bucket", "user_game_win_rate_bucket"]
-    select = ", ".join([_meta_expr(name, present) for name in meta_cols]
-                       + [_quote(c) for c in cand_cols] + [_quote("opening_hand")])
+    meta_cols = [
+        "draft_id",
+        "match_number",
+        "game_number",
+        "game_time",
+        "on_play",
+        "won",
+        "num_mulligans",
+        "opp_num_mulligans",
+        "user_n_games_bucket",
+        "user_game_win_rate_bucket",
+    ]
+    select = ", ".join(
+        [_meta_expr(name, present) for name in meta_cols]
+        + [_quote(c) for c in cand_cols]
+        + [_quote("opening_hand")]
+    )
 
     out.parent.mkdir(parents=True, exist_ok=True)
     tmp = out.parent / f".{out.name}.part"
@@ -432,9 +501,11 @@ def curate_mulligans(set_code, limited_type, force=False):
         f"SELECT {select} FROM read_csv(?, header=true, columns={columns_arg})",
         [str(source)],
     )
-    reader = (result.to_arrow_reader(BATCH_ROWS)
-              if hasattr(result, "to_arrow_reader")
-              else result.fetch_record_batch(BATCH_ROWS))
+    reader = (
+        result.to_arrow_reader(BATCH_ROWS)
+        if hasattr(result, "to_arrow_reader")
+        else result.fetch_record_batch(BATCH_ROWS)
+    )
 
     anomalies = Counter()
     game_seq = 0
@@ -445,9 +516,19 @@ def curate_mulligans(set_code, limited_type, force=False):
             data = batch.to_pydict()
             hands_in = [data[c] for c in cand_cols] + [data["opening_hand"]]
             out_cols = {name: [] for name in MULL_SCHEMA.names}
-            for (draft_id, match_number, game_number, game_time, on_play, won,
-                 num_mulligans, opp_num_mulligans, n_games, wr_bucket,
-                 *hands) in zip(*(data[c] for c in meta_cols), *hands_in):
+            for (
+                draft_id,
+                match_number,
+                game_number,
+                game_time,
+                on_play,
+                won,
+                num_mulligans,
+                opp_num_mulligans,
+                n_games,
+                wr_bucket,
+                *hands,
+            ) in zip(*(data[c] for c in meta_cols), *hands_in):
                 seq = game_seq
                 game_seq += 1
                 reason, expanded = _game_decisions(num_mulligans, hands[:-1], hands[-1])
@@ -477,7 +558,8 @@ def curate_mulligans(set_code, limited_type, force=False):
                     decisions += 1
             if out_cols["draft_id"]:
                 writer.write_batch(
-                    pa.RecordBatch.from_pydict(out_cols, schema=MULL_SCHEMA))
+                    pa.RecordBatch.from_pydict(out_cols, schema=MULL_SCHEMA)
+                )
     finally:
         writer.close()
         con.close()
@@ -485,8 +567,19 @@ def curate_mulligans(set_code, limited_type, force=False):
 
     dropped = sum(anomalies.values())
     _write_curated_meta(
-        out, raw_etag, decisions,
-        set=set_code, format=limited_type, games=game_seq,
-        games_dropped=dropped, anomalies=dict(anomalies))
-    return {"status": "CURATED", "path": str(out), "rows": decisions,
-            "games": game_seq, "dropped": dropped}
+        out,
+        raw_etag,
+        decisions,
+        set=set_code,
+        format=limited_type,
+        games=game_seq,
+        games_dropped=dropped,
+        anomalies=dict(anomalies),
+    )
+    return {
+        "status": "CURATED",
+        "path": str(out),
+        "rows": decisions,
+        "games": game_seq,
+        "dropped": dropped,
+    }

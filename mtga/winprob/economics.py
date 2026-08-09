@@ -55,9 +55,9 @@ REF_TURNS = (5, 8, 11)
 REF_LIVES = (20, 15, 10, 5)
 LIFE_CURVE_LEVELS = (20, 18, 16, 14, 12, 10, 8, 6, 4, 2)
 PARITY_TURNS = tuple(range(1, 16))
-LIFE_WINDOW = 1.0        # +/- life tolerance when selecting reference states
-SAMPLE_CAP = 50_000      # representative-state cap for pooled means
-EPS_LIFE = 1e-4          # dP/dlife floor for the exchange-rate ratio
+LIFE_WINDOW = 1.0  # +/- life tolerance when selecting reference states
+SAMPLE_CAP = 50_000  # representative-state cap for pooled means
+EPS_LIFE = 1e-4  # dP/dlife floor for the exchange-rate ratio
 
 
 def _all_columns():
@@ -85,8 +85,9 @@ def gradient(model, mean, std, X_raw, group, delta=1.0):
 
 
 def base_proba(model, mean, std, X_raw):
-    return predict_proba(model, wdata.standardize(
-        X_raw.astype(np.float32), mean, std), _all_columns())
+    return predict_proba(
+        model, wdata.standardize(X_raw.astype(np.float32), mean, std), _all_columns()
+    )
 
 
 def _exchange(grad_card, grad_life):
@@ -187,18 +188,34 @@ def compute(model, mean, std, data, val_idx, seed=17):
         for life in REF_LIVES:
             rows = _select(X, turn, np.ones(len(X), bool), t, life_col, life)
             cell = _cell(model, mean, std, X[rows])
-            table.append({"turn": t, "user_life": life,
-                          **(cell or {"n": 0, "life_per_card": None,
-                                      "life_per_creature": None,
-                                      "dP_dcard": None, "dP_dlife": None,
-                                      "dP_dcreature": None, "mean_p": None})})
+            table.append(
+                {
+                    "turn": t,
+                    "user_life": life,
+                    **(
+                        cell
+                        or {
+                            "n": 0,
+                            "life_per_card": None,
+                            "life_per_creature": None,
+                            "dP_dcard": None,
+                            "dP_dlife": None,
+                            "dP_dcreature": None,
+                            "mean_p": None,
+                        }
+                    ),
+                }
+            )
 
     return {
         "kind": "winprob-economics-v1",
         "framing": "associational gradients along the data manifold; NOT "
-                   "causal interventions (see economics.py docstring)",
-        "delta_units": {"card": "1 card in hand", "life": "1 life",
-                        "creature": "1 creature on board"},
+        "causal interventions (see economics.py docstring)",
+        "delta_units": {
+            "card": "1 card in hand",
+            "life": "1 life",
+            "creature": "1 creature on board",
+        },
         "headline": headline,
         "pooled_typical": pooled,
         "life_curve_at_t7": life_curve,
@@ -218,9 +235,11 @@ def render_table(econ):
     lines.append("Card value in LIFE-EQUIVALENTS  (dP/dcard / dP/dlife)")
     lines.append("associational gradients along the data manifold, not causal")
     lp = head.get("life_per_card")
-    lines.append(f"headline (median state): 1 card = "
-                 f"{'n/a' if lp is None else f'{lp:.2f}'} life  "
-                 f"[dP/dcard={head.get('dP_dcard')}, dP/dlife={head.get('dP_dlife')}]")
+    lines.append(
+        f"headline (median state): 1 card = "
+        f"{'n/a' if lp is None else f'{lp:.2f}'} life  "
+        f"[dP/dcard={head.get('dP_dcard')}, dP/dlife={head.get('dP_dlife')}]"
+    )
     lines.append("")
     header = f"{'turn':>5} | " + " ".join(f"life{L:>2}" for L in REF_LIVES)
     lines.append(header)
@@ -243,8 +262,11 @@ def render_by_set_table(by_set):
     check: a stable number across `by_set` says the card/life exchange rate
     is not a single-set artifact (see compute_by_set)."""
     header = f"{'set':>6} | {'n':>10} | {'life/card':>10} | {'life/creature':>14}"
-    lines = ["Card value in LIFE-EQUIVALENTS by source set (headline/median state)",
-             header, "-" * len(header)]
+    lines = [
+        "Card value in LIFE-EQUIVALENTS by source set (headline/median state)",
+        header,
+        "-" * len(header),
+    ]
     for set_code in sorted(by_set):
         head = (by_set[set_code] or {}).get("headline") or {}
         lpc = head.get("life_per_card")
@@ -252,7 +274,8 @@ def render_by_set_table(by_set):
         lines.append(
             f"{set_code:>6} | {head.get('n', 0):>10,} | "
             f"{'n/a' if lpc is None else f'{lpc:9.3f}'} | "
-            f"{'n/a' if lpcr is None else f'{lpcr:13.3f}'}")
+            f"{'n/a' if lpcr is None else f'{lpcr:13.3f}'}"
+        )
     return "\n".join(lines)
 
 
@@ -264,6 +287,7 @@ _INK, _MUTED, _GRID = "#0b0b0b", "#52514e", "#e1e0d9"
 def render_figure(econ, out_path):
     """Two-panel matplotlib (Agg) figure summarizing the economics."""
     import matplotlib
+
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
@@ -274,10 +298,24 @@ def render_figure(econ, out_path):
     lc = econ["life_curve_at_t7"]
     if lc:
         lives = [c["user_life"] for c in lc]
-        ax1.plot(lives, [c["dP_dlife"] for c in lc], "-o", color=_BLUE,
-                 lw=2, ms=5, label="dP/d(life)")
-        ax1.plot(lives, [c["dP_dcard"] for c in lc], "-o", color=_AQUA,
-                 lw=2, ms=5, label="dP/d(card)")
+        ax1.plot(
+            lives,
+            [c["dP_dlife"] for c in lc],
+            "-o",
+            color=_BLUE,
+            lw=2,
+            ms=5,
+            label="dP/d(life)",
+        )
+        ax1.plot(
+            lives,
+            [c["dP_dcard"] for c in lc],
+            "-o",
+            color=_AQUA,
+            lw=2,
+            ms=5,
+            label="dP/d(card)",
+        )
         ax1.set_xlabel("user life at turn 7", color=_MUTED)
         ax1.set_ylabel("dP(win) per unit", color=_MUTED)
         ax1.set_title("Marginal value vs life level (t=7)", color=_INK)
@@ -290,10 +328,8 @@ def render_figure(econ, out_path):
         turns = [c["turn"] for c in pc]
         card = [c["life_per_card"] for c in pc]
         creat = [c["life_per_creature"] for c in pc]
-        ax2.plot(turns, card, "-o", color=_YELLOW, lw=2, ms=5,
-                 label="life / card")
-        ax2.plot(turns, creat, "-o", color=_BLUE, lw=2, ms=5,
-                 label="life / creature")
+        ax2.plot(turns, card, "-o", color=_YELLOW, lw=2, ms=5, label="life / card")
+        ax2.plot(turns, creat, "-o", color=_BLUE, lw=2, ms=5, label="life / creature")
         ax2.set_xlabel("turn (life parity)", color=_MUTED)
         ax2.set_ylabel("life-equivalents", color=_INK)
         ax2.set_title("Exchange rate over the game", color=_INK)
@@ -306,11 +342,14 @@ def render_figure(econ, out_path):
             ax.spines[spine].set_visible(False)
         ax.tick_params(colors=_MUTED)
 
-    fig.suptitle("Card-value economics (associational, not causal)",
-                 color=_INK, fontsize=12, y=1.02)
+    fig.suptitle(
+        "Card-value economics (associational, not causal)",
+        color=_INK,
+        fontsize=12,
+        y=1.02,
+    )
     fig.tight_layout()
-    fig.savefig(out_path, dpi=130, bbox_inches="tight",
-                facecolor=fig.get_facecolor())
+    fig.savefig(out_path, dpi=130, bbox_inches="tight", facecolor=fig.get_facecolor())
     plt.close(fig)
     return out_path
 

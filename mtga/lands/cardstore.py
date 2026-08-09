@@ -28,8 +28,15 @@ def build_card_store(verbose=True):
     lands["set_norm"] = lands["expansion"].str.lower()
 
     scry_cols = [
-        "id", "name", "set", "collector_number", "colors", "mana_cost",
-        "type_line", "image_small_url", "image_normal_url",
+        "id",
+        "name",
+        "set",
+        "collector_number",
+        "colors",
+        "mana_cost",
+        "type_line",
+        "image_small_url",
+        "image_normal_url",
     ]
     try:
         scry = pd.read_parquet(
@@ -46,8 +53,13 @@ def build_card_store(verbose=True):
     scry = scry.drop(columns=["name"])
 
     join_cols = [
-        "scryfall_id", "collector_number", "colors", "mana_cost", "type_line",
-        "image_small_url", "image_normal_url",
+        "scryfall_id",
+        "collector_number",
+        "colors",
+        "mana_cost",
+        "type_line",
+        "image_small_url",
+        "image_normal_url",
     ]
 
     def take(frame, on_left, on_right, label):
@@ -94,10 +106,9 @@ def build_card_store(verbose=True):
             )
         else:
             ranked_by_name = scry.sort_values("released_at", ascending=False)
-        by_name = (
-            ranked_by_name.drop_duplicates(subset=["name_norm"])
-            .set_index("name_norm")[join_cols]
-        )
+        by_name = ranked_by_name.drop_duplicates(subset=["name_norm"]).set_index(
+            "name_norm"
+        )[join_cols]
         fallback = lands.loc[missing.values, "name_norm"].map(by_name.to_dict("index"))
         rows = fallback.dropna()
         for col in join_cols:
@@ -105,10 +116,21 @@ def build_card_store(verbose=True):
         result.loc[rows.index, "match"] = "name"
 
     result["match"] = result["match"].fillna("none")
-    out_cols = [
-        "grp_id", "expansion", "name", "base_name", "rarity", "color_identity",
-        "mana_value", "types", "is_booster",
-    ] + join_cols + ["match"]
+    out_cols = (
+        [
+            "grp_id",
+            "expansion",
+            "name",
+            "base_name",
+            "rarity",
+            "color_identity",
+            "mana_value",
+            "types",
+            "is_booster",
+        ]
+        + join_cols
+        + ["match"]
+    )
     store = result[out_cols]
 
     paths.CARD_STORE_PARQUET.parent.mkdir(parents=True, exist_ok=True)
@@ -123,7 +145,11 @@ def build_card_store(verbose=True):
         recent = coverage.tail(12)
         print(f"card_store: {len(store)} grpIds -> {paths.CARD_STORE_PARQUET}")
         print("match coverage (last 12 expansions):")
-        print((recent["mean"] * 100).round(1).astype(str) + f"% of " + recent["count"].astype(str))
+        print(
+            (recent["mean"] * 100).round(1).astype(str)
+            + f"% of "
+            + recent["count"].astype(str)
+        )
     return store
 
 
@@ -146,7 +172,8 @@ def name_resolution(set_code):
     store = load_card_store()
     in_set = store["expansion"] == set_code
     ranked = store.assign(
-        _pref=(~in_set).astype(int) * 2 + (~store["is_booster"].astype(bool)).astype(int)
+        _pref=(~in_set).astype(int) * 2
+        + (~store["is_booster"].astype(bool)).astype(int)
     ).sort_values(["_pref", "grp_id"])
 
     canonical, aliases, attrs = {}, {}, {}

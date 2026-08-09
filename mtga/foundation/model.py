@@ -59,8 +59,10 @@ class CardEncoder(nn.Module):
         super().__init__()
         self.net = nn.Sequential(
             ManualLayerNorm(feat_dim),
-            nn.Linear(feat_dim, 512), nn.GELU(),
-            nn.Linear(512, d), nn.GELU(),
+            nn.Linear(feat_dim, 512),
+            nn.GELU(),
+            nn.Linear(512, d),
+            nn.GELU(),
             ManualLayerNorm(d),
         )
 
@@ -82,7 +84,10 @@ class QueryPool(nn.Module):
         batch = keys.shape[0]
         queries = self.queries.unsqueeze(0).expand(batch, -1, -1)
         attended, _ = self.attention(
-            queries, keys, keys, key_padding_mask=key_padding_mask,
+            queries,
+            keys,
+            keys,
+            key_padding_mask=key_padding_mask,
             need_weights=False,
         )
         return self.project(attended.flatten(1))
@@ -106,17 +111,22 @@ class DraftFM(nn.Module):
             self.set_tower = QueryPool(d)
 
         # Context: skill/games/format embeddings + position floats
-        self.wr_embedding = nn.Embedding(256, 16)      # ids 15..45 + 255 missing
+        self.wr_embedding = nn.Embedding(256, 16)  # ids 15..45 + 255 missing
         self.games_embedding = nn.Embedding(256, 8)
         self.format_embedding = nn.Embedding(4, 8)
         ctx_in = 16 + 8 + 8 + 7 + 4 + (d if set_ctx else 0)
         self.context_mlp = nn.Sequential(
-            nn.Linear(ctx_in, 128), nn.GELU(), nn.Linear(128, CTX_DIM),
+            nn.Linear(ctx_in, 128),
+            nn.GELU(),
+            nn.Linear(128, CTX_DIM),
         )
 
         self.scorer = nn.Sequential(
-            nn.Linear(3 * d + CTX_DIM, 512), nn.GELU(), nn.Dropout(dropout),
-            nn.Linear(512, 256), nn.GELU(),
+            nn.Linear(3 * d + CTX_DIM, 512),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(512, 256),
+            nn.GELU(),
             nn.Linear(256, 1),
         )
 
@@ -168,11 +178,11 @@ class DraftFM(nn.Module):
 
         pack_mask = batch["pack_slots"].eq(int(PAD))
         pack_slots = batch["pack_slots"].masked_fill(pack_mask, 0)
-        candidates = table[pack_slots]                       # [B, 16, d]
+        candidates = table[pack_slots]  # [B, 16, d]
         pool_b = pool_summary.unsqueeze(1).expand_as(candidates)
         ctx_b = context.unsqueeze(1).expand(-1, candidates.shape[1], -1)
         h = torch.cat([candidates, pool_b, candidates * pool_b, ctx_b], dim=2)
-        logits = self.scorer(h).squeeze(-1)                  # [B, 16]
+        logits = self.scorer(h).squeeze(-1)  # [B, 16]
         return logits.masked_fill(pack_mask, float("-inf"))
 
 
@@ -182,15 +192,18 @@ def position_features(context_ints, picks_per_pack):
     pick_number = context_ints[:, 1].float()
     ppp = float(picks_per_pack)
     pool_size = pack_number * ppp + pick_number
-    return torch.stack([
-        (pack_number == 0).float(),
-        (pack_number == 1).float(),
-        (pack_number == 2).float(),
-        pick_number / ppp,
-        (ppp - 1 - pick_number).clamp(min=0) / ppp,
-        pool_size / 45.0,
-        (pool_size / (3 * ppp)).clamp(max=1.0),
-    ], dim=1)
+    return torch.stack(
+        [
+            (pack_number == 0).float(),
+            (pack_number == 1).float(),
+            (pack_number == 2).float(),
+            pick_number / ppp,
+            (ppp - 1 - pick_number).clamp(min=0) / ppp,
+            pool_size / 45.0,
+            (pool_size / (3 * ppp)).clamp(max=1.0),
+        ],
+        dim=1,
+    )
 
 
 def masked_cross_entropy(logits, pick_pos, label_smoothing=0.05):

@@ -26,7 +26,9 @@ from typing import Any
 MTGJSON_ALLPRINTINGS_URL = "https://mtgjson.com/api/v5/AllPrintings.json"
 
 # Default Arena DB location (macOS)
-ARENA_DB_GLOB = Path.home() / "Library/Application Support/com.wizards.mtga/Downloads/Raw"
+ARENA_DB_GLOB = (
+    Path.home() / "Library/Application Support/com.wizards.mtga/Downloads/Raw"
+)
 
 # Output path
 OUTPUT_DIR = Path(__file__).parent.parent / "data"
@@ -105,10 +107,13 @@ def build_mapping_arena_db(db_path: Path) -> dict[int, dict[str, Any]]:
 def download_json(url: str) -> dict[str, Any]:
     """Download and parse JSON from URL."""
     print(f"Downloading from {url}...")
-    req = Request(url, headers={
-        "Accept-Encoding": "gzip",
-        "User-Agent": "MTGA-Tracker/1.0",
-    })
+    req = Request(
+        url,
+        headers={
+            "Accept-Encoding": "gzip",
+            "User-Agent": "MTGA-Tracker/1.0",
+        },
+    )
     with urlopen(req, timeout=300) as response:
         if response.info().get("Content-Encoding") == "gzip":
             data = gzip.decompress(response.read()).decode("utf-8")
@@ -181,12 +186,23 @@ def build_mapping_scryfall(path: Path) -> dict[int, dict[str, Any]]:
 
 def main():
     parser = argparse.ArgumentParser(description="Build Arena card mapping.")
-    parser.add_argument("--arena-db", type=Path, default=None,
-                        help="Path to Arena Raw_CardDatabase .mtga file")
-    parser.add_argument("--mtgjson", action="store_true",
-                        help="Download from MTGJSON (used as fallback if no Arena DB)")
-    parser.add_argument("--scryfall", type=Path, default=None,
-                        help="Path to Scryfall all_cards JSON (supplemental)")
+    parser.add_argument(
+        "--arena-db",
+        type=Path,
+        default=None,
+        help="Path to Arena Raw_CardDatabase .mtga file",
+    )
+    parser.add_argument(
+        "--mtgjson",
+        action="store_true",
+        help="Download from MTGJSON (used as fallback if no Arena DB)",
+    )
+    parser.add_argument(
+        "--scryfall",
+        type=Path,
+        default=None,
+        help="Path to Scryfall all_cards JSON (supplemental)",
+    )
     args = parser.parse_args()
 
     print("Building Arena card mapping...")
@@ -228,6 +244,7 @@ def main():
 
     # Summary
     from collections import Counter
+
     sets = Counter(v["setCode"] for v in mapping.values())
     recent = ["FIN", "EOE", "SPM", "TLA", "TMT"]
     print(f"Recent sets: {', '.join(f'{s}={sets.get(s,0)}' for s in recent)}")

@@ -42,28 +42,59 @@ from mtga.lands import corpus, names, paths
 
 MANIFEST_VERSION = "cardfeats_v1"
 N_FEATURES = 391
-SUBTYPE_SLOTS = 128     # top-128 subtypes by unique-card frequency
-KEYWORD_SLOTS = 166     # fixed capacity; a manifest may populate fewer slots
+SUBTYPE_SLOTS = 128  # top-128 subtypes by unique-card frequency
+KEYWORD_SLOTS = 166  # fixed capacity; a manifest may populate fewer slots
 KEYWORD_MIN_CARDS = 8
-UNMATCHED_SCALE = 4.0   # count-of-unmatched subtypes/keywords, /4 clipped
+UNMATCHED_SCALE = 4.0  # count-of-unmatched subtypes/keywords, /4 clipped
 
-CARD_TYPES = ["Creature", "Instant", "Sorcery", "Enchantment", "Artifact",
-              "Planeswalker", "Land", "Battle", "Kindred"]
+CARD_TYPES = [
+    "Creature",
+    "Instant",
+    "Sorcery",
+    "Enchantment",
+    "Artifact",
+    "Planeswalker",
+    "Land",
+    "Battle",
+    "Kindred",
+]
 
 # Multiface layouts whose per-face rows exist in card_faces.parquet; numeric
 # blocks come from face 0. Physically double-faced layouts set has_back_face.
 FACE_LAYOUTS = frozenset(
-    {"transform", "modal_dfc", "adventure", "split", "flip", "prepare",
-     "reversible_card"})
+    {
+        "transform",
+        "modal_dfc",
+        "adventure",
+        "split",
+        "flip",
+        "prepare",
+        "reversible_card",
+    }
+)
 BACK_FACE_LAYOUTS = frozenset({"transform", "modal_dfc"})
 
-LAYOUT_CATEGORIES = ["normal", "transform", "modal_dfc", "adventure",
-                     "split", "saga_like", "leveler_like", "other"]
+LAYOUT_CATEGORIES = [
+    "normal",
+    "transform",
+    "modal_dfc",
+    "adventure",
+    "split",
+    "saga_like",
+    "leveler_like",
+    "other",
+]
 _LAYOUT_GROUPS = {
-    "normal": "normal", "transform": "transform", "modal_dfc": "modal_dfc",
-    "adventure": "adventure", "split": "split",
-    "saga": "saga_like", "class": "saga_like", "case": "saga_like",
-    "leveler": "leveler_like", "prototype": "leveler_like",
+    "normal": "normal",
+    "transform": "transform",
+    "modal_dfc": "modal_dfc",
+    "adventure": "adventure",
+    "split": "split",
+    "saga": "saga_like",
+    "class": "saga_like",
+    "case": "saga_like",
+    "leveler": "leveler_like",
+    "prototype": "leveler_like",
     "mutate": "leveler_like",
 }
 
@@ -97,9 +128,22 @@ TEXT_FLAGS = [
 ]
 
 _SCRYFALL_COLUMNS = [
-    "id", "name", "set", "rarity", "type_line", "mana_cost", "cmc",
-    "colors", "color_identity", "oracle_text", "power", "toughness",
-    "loyalty", "keywords", "layout", "digital",
+    "id",
+    "name",
+    "set",
+    "rarity",
+    "type_line",
+    "mana_cost",
+    "cmc",
+    "colors",
+    "color_identity",
+    "oracle_text",
+    "power",
+    "toughness",
+    "loyalty",
+    "keywords",
+    "layout",
+    "digital",
 ]
 
 
@@ -118,28 +162,76 @@ class UnmatchedNamesError(ValueError):
 # ---------------------------------------------------------------------------
 # Feature-block layout (position-stable; vocab entries live in the manifest).
 
+
 def feature_blocks():
     """Ordered [{name, start, columns}] covering exactly N_FEATURES dims."""
     spec = [
-        ("mana_value", ["cmc_scaled"] + [f"cmc_is_{i}" for i in range(8)]
-         + ["cmc_is_8plus"]),
-        ("pips", ["pip_w", "pip_u", "pip_b", "pip_r", "pip_g", "pip_c",
-                  "pip_generic", "has_x", "n_hybrid", "n_phyrexian"]),
-        ("colors", ["color_w", "color_u", "color_b", "color_r", "color_g",
-                    "n_colors", "is_colorless", "is_multicolor"]),
+        (
+            "mana_value",
+            ["cmc_scaled"] + [f"cmc_is_{i}" for i in range(8)] + ["cmc_is_8plus"],
+        ),
+        (
+            "pips",
+            [
+                "pip_w",
+                "pip_u",
+                "pip_b",
+                "pip_r",
+                "pip_g",
+                "pip_c",
+                "pip_generic",
+                "has_x",
+                "n_hybrid",
+                "n_phyrexian",
+            ],
+        ),
+        (
+            "colors",
+            [
+                "color_w",
+                "color_u",
+                "color_b",
+                "color_r",
+                "color_g",
+                "n_colors",
+                "is_colorless",
+                "is_multicolor",
+            ],
+        ),
         ("color_identity", ["ci_w", "ci_u", "ci_b", "ci_r", "ci_g"]),
         ("supertypes", ["super_legendary", "super_snow", "super_basic"]),
         ("card_types", [f"type_{t.lower()}" for t in CARD_TYPES]),
-        ("subtypes", [f"subtype_{i:03d}" for i in range(SUBTYPE_SLOTS)]
-         + ["subtype_unmatched"]),
-        ("stats", [f"{s}_{k}" for s in ("power", "toughness", "loyalty")
-                   for k in ("scaled", "missing", "star")]),
-        ("rarity", ["rarity_common", "rarity_uncommon", "rarity_rare",
-                    "rarity_mythic", "rarity_other"]),
-        ("keywords", [f"keyword_{i:03d}" for i in range(KEYWORD_SLOTS)]
-         + ["keyword_unmatched"]),
-        ("layout", [f"layout_{c}" for c in LAYOUT_CATEGORIES]
-         + ["has_back_face", "back_is_land"]),
+        (
+            "subtypes",
+            [f"subtype_{i:03d}" for i in range(SUBTYPE_SLOTS)] + ["subtype_unmatched"],
+        ),
+        (
+            "stats",
+            [
+                f"{s}_{k}"
+                for s in ("power", "toughness", "loyalty")
+                for k in ("scaled", "missing", "star")
+            ],
+        ),
+        (
+            "rarity",
+            [
+                "rarity_common",
+                "rarity_uncommon",
+                "rarity_rare",
+                "rarity_mythic",
+                "rarity_other",
+            ],
+        ),
+        (
+            "keywords",
+            [f"keyword_{i:03d}" for i in range(KEYWORD_SLOTS)] + ["keyword_unmatched"],
+        ),
+        (
+            "layout",
+            [f"layout_{c}" for c in LAYOUT_CATEGORIES]
+            + ["has_back_face", "back_is_land"],
+        ),
         ("text", ["text_len", "text_lines"] + [n for n, _ in TEXT_FLAGS]),
     ]
     blocks, start = [], 0
@@ -158,20 +250,29 @@ def manifest_columns(manifest):
 # ---------------------------------------------------------------------------
 # Scryfall loading + name resolution.
 
+
 def load_scryfall():
     """(cards, faces) frames; cards carries released_at from sets.parquet."""
-    cards = pd.read_parquet(paths.SCRYFALL_CARDS_PARQUET,
-                            columns=_SCRYFALL_COLUMNS)
-    sets = pd.read_parquet(paths.SCRYFALL_SETS_PARQUET,
-                           columns=["set", "released_at"])
+    cards = pd.read_parquet(paths.SCRYFALL_CARDS_PARQUET, columns=_SCRYFALL_COLUMNS)
+    sets = pd.read_parquet(paths.SCRYFALL_SETS_PARQUET, columns=["set", "released_at"])
     cards = cards.merge(sets, on="set", how="left")
     if paths.SCRYFALL_FACES_PARQUET.exists():
         faces = pd.read_parquet(paths.SCRYFALL_FACES_PARQUET)
     else:
-        faces = pd.DataFrame(columns=["card_id", "face_index", "name",
-                                      "mana_cost", "type_line", "oracle_text",
-                                      "colors", "power", "toughness",
-                                      "loyalty"])
+        faces = pd.DataFrame(
+            columns=[
+                "card_id",
+                "face_index",
+                "name",
+                "mana_cost",
+                "type_line",
+                "oracle_text",
+                "colors",
+                "power",
+                "toughness",
+                "loyalty",
+            ]
+        )
     return cards, faces
 
 
@@ -193,8 +294,7 @@ def _back_face(full_name):
     return parts[1] if len(parts) > 1 else None
 
 
-def resolve_names(query_names, cards=None, faces=None,
-                  prefer_sets_by_name=None):
+def resolve_names(query_names, cards=None, faces=None, prefer_sets_by_name=None):
     """Join 17Lands names to one Scryfall printing each.
 
     Returns a list of records aligned with query_names:
@@ -254,14 +354,16 @@ def resolve_names(query_names, cards=None, faces=None,
             ),
         )
         row = rows[chosen]
-        records.append({
-            "name": query,
-            "name_norm": key,
-            "card": row,
-            "faces": faces_by_card.get(row["id"], []),
-            "match": match,
-            "in_expansion": row["set"] in prefer,
-        })
+        records.append(
+            {
+                "name": query,
+                "name_norm": key,
+                "card": row,
+                "faces": faces_by_card.get(row["id"], []),
+                "match": match,
+                "in_expansion": row["set"] in prefer,
+            }
+        )
     if unmatched:
         raise UnmatchedNamesError(unmatched)
     return records
@@ -277,6 +379,7 @@ def _released_sort_key(released_at):
 
 # ---------------------------------------------------------------------------
 # Per-card field extraction (front face for multiface layouts).
+
 
 def card_fields(record):
     """Front-face fields + back-face info for one resolved record."""
@@ -297,18 +400,22 @@ def card_fields(record):
         cmc = parsed["mv"]  # FRONT-face mana value, never the combined cmc
     else:
         raw_cmc = card.get("cmc")
-        cmc = (float(raw_cmc)
-               if raw_cmc is not None and not pd.isna(raw_cmc)
-               else parsed["mv"])
+        cmc = (
+            float(raw_cmc)
+            if raw_cmc is not None and not pd.isna(raw_cmc)
+            else parsed["mv"]
+        )
 
     colors = pick("colors")
     if multiface and not _s(front.get("colors")):
         # Split/adventure/prepare faces carry no colors; the face's mana cost
         # is authoritative (top-level colors merge both faces). Cards with no
         # cost at all fall back to the card-level colors.
-        colors = (",".join(sorted(c for c in "WUBRG"
-                                  if parsed["pips"][c] > 0))
-                  if mana_cost else _s(card.get("colors")))
+        colors = (
+            ",".join(sorted(c for c in "WUBRG" if parsed["pips"][c] > 0))
+            if mana_cost
+            else _s(card.get("colors"))
+        )
 
     has_back = layout in BACK_FACE_LAYOUTS and back is not None
     back_type_line = _s(back["type_line"]) if back is not None else ""
@@ -324,16 +431,16 @@ def card_fields(record):
         "oracle_text": pick("oracle_text"),
         "back_oracle_text": _s(back["oracle_text"]) if back is not None else "",
         "colors": {c for c in colors.split(",") if c in set("WUBRG")},
-        "color_identity": {c for c in _s(card["color_identity"]).split(",")
-                           if c in set("WUBRG")},
+        "color_identity": {
+            c for c in _s(card["color_identity"]).split(",") if c in set("WUBRG")
+        },
         "power": front.get("power") if front is not None else card.get("power"),
-        "toughness": (front.get("toughness") if front is not None
-                      else card.get("toughness")),
-        "loyalty": (front.get("loyalty") if front is not None
-                    else card.get("loyalty")),
+        "toughness": (
+            front.get("toughness") if front is not None else card.get("toughness")
+        ),
+        "loyalty": (front.get("loyalty") if front is not None else card.get("loyalty")),
         "rarity": _s(card["rarity"]).lower(),
-        "keywords": [k.strip() for k in _s(card["keywords"]).split(",")
-                     if k.strip()],
+        "keywords": [k.strip() for k in _s(card["keywords"]).split(",") if k.strip()],
         "has_back_face": has_back,
         "back_is_land": has_back and "land" in back_type_line.lower(),
     }
@@ -349,8 +456,14 @@ def parse_mana_cost(cost):
     Mana-value rules: {X}=0, {N}=N, {2/W}=2, everything else 1.
     Hybrid tokens count toward every color they contain.
     """
-    out = {"pips": {c: 0 for c in "WUBRGC"}, "generic": 0, "has_x": False,
-           "hybrid": 0, "phyrexian": 0, "mv": 0.0}
+    out = {
+        "pips": {c: 0 for c in "WUBRGC"},
+        "generic": 0,
+        "has_x": False,
+        "hybrid": 0,
+        "phyrexian": 0,
+        "mv": 0.0,
+    }
     for token in _PIP_RE.findall(cost or ""):
         t = token.upper().strip()
         if not t or t in ("Y", "Z"):
@@ -409,8 +522,11 @@ def parse_type_line(type_line):
     front = type_line.split(" // ")[0]
     left, _, right = front.partition("—")
     tokens = left.split()
-    types = {("Kindred" if t == "Tribal" else t)
-             for t in tokens if t in CARD_TYPES or t == "Tribal"}
+    types = {
+        ("Kindred" if t == "Tribal" else t)
+        for t in tokens
+        if t in CARD_TYPES or t == "Tribal"
+    }
     return tokens, types, right.split()
 
 
@@ -420,6 +536,7 @@ def _clip(x):
 
 # ---------------------------------------------------------------------------
 # Phase (a): the frozen manifest.
+
 
 def build_manifest(names_by_set, cards=None, faces=None):
     """Freeze vocabularies + layout from the given TRAINING sets only.
@@ -431,7 +548,8 @@ def build_manifest(names_by_set, cards=None, faces=None):
     banned = set(names_by_set) & corpus.EVAL_ONLY
     if banned:
         raise ValueError(
-            f"manifest must never be built from EVAL_ONLY sets: {sorted(banned)}")
+            f"manifest must never be built from EVAL_ONLY sets: {sorted(banned)}"
+        )
 
     prefer = {}
     for set_code, set_names in names_by_set.items():
@@ -449,12 +567,16 @@ def build_manifest(names_by_set, cards=None, faces=None):
         for keyword in set(fields["keywords"]):
             keyword_names.setdefault(keyword, set()).add(record["name_norm"])
 
-    subtype_vocab = [t for t, _ in sorted(
-        subtype_names.items(), key=lambda kv: (-len(kv[1]), kv[0])
-    )][:SUBTYPE_SLOTS]
-    keyword_vocab = [k for k, cards_ in sorted(
-        keyword_names.items(), key=lambda kv: (-len(kv[1]), kv[0])
-    ) if len(cards_) >= KEYWORD_MIN_CARDS][:KEYWORD_SLOTS]
+    subtype_vocab = [
+        t for t, _ in sorted(subtype_names.items(), key=lambda kv: (-len(kv[1]), kv[0]))
+    ][:SUBTYPE_SLOTS]
+    keyword_vocab = [
+        k
+        for k, cards_ in sorted(
+            keyword_names.items(), key=lambda kv: (-len(kv[1]), kv[0])
+        )
+        if len(cards_) >= KEYWORD_MIN_CARDS
+    ][:KEYWORD_SLOTS]
 
     manifest = {
         "version": MANIFEST_VERSION,
@@ -475,9 +597,19 @@ def build_manifest(names_by_set, cards=None, faces=None):
     return manifest
 
 
-_HASH_KEYS = ["version", "n_features", "subtype_slots", "subtype_vocab",
-              "keyword_slots", "keyword_min_cards", "keyword_vocab",
-              "unmatched_scale", "layout_categories", "text_flags", "blocks"]
+_HASH_KEYS = [
+    "version",
+    "n_features",
+    "subtype_slots",
+    "subtype_vocab",
+    "keyword_slots",
+    "keyword_min_cards",
+    "keyword_vocab",
+    "unmatched_scale",
+    "layout_categories",
+    "text_flags",
+    "blocks",
+]
 
 
 def content_hash(manifest):
@@ -504,21 +636,21 @@ def load_manifest(path=None):
 # ---------------------------------------------------------------------------
 # Phase (b): featurize through a frozen manifest.
 
-def featurize(query_names, manifest, cards=None, faces=None,
-              prefer_sets_by_name=None):
+
+def featurize(query_names, manifest, cards=None, faces=None, prefer_sets_by_name=None):
     """float32 [N, 391] matrix + per-name provenance dicts.
 
     Any name with no Scryfall row raises UnmatchedNamesError up front.
     """
-    records = resolve_names(query_names, cards, faces,
-                            prefer_sets_by_name=prefer_sets_by_name)
+    records = resolve_names(
+        query_names, cards, faces, prefer_sets_by_name=prefer_sets_by_name
+    )
     columns = manifest_columns(manifest)
     col = {name: i for i, name in enumerate(columns)}
     assert len(columns) == manifest["n_features"]
 
     subtype_slot = {t: i for i, t in enumerate(manifest["subtype_vocab"])}
-    keyword_slot = {k.casefold(): i
-                    for i, k in enumerate(manifest["keyword_vocab"])}
+    keyword_slot = {k.casefold(): i for i, k in enumerate(manifest["keyword_vocab"])}
     layout_index = {c: i for i, c in enumerate(manifest["layout_categories"])}
     flags = [(n, re.compile(p)) for n, p in manifest["text_flags"]]
     scale = float(manifest.get("unmatched_scale", UNMATCHED_SCALE))
@@ -548,8 +680,7 @@ def featurize(query_names, manifest, cards=None, faces=None,
         colors = fields["colors"]
         for c in "WUBRG":
             row[col[f"color_{c.lower()}"]] = 1.0 if c in colors else 0.0
-            row[col[f"ci_{c.lower()}"]] = (
-                1.0 if c in fields["color_identity"] else 0.0)
+            row[col[f"ci_{c.lower()}"]] = 1.0 if c in fields["color_identity"] else 0.0
         row[col["n_colors"]] = _clip(len(colors) / 3.0)
         row[col["is_colorless"]] = 1.0 if not colors else 0.0
         row[col["is_multicolor"]] = 1.0 if len(colors) >= 2 else 0.0
@@ -603,35 +734,37 @@ def featurize(query_names, manifest, cards=None, faces=None,
         # Text-derived features (front face, self-name masked).
         raw = fields["oracle_text"]
         masked = textemb.mask_self_names(
-            fields["full_name"], fields["full_type_line"], raw)
+            fields["full_name"], fields["full_type_line"], raw
+        )
         collapsed = textemb.collapse_lines(masked).casefold()
         row[col["text_len"]] = _clip(len(collapsed) / 400.0)
-        row[col["text_lines"]] = _clip(
-            (raw.count("\n") + 1 if raw else 0) / 6.0)
+        row[col["text_lines"]] = _clip((raw.count("\n") + 1 if raw else 0) / 6.0)
         for flag_name, pattern in flags:
             if pattern.search(collapsed):
                 row[col[flag_name]] = 1.0
 
         card = record["card"]
-        provenance.append({
-            "name": record["name"],
-            "name_norm": record["name_norm"],
-            "scryfall_id": _s(card["id"]),
-            "set": _s(card["set"]),
-            "released_at": _s(card["released_at"]),
-            "digital": bool(card["digital"]),
-            "layout": fields["layout"],
-            "match": record["match"],
-            "in_expansion": record["in_expansion"],
-        })
+        provenance.append(
+            {
+                "name": record["name"],
+                "name_norm": record["name_norm"],
+                "scryfall_id": _s(card["id"]),
+                "set": _s(card["set"]),
+                "released_at": _s(card["released_at"]),
+                "digital": bool(card["digital"]),
+                "layout": fields["layout"],
+                "match": record["match"],
+                "in_expansion": record["in_expansion"],
+            }
+        )
     return matrix, provenance
 
 
-def embed_inputs(query_names, cards=None, faces=None,
-                 prefer_sets_by_name=None):
+def embed_inputs(query_names, cards=None, faces=None, prefer_sets_by_name=None):
     """Per-name inputs for textemb.normalize_oracle, keyed by name."""
-    records = resolve_names(query_names, cards, faces,
-                            prefer_sets_by_name=prefer_sets_by_name)
+    records = resolve_names(
+        query_names, cards, faces, prefer_sets_by_name=prefer_sets_by_name
+    )
     out = {}
     for record in records:
         fields = card_fields(record)

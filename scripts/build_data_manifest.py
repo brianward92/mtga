@@ -108,11 +108,14 @@ def build(allow_eval_only=False):
         raise SystemExit(
             f"EVAL_ONLY raw data present ({[p.name for p in eval_only_files]}); "
             f"manifest v1 pins the training universe WITHOUT the held-out "
-            f"set. Pass --allow-eval-only only for the T0 snapshot freeze.")
+            f"set. Pass --allow-eval-only only for the T0 snapshot freeze."
+        )
 
     eval_only = {
-        code: {"present": False,
-               "note": "held out per docs/eval_protocol.md; frozen at T0"}
+        code: {
+            "present": False,
+            "note": "held out per docs/eval_protocol.md; frozen at T0",
+        }
         for code in sorted(corpus.EVAL_ONLY)
     }
     for path in eval_only_files:
@@ -149,8 +152,8 @@ def check(recorded):
         for key in ["etag", "sha256", "size", "rows"]:
             if now.get(key) != entry.get(key):
                 problems.append(
-                    f"{name}: {key} drift ({entry.get(key)!r} -> "
-                    f"{now.get(key)!r})")
+                    f"{name}: {key} drift ({entry.get(key)!r} -> " f"{now.get(key)!r})"
+                )
     for name in sorted(set(current_files) - set(recorded_files)):
         problems.append(f"{name}: on disk but not in the manifest")
 
@@ -162,21 +165,29 @@ def check(recorded):
     for code, entry in recorded.get("eval_only", {}).items():
         present_now = any(
             (p := _parse_raw_name(f.name)) and p[1] == code
-            for f in paths.RAW_DIR.glob("*.csv.gz"))
+            for f in paths.RAW_DIR.glob("*.csv.gz")
+        )
         if entry.get("present") != present_now:
             problems.append(
                 f"eval_only.{code}: presence drift "
-                f"({entry.get('present')} -> {present_now})")
+                f"({entry.get('present')} -> {present_now})"
+            )
     return problems
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--check", action="store_true",
-                        help="re-verify the existing manifest against disk")
-    parser.add_argument("--allow-eval-only", action="store_true",
-                        help="record EVAL_ONLY raw files instead of refusing "
-                             "(T0 snapshot freeze only)")
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="re-verify the existing manifest against disk",
+    )
+    parser.add_argument(
+        "--allow-eval-only",
+        action="store_true",
+        help="record EVAL_ONLY raw files instead of refusing "
+        "(T0 snapshot freeze only)",
+    )
     args = parser.parse_args(argv)
     out = manifest_path()
 
@@ -196,8 +207,10 @@ def main(argv=None):
     with open(out, "w") as fh:
         json.dump(manifest, fh, indent=2)
     absent = [c for c, e in manifest["eval_only"].items() if not e["present"]]
-    print(f"{out}: {len(manifest['files'])} raw files, "
-          f"content hash {manifest['content_hash'][:12]}")
+    print(
+        f"{out}: {len(manifest['files'])} raw files, "
+        f"content hash {manifest['content_hash'][:12]}"
+    )
     if absent:
         print(f"EVAL_ONLY absent (universe pinned without): {absent}")
     else:

@@ -38,14 +38,34 @@ DEV_SETS = ["BRO", "TMT", "SOS"]
 # frozen identifiers; set counts are reported from run records. `name` matches
 # TrainConfig.name in record.json.
 RUNGS = [
-    ("S1",  "s1",  ["NEO"]),
-    ("S2",  "s2",  ["NEO", "DSK"]),
+    ("S1", "s1", ["NEO"]),
+    ("S2", "s2", ["NEO", "DSK"]),
     ("S2b", "s2b", ["MOM", "TDM"]),
-    ("S4",  "s4",  ["NEO", "DSK", "DMU", "FIN"]),
+    ("S4", "s4", ["NEO", "DSK", "DMU", "FIN"]),
     ("S4b", "s4b", ["STX", "SNC", "OTJ", "TLA"]),
-    ("S8",  "s8",  ["NEO", "DSK", "DMU", "FIN", "STX", "MOM", "BLB", "TLA"]),
-    ("S16", "s16", ["NEO", "DSK", "DMU", "FIN", "STX", "MOM", "BLB", "TLA",
-                    "AFR", "SNC", "ONE", "LTR", "WOE", "MKM", "OTJ", "EOE"]),
+    ("S8", "s8", ["NEO", "DSK", "DMU", "FIN", "STX", "MOM", "BLB", "TLA"]),
+    (
+        "S16",
+        "s16",
+        [
+            "NEO",
+            "DSK",
+            "DMU",
+            "FIN",
+            "STX",
+            "MOM",
+            "BLB",
+            "TLA",
+            "AFR",
+            "SNC",
+            "ONE",
+            "LTR",
+            "WOE",
+            "MKM",
+            "OTJ",
+            "EOE",
+        ],
+    ),
     ("S27", "f_dev", None),  # full F-dev universe
 ]
 
@@ -112,8 +132,12 @@ def discover_runs(repo):
         for d in sorted(runs_dir.iterdir()):
             if not d.is_dir() or d.name in runs:
                 continue
-            entry = {"run_id": d.name, "record": None, "summary": None,
-                     "root": str(root)}
+            entry = {
+                "run_id": d.name,
+                "record": None,
+                "summary": None,
+                "root": str(root),
+            }
             if (d / "record.json").exists():
                 entry["record"] = load_json(d / "record.json")
             zs = d / "zeroshot"
@@ -122,11 +146,12 @@ def discover_runs(repo):
             # Secondary zero-shot analyses (eval_*.py outputs) live beside the
             # summary; load whichever are present so their numbers reach the
             # prose macros instead of being transcribed by hand.
-            for key, fname in (("normalized_score", "normalized_score.json"),
-                               ("late_retention", "late_draft_retention.json"),
-                               ("bro_transfer", "bro_transfer_analysis.json")):
-                entry[key] = load_json(zs / fname) if (zs / fname).exists() \
-                    else None
+            for key, fname in (
+                ("normalized_score", "normalized_score.json"),
+                ("late_retention", "late_draft_retention.json"),
+                ("bro_transfer", "bro_transfer_analysis.json"),
+            ):
+                entry[key] = load_json(zs / fname) if (zs / fname).exists() else None
             if entry["record"] or entry["summary"]:
                 runs[d.name] = entry
     return runs
@@ -163,8 +188,7 @@ def load_ledger(repo):
 def runs_by_manifest(runs, manifest, required_roles=PAPER_RUN_ROLES):
     """Resolve paper roles to exact run ids declared in the tracked manifest."""
     if manifest.get("schema_version") != 1:
-        raise PaperSourceError(
-            "paper run manifest must have schema_version 1")
+        raise PaperSourceError("paper run manifest must have schema_version 1")
     specs = manifest.get("runs")
     if not isinstance(specs, dict):
         raise PaperSourceError("paper run manifest must contain a 'runs' object")
@@ -172,8 +196,8 @@ def runs_by_manifest(runs, manifest, required_roles=PAPER_RUN_ROLES):
     missing_roles = sorted(set(required_roles) - set(specs))
     if missing_roles:
         raise PaperSourceError(
-            "paper run manifest is missing required roles: "
-            + ", ".join(missing_roles))
+            "paper run manifest is missing required roles: " + ", ".join(missing_roles)
+        )
 
     pinned = {}
     for role in sorted(required_roles):
@@ -186,42 +210,50 @@ def runs_by_manifest(runs, manifest, required_roles=PAPER_RUN_ROLES):
         if not run_id or not config_name or not best_sha256:
             raise PaperSourceError(
                 f"paper run role {role!r} requires run_id, config_name, and "
-                "best_sha256")
+                "best_sha256"
+            )
 
         entry = runs.get(run_id)
         if entry is None:
             raise PaperSourceError(
                 f"paper run role {role!r} pins {run_id!r}, but that run was "
-                "not found in any live or mirrored data root")
+                "not found in any live or mirrored data root"
+            )
         record = entry.get("record")
         if record is None:
             raise PaperSourceError(
                 f"paper run role {role!r} pins {run_id!r}, but record.json "
-                "is missing")
+                "is missing"
+            )
         recorded_run_id = record.get("run_id")
         if recorded_run_id != run_id:
             raise PaperSourceError(
                 f"paper run role {role!r} pins {run_id!r}, but record.json "
-                f"declares run_id {recorded_run_id!r}")
+                f"declares run_id {recorded_run_id!r}"
+            )
         recorded_config = record.get("config", {}).get("name")
         if recorded_config != config_name:
             raise PaperSourceError(
                 f"paper run role {role!r} pins config {config_name!r}, but "
-                f"run {run_id!r} declares config {recorded_config!r}")
+                f"run {run_id!r} declares config {recorded_config!r}"
+            )
         recorded_sha256 = (record.get("artifacts") or {}).get("best_sha256")
         if recorded_sha256 != best_sha256:
             raise PaperSourceError(
                 f"paper run role {role!r} pins best_sha256 {best_sha256!r}, "
-                f"but run {run_id!r} declares {recorded_sha256!r}")
+                f"but run {run_id!r} declares {recorded_sha256!r}"
+            )
         if spec.get("require_summary") and entry.get("summary") is None:
             raise PaperSourceError(
                 f"paper run role {role!r} pins {run_id!r}, but "
-                "zeroshot/summary.json is missing")
+                "zeroshot/summary.json is missing"
+            )
         pinned[role] = entry
     return pinned
 
 
 # --- formatting -------------------------------------------------------------
+
 
 def pct(x, dp=1):
     return f"{100 * float(x):.{dp}f}"
@@ -272,6 +304,7 @@ def write_table(path, lines, header):
 
 # --- extraction -------------------------------------------------------------
 
+
 def dev_expert(summary, set_code):
     """(top1, ci, extras) for one dev set from a zeroshot summary.json."""
     if not summary:
@@ -280,11 +313,17 @@ def dev_expert(summary, set_code):
     if not block:
         return None
     e = block["expert"]
-    return {"top1": e["top1"], "ci": e.get("top1_ci"),
-            "top3": e.get("top3"), "log_loss": e.get("log_loss"),
-            "ece": e.get("ece"), "non_forced": e.get("top1_non_forced"),
-            "n_picks": e.get("n_picks"), "n_drafts": e.get("n_drafts"),
-            "all_users_top1": block.get("all_users_top1")}
+    return {
+        "top1": e["top1"],
+        "ci": e.get("top1_ci"),
+        "top3": e.get("top3"),
+        "log_loss": e.get("log_loss"),
+        "ece": e.get("ece"),
+        "non_forced": e.get("top1_non_forced"),
+        "n_picks": e.get("n_picks"),
+        "n_drafts": e.get("n_drafts"),
+        "all_users_top1": block.get("all_users_top1"),
+    }
 
 
 def msh_expert(frozen, member):
@@ -300,8 +339,11 @@ def msh_expert(frozen, member):
                 continue
             block = modes.get("deployment", {}).get("expert")
             if block:
-                return {"top1": block["top1"], "ci": block.get("top1_ci"),
-                        "run_id": f"frozen_eval/{sha[:12]}"}
+                return {
+                    "top1": block["top1"],
+                    "ci": block.get("top1_ci"),
+                    "run_id": f"frozen_eval/{sha[:12]}",
+                }
     return None
 
 
@@ -331,8 +373,7 @@ def msh_secondary(frozen, member):
                 "log_loss": deploy_expert["log_loss"],
                 "ece": deploy_expert["ece"],
                 "all_users_top1": human_all["top1"],
-                "skill_gap_pp": 100 * (deploy_expert["top1"]
-                                       - human_expert["top1"]),
+                "skill_gap_pp": 100 * (deploy_expert["top1"] - human_expert["top1"]),
             }
     return None
 
@@ -347,8 +388,7 @@ def msh_ceiling_comparison(frozen, member):
         ctx = summary.get("context", {})
         if ctx.get("rehearse") or ctx.get("set") != "MSH":
             continue
-        for name, comparison in (summary.get("ceiling_comparisons")
-                                 or {}).items():
+        for name, comparison in (summary.get("ceiling_comparisons") or {}).items():
             if norm_member(name) == want and comparison:
                 return {**comparison, "run_id": f"frozen_eval/{sha[:12]}"}
     return None
@@ -379,16 +419,22 @@ def rehearsal_baselines(frozen):
             e = block.get("expert") or block.get("all")
             if not e:
                 continue
-            out.setdefault(norm_member(name), {
-                "top1": e["top1"], "ci": e.get("top1_ci"),
-                "run_id": f"frozen_eval/{sha[:12]} (rehearsal)",
-                "set": ctx.get("set"), "format": ctx.get("format"),
-                "n_picks": e.get("n_picks"),
-            })
+            out.setdefault(
+                norm_member(name),
+                {
+                    "top1": e["top1"],
+                    "ci": e.get("top1_ci"),
+                    "run_id": f"frozen_eval/{sha[:12]} (rehearsal)",
+                    "set": ctx.get("set"),
+                    "format": ctx.get("format"),
+                    "n_picks": e.get("n_picks"),
+                },
+            )
     return out
 
 
 # --- tables -----------------------------------------------------------------
+
 
 def table_main(anchors, fdev, ffull, a_noctx, frozen, ledger):
     ceil = anchors["ceilings"]
@@ -411,14 +457,12 @@ def table_main(anchors, fdev, ffull, a_noctx, frozen, ledger):
         else:
             fdev_cells.append(pending(s))
     if len(dev_vals) == 3:
-        mean = fdev["summary"].get("dev_mean_expert_top1",
-                                   sum(dev_vals) / 3)
+        mean = fdev["summary"].get("dev_mean_expert_top1", sum(dev_vals) / 3)
         fdev_cells.append(cell(mean, run_id=run_id))
     else:
         fdev_cells.append(pending("mean"))
     m = msh_expert(frozen, "F-dev")
-    fdev_cells.append(cell(m["top1"], m["ci"], m["run_id"]) if m
-                      else pending("eval"))
+    fdev_cells.append(cell(m["top1"], m["ci"], m["run_id"]) if m else pending("eval"))
     rows.append(fdev_cells)
 
     # A-noctx row: the pre-registered architecture ablation that won the
@@ -438,8 +482,7 @@ def table_main(anchors, fdev, ffull, a_noctx, frozen, ledger):
         else:
             anoctx_cells.append(pending(s))
     if len(anoctx_vals) == 3:
-        mean = a_noctx["summary"].get("dev_mean_expert_top1",
-                                      sum(anoctx_vals) / 3)
+        mean = a_noctx["summary"].get("dev_mean_expert_top1", sum(anoctx_vals) / 3)
         anoctx_cells.append(cell(mean, run_id=anoctx_run_id))
     else:
         anoctx_cells.append(pending("mean"))
@@ -450,8 +493,7 @@ def table_main(anchors, fdev, ffull, a_noctx, frozen, ledger):
     ffull_cells = [r"DraftFM (F-full, zero-shot)"]
     ffull_cells += [r"--", r"--", r"--", r"--"]
     m = msh_expert(frozen, "F-full")
-    ffull_cells.append(cell(m["top1"], m["ci"], m["run_id"]) if m
-                       else pending("eval"))
+    ffull_cells.append(cell(m["top1"], m["ci"], m["run_id"]) if m else pending("eval"))
     rows.append(ffull_cells)
     rows.append(r"\midrule")
 
@@ -464,8 +506,9 @@ def table_main(anchors, fdev, ffull, a_noctx, frozen, ledger):
         ceil_vals.append(c["top1"])
     ceil_cells.append(cell(sum(ceil_vals) / 3))
     m = msh_expert(frozen, "perset")
-    ceil_cells.append(cell(m["top1"], m["ci"], m["run_id"]) if m
-                      else pending("post-T0"))
+    ceil_cells.append(
+        cell(m["top1"], m["ci"], m["run_id"]) if m else pending("post-T0")
+    )
     rows.append(ceil_cells)
 
     # Unaligned ratio row (arithmetic on the two rows above; the
@@ -481,8 +524,7 @@ def table_main(anchors, fdev, ffull, a_noctx, frozen, ledger):
     fdev_msh = msh_expert(frozen, "F-dev")
     ceil_msh = msh_expert(frozen, "perset")
     if fdev_msh and ceil_msh:
-        ratio_cells.append(
-            (f"{fdev_msh['top1'] / ceil_msh['top1']:.3f}", ""))
+        ratio_cells.append((f"{fdev_msh['top1'] / ceil_msh['top1']:.3f}", ""))
     else:
         ratio_cells.append(pending("post-T0"))
     rows.append(ratio_cells)
@@ -510,18 +552,25 @@ def table_baselines(anchors, frozen):
         if m:  # real MSH number supersedes the rehearsal
             return [label, info, "MSH", cell(m["top1"], m["ci"], m["run_id"])]
         if b:
-            return [label, info, f"{b['set']} {b['format']} (rehearsal)",
-                    cell(b["top1"], b["ci"], b["run_id"])]
+            return [
+                label,
+                info,
+                f"{b['set']} {b['format']} (rehearsal)",
+                cell(b["top1"], b["ci"], b["run_id"]),
+            ]
         return [label, info, "MSH", pending("eval")]
 
     rows.append(measured("baseline-random", "Random", "none"))
-    rows.append(measured("baseline-rarity", "Rarity--color heuristic",
-                         "card features (hour 0)"))
+    rows.append(
+        measured("baseline-rarity", "Rarity--color heuristic", "card features (hour 0)")
+    )
     for member, label in ASTERISKED_BASELINES:
         m = msh_expert(frozen, member)
-        c = cell(m["top1"], m["ci"], m["run_id"]) if m \
-            else (r"\textit{not evaluated}",
-                  " % recipe not frozen before T0")
+        c = (
+            cell(m["top1"], m["ci"], m["run_id"])
+            if m
+            else (r"\textit{not evaluated}", " % recipe not frozen before T0")
+        )
         rows.append([label + r"$^{*}$", "post-release statistics", "MSH", c])
     rows += [r"\bottomrule", r"\end{tabular}"]
     return emit_rows(rows)
@@ -551,8 +600,7 @@ def table_prior_work(anchors, frozen):
         r"\begin{tabular}{llccll}",
         r"\toprule",
         r"\rowcolor{tblhead}",
-        r"Reference & Approach & Unseen & Day 1 & Test set "
-        r"& Top-1 (\%) \\",
+        r"Reference & Approach & Unseen & Day 1 & Test set " r"& Top-1 (\%) \\",
         r"\midrule",
     ]
     for key, approach, unseen, dayone in PRIOR_WORK_ROWS:
@@ -562,13 +610,29 @@ def table_prior_work(anchors, frozen):
             val = (pct(p["top1"]), "")
         else:
             val = (f"{pct(p['top1_lo'])}--{pct(p['top1_hi'])}", "")
-        rows.append([f"\\citet{{{p['cite']}}}{star}", approach, unseen,
-                     dayone, p["test_set"], val])
+        rows.append(
+            [
+                f"\\citet{{{p['cite']}}}{star}",
+                approach,
+                unseen,
+                dayone,
+                p["test_set"],
+                val,
+            ]
+        )
     rows.append(r"\midrule")
     m = msh_expert(frozen, "F-full")
     msh_cell = cell(m["top1"], run_id=m["run_id"]) if m else pending("MSH")
-    rows.append(["DraftFM (this paper)", "Card features, 31 sets", "yes",
-                 "yes", "MSH (unseen)", msh_cell])
+    rows.append(
+        [
+            "DraftFM (this paper)",
+            "Card features, 31 sets",
+            "yes",
+            "yes",
+            "MSH (unseen)",
+            msh_cell,
+        ]
+    )
     rows += [r"\bottomrule", r"\end{tabular}"]
     return emit_rows(rows)
 
@@ -596,10 +660,16 @@ def table_skill_bands(breakdowns):
         cells = [SKILL_BAND_LABELS[band]]
         for s in sets:
             entry = breakdowns["sets"].get(s) if breakdowns else None
-            rec = next((b for b in entry["skill_bands"]
-                        if b["band"] == band), None) if entry else None
-            cells.append(cell(rec["top1"], rec["top1_ci"],
-                              entry["source_run"]) if rec else pending(s))
+            rec = (
+                next((b for b in entry["skill_bands"] if b["band"] == band), None)
+                if entry
+                else None
+            )
+            cells.append(
+                cell(rec["top1"], rec["top1_ci"], entry["source_run"])
+                if rec
+                else pending(s)
+            )
         rows.append(cells)
     rows += [r"\bottomrule", r"\end{tabular}"]
     return emit_rows(rows)
@@ -617,27 +687,31 @@ def skill_band_macros(breakdowns):
         entry = breakdowns["sets"].get(set_key) if breakdowns else None
         if not entry:
             return None, None
-        rec = next((b for b in entry["skill_bands"]
-                    if b["band"] == band_name), None)
+        rec = next((b for b in entry["skill_bands"] if b["band"] == band_name), None)
         return (rec, entry["source_run"]) if rec else (None, None)
 
     caps = {"bottom": "Bot", "middle": "Mid", "top": "Top"}
-    for set_key, suffix in [("BRO", "Bro"), ("TMT", "Tmt"), ("SOS", "Sos"),
-                            ("MSH.deployment", "Msh")]:
+    for set_key, suffix in [
+        ("BRO", "Bro"),
+        ("TMT", "Tmt"),
+        ("SOS", "Sos"),
+        ("MSH.deployment", "Msh"),
+    ]:
         for band_name, cap in caps.items():
             rec, run = band(set_key, band_name)
             name = f"SkillBand{cap}{suffix}"
-            macro(name, pct(rec["top1"]) if rec
-                  else f"\\pending{{{name}}}", run)
+            macro(name, pct(rec["top1"]) if rec else f"\\pending{{{name}}}", run)
     for band_name, cap in [("bottom", "Bot"), ("top", "Top")]:
         rec, run = band("MSH.human", band_name)
-        macro(f"SkillBand{cap}MshHuman",
-              pct(rec["top1"]) if rec else "\\pending{MSH human band}", run)
+        macro(
+            f"SkillBand{cap}MshHuman",
+            pct(rec["top1"]) if rec else "\\pending{MSH human band}",
+            run,
+        )
     top, run = band("MSH.deployment", "top")
     bot, _ = band("MSH.deployment", "bottom")
     if top and bot:
-        macro("SkillBandGapMsh",
-              f"{100 * (top['top1'] - bot['top1']):.1f}", run)
+        macro("SkillBandGapMsh", f"{100 * (top['top1'] - bot['top1']):.1f}", run)
     else:
         macro("SkillBandGapMsh", "\\pending{MSH band gap}")
     return out
@@ -666,14 +740,12 @@ def table_ablations(by_role, frozen):
             else:
                 cells.append(pending(s))
         if len(vals) == 3:
-            mean = entry["summary"].get("dev_mean_expert_top1",
-                                        sum(vals) / 3)
+            mean = entry["summary"].get("dev_mean_expert_top1", sum(vals) / 3)
             cells.append(cell(mean, run_id=run_id))
         else:
             cells.append(pending("mean"))
         m = msh_expert(frozen, member)
-        cells.append(cell(m["top1"], run_id=m["run_id"]) if m
-                     else pending("eval"))
+        cells.append(cell(m["top1"], run_id=m["run_id"]) if m else pending("eval"))
         rows.append(cells)
     rows += [r"\bottomrule", r"\end{tabular}"]
     return emit_rows(rows)
@@ -716,10 +788,10 @@ def table_scaling(by_role, frozen, ledger):
 
         cells = [rung, label]
         cells.append((str(n_sets), "") if n_sets else pending("n"))
-        cells.append((f"{picks / 1e6:.1f}",
-                      f" % run={run_id}") if picks else pending("train"))
-        cells.append((str(step), "") if step is not None
-                     else pending("train"))
+        cells.append(
+            (f"{picks / 1e6:.1f}", f" % run={run_id}") if picks else pending("train")
+        )
+        cells.append((str(step), "") if step is not None else pending("train"))
         mean = None
         if entry and entry["summary"]:
             mean = entry["summary"].get("dev_mean_expert_top1")
@@ -728,12 +800,17 @@ def table_scaling(by_role, frozen, ledger):
         else:
             cells.append(pending("eval"))
         rows.append(cells)
-        curve.append({
-            "rung": rung, "config_name": cfg_name, "run_id": run_id,
-            "n_sets": n_sets, "train_picks": picks,
-            "dev_mean_top1": mean,
-            "in_ledger": run_id in ledger if run_id else False,
-        })
+        curve.append(
+            {
+                "rung": rung,
+                "config_name": cfg_name,
+                "run_id": run_id,
+                "n_sets": n_sets,
+                "train_picks": picks,
+                "dev_mean_top1": mean,
+                "in_ledger": run_id in ledger if run_id else False,
+            }
+        )
     rows += [r"\bottomrule", r"\end{tabular}"]
     return emit_rows(rows), curve
 
@@ -755,15 +832,13 @@ def numbers_macros(anchors, fdev, ffull, a_noctx, frozen, calibration=None):
             macro(f"Fdev{s.title()}", pct(d["top1"]), run_id)
             macro(f"Fdev{s.title()}NonForced", pct(d["non_forced"]), run_id)
             macro(f"Fdev{s.title()}Ece", f"{d['ece']:.3f}", run_id)
-            macro(f"Fdev{s.title()}AllUsers", pct(d["all_users_top1"]),
-                  run_id)
+            macro(f"Fdev{s.title()}AllUsers", pct(d["all_users_top1"]), run_id)
             dev_vals.append(d["top1"])
         else:
             macro(f"Fdev{s.title()}", f"\\pending{{F-dev {s}}}")
             macro(f"Fdev{s.title()}NonForced", f"\\pending{{F-dev {s} nf}}")
             macro(f"Fdev{s.title()}Ece", f"\\pending{{F-dev {s} ECE}}")
-            macro(f"Fdev{s.title()}AllUsers",
-                  f"\\pending{{F-dev {s} all-users}}")
+            macro(f"Fdev{s.title()}AllUsers", f"\\pending{{F-dev {s} all-users}}")
     wr_id = fdev["summary"].get("wr_id") if fdev and fdev["summary"] else None
     if wr_id is not None:
         macro("DeployBucket", f"{wr_id / 50:.2f}", run_id)
@@ -802,8 +877,10 @@ def numbers_macros(anchors, fdev, ffull, a_noctx, frozen, calibration=None):
     # sharply for the rarity heuristic (42.8 rehearsal vs 25.6 MSH), so prose
     # must never quote one while describing the other.
     reh = rehearsal_baselines(frozen)
-    for member, name in [("baseline-random", "BaseRandom"),
-                         ("baseline-rarity", "BaseRarity")]:
+    for member, name in [
+        ("baseline-random", "BaseRandom"),
+        ("baseline-rarity", "BaseRarity"),
+    ]:
         b = reh.get(norm_member(member))
         if b:
             macro(name, pct(b["top1"]), b["run_id"])
@@ -816,9 +893,11 @@ def numbers_macros(anchors, fdev, ffull, a_noctx, frozen, calibration=None):
             macro(f"{name}Msh", f"\\pending{{{member} MSH}}")
 
     m = msh_expert(frozen, "F-full")
-    macro("FfullMsh", pct(m["top1"]) if m
-          else "\\pending{F-full MSH top-1}",
-          m["run_id"] if m else None)
+    macro(
+        "FfullMsh",
+        pct(m["top1"]) if m else "\\pending{F-full MSH top-1}",
+        m["run_id"] if m else None,
+    )
 
     # Secondary MSH metrics (top-3, log-loss, ECE, all-users slice,
     # skill-conditioning gap): all read from the single completed frozen-eval
@@ -828,14 +907,15 @@ def numbers_macros(anchors, fdev, ffull, a_noctx, frozen, calibration=None):
     # Post-day-one rows: the per-set MSH ceiling and the pre-registered
     # ceiling comparisons for the headline model, from the addendum summary.
     cm = msh_expert(frozen, "perset")
-    macro("CeilMsh", pct(cm["top1"]) if cm else "\\pending{MSH ceiling}",
-          cm["run_id"] if cm else None)
+    macro(
+        "CeilMsh",
+        pct(cm["top1"]) if cm else "\\pending{MSH ceiling}",
+        cm["run_id"] if cm else None,
+    )
     cc = msh_ceiling_comparison(frozen, "f-full")
     if cc:
-        macro("NormScoreMsh", f"{100 * cc['normalized_top1']:.1f}",
-              cc["run_id"])
-        macro("LateRetMsh", f"{100 * cc['late_draft_retention']:.1f}",
-              cc["run_id"])
+        macro("NormScoreMsh", f"{100 * cc['normalized_top1']:.1f}", cc["run_id"])
+        macro("LateRetMsh", f"{100 * cc['late_draft_retention']:.1f}", cc["run_id"])
         macro("MshSharedPicks", f"{cc['n_shared_picks']:,}", cc["run_id"])
     else:
         macro("NormScoreMsh", "\\pending{MSH normalized score}")
@@ -850,29 +930,27 @@ def numbers_macros(anchors, fdev, ffull, a_noctx, frozen, calibration=None):
         macro("FfullMshAllUsers", pct(ms["all_users_top1"]), ms["run_id"])
         macro("FfullMshSkillGap", f"{ms['skill_gap_pp']:.2f}", ms["run_id"])
     else:
-        for name, desc in [("FfullMshTopThree", "MSH top-3"),
-                           ("FfullMshLogLoss", "MSH log-loss"),
-                           ("FfullMshEce", "MSH ECE"),
-                           ("FfullMshAllUsers", "MSH all-users top-1"),
-                           ("FfullMshSkillGap", "MSH skill-conditioning gap")]:
+        for name, desc in [
+            ("FfullMshTopThree", "MSH top-3"),
+            ("FfullMshLogLoss", "MSH log-loss"),
+            ("FfullMshEce", "MSH ECE"),
+            ("FfullMshAllUsers", "MSH all-users top-1"),
+            ("FfullMshSkillGap", "MSH skill-conditioning gap"),
+        ]:
             macro(name, f"\\pending{{{desc}}}")
     macro("ProtocolTag", anchors["manifests"]["protocol_tag"])
-    macro("DataManifestHash",
-          anchors["manifests"]["data_manifest_content_hash"][:12])
-    macro("FeaturizerHash",
-          anchors["manifests"]["featurizer_manifest_hash"][:12])
+    macro("DataManifestHash", anchors["manifests"]["data_manifest_content_hash"][:12])
+    macro("FeaturizerHash", anchors["manifests"]["featurizer_manifest_hash"][:12])
     if fdev and fdev["record"]:
         rec = fdev["record"]
         macro("FdevParams", f"{rec['n_params'] / 1e6:.1f}", fdev["run_id"])
-        macro("FdevPicks", f"{rec['n_train_picks'] / 1e6:.1f}",
-              fdev["run_id"])
+        macro("FdevPicks", f"{rec['n_train_picks'] / 1e6:.1f}", fdev["run_id"])
         macro("FdevShards", str(rec["n_shards"]), fdev["run_id"])
-        macro("FdevSets", str(len({s for s, _ in rec["config"]["sets"]})),
-              fdev["run_id"])
-        macro("FdevWallHours", f"{rec['wall_clock_s'] / 3600:.1f}",
-              fdev["run_id"])
-        macro("FdevExamplesPerSec", f"{rec['examples_per_s']:,}",
-              fdev["run_id"])
+        macro(
+            "FdevSets", str(len({s for s, _ in rec["config"]["sets"]})), fdev["run_id"]
+        )
+        macro("FdevWallHours", f"{rec['wall_clock_s'] / 3600:.1f}", fdev["run_id"])
+        macro("FdevExamplesPerSec", f"{rec['examples_per_s']:,}", fdev["run_id"])
         macro("FdevRunId", fdev["run_id"].replace("_", r"\_"))
 
     # F-full: the actual shipped/frozen recipe (A-noctx's architecture,
@@ -884,8 +962,7 @@ def numbers_macros(anchors, fdev, ffull, a_noctx, frozen, calibration=None):
         rec = ffull["record"]
         macro("FfullParams", f"{rec['n_params'] / 1e6:.1f}", ffull["run_id"])
         macro("FfullPicks", f"{rec['n_train_picks'] / 1e6:.1f}", ffull["run_id"])
-        macro("FfullWallHours", f"{rec['wall_clock_s'] / 3600:.1f}",
-              ffull["run_id"])
+        macro("FfullWallHours", f"{rec['wall_clock_s'] / 3600:.1f}", ffull["run_id"])
         macro("FfullRunId", ffull["run_id"].replace("_", r"\_"))
 
     # A-noctx: the winning architecture ablation -- same param count as
@@ -904,8 +981,7 @@ def numbers_macros(anchors, fdev, ffull, a_noctx, frozen, calibration=None):
             else:
                 macro(f"ANoctx{s.title()}", f"\\pending{{A-noctx {s}}}")
         if len(anoctx_vals) == 3:
-            mean = a_noctx["summary"].get("dev_mean_expert_top1",
-                                          sum(anoctx_vals) / 3)
+            mean = a_noctx["summary"].get("dev_mean_expert_top1", sum(anoctx_vals) / 3)
             macro("ANoctxDevMean", pct(mean), run_id)
             ratios = [v / ceil[s]["top1"] for v, s in zip(anoctx_vals, DEV_SETS)]
             for s, r in zip(DEV_SETS, ratios):
@@ -918,13 +994,21 @@ def numbers_macros(anchors, fdev, ffull, a_noctx, frozen, calibration=None):
     # "calibration" block, docs/eval_protocol.md section 3). Never fitted on
     # MSH -- MSH ECE stays a separate, still-pending quantity.
     if calibration:
-        macro("FrozenTemperature", f"{calibration['temperature']:.2f}",
-              calibration.get("fit_run"))
-        macro("DevMeanEceAtTOne", f"{calibration['dev_mean_ece_at_t1']:.3f}",
-              calibration.get("fit_run"))
-        macro("DevMeanEceAtFrozenT",
-              f"{calibration['dev_mean_ece_at_frozen_t']:.3f}",
-              calibration.get("fit_run"))
+        macro(
+            "FrozenTemperature",
+            f"{calibration['temperature']:.2f}",
+            calibration.get("fit_run"),
+        )
+        macro(
+            "DevMeanEceAtTOne",
+            f"{calibration['dev_mean_ece_at_t1']:.3f}",
+            calibration.get("fit_run"),
+        )
+        macro(
+            "DevMeanEceAtFrozenT",
+            f"{calibration['dev_mean_ece_at_frozen_t']:.3f}",
+            calibration.get("fit_run"),
+        )
     else:
         macro("FrozenTemperature", "\\pending{frozen temperature}")
         macro("DevMeanEceAtTOne", "\\pending{dev mean ECE at T=1}")
@@ -967,10 +1051,14 @@ def analysis_macros(fdev, ablation_deltas, seed_bands):
     if ns:
         for s in DEV_SETS:
             block = ns["per_set"][f"{s}.PremierDraft"]
-            macro(f"NormScore{s.title()}",
-                  f"{100 * block['normalized_score']:.1f}", run_id)
-        macro("NormScoreDevMean",
-              f"{100 * ns['dev_mean_normalized_score']:.1f}", run_id)
+            macro(
+                f"NormScore{s.title()}",
+                f"{100 * block['normalized_score']:.1f}",
+                run_id,
+            )
+        macro(
+            "NormScoreDevMean", f"{100 * ns['dev_mean_normalized_score']:.1f}", run_id
+        )
     else:
         for s in DEV_SETS:
             pend(f"NormScore{s.title()}", f"normalized score {s}")
@@ -981,11 +1069,14 @@ def analysis_macros(fdev, ablation_deltas, seed_bands):
     lr = fdev.get("late_retention") if fdev else None
     if lr:
         for s in DEV_SETS:
-            macro(f"LateRet{s.title()}",
-                  f"{100 * lr['per_set'][s]['late_draft_retention']:.1f}",
-                  run_id)
-        macro("LateRetDevMean",
-              f"{100 * lr['dev_mean_late_draft_retention']:.1f}", run_id)
+            macro(
+                f"LateRet{s.title()}",
+                f"{100 * lr['per_set'][s]['late_draft_retention']:.1f}",
+                run_id,
+            )
+        macro(
+            "LateRetDevMean", f"{100 * lr['dev_mean_late_draft_retention']:.1f}", run_id
+        )
     else:
         for s in DEV_SETS:
             pend(f"LateRet{s.title()}", f"late retention {s}")
@@ -1004,17 +1095,21 @@ def analysis_macros(fdev, ablation_deltas, seed_bands):
         macro("BonusStratGap", f"{100 * strat['point']:.1f}", run_id)
         macro("BonusStratGapCi", pp_ci(*strat["ci"]), run_id)
         macro("BroTrioShortfall", f"{100 * bt['gap_vs_others']:.1f}", run_id)
-        macro("BonusPresentFrac",
-              f"{100 * bt['bonus_slice']['bonus_present']['frac_of_picks']:.0f}",
-              run_id)
+        macro(
+            "BonusPresentFrac",
+            f"{100 * bt['bonus_slice']['bonus_present']['frac_of_picks']:.0f}",
+            run_id,
+        )
     else:
-        for name, desc in [("BonusPresentTopOne", "bonus-present top1"),
-                           ("BonusAbsentTopOne", "bonus-absent top1"),
-                           ("BonusRawGap", "bonus raw gap"),
-                           ("BonusStratGap", "bonus stratified gap"),
-                           ("BonusStratGapCi", "bonus stratified gap CI"),
-                           ("BroTrioShortfall", "BRO trio shortfall"),
-                           ("BonusPresentFrac", "bonus-present frac")]:
+        for name, desc in [
+            ("BonusPresentTopOne", "bonus-present top1"),
+            ("BonusAbsentTopOne", "bonus-absent top1"),
+            ("BonusRawGap", "bonus raw gap"),
+            ("BonusStratGap", "bonus stratified gap"),
+            ("BonusStratGapCi", "bonus stratified gap CI"),
+            ("BroTrioShortfall", "BRO trio shortfall"),
+            ("BonusPresentFrac", "bonus-present frac"),
+        ]:
             pend(name, desc)
 
     # -- Pre-registered ablation paired-difference deltas (analysis.tex "The
@@ -1025,8 +1120,7 @@ def analysis_macros(fdev, ablation_deltas, seed_bands):
         block = (ablation_deltas or {}).get(label)
         for s in DEV_SETS:
             if block and s in block:
-                macro(f"{prefix}{s.title()}",
-                      f"{100 * block[s]['point']:.1f}")
+                macro(f"{prefix}{s.title()}", f"{100 * block[s]['point']:.1f}")
                 macro(f"{prefix}{s.title()}Ci", pp_ci(*block[s]["ci"]))
             else:
                 pend(f"{prefix}{s.title()}", f"{label} {s}")
@@ -1081,31 +1175,49 @@ def main(argv=None):
     breakdowns = load_json(breakdown_path) if breakdown_path.exists() else None
 
     tables = repo / "paper" / "tables"
-    write_table(tables / "main_results.tex",
-                table_main(anchors, fdev, ffull, a_noctx, frozen, ledger),
-                "Main results: high-win-rate-slice deployment-mode top-1 "
-                "(95% cluster-bootstrap CIs over drafts).")
-    write_table(tables / "baselines.tex", table_baselines(anchors, frozen),
-                "Measured baselines (hour-0 and asterisked post-release). "
-                "Published prior numbers are in prior_work.tex.")
-    write_table(tables / "prior_work.tex", table_prior_work(anchors, frozen),
-                "Published pick-agreement anchors + this paper's frozen MSH "
-                "row. * = caveat recorded in anchors.json.")
-    write_table(tables / "skill_bands.tex", table_skill_bands(breakdowns),
-                "Top-1 by drafter win-rate band, deployment mode, from "
-                "cached predictions (eval_pick_breakdowns.py).")
-    write_table(tables / "ablations.tex", table_ablations(by_role, frozen),
-                "Pre-registered variant grid (protocol section 5).")
+    write_table(
+        tables / "main_results.tex",
+        table_main(anchors, fdev, ffull, a_noctx, frozen, ledger),
+        "Main results: high-win-rate-slice deployment-mode top-1 "
+        "(95% cluster-bootstrap CIs over drafts).",
+    )
+    write_table(
+        tables / "baselines.tex",
+        table_baselines(anchors, frozen),
+        "Measured baselines (hour-0 and asterisked post-release). "
+        "Published prior numbers are in prior_work.tex.",
+    )
+    write_table(
+        tables / "prior_work.tex",
+        table_prior_work(anchors, frozen),
+        "Published pick-agreement anchors + this paper's frozen MSH "
+        "row. * = caveat recorded in anchors.json.",
+    )
+    write_table(
+        tables / "skill_bands.tex",
+        table_skill_bands(breakdowns),
+        "Top-1 by drafter win-rate band, deployment mode, from "
+        "cached predictions (eval_pick_breakdowns.py).",
+    )
+    write_table(
+        tables / "ablations.tex",
+        table_ablations(by_role, frozen),
+        "Pre-registered variant grid (protocol section 5).",
+    )
     scaling_rows, curve = table_scaling(by_role, frozen, ledger)
-    write_table(tables / "scaling.tex", scaling_rows,
-                "Scaling ladder (protocol section 4.3). Rung labels are "
-                "frozen identifiers; counts come from run records.")
-    write_table(tables / "numbers.tex",
-                numbers_macros(anchors, fdev, ffull, a_noctx, frozen,
-                              calibration)
-                + analysis_macros(fdev, ablation_deltas, seed_bands)
-                + skill_band_macros(breakdowns),
-                "Number macros used by the prose.")
+    write_table(
+        tables / "scaling.tex",
+        scaling_rows,
+        "Scaling ladder (protocol section 4.3). Rung labels are "
+        "frozen identifiers; counts come from run records.",
+    )
+    write_table(
+        tables / "numbers.tex",
+        numbers_macros(anchors, fdev, ffull, a_noctx, frozen, calibration)
+        + analysis_macros(fdev, ablation_deltas, seed_bands)
+        + skill_band_macros(breakdowns),
+        "Number macros used by the prose.",
+    )
 
     figures = repo / "paper" / "figures"
     figures.mkdir(parents=True, exist_ok=True)
@@ -1114,19 +1226,20 @@ def main(argv=None):
         "anchors": {
             "expert_tuned": {
                 "top1": anchors["published"]["ward_draftsimbot"]["top1"],
-                "label": "DraftsimBot 44.5 (expert-tuned, M19)"},
+                "label": "DraftsimBot 44.5 (expert-tuned, M19)",
+            },
             "gpt4o": {
                 "top1": anchors["published"]["urzagpt_gpt4o"]["top1"],
-                "label": "GPT-4o zero-shot 43 (NEO)"},
+                "label": "GPT-4o zero-shot 43 (NEO)",
+            },
             "bertram": {
                 "top1": anchors["published"]["bertram_bro_zeroshot"]["top1"],
-                "label": "Bertram et al. 55.4* (BRO, incl. post-release meta)"},
+                "label": "Bertram et al. 55.4* (BRO, incl. post-release meta)",
+            },
         },
-        "ceiling_dev_mean": sum(
-            anchors["ceilings"][s]["top1"] for s in DEV_SETS) / 3,
+        "ceiling_dev_mean": sum(anchors["ceilings"][s]["top1"] for s in DEV_SETS) / 3,
     }
-    (figures / "scaling_data.json").write_text(
-        json.dumps(curve_data, indent=2))
+    (figures / "scaling_data.json").write_text(json.dumps(curve_data, indent=2))
     print(f"wrote {(figures / 'scaling_data.json').relative_to(repo)}")
 
     n_real = sum(1 for r in curve if r["dev_mean_top1"] is not None)

@@ -11,10 +11,13 @@ def create_parser():
     parser.add_argument("--sets", default=",".join(config.TRACKED_SETS))
     parser.add_argument("--formats", default=",".join(config.FORMATS))
     parser.add_argument("--types", default=",".join(config.DATA_TYPES))
-    parser.add_argument("--corpus", action="store_true",
-                        help="curate the DraftFM training corpus: corpus.TRAINING_SETS "
-                             "with per-set formats, draft type only (--sets may narrow "
-                             "it; eval-only sets refused)")
+    parser.add_argument(
+        "--corpus",
+        action="store_true",
+        help="curate the DraftFM training corpus: corpus.TRAINING_SETS "
+        "with per-set formats, draft type only (--sets may narrow "
+        "it; eval-only sets refused)",
+    )
     parser.add_argument("--force", action="store_true")
     return parser
 

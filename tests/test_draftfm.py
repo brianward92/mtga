@@ -12,8 +12,17 @@ import math
 import numpy as np
 import pytest
 
-from _synth import (ALIASES_A, DRAFTFM_NULL, FMT, GRP, SET, CARD_B, CARD_C,
-                    CARD_D, StubOrtSession)
+from _synth import (
+    ALIASES_A,
+    DRAFTFM_NULL,
+    FMT,
+    GRP,
+    SET,
+    CARD_B,
+    CARD_C,
+    CARD_D,
+    StubOrtSession,
+)
 from mtga.models import draftfm
 from mtga.models.draftfm import OnnxDraftFMModel
 
@@ -31,8 +40,7 @@ def test_load_caches_table_and_summary(model):
     assert model.table.shape == (4, 4)
     assert model.table[0, 0] == pytest.approx(3.0)
     # Mean-pool set encoder over the diag features.
-    np.testing.assert_allclose(model.set_summary,
-                               [0.75, 0.5, 0.25, 0.0])
+    np.testing.assert_allclose(model.set_summary, [0.75, 0.5, 0.25, 0.0])
     assert model.model_id == "_foundation/v1"
     assert model.model_kind == "draftfm-zeroshot"
     assert model.fallback is False
@@ -46,16 +54,14 @@ def test_score_pack_ranks_by_model_logit(model):
     assert scores[1].ev == pytest.approx(0.0)
     assert [s.rank for s in scores] == [1, 2]
     # Probabilities are softmax over the pack logits.
-    assert scores[0].prob == pytest.approx(
-        math.exp(3.0) / (math.exp(3.0) + 1.0))
+    assert scores[0].prob == pytest.approx(math.exp(3.0) / (math.exp(3.0) + 1.0))
     assert scores[0].prob + scores[1].prob == pytest.approx(1.0)
 
 
 def test_empty_pool_injects_learned_null_token(model):
     model.score_pack([B, C], [])
     feeds = StubOrtSession.last_scorer_feeds
-    np.testing.assert_allclose(feeds["pool_emb"],
-                               np.full((1, 1, 4), DRAFTFM_NULL))
+    np.testing.assert_allclose(feeds["pool_emb"], np.full((1, 1, 4), DRAFTFM_NULL))
     assert feeds["pool_counts"].tolist() == [[0]]
     assert feeds["pool_mask"].tolist() == [[False]]
 
@@ -77,12 +83,20 @@ def test_scorer_conditioning_and_position_inputs(model):
     assert feeds["games_id"].tolist() == [6]
     assert feeds["format_id"].tolist() == [0]  # PremierDraft
     ppp = 14.0
-    np.testing.assert_allclose(feeds["position"][0], [
-        0.0, 1.0, 0.0, 3 / ppp, (ppp - 1 - 3) / ppp,
-        (ppp + 3) / 45.0, (ppp + 3) / (3 * ppp),
-    ], rtol=1e-6)
-    np.testing.assert_allclose(feeds["set_scalars"][0],
-                               [4 / 400.0, 0.0, 1.0, 0.0])
+    np.testing.assert_allclose(
+        feeds["position"][0],
+        [
+            0.0,
+            1.0,
+            0.0,
+            3 / ppp,
+            (ppp - 1 - 3) / ppp,
+            (ppp + 3) / 45.0,
+            (ppp + 3) / (3 * ppp),
+        ],
+        rtol=1e-6,
+    )
+    np.testing.assert_allclose(feeds["set_scalars"][0], [4 / 400.0, 0.0, 1.0, 0.0])
     np.testing.assert_allclose(feeds["set_summary"], model.set_summary)
 
 
@@ -90,7 +104,7 @@ def test_position_defaults_derive_from_pool_size(model):
     # 15 pool cards, no pack/pick numbers: pack 1 pick 1 under 14 picks/pack.
     model.score_pack([B], [C] * 15)
     feeds = StubOrtSession.last_scorer_feeds
-    assert feeds["position"][0][1] == pytest.approx(1.0)   # pack_number == 1
+    assert feeds["position"][0][1] == pytest.approx(1.0)  # pack_number == 1
     assert feeds["position"][0][3] == pytest.approx(1 / 14)  # pick_number 1
 
 
@@ -120,8 +134,7 @@ def test_p1p1_table_sized_pack(model):
     assert StubOrtSession.last_scorer_feeds["pack_emb"].shape == (1, 4, 4)
 
 
-def test_manifest_hash_mismatch_refused(stub_ort, make_foundation_version,
-                                        data_root):
+def test_manifest_hash_mismatch_refused(stub_ort, make_foundation_version, data_root):
     import _synth
 
     _synth.write_draftfm_assets(manifest_hash="different-hash")
@@ -129,14 +142,16 @@ def test_manifest_hash_mismatch_refused(stub_ort, make_foundation_version,
         OnnxDraftFMModel(make_foundation_version(), SET, FMT)
 
 
-def test_missing_assets_raise_with_pointer(stub_ort, make_foundation_version,
-                                           data_root):
+def test_missing_assets_raise_with_pointer(
+    stub_ort, make_foundation_version, data_root
+):
     with pytest.raises(FileNotFoundError, match="build_set_assets"):
         OnnxDraftFMModel(make_foundation_version(), SET, FMT)
 
 
-def test_set_ctx_false_export_has_no_summary(stub_ort, make_foundation_version,
-                                             draftfm_assets):
+def test_set_ctx_false_export_has_no_summary(
+    stub_ort, make_foundation_version, draftfm_assets
+):
     # set_ctx=False exports omit set_encoder.onnx entirely (not a zeroed
     # summary) -- serving must not load it or feed set_summary to the scorer.
     m = OnnxDraftFMModel(make_foundation_version(set_ctx=False), SET, FMT)

@@ -26,7 +26,11 @@ from mtga.foundation.featurize import parse_mana_cost
 WUBRG = "WUBRG"
 _PIP_RE = re.compile(r"\{([^}]+)\}")
 BASIC_FOR_COLOR = {
-    "W": "Plains", "U": "Island", "B": "Swamp", "R": "Mountain", "G": "Forest",
+    "W": "Plains",
+    "U": "Island",
+    "B": "Swamp",
+    "R": "Mountain",
+    "G": "Forest",
 }
 
 
@@ -127,20 +131,40 @@ def mana_curve(spells):
 # --- synergy -----------------------------------------------------------------
 
 _SYNERGY_RULES = (
-    ("landcycling", re.compile(r"\blandcycling\b", re.I),
-     "cycles for a land, so extra copies are never dead draws"),
-    ("noncreature_payoff", re.compile(r"whenever you cast a noncreature spell", re.I),
-     "pays off noncreature spells"),
-    ("artifact_payoff", re.compile(r"for each (?:other )?artifact you control|"
-                                  r"artifact entered the battlefield", re.I),
-     "scales with your artifact count"),
-    ("cost_reduction", re.compile(r"spells? you cast .*cost \{?[X0-9]", re.I),
-     "reduces your spell costs"),
-    ("card_draw", re.compile(r"\bdraw (?:a|two|three) card", re.I),
-     "draws cards"),
-    ("removal", re.compile(r"\bdestroy target\b|\bexile target\b|"
-                           r"deals \d+ damage to (?:any target|target creature)", re.I),
-     "removal"),
+    (
+        "landcycling",
+        re.compile(r"\blandcycling\b", re.I),
+        "cycles for a land, so extra copies are never dead draws",
+    ),
+    (
+        "noncreature_payoff",
+        re.compile(r"whenever you cast a noncreature spell", re.I),
+        "pays off noncreature spells",
+    ),
+    (
+        "artifact_payoff",
+        re.compile(
+            r"for each (?:other )?artifact you control|"
+            r"artifact entered the battlefield",
+            re.I,
+        ),
+        "scales with your artifact count",
+    ),
+    (
+        "cost_reduction",
+        re.compile(r"spells? you cast .*cost \{?[X0-9]", re.I),
+        "reduces your spell costs",
+    ),
+    ("card_draw", re.compile(r"\bdraw (?:a|two|three) card", re.I), "draws cards"),
+    (
+        "removal",
+        re.compile(
+            r"\bdestroy target\b|\bexile target\b|"
+            r"deals \d+ damage to (?:any target|target creature)",
+            re.I,
+        ),
+        "removal",
+    ),
 )
 
 
@@ -171,6 +195,7 @@ def synergy_notes(cards):
 
 
 # --- cuts --------------------------------------------------------------------
+
 
 def cut_candidates(spells, target, alsa_late=6.5):
     """Weakest `len(spells) - target` playables, weakest first.
@@ -213,6 +238,7 @@ def cut_candidates(spells, target, alsa_late=6.5):
 
 
 # --- top-level ---------------------------------------------------------------
+
 
 def advise(cards, deck_size=40, land_slots=17, colors=None):
     """Full advice for a submitted deck.

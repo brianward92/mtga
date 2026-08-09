@@ -10,8 +10,16 @@ import pytest
 
 import _synth
 from _synth import (
-    FMT, SET,
-    RID_A, RID_B, RID_C, RID_D, RID_GHOST, RID_L1, RID_L2, RID_OPP,
+    FMT,
+    SET,
+    RID_A,
+    RID_B,
+    RID_C,
+    RID_D,
+    RID_GHOST,
+    RID_L1,
+    RID_L2,
+    RID_OPP,
 )
 from mtga.lands import paths
 from mtga.replay import etl
@@ -42,23 +50,36 @@ def _rows(frame, **filters):
 
 
 def test_replay_paths_derive_from_curated_dir(data_root):
-    assert paths.replay_mull_path(SET, FMT) == \
-        paths.CURATED_DIR / "replay_mull" / f"{SET}.{FMT}.parquet"
-    assert paths.replay_turns_path(SET, FMT) == \
-        paths.CURATED_DIR / "replay_turns" / f"{SET}.{FMT}.parquet"
-    assert paths.replay_games_path(SET, FMT) == \
-        paths.CURATED_DIR / "replay_turns" / f"{SET}.{FMT}.games.parquet"
+    assert (
+        paths.replay_mull_path(SET, FMT)
+        == paths.CURATED_DIR / "replay_mull" / f"{SET}.{FMT}.parquet"
+    )
+    assert (
+        paths.replay_turns_path(SET, FMT)
+        == paths.CURATED_DIR / "replay_turns" / f"{SET}.{FMT}.parquet"
+    )
+    assert (
+        paths.replay_games_path(SET, FMT)
+        == paths.CURATED_DIR / "replay_turns" / f"{SET}.{FMT}.games.parquet"
+    )
 
 
 def test_replay_columns_typing():
-    header = ["draft_id", "num_turns", "won", "candidate_hand_1",
-              "opening_hand", "user_turn_3_eot_user_life",
-              "user_turn_3_eot_oppo_cards_in_hand",
-              "user_turn_3_user_mana_spent",
-              "user_turn_3_user_combat_damage_taken",  # int-as-string, signed
-              "user_turn_3_eot_user_cards_in_hand",    # pipe list
-              "oppo_turn_3_eot_user_life",             # unconsumed -> VARCHAR
-              f"deck_{_synth.CARD_C}", f"sideboard_{_synth.CARD_B}"]
+    header = [
+        "draft_id",
+        "num_turns",
+        "won",
+        "candidate_hand_1",
+        "opening_hand",
+        "user_turn_3_eot_user_life",
+        "user_turn_3_eot_oppo_cards_in_hand",
+        "user_turn_3_user_mana_spent",
+        "user_turn_3_user_combat_damage_taken",  # int-as-string, signed
+        "user_turn_3_eot_user_cards_in_hand",  # pipe list
+        "oppo_turn_3_eot_user_life",  # unconsumed -> VARCHAR
+        f"deck_{_synth.CARD_C}",
+        f"sideboard_{_synth.CARD_B}",
+    ]
     columns = etl.replay_columns(header)
     assert columns["draft_id"] == "VARCHAR"
     assert columns["num_turns"] == "SMALLINT"
@@ -116,7 +137,7 @@ def test_game_decisions_anomaly_reasons():
 def test_curate_mulligans_hand_rows(replay_raw):
     result = etl.curate_mulligans(SET, FMT)
     assert result["status"] == "CURATED"
-    assert result["rows"] == 8       # 1 + 2 + 3 + 0 (dropped) + 1 + 1
+    assert result["rows"] == 8  # 1 + 2 + 3 + 0 (dropped) + 1 + 1
     assert result["games"] == 6
     assert result["dropped"] == 1
 
@@ -124,18 +145,36 @@ def test_curate_mulligans_hand_rows(replay_raw):
     assert len(frame) == 8
     # One decision row per candidate hand, num_mulligans+1 per surviving game.
     assert frame.groupby("draft_id").size().to_dict() == {
-        "rg0": 1, "rg1": 2, "rg2": 3, "rg4": 1, "rg5": 1}
+        "rg0": 1,
+        "rg1": 2,
+        "rg2": 3,
+        "rg4": 1,
+        "rg5": 1,
+    }
     assert "rg3" not in set(frame["draft_id"])  # subset anomaly dropped
     # game_seq is the file row ordinal (rg3 still occupies ordinal 3).
     assert frame.set_index("draft_id")["game_seq"].to_dict() == {
-        "rg0": 0, "rg1": 1, "rg2": 2, "rg4": 4, "rg5": 5}
+        "rg0": 0,
+        "rg1": 1,
+        "rg2": 2,
+        "rg4": 4,
+        "rg5": 5,
+    }
 
     # Keep-at-7: kept row is decision 1; opening == candidate; nothing
     # bottomed (empty list, NOT null).
     rg0 = _rows(frame, draft_id="rg0").iloc[0]
     assert bool(rg0.kept) and rg0.decision_index == 1
     assert rg0.hand_size_if_kept == 7
-    assert list(rg0.hand_card_ids) == [RID_A, RID_B, RID_C, RID_D, RID_L1, RID_L1, RID_L2]
+    assert list(rg0.hand_card_ids) == [
+        RID_A,
+        RID_B,
+        RID_C,
+        RID_D,
+        RID_L1,
+        RID_L1,
+        RID_L2,
+    ]
     assert list(rg0.kept_card_ids) == list(rg0.hand_card_ids)
     assert list(rg0.bottomed_card_ids) == []
     assert bool(rg0.on_play) and bool(rg0.won)
@@ -148,9 +187,25 @@ def test_curate_mulligans_hand_rows(replay_raw):
     assert list(rg1["kept"]) == [False, True]
     assert list(rg1["hand_size_if_kept"]) == [7, 6]
     first, kept = rg1.iloc[0], rg1.iloc[1]
-    assert list(first.hand_card_ids) == [RID_A, RID_B, RID_C, RID_D, RID_L1, RID_L2, RID_A]
+    assert list(first.hand_card_ids) == [
+        RID_A,
+        RID_B,
+        RID_C,
+        RID_D,
+        RID_L1,
+        RID_L2,
+        RID_A,
+    ]
     assert first.kept_card_ids is None and first.bottomed_card_ids is None
-    assert list(kept.hand_card_ids) == [RID_A, RID_A, RID_B, RID_C, RID_L1, RID_L1, RID_L2]
+    assert list(kept.hand_card_ids) == [
+        RID_A,
+        RID_A,
+        RID_B,
+        RID_C,
+        RID_L1,
+        RID_L1,
+        RID_L2,
+    ]
     assert list(kept.kept_card_ids) == [RID_A, RID_B, RID_C, RID_L1, RID_L1, RID_L2]
     assert list(kept.bottomed_card_ids) == [RID_A]  # duplicate 101 bottomed
     assert not bool(kept.on_play) and not bool(kept.won)
@@ -171,10 +226,15 @@ def test_curate_mulligans_hand_rows(replay_raw):
     assert frame["kept"].dtype == bool
 
     meta = json.loads(paths.meta_path(paths.replay_mull_path(SET, FMT)).read_text())
-    assert meta == {"source_etag": "etag-replay-1", "rows": 8,
-                    "set": SET, "format": FMT, "games": 6,
-                    "games_dropped": 1,
-                    "anomalies": {"subset_violation": 1}}
+    assert meta == {
+        "source_etag": "etag-replay-1",
+        "rows": 8,
+        "set": SET,
+        "format": FMT,
+        "games": 6,
+        "games_dropped": 1,
+        "anomalies": {"subset_violation": 1},
+    }
 
 
 def test_curate_mulligans_skip_and_force(replay_raw):
@@ -197,7 +257,7 @@ def test_curate_mulligans_missing_raw(data_root):
 def test_curate_turn_states_hand_rows(replay_raw):
     result = etl.curate_turn_states(SET, FMT)
     assert result["status"] == "CURATED"
-    assert result["rows"] == 12      # num_turns 3+2+2+1+2+2
+    assert result["rows"] == 12  # num_turns 3+2+2+1+2+2
     assert result["games"] == 6
 
     frame = pd.read_parquet(paths.replay_turns_path(SET, FMT))
@@ -205,7 +265,13 @@ def test_curate_turn_states_hand_rows(replay_raw):
     # Strict truncation at num_turns: the zero-fill padding on turns 3/4 of
     # rg4 (life '0.0', damage '0') must never surface as rows.
     assert frame.groupby("draft_id")["turn"].max().to_dict() == {
-        "rg0": 3, "rg1": 2, "rg2": 2, "rg3": 1, "rg4": 2, "rg5": 2}
+        "rg0": 3,
+        "rg1": 2,
+        "rg2": 2,
+        "rg3": 1,
+        "rg4": 2,
+        "rg5": 2,
+    }
     assert (frame["turn"] <= frame["num_turns"]).all()
     assert (frame["user_life"] != 0).all()  # no padding zeros leaked
 
@@ -231,8 +297,7 @@ def test_curate_turn_states_hand_rows(replay_raw):
     assert list(t1.user_hand_ids) == [RID_A, RID_B, RID_C, RID_D, RID_L1, RID_L2]
     assert list(t2.user_creatures_ids) == [RID_B]
     assert list(t2.oppo_creatures_ids) == [RID_OPP]
-    assert (rg0["on_play"].all() and rg0["won"].all()
-            and (rg0["num_turns"] == 3).all())
+    assert rg0["on_play"].all() and rg0["won"].all() and (rg0["num_turns"] == 3).all()
 
     # Cumulative lands stall when a land drop is missed (rg1 turn 2).
     rg1 = _rows(frame, draft_id="rg1").sort_values("turn")
@@ -258,10 +323,16 @@ def test_curate_turn_states_hand_rows(replay_raw):
     assert frame["user_n_games_bucket"].dtype == "int32"
 
     meta = json.loads(paths.meta_path(paths.replay_turns_path(SET, FMT)).read_text())
-    assert meta == {"source_etag": "etag-replay-1", "rows": 12,
-                    "set": SET, "format": FMT, "games": 6,
-                    "max_turn_columns": 4, "games_truncated_at_max_turn": 0,
-                    "null_state_rows": 0}
+    assert meta == {
+        "source_etag": "etag-replay-1",
+        "rows": 12,
+        "set": SET,
+        "format": FMT,
+        "games": 6,
+        "max_turn_columns": 4,
+        "games_truncated_at_max_turn": 0,
+        "null_state_rows": 0,
+    }
 
 
 def test_curate_turn_states_games_sidecar(replay_raw):
@@ -282,8 +353,13 @@ def test_curate_turn_states_games_sidecar(replay_raw):
     assert games["opp_rank"].isna().all()  # blank in source -> NULL
 
     meta = json.loads(paths.meta_path(paths.replay_games_path(SET, FMT)).read_text())
-    assert meta == {"source_etag": "etag-replay-1", "rows": 6,
-                    "set": SET, "format": FMT, "deck_columns": 4}
+    assert meta == {
+        "source_etag": "etag-replay-1",
+        "rows": 6,
+        "set": SET,
+        "format": FMT,
+        "deck_columns": 4,
+    }
 
     # game_seq agrees across ALL THREE outputs (it is the join key).
     turns = pd.read_parquet(paths.replay_turns_path(SET, FMT))
@@ -312,25 +388,34 @@ def test_curate_turn_states_missing_raw(data_root):
 # scripts/run_replay_etl.py
 
 
-def test_cli_default_runs_only_existing_replay_raw(replay_script, data_root,
-                                                   monkeypatch, capsys):
+def test_cli_default_runs_only_existing_replay_raw(
+    replay_script, data_root, monkeypatch, capsys
+):
     for set_code, fmt in [("DSK", "PremierDraft"), ("FIN", "TradDraft")]:
         dest = paths.raw_dataset_path("replay", set_code, fmt)
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.touch()
     calls = []
-    monkeypatch.setattr(replay_script.etl, "curate_mulligans",
-                        lambda s, f, force=False: calls.append(("mull", s, f, force))
-                        or {"status": "X"})
-    monkeypatch.setattr(replay_script.etl, "curate_turn_states",
-                        lambda s, f, force=False: calls.append(("turns", s, f, force))
-                        or {"status": "X"})
+    monkeypatch.setattr(
+        replay_script.etl,
+        "curate_mulligans",
+        lambda s, f, force=False: calls.append(("mull", s, f, force))
+        or {"status": "X"},
+    )
+    monkeypatch.setattr(
+        replay_script.etl,
+        "curate_turn_states",
+        lambda s, f, force=False: calls.append(("turns", s, f, force))
+        or {"status": "X"},
+    )
     monkeypatch.setattr(sys, "argv", ["prog", "--force"])
     replay_script.main()
-    assert calls == [("mull", "DSK", "PremierDraft", True),
-                     ("turns", "DSK", "PremierDraft", True),
-                     ("mull", "FIN", "TradDraft", True),
-                     ("turns", "FIN", "TradDraft", True)]
+    assert calls == [
+        ("mull", "DSK", "PremierDraft", True),
+        ("turns", "DSK", "PremierDraft", True),
+        ("mull", "FIN", "TradDraft", True),
+        ("turns", "FIN", "TradDraft", True),
+    ]
 
 
 def test_cli_refuses_eval_only(replay_script, monkeypatch, capsys):
@@ -341,13 +426,13 @@ def test_cli_refuses_eval_only(replay_script, monkeypatch, capsys):
     assert "EVAL_ONLY" in capsys.readouterr().err
 
 
-def test_cli_allow_eval_only_override(replay_script, data_root, monkeypatch,
-                                      capsys):
+def test_cli_allow_eval_only_override(replay_script, data_root, monkeypatch, capsys):
     monkeypatch.setattr(
-        sys, "argv",
-        ["prog", "--sets", "MSH", "--formats", "PremierDraft",
-         "--allow-eval-only"])
-    replay_script.main()   # no raw on disk -> both curations report missing
+        sys,
+        "argv",
+        ["prog", "--sets", "MSH", "--formats", "PremierDraft", "--allow-eval-only"],
+    )
+    replay_script.main()  # no raw on disk -> both curations report missing
     out = capsys.readouterr().out
     assert out.count("MISSING_RAW") == 2
 

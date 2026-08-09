@@ -65,9 +65,7 @@ def test_bare_card_store_falls_back_to_rarity_floor(card_store):
     assert model.fallback is True
 
 
-def test_resolve_caches_then_hot_swaps_on_new_model(
-    ratings_cache, make_onnx_version
-):
+def test_resolve_caches_then_hot_swaps_on_new_model(ratings_cache, make_onnx_version):
     first = registry.resolve(SET, FMT)
     assert isinstance(first, HeuristicRatingsModel)
     assert registry.resolve(SET, FMT) is first  # cached instance
@@ -82,8 +80,9 @@ def test_resolve_caches_then_hot_swaps_on_new_model(
 # -- the DraftFM zero-shot tier (between per-set-latest and heuristics) ------
 
 
-def test_foundation_beats_heuristics(ratings_cache, make_foundation_version,
-                                     draftfm_assets, stub_ort):
+def test_foundation_beats_heuristics(
+    ratings_cache, make_foundation_version, draftfm_assets, stub_ort
+):
     make_foundation_version(tag="v20260706")
     model = registry.resolve(SET, FMT)
     assert isinstance(model, OnnxDraftFMModel)
@@ -92,9 +91,9 @@ def test_foundation_beats_heuristics(ratings_cache, make_foundation_version,
     assert model.model_id == "_foundation/v20260706"
 
 
-def test_per_set_latest_beats_foundation(make_onnx_version,
-                                         make_foundation_version,
-                                         draftfm_assets):
+def test_per_set_latest_beats_foundation(
+    make_onnx_version, make_foundation_version, draftfm_assets
+):
     make_onnx_version(SET, FMT, tag="v1")
     make_foundation_version()
     model = registry.resolve(SET, FMT)

@@ -27,37 +27,57 @@ from mtga.winprob import train as wtrain
 def create_parser():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--format", dest="limited_type", default="PremierDraft")
-    parser.add_argument("--train-sets", default=",".join(wtrain.DEFAULT_TRAIN_SETS),
-                        help="comma set codes to train on")
-    parser.add_argument("--holdout-sets", default=",".join(wtrain.DEFAULT_HOLDOUT_SETS),
-                        help="comma set codes held out entirely (zero-shot eval)")
-    parser.add_argument("--per-set-row-cap", type=int,
-                        default=wtrain.DEFAULT_PER_SET_ROW_CAP,
-                        help="cap on training rows per set (0 = no cap)")
+    parser.add_argument(
+        "--train-sets",
+        default=",".join(wtrain.DEFAULT_TRAIN_SETS),
+        help="comma set codes to train on",
+    )
+    parser.add_argument(
+        "--holdout-sets",
+        default=",".join(wtrain.DEFAULT_HOLDOUT_SETS),
+        help="comma set codes held out entirely (zero-shot eval)",
+    )
+    parser.add_argument(
+        "--per-set-row-cap",
+        type=int,
+        default=wtrain.DEFAULT_PER_SET_ROW_CAP,
+        help="cap on training rows per set (0 = no cap)",
+    )
     parser.add_argument("--epochs", type=int, default=8)
     parser.add_argument("--batch-size", type=int, default=8192)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--seed", type=int, default=17)
     parser.add_argument("--patience", type=int, default=2)
     parser.add_argument("--val-permille", type=int, default=wtrain.VAL_PERMILLE)
-    parser.add_argument("--tag", default="v2-crossset",
-                        help="artifact dir name under <MODELS_DIR>/_winprob/")
+    parser.add_argument(
+        "--tag",
+        default="v2-crossset",
+        help="artifact dir name under <MODELS_DIR>/_winprob/",
+    )
     return parser
 
 
 def main():
     args = create_parser().parse_args()
     train_sets = [s.strip().upper() for s in args.train_sets.split(",") if s.strip()]
-    holdout_sets = [s.strip().upper() for s in args.holdout_sets.split(",") if s.strip()]
+    holdout_sets = [
+        s.strip().upper() for s in args.holdout_sets.split(",") if s.strip()
+    ]
     overlap = set(train_sets) & set(holdout_sets)
     if overlap:
         raise SystemExit(f"sets in both --train-sets and --holdout-sets: {overlap}")
 
     models, report, context = wtrain.train_multiset(
-        train_sets, holdout_sets, limited_type=args.limited_type,
-        per_set_row_cap=args.per_set_row_cap or None, epochs=args.epochs,
-        batch_size=args.batch_size, lr=args.lr, seed=args.seed,
-        patience=args.patience, val_permille=args.val_permille,
+        train_sets,
+        holdout_sets,
+        limited_type=args.limited_type,
+        per_set_row_cap=args.per_set_row_cap or None,
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        lr=args.lr,
+        seed=args.seed,
+        patience=args.patience,
+        val_permille=args.val_permille,
     )
     out_dir = wtrain.save_version_multiset(models, report, context, tag=args.tag)
 
@@ -74,14 +94,16 @@ def main():
     # DSK-specific artifact? Training sets from the within-training val
     # split; holdout sets from their own full (zero-shot) data.
     by_set = economics.compute_by_set(
-        models["mlp"], mean, std, data, val_idx, train_sets, seed=args.seed)
+        models["mlp"], mean, std, data, val_idx, train_sets, seed=args.seed
+    )
     for set_code in holdout_sets:
         z = report["zero_shot"].get(set_code)
         if z is None:
             continue
         hdata = wdata.load_dataset(set_code, args.limited_type)
         by_set[set_code] = economics.compute(
-            models["mlp"], mean, std, hdata, np.arange(hdata.n_rows), seed=args.seed)
+            models["mlp"], mean, std, hdata, np.arange(hdata.n_rows), seed=args.seed
+        )
 
     with open(out_dir / "economics_by_set.json", "w") as fh:
         json.dump(by_set, fh, indent=2)
@@ -91,17 +113,26 @@ def main():
     print(f"ledgered {record['run_id']}")
     print(f"train_sets ({len(train_sets)}): {train_sets}")
     print(f"holdout_sets: {holdout_sets}")
-    print(json.dumps({
-        "n_rows": report["n_rows"], "n_games": report["n_games"],
-        "n_train": report["n_train"], "n_val": report["n_val"],
-        "models": report["models"],
-        "nonlinearity_gap": report["nonlinearity_gap"],
-        "zero_shot_mlp_auc_mean": report["zero_shot_mlp_auc_mean"],
-    }, indent=2))
+    print(
+        json.dumps(
+            {
+                "n_rows": report["n_rows"],
+                "n_games": report["n_games"],
+                "n_train": report["n_train"],
+                "n_val": report["n_val"],
+                "models": report["models"],
+                "nonlinearity_gap": report["nonlinearity_gap"],
+                "zero_shot_mlp_auc_mean": report["zero_shot_mlp_auc_mean"],
+            },
+            indent=2,
+        )
+    )
     print()
     for set_code, z in report["zero_shot"].items():
-        print(f"-- zero-shot {set_code} ({z['n_rows']:,} rows / "
-              f"{z['n_games']:,} games) --")
+        print(
+            f"-- zero-shot {set_code} ({z['n_rows']:,} rows / "
+            f"{z['n_games']:,} games) --"
+        )
         print(json.dumps(z["models"]["mlp"]["pooled"], indent=2))
     print()
     print(economics.render_table(econ))

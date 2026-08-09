@@ -8,7 +8,6 @@ import _synth
 from _synth import CARD_A, CARD_B, CARD_C, CARD_D, FMT, SET, VOCAB
 from mtga.lands import etl, metrics, paths
 
-
 # -- shrink() ---------------------------------------------------------------
 
 

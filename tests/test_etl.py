@@ -13,9 +13,14 @@ from mtga.lands import etl, paths
 
 def test_classify_columns_draft_header():
     header = [
-        "draft_id", "pick", "event_match_wins", "mystery_meta",
-        f"pack_card_{VOCAB[0]}", f"pack_card_{VOCAB[1]}",
-        f"pool_{VOCAB[0]}", f"pool_{VOCAB[1]}",
+        "draft_id",
+        "pick",
+        "event_match_wins",
+        "mystery_meta",
+        f"pack_card_{VOCAB[0]}",
+        f"pack_card_{VOCAB[1]}",
+        f"pool_{VOCAB[0]}",
+        f"pool_{VOCAB[1]}",
     ]
     columns, cards = etl.classify_columns(
         header, [etl.PACK_PREFIX, etl.POOL_PREFIX], etl.DRAFT_META_TYPES
@@ -72,9 +77,13 @@ def test_curate_draft_writes_parquet_vocab_and_pick_index(draft_raw, capsys):
     # Curated meta now also records the schema era and empirical pack shape
     # (the fixture's drafts sit in pack 1, so pack-0-pick-0 is absent).
     meta = json.loads(paths.meta_path(out).read_text())
-    assert meta == {"source_etag": "etag-draft-1", "rows": 9,
-                    "schema_era": "modern", "p1p1_missing": True,
-                    "picks_per_pack": 4}
+    assert meta == {
+        "source_etag": "etag-draft-1",
+        "rows": 9,
+        "schema_era": "modern",
+        "p1p1_missing": True,
+        "picks_per_pack": 4,
+    }
 
 
 def test_curate_draft_skips_on_matching_source_etag(curated_draft, draft_raw):

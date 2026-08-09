@@ -17,12 +17,14 @@ REPO = Path(__file__).resolve().parents[1]
 SCRIPTS = REPO / "scripts"
 
 spec = importlib.util.spec_from_file_location(
-    "run_frozen_eval", SCRIPTS / "run_frozen_eval.py")
+    "run_frozen_eval", SCRIPTS / "run_frozen_eval.py"
+)
 rfe = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(rfe)
 
 
 # -- (a) protocol freeze ------------------------------------------------------
+
 
 def test_check_protocol_accepts_identical_bytes():
     rfe.check_protocol(b"frozen protocol", b"frozen protocol")
@@ -46,18 +48,19 @@ def test_tagged_blob_from_fabricated_git_object(tmp_path):
     for cmd in [
         ["git", "init", "-q"],
         ["git", "add", "proto.py"],
-        ["git", "-c", "user.email=t@t", "-c", "user.name=t",
-         "commit", "-qm", "freeze"],
+        ["git", "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "freeze"],
         ["git", "tag", "fake-protocol-v1"],
     ]:
         subprocess.run(cmd, cwd=repo, check=True, capture_output=True)
-    tagged = rfe.tagged_protocol_bytes(repo=repo, tag="fake-protocol-v1",
-                                       path="proto.py")
+    tagged = rfe.tagged_protocol_bytes(
+        repo=repo, tag="fake-protocol-v1", path="proto.py"
+    )
     rfe.check_protocol(b"THE FROZEN CONTENT\n", tagged)
     with pytest.raises(rfe.RefusalError, match="drifted"):
         rfe.check_protocol(b"THE FROZEN CONTENT\n# edited\n", tagged)
-    assert rfe.tagged_protocol_bytes(repo=repo, tag="no-such-tag",
-                                     path="proto.py") is None
+    assert (
+        rfe.tagged_protocol_bytes(repo=repo, tag="no-such-tag", path="proto.py") is None
+    )
 
 
 def test_working_evalproto_matches_the_real_tag():
@@ -70,17 +73,31 @@ def test_working_evalproto_matches_the_real_tag():
 
 # -- (b) battery integrity ----------------------------------------------------
 
+
 def _battery(models=None, snapshot=None):
     return {
-        "models": models if models is not None else [
-            {"name": "baseline-random", "kind": "baseline-random"},
-            {"name": "f-full", "kind": "draftfm", "path": "runs/x/best.pt",
-             "sha256": "a" * 64},
-        ],
-        "frozen_snapshot": snapshot if snapshot is not None else {
-            "path": "raw/draft_data_public.MSH.PremierDraft.csv.gz",
-            "sha256": "b" * 64, "etag": '"etag"',
-        },
+        "models": (
+            models
+            if models is not None
+            else [
+                {"name": "baseline-random", "kind": "baseline-random"},
+                {
+                    "name": "f-full",
+                    "kind": "draftfm",
+                    "path": "runs/x/best.pt",
+                    "sha256": "a" * 64,
+                },
+            ]
+        ),
+        "frozen_snapshot": (
+            snapshot
+            if snapshot is not None
+            else {
+                "path": "raw/draft_data_public.MSH.PremierDraft.csv.gz",
+                "sha256": "b" * 64,
+                "etag": '"etag"',
+            }
+        ),
     }
 
 
@@ -89,10 +106,12 @@ def test_battery_hashes_ok_when_artifacts_frozen():
 
 
 def test_baselines_need_no_hash_but_models_do():
-    battery = _battery(models=[
-        {"name": "baseline-rarity", "kind": "baseline-rarity"},
-        {"name": "f-full", "kind": "draftfm", "path": "runs/x/best.pt"},
-    ])
+    battery = _battery(
+        models=[
+            {"name": "baseline-rarity", "kind": "baseline-rarity"},
+            {"name": "f-full", "kind": "draftfm", "path": "runs/x/best.pt"},
+        ]
+    )
     with pytest.raises(rfe.RefusalError, match="missing sha256.*f-full"):
         rfe.check_battery_hashes(battery)
 
@@ -120,19 +139,30 @@ def test_ledger_must_predate_t0(tmp_path):
     ledger = tmp_path / "ledger.jsonl"
     sha = "c" * 64
     ledger.write_text(
-        json.dumps({"run_id": "r1", "logged_at": "2026-07-05T10:00:00",
-                    "artifacts": {"best_sha256": sha}}) + "\n"
-        + json.dumps({"run_id": "r2", "logged_at": "2026-07-01T09:00:00",
-                      "artifacts": {"best_sha256": sha}}) + "\n")
+        json.dumps(
+            {
+                "run_id": "r1",
+                "logged_at": "2026-07-05T10:00:00",
+                "artifacts": {"best_sha256": sha},
+            }
+        )
+        + "\n"
+        + json.dumps(
+            {
+                "run_id": "r2",
+                "logged_at": "2026-07-01T09:00:00",
+                "artifacts": {"best_sha256": sha},
+            }
+        )
+        + "\n"
+    )
     # Earliest mention wins; it predates T0.
     assert rfe.ledger_logged_at(sha, ledger) == "2026-07-01T09:00:00"
     rfe.check_ledger_predates(sha, "2026-07-07T00:00:00", "f-full", ledger)
     with pytest.raises(rfe.RefusalError, match="does not predate"):
-        rfe.check_ledger_predates(sha, "2026-06-30T00:00:00", "f-full",
-                                  ledger)
+        rfe.check_ledger_predates(sha, "2026-06-30T00:00:00", "f-full", ledger)
     with pytest.raises(rfe.RefusalError, match="never committed"):
-        rfe.check_ledger_predates("d" * 64, "2026-07-07T00:00:00", "f-full",
-                                  ledger)
+        rfe.check_ledger_predates("d" * 64, "2026-07-07T00:00:00", "f-full", ledger)
 
 
 def test_ledger_git_predates_uses_commit_history(tmp_path):
@@ -144,36 +174,49 @@ def test_ledger_git_predates_uses_commit_history(tmp_path):
     ledger_rel = "experiments/ledger.jsonl"
     sha = "e" * 64
     (repo / ledger_rel).write_text(
-        json.dumps({"run_id": "r1", "logged_at": "2026-07-01T09:00:00",
-                    "artifacts": {"best_sha256": sha}}) + "\n")
-    env = {**os.environ,
-           "GIT_AUTHOR_DATE": "2026-07-01T09:00:00",
-           "GIT_COMMITTER_DATE": "2026-07-01T09:00:00"}
+        json.dumps(
+            {
+                "run_id": "r1",
+                "logged_at": "2026-07-01T09:00:00",
+                "artifacts": {"best_sha256": sha},
+            }
+        )
+        + "\n"
+    )
+    env = {
+        **os.environ,
+        "GIT_AUTHOR_DATE": "2026-07-01T09:00:00",
+        "GIT_COMMITTER_DATE": "2026-07-01T09:00:00",
+    }
     for cmd in [
         ["git", "init", "-q"],
         ["git", "add", ledger_rel],
-        ["git", "-c", "user.email=t@t", "-c", "user.name=t",
-         "commit", "-qm", "ledger"],
+        ["git", "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "ledger"],
     ]:
         subprocess.run(cmd, cwd=repo, check=True, capture_output=True, env=env)
     # Committed 2026-07-01; a T0 on 2026-07-07 postdates it -> accepted.
-    assert rfe.check_ledger_git_predates(
-        sha, "2026-07-07T00:00:00", "f-full",
-        repo=repo, ledger_rel=ledger_rel) is not None
+    assert (
+        rfe.check_ledger_git_predates(
+            sha, "2026-07-07T00:00:00", "f-full", repo=repo, ledger_rel=ledger_rel
+        )
+        is not None
+    )
     # A T0 on 2026-06-30 predates the commit -> refused (would be backdated).
     with pytest.raises(rfe.RefusalError, match="does not predate"):
-        rfe.check_ledger_git_predates(sha, "2026-06-30T00:00:00", "f-full",
-                                      repo=repo, ledger_rel=ledger_rel)
+        rfe.check_ledger_git_predates(
+            sha, "2026-06-30T00:00:00", "f-full", repo=repo, ledger_rel=ledger_rel
+        )
     # A sha256 present only in the uncommitted working tree -> refused: git
     # history cannot vouch for it (this is the honor-system hole T1.4 closes).
     wt_sha = "f" * 64
     with (repo / ledger_rel).open("a") as fh:
-        fh.write(json.dumps({"run_id": "r2",
-                             "artifacts": {"best_sha256": wt_sha}}) + "\n")
-    with pytest.raises(rfe.RefusalError,
-                       match="not introduced by any git commit"):
-        rfe.check_ledger_git_predates(wt_sha, "2026-07-07T00:00:00", "f-full",
-                                      repo=repo, ledger_rel=ledger_rel)
+        fh.write(
+            json.dumps({"run_id": "r2", "artifacts": {"best_sha256": wt_sha}}) + "\n"
+        )
+    with pytest.raises(rfe.RefusalError, match="not introduced by any git commit"):
+        rfe.check_ledger_git_predates(
+            wt_sha, "2026-07-07T00:00:00", "f-full", repo=repo, ledger_rel=ledger_rel
+        )
 
 
 def test_resolve_artifact_path_is_portable(monkeypatch, tmp_path):
@@ -186,15 +229,20 @@ def test_resolve_artifact_path_is_portable(monkeypatch, tmp_path):
     assert rfe.resolve_artifact_path(str(abs_p)) == abs_p
 
     monkeypatch.setattr(paths, "DATA_ROOT", tmp_path)
-    assert rfe.resolve_artifact_path("runs/x/best.pt") == \
-        tmp_path / "foundation" / "runs" / "x" / "best.pt"
+    assert (
+        rfe.resolve_artifact_path("runs/x/best.pt")
+        == tmp_path / "foundation" / "runs" / "x" / "best.pt"
+    )
     # baselines carry no artifact; draftfm members resolve portably
     assert rfe.member_artifact_path({"kind": "baseline-random"}) is None
-    assert rfe.member_artifact_path({"path": "runs/x/best.pt"}) == \
-        tmp_path / "foundation" / "runs" / "x" / "best.pt"
+    assert (
+        rfe.member_artifact_path({"path": "runs/x/best.pt"})
+        == tmp_path / "foundation" / "runs" / "x" / "best.pt"
+    )
 
 
 # -- (c) T0 quality gates ------------------------------------------------------
+
 
 def test_expert_draft_volume_gate():
     assert rfe.check_expert_drafts(2500) == 2500
@@ -216,6 +264,7 @@ def test_modern_schema_gate():
 
 
 # -- mode selection ------------------------------------------------------------
+
 
 def test_real_mode_targets_msh():
     assert rfe.eval_set_for(None) == "MSH"

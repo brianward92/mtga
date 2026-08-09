@@ -24,29 +24,40 @@ from mtga.mulligan.model import DEFAULT_DROPOUT
 
 def create_parser():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--set", dest="set_code",
-                        help="v1: single set to train on")
-    parser.add_argument("--sets", dest="train_sets",
-                        help="v2: comma-separated sets to train on (cross-set)")
-    parser.add_argument("--held-out", dest="held_out_sets", default="",
-                        help="v2: comma-separated sets excluded from "
-                             "training, scored zero-shot")
+    parser.add_argument("--set", dest="set_code", help="v1: single set to train on")
+    parser.add_argument(
+        "--sets",
+        dest="train_sets",
+        help="v2: comma-separated sets to train on (cross-set)",
+    )
+    parser.add_argument(
+        "--held-out",
+        dest="held_out_sets",
+        default="",
+        help="v2: comma-separated sets excluded from " "training, scored zero-shot",
+    )
     parser.add_argument("--format", dest="limited_type", default="PremierDraft")
     parser.add_argument("--epochs", type=int, default=8)
     parser.add_argument("--batch-size", type=int, default=4096)
     parser.add_argument("--lr", type=float, default=1e-3)
-    parser.add_argument("--hidden", default="128,64",
-                        help="comma widths of the MLP hidden layers")
+    parser.add_argument(
+        "--hidden", default="128,64", help="comma widths of the MLP hidden layers"
+    )
     parser.add_argument("--dropout", type=float, default=DEFAULT_DROPOUT)
     parser.add_argument("--seed", type=int, default=17)
     parser.add_argument("--patience", type=int, default=2)
-    parser.add_argument("--val-permille", type=int,
-                        default=draftnet.VAL_PERMILLE)
-    parser.add_argument("--subsample", type=int, default=None,
-                        help="cap on training rows (default: all kept rows)")
-    parser.add_argument("--tag", default=None,
-                        help="artifact dir name (default: v1-<set> / "
-                             "v2-crossset)")
+    parser.add_argument("--val-permille", type=int, default=draftnet.VAL_PERMILLE)
+    parser.add_argument(
+        "--subsample",
+        type=int,
+        default=None,
+        help="cap on training rows (default: all kept rows)",
+    )
+    parser.add_argument(
+        "--tag",
+        default=None,
+        help="artifact dir name (default: v1-<set> / " "v2-crossset)",
+    )
     return parser
 
 
@@ -62,22 +73,37 @@ def main():
 
     if args.train_sets:
         model, report, context = mtrain.train_crossset(
-            _split(args.train_sets), args.limited_type,
-            held_out_sets=_split(args.held_out_sets), epochs=args.epochs,
-            batch_size=args.batch_size, lr=args.lr, hidden=hidden,
-            dropout=args.dropout, seed=args.seed, patience=args.patience,
-            val_permille=args.val_permille, subsample=args.subsample,
+            _split(args.train_sets),
+            args.limited_type,
+            held_out_sets=_split(args.held_out_sets),
+            epochs=args.epochs,
+            batch_size=args.batch_size,
+            lr=args.lr,
+            hidden=hidden,
+            dropout=args.dropout,
+            seed=args.seed,
+            patience=args.patience,
+            val_permille=args.val_permille,
+            subsample=args.subsample,
         )
         out_dir = mtrain.save_crossset_version(
-            model, report, context, tag=args.tag or "v2-crossset")
+            model, report, context, tag=args.tag or "v2-crossset"
+        )
         record = mtrain.ledger_run_crossset(report, context, out_dir)
         summary_keys = ["anchors", "outcome_head", "decision", "held_out"]
     else:
         model, report, context = mtrain.train(
-            args.set_code.upper(), args.limited_type, epochs=args.epochs,
-            batch_size=args.batch_size, lr=args.lr, hidden=hidden,
-            dropout=args.dropout, seed=args.seed, patience=args.patience,
-            val_permille=args.val_permille, subsample=args.subsample,
+            args.set_code.upper(),
+            args.limited_type,
+            epochs=args.epochs,
+            batch_size=args.batch_size,
+            lr=args.lr,
+            hidden=hidden,
+            dropout=args.dropout,
+            seed=args.seed,
+            patience=args.patience,
+            val_permille=args.val_permille,
+            subsample=args.subsample,
         )
         out_dir = mtrain.save_version(model, report, context, tag=args.tag)
         record = mtrain.ledger_run(report, context, out_dir)
@@ -85,8 +111,7 @@ def main():
 
     print(f"saved {out_dir}")
     print(f"ledgered {record['run_id']}")
-    print(json.dumps({k: report[k] for k in summary_keys if k in report},
-                     indent=2))
+    print(json.dumps({k: report[k] for k in summary_keys if k in report}, indent=2))
 
 
 if __name__ == "__main__":

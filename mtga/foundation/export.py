@@ -83,21 +83,37 @@ class _ScorerGraph(nn.Module):
         self.context_mlp = model.context_mlp
         self.scorer = model.scorer
 
-    def forward(self, pool_emb, pool_counts, pool_mask, pack_emb, pack_mask,
-                wr_id, games_id, format_id, position, set_scalars,
-                set_summary):
+    def forward(
+        self,
+        pool_emb,
+        pool_counts,
+        pool_mask,
+        pack_emb,
+        pack_mask,
+        wr_id,
+        games_id,
+        format_id,
+        position,
+        set_scalars,
+        set_summary,
+    ):
         keys = pool_emb + self.count_embedding(pool_counts)
         pool_summary = self.pool_tower(keys, key_padding_mask=pool_mask)
 
         batch = pool_emb.shape[0]
-        context = self.context_mlp(torch.cat([
-            self.wr_embedding(wr_id),
-            self.games_embedding(games_id),
-            self.format_embedding(format_id),
-            position,
-            set_scalars,
-            set_summary.unsqueeze(0).expand(batch, -1),
-        ], dim=1))
+        context = self.context_mlp(
+            torch.cat(
+                [
+                    self.wr_embedding(wr_id),
+                    self.games_embedding(games_id),
+                    self.format_embedding(format_id),
+                    position,
+                    set_scalars,
+                    set_summary.unsqueeze(0).expand(batch, -1),
+                ],
+                dim=1,
+            )
+        )
 
         pool_b = pool_summary.unsqueeze(1).expand_as(pack_emb)
         ctx_b = context.unsqueeze(1).expand(-1, pack_emb.shape[1], -1)
@@ -122,18 +138,34 @@ class _ScorerGraphNoCtx(nn.Module):
         self.context_mlp = model.context_mlp
         self.scorer = model.scorer
 
-    def forward(self, pool_emb, pool_counts, pool_mask, pack_emb, pack_mask,
-                wr_id, games_id, format_id, position, set_scalars):
+    def forward(
+        self,
+        pool_emb,
+        pool_counts,
+        pool_mask,
+        pack_emb,
+        pack_mask,
+        wr_id,
+        games_id,
+        format_id,
+        position,
+        set_scalars,
+    ):
         keys = pool_emb + self.count_embedding(pool_counts)
         pool_summary = self.pool_tower(keys, key_padding_mask=pool_mask)
 
-        context = self.context_mlp(torch.cat([
-            self.wr_embedding(wr_id),
-            self.games_embedding(games_id),
-            self.format_embedding(format_id),
-            position,
-            set_scalars,
-        ], dim=1))
+        context = self.context_mlp(
+            torch.cat(
+                [
+                    self.wr_embedding(wr_id),
+                    self.games_embedding(games_id),
+                    self.format_embedding(format_id),
+                    position,
+                    set_scalars,
+                ],
+                dim=1,
+            )
+        )
 
         pool_b = pool_summary.unsqueeze(1).expand_as(pack_emb)
         ctx_b = context.unsqueeze(1).expand(-1, pack_emb.shape[1], -1)
@@ -144,12 +176,12 @@ class _ScorerGraphNoCtx(nn.Module):
 
 def load_checkpoint(checkpoint_path):
     """(model.eval() on CPU, checkpoint dict) from a training best.pt."""
-    checkpoint = torch.load(checkpoint_path, map_location="cpu",
-                            weights_only=False)
+    checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
     config = checkpoint["config"]
     feat_dim = checkpoint["model"]["card_encoder.net.0.weight"].shape[0]
-    model = DraftFM(feat_dim, config["d_model"], config["dropout"],
-                    config.get("set_ctx", True))
+    model = DraftFM(
+        feat_dim, config["d_model"], config["dropout"], config.get("set_ctx", True)
+    )
     model.load_state_dict(checkpoint["model"])
     model.eval()
     return model, checkpoint
@@ -169,10 +201,14 @@ def export_graphs(model, out_dir):
     pack = torch.export.Dim("pack_slots", min=1)
 
     torch.onnx.export(
-        model.card_encoder, (torch.randn(8, feat_dim),),
+        model.card_encoder,
+        (torch.randn(8, feat_dim),),
         str(out_dir / "card_encoder.onnx"),
-        input_names=["features"], output_names=["card_emb"],
-        dynamic_shapes=({0: n_cards},), dynamo=True, opset_version=OPSET,
+        input_names=["features"],
+        output_names=["card_emb"],
+        dynamic_shapes=({0: n_cards},),
+        dynamo=True,
+        opset_version=OPSET,
     )
 
     if model.set_ctx:
@@ -180,32 +216,49 @@ def export_graphs(model, out_dir):
             _SetEncoderGraph(model).eval(),
             (torch.randn(8, d), torch.randint(0, 6, (8,))),
             str(out_dir / "set_encoder.onnx"),
-            input_names=["card_emb", "rarity_ids"], output_names=["set_summary"],
+            input_names=["card_emb", "rarity_ids"],
+            output_names=["set_summary"],
             dynamic_shapes=({0: n_cards}, {0: n_cards}),
-            dynamo=True, opset_version=OPSET,
+            dynamo=True,
+            opset_version=OPSET,
         )
 
     b, p, k = 3, 5, 4
     scorer_args = (
-        torch.randn(b, p, d),                       # pool_emb
+        torch.randn(b, p, d),  # pool_emb
         torch.randint(0, POOL_COUNT_CAP + 1, (b, p)),  # pool_counts
-        torch.zeros(b, p, dtype=torch.bool),        # pool_mask
-        torch.randn(b, k, d),                       # pack_emb
-        torch.zeros(b, k, dtype=torch.bool),        # pack_mask
-        torch.randint(15, 46, (b,)),                # wr_id
-        torch.randint(0, 7, (b,)),                  # games_id
-        torch.randint(0, 3, (b,)),                  # format_id
-        torch.randn(b, 7),                          # position
-        torch.randn(b, 4),                          # set_scalars
+        torch.zeros(b, p, dtype=torch.bool),  # pool_mask
+        torch.randn(b, k, d),  # pack_emb
+        torch.zeros(b, k, dtype=torch.bool),  # pack_mask
+        torch.randint(15, 46, (b,)),  # wr_id
+        torch.randint(0, 7, (b,)),  # games_id
+        torch.randint(0, 3, (b,)),  # format_id
+        torch.randn(b, 7),  # position
+        torch.randn(b, 4),  # set_scalars
     )
-    scorer_input_names = ["pool_emb", "pool_counts", "pool_mask", "pack_emb",
-                          "pack_mask", "wr_id", "games_id", "format_id",
-                          "position", "set_scalars"]
+    scorer_input_names = [
+        "pool_emb",
+        "pool_counts",
+        "pool_mask",
+        "pack_emb",
+        "pack_mask",
+        "wr_id",
+        "games_id",
+        "format_id",
+        "position",
+        "set_scalars",
+    ]
     scorer_dynamic_shapes = (
-        {0: batch, 1: pool}, {0: batch, 1: pool}, {0: batch, 1: pool},
-        {0: batch, 1: pack}, {0: batch, 1: pack},
-        {0: batch}, {0: batch}, {0: batch},
-        {0: batch}, {0: batch},
+        {0: batch, 1: pool},
+        {0: batch, 1: pool},
+        {0: batch, 1: pool},
+        {0: batch, 1: pack},
+        {0: batch, 1: pack},
+        {0: batch},
+        {0: batch},
+        {0: batch},
+        {0: batch},
+        {0: batch},
     )
     if model.set_ctx:
         scorer_args = scorer_args + (torch.randn(d),)
@@ -216,23 +269,27 @@ def export_graphs(model, out_dir):
         scorer_module = _ScorerGraphNoCtx(model).eval()
 
     torch.onnx.export(
-        scorer_module, scorer_args, str(out_dir / "scorer.onnx"),
+        scorer_module,
+        scorer_args,
+        str(out_dir / "scorer.onnx"),
         input_names=scorer_input_names,
         output_names=["logits"],
         dynamic_shapes=scorer_dynamic_shapes,
-        dynamo=True, opset_version=OPSET,
+        dynamo=True,
+        opset_version=OPSET,
     )
 
     with torch.no_grad():
-        pool_null_input = (model.empty_pool
-                           - model.count_embedding.weight[0]).numpy()
-    np.savez(out_dir / "constants.npz",
-             pool_null_input=pool_null_input.astype(np.float32))
+        pool_null_input = (model.empty_pool - model.count_embedding.weight[0]).numpy()
+    np.savez(
+        out_dir / "constants.npz", pool_null_input=pool_null_input.astype(np.float32)
+    )
     return feat_dim, d
 
 
 # ---------------------------------------------------------------------------
 # Validation: torch forward vs the composed three-graph ONNX path.
+
 
 def _random_batch(rng, n_cards, batch, pool_len, pack_len, picks_per_pack=14):
     """Numpy batch in the training layout, with one guaranteed-empty pool."""
@@ -247,28 +304,37 @@ def _random_batch(rng, n_cards, batch, pool_len, pack_len, picks_per_pack=14):
         pool_counts[i, :n_pool] = rng.integers(1, POOL_COUNT_CAP + 1, n_pool)
         n_pack = int(rng.integers(1, pack_len + 1))
         pack_slots[i, :n_pack] = rng.choice(n_cards, size=n_pack, replace=False)
-        context[i] = [rng.integers(0, 3), rng.integers(0, picks_per_pack),
-                      rng.integers(15, 46), rng.integers(0, 7),
-                      rng.integers(0, 3)]
-    position = position_features(torch.from_numpy(context),
-                                 picks_per_pack).numpy()
+        context[i] = [
+            rng.integers(0, 3),
+            rng.integers(0, picks_per_pack),
+            rng.integers(15, 46),
+            rng.integers(0, 7),
+            rng.integers(0, 3),
+        ]
+    position = position_features(torch.from_numpy(context), picks_per_pack).numpy()
     set_scalars = np.tile(
-        np.array([n_cards / 400.0, 0.0, 1.0, 0.0], dtype=np.float32),
-        (batch, 1))
+        np.array([n_cards / 400.0, 0.0, 1.0, 0.0], dtype=np.float32), (batch, 1)
+    )
     return {
-        "pool_slots": pool_slots, "pool_counts": pool_counts,
-        "pack_slots": pack_slots, "position": position.astype(np.float32),
-        "wr_id": context[:, 2], "games_id": context[:, 3],
-        "format_id": context[:, 4], "set_scalars": set_scalars,
+        "pool_slots": pool_slots,
+        "pool_counts": pool_counts,
+        "pack_slots": pack_slots,
+        "position": position.astype(np.float32),
+        "wr_id": context[:, 2],
+        "games_id": context[:, 3],
+        "format_id": context[:, 4],
+        "set_scalars": set_scalars,
     }
 
 
 def _torch_logits(model, features, rarity_ids, batch):
     with torch.no_grad():
-        table, summary = model.encode_set(torch.from_numpy(features),
-                                          torch.from_numpy(rarity_ids))
-        logits = model(table, summary,
-                       {k: torch.from_numpy(v) for k, v in batch.items()})
+        table, summary = model.encode_set(
+            torch.from_numpy(features), torch.from_numpy(rarity_ids)
+        )
+        logits = model(
+            table, summary, {k: torch.from_numpy(v) for k, v in batch.items()}
+        )
     return logits.numpy()
 
 
@@ -296,20 +362,24 @@ def onnx_logits(sessions, pool_null_input, features, rarity_ids, batch):
         "pool_mask": pool_mask,
         "pack_emb": pack_emb.astype(np.float32),
         "pack_mask": pack_mask,
-        "wr_id": batch["wr_id"], "games_id": batch["games_id"],
+        "wr_id": batch["wr_id"],
+        "games_id": batch["games_id"],
         "format_id": batch["format_id"],
-        "position": batch["position"], "set_scalars": batch["set_scalars"],
+        "position": batch["position"],
+        "set_scalars": batch["set_scalars"],
     }
     if set_enc is not None:
-        feed["set_summary"] = set_enc.run(["set_summary"], {
-            "card_emb": table, "rarity_ids": rarity_ids})[0]
+        feed["set_summary"] = set_enc.run(
+            ["set_summary"], {"card_emb": table, "rarity_ids": rarity_ids}
+        )[0]
 
     logits = scorer.run(["logits"], feed)[0]
     return logits, pack_mask
 
 
-def validate_export(model, version_dir, n_cards=40,
-                    tolerance=VALIDATION_TOLERANCE, seed=VALIDATION_SEED):
+def validate_export(
+    model, version_dir, n_cards=40, tolerance=VALIDATION_TOLERANCE, seed=VALIDATION_SEED
+):
     """Torch-vs-ORT parity on random inputs; raises RuntimeError past
     tolerance. Covers training shapes (46/16), serving shapes (B=1, short
     dynamic pool/pack axes), and the empty-pool null-token path."""
@@ -318,12 +388,17 @@ def validate_export(model, version_dir, n_cards=40,
     version_dir = Path(version_dir)
     providers = ["CPUExecutionProvider"]
     card = onnxruntime.InferenceSession(
-        str(version_dir / "card_encoder.onnx"), providers=providers)
+        str(version_dir / "card_encoder.onnx"), providers=providers
+    )
     set_enc_path = version_dir / "set_encoder.onnx"
-    set_enc = (onnxruntime.InferenceSession(str(set_enc_path), providers=providers)
-              if set_enc_path.exists() else None)
+    set_enc = (
+        onnxruntime.InferenceSession(str(set_enc_path), providers=providers)
+        if set_enc_path.exists()
+        else None
+    )
     scorer = onnxruntime.InferenceSession(
-        str(version_dir / "scorer.onnx"), providers=providers)
+        str(version_dir / "scorer.onnx"), providers=providers
+    )
     sessions = (card, set_enc, scorer)
     pool_null_input = np.load(version_dir / "constants.npz")["pool_null_input"]
 
@@ -336,13 +411,14 @@ def validate_export(model, version_dir, n_cards=40,
     worst = 0.0
     for label, (batch_size, pool_len, pack_len) in {
         "train_shape_b64": (64, 46, 16),
-        "serve_shape_b1": (1, 1, 4),      # row 0 is always the empty pool
+        "serve_shape_b1": (1, 1, 4),  # row 0 is always the empty pool
         "serve_shape_b2_short": (2, 5, 3),
     }.items():
         batch = _random_batch(rng, n_cards, batch_size, pool_len, pack_len)
         want = _torch_logits(model, features, rarity_ids, batch)
-        got, pack_mask = onnx_logits(sessions, pool_null_input, features,
-                                     rarity_ids, batch)
+        got, pack_mask = onnx_logits(
+            sessions, pool_null_input, features, rarity_ids, batch
+        )
         if not np.isneginf(got[pack_mask]).all():
             raise RuntimeError(f"{label}: padded pack slots not masked to -inf")
         diff = float(np.abs(want[~pack_mask] - got[~pack_mask]).max())
@@ -352,12 +428,14 @@ def validate_export(model, version_dir, n_cards=40,
     if worst >= tolerance:
         raise RuntimeError(
             f"ONNX export validation FAILED: max |torch - ort| = {worst:.3e} "
-            f">= {tolerance:.0e} ({report['cases']})")
+            f">= {tolerance:.0e} ({report['cases']})"
+        )
     return report
 
 
-def export_version(checkpoint_path, out_dir, wr_id, games_id, manifest_hash,
-                   model_id=None):
+def export_version(
+    checkpoint_path, out_dir, wr_id, games_id, manifest_hash, model_id=None
+):
     """Export + validate + write meta.json. Returns the meta dict.
 
     meta.json is written only after validation passes, so a failed export

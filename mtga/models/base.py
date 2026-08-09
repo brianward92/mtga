@@ -29,8 +29,7 @@ class EVModel(Protocol):
         pool_grp_ids: List[int],
         pack_number: Optional[int] = None,
         pick_number: Optional[int] = None,
-    ) -> List[CardScore]:
-        ...
+    ) -> List[CardScore]: ...
 
 
 def rank_scores(pack_grp_ids, evs):

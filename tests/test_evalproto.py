@@ -13,23 +13,33 @@ from mtga.foundation import evalproto
 
 
 def frame_from(rows):
-    columns = ["draft_id", "pack_number", "pick_number", "pack_size",
-               "wr_bucket", "n_games_bucket", "target_rank", "pick_prob",
-               "top_prob"]
+    columns = [
+        "draft_id",
+        "pack_number",
+        "pick_number",
+        "pack_size",
+        "wr_bucket",
+        "n_games_bucket",
+        "target_rank",
+        "pick_prob",
+        "top_prob",
+    ]
     return pd.DataFrame(rows, columns=columns)
 
 
 @pytest.fixture
 def small():
     # 2 drafts x 3 picks. Draft a: ranks 1,1,2 -> 2/3 top1. Draft b: 1,3,4.
-    return frame_from([
-        ("a", 0, 0, 14, 0.60, 500, 1, 0.50, 0.50),
-        ("a", 0, 1, 13, 0.60, 500, 1, 0.40, 0.40),
-        ("a", 0, 2, 12, 0.60, 500, 2, 0.20, 0.30),
-        ("b", 0, 0, 14, 0.50, 10, 1, 0.25, 0.25),
-        ("b", 0, 1, 13, 0.50, 10, 3, 0.10, 0.60),
-        ("b", 1, 0, 14, 0.50, 10, 4, 0.05, 0.80),
-    ])
+    return frame_from(
+        [
+            ("a", 0, 0, 14, 0.60, 500, 1, 0.50, 0.50),
+            ("a", 0, 1, 13, 0.60, 500, 1, 0.40, 0.40),
+            ("a", 0, 2, 12, 0.60, 500, 2, 0.20, 0.30),
+            ("b", 0, 0, 14, 0.50, 10, 1, 0.25, 0.25),
+            ("b", 0, 1, 13, 0.50, 10, 3, 0.10, 0.60),
+            ("b", 1, 0, 14, 0.50, 10, 4, 0.05, 0.80),
+        ]
+    )
 
 
 def test_point_stats(small):
@@ -46,10 +56,12 @@ def test_expert_slice_filters_both_buckets(small):
 
 
 def test_forced_pick_variant():
-    frame = frame_from([
-        ("a", 0, 12, 2, 0.6, 500, 2, 0.4, 0.6),
-        ("a", 0, 13, 1, 0.6, 500, 1, 1.0, 1.0),  # forced: always "correct"
-    ])
+    frame = frame_from(
+        [
+            ("a", 0, 12, 2, 0.6, 500, 2, 0.4, 0.6),
+            ("a", 0, 13, 1, 0.6, 500, 1, 1.0, 1.0),  # forced: always "correct"
+        ]
+    )
     assert evalproto.top1(frame) == pytest.approx(0.5)
     assert evalproto.top1(evalproto.non_forced(frame)) == pytest.approx(0.0)
 
@@ -60,10 +72,12 @@ def test_ece_perfectly_calibrated_and_not():
     n = 30000
     conf = rng.uniform(0.2, 0.9, n)
     correct = rng.uniform(size=n) < conf
-    frame = frame_from([
-        (f"d{i}", 0, 0, 14, 0.6, 500, 1 if correct[i] else 2, 0.5, conf[i])
-        for i in range(n)
-    ])
+    frame = frame_from(
+        [
+            (f"d{i}", 0, 0, 14, 0.6, 500, 1 if correct[i] else 2, 0.5, conf[i])
+            for i in range(n)
+        ]
+    )
     assert evalproto.ece(frame) < 0.01
     # Maximally overconfident: conf 1.0, accuracy 0 -> ECE 1.0.
     bad = frame_from([("d", 0, 0, 14, 0.6, 500, 2, 0.0001, 1.0)] * 100)
@@ -93,10 +107,14 @@ def test_paired_bootstrap_constant_difference():
     # every draft -> the paired difference is 0.5 with zero variance.
     rows_a, rows_b = [], []
     for d in "abcde":
-        rows_a += [(d, 0, 0, 14, 0.6, 500, 1, 0.5, 0.5),
-                   (d, 0, 1, 13, 0.6, 500, 1, 0.5, 0.5)]
-        rows_b += [(d, 0, 0, 14, 0.6, 500, 1, 0.5, 0.5),
-                   (d, 0, 1, 13, 0.6, 500, 2, 0.2, 0.5)]
+        rows_a += [
+            (d, 0, 0, 14, 0.6, 500, 1, 0.5, 0.5),
+            (d, 0, 1, 13, 0.6, 500, 1, 0.5, 0.5),
+        ]
+        rows_b += [
+            (d, 0, 0, 14, 0.6, 500, 1, 0.5, 0.5),
+            (d, 0, 1, 13, 0.6, 500, 2, 0.2, 0.5),
+        ]
     point, lo, hi = evalproto.paired_bootstrap_diff(
         frame_from(rows_a), frame_from(rows_b), evalproto.top1, b=100
     )
@@ -110,16 +128,16 @@ def test_icc_extremes():
     rows = []
     for d in range(200):
         for p in range(10):
-            rows.append((f"d{d}", 0, p, 14, 0.6, 500,
-                         1 if rng.uniform() < 0.5 else 2, 0.5, 0.5))
+            rows.append(
+                (f"d{d}", 0, p, 14, 0.6, 500, 1 if rng.uniform() < 0.5 else 2, 0.5, 0.5)
+            )
     assert evalproto.intraclass_correlation(frame_from(rows)) < 0.02
     # Perfectly clustered: half the drafts always right, half always wrong.
     rows = []
     for d in range(100):
         correct = d < 50
         for p in range(10):
-            rows.append((f"d{d}", 0, p, 14, 0.6, 500,
-                         1 if correct else 2, 0.5, 0.5))
+            rows.append((f"d{d}", 0, p, 14, 0.6, 500, 1 if correct else 2, 0.5, 0.5))
     assert evalproto.intraclass_correlation(frame_from(rows)) > 0.95
 
 
@@ -145,9 +163,18 @@ def test_summarize_reports_non_forced_calibration():
         # a forced pick: lone candidate, trivially "correct", confidence 1.0
         rows.append((f"d{d}", 0, 13, 1, 0.6, 500, 1, 1.0, 1.0))
     result = evalproto.summarize(frame_from(rows), "mixed")
-    for key in ["top1", "top1_ci", "top3", "top3_ci", "log_loss",
-                "log_loss_ci", "ece", "top1_non_forced",
-                "log_loss_non_forced", "ece_non_forced"]:
+    for key in [
+        "top1",
+        "top1_ci",
+        "top3",
+        "top3_ci",
+        "log_loss",
+        "log_loss_ci",
+        "ece",
+        "top1_non_forced",
+        "log_loss_non_forced",
+        "ece_non_forced",
+    ]:
         assert key in result, f"summarize missing {key}"
     nf = evalproto.non_forced(frame_from(rows))
     assert result["top1_non_forced"] == pytest.approx(evalproto.top1(nf))

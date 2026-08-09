@@ -53,50 +53,64 @@ def ceiling_comparison(zeroshot, ceiling):
     module argparses at import in some environments; logic mirrored and kept
     in lockstep with the frozen evalproto calls)."""
     aligned_z, aligned_c = evalproto.align_on_picks(
-        evalproto.expert_slice(zeroshot), evalproto.expert_slice(ceiling))
+        evalproto.expert_slice(zeroshot), evalproto.expert_slice(ceiling)
+    )
     if not len(aligned_z):
         return None
-    diff, lo, hi = evalproto.paired_bootstrap_diff(
-        aligned_z, aligned_c, evalproto.top1)
+    diff, lo, hi = evalproto.paired_bootstrap_diff(aligned_z, aligned_c, evalproto.top1)
     return {
         "n_shared_picks": int(len(aligned_z)),
         "zeroshot_top1": evalproto.top1(aligned_z),
         "ceiling_top1": evalproto.top1(aligned_c),
-        "normalized_top1": (evalproto.top1(aligned_z)
-                            / max(evalproto.top1(aligned_c), 1e-12)),
-        "top1_diff": diff, "top1_diff_ci": [lo, hi],
-        "late_draft_retention": evalproto.late_draft_retention(
-            aligned_z, aligned_c),
+        "normalized_top1": (
+            evalproto.top1(aligned_z) / max(evalproto.top1(aligned_c), 1e-12)
+        ),
+        "top1_diff": diff,
+        "top1_diff_ci": [lo, hi],
+        "late_draft_retention": evalproto.late_draft_retention(aligned_z, aligned_c),
     }
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--version", default="msh_perset_ceiling",
-                        help="per-set model version dir under models/MSH")
+    parser.add_argument(
+        "--version",
+        default="msh_perset_ceiling",
+        help="per-set model version dir under models/MSH",
+    )
     parser.add_argument("--frozen-root", default=None)
     args = parser.parse_args()
 
-    frozen_root = Path(args.frozen_root) if args.frozen_root else (
-        paths.DATA_ROOT / "foundation" / "frozen_eval")
+    frozen_root = (
+        Path(args.frozen_root)
+        if args.frozen_root
+        else (paths.DATA_ROOT / "foundation" / "frozen_eval")
+    )
     canonical = frozen_root / MSH_SHA
     out_dir = frozen_root / f"{MSH_SHA}_postday1"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     model_meta = json.loads(
-        (paths.MODELS_DIR / "MSH" / "PremierDraft" / args.version /
-         "meta.json").read_text())
+        (
+            paths.MODELS_DIR / "MSH" / "PremierDraft" / args.version / "meta.json"
+        ).read_text()
+    )
 
-    print(f"ceiling: MSH/PremierDraft/{args.version} "
-          f"(trained {model_meta['trained_at']})")
+    print(
+        f"ceiling: MSH/PremierDraft/{args.version} "
+        f"(trained {model_meta['trained_at']})"
+    )
     ceiling = predict.per_set_model_predictions(
-        "MSH", "PremierDraft", version=args.version, split="val")
+        "MSH", "PremierDraft", version=args.version, split="val"
+    )
     ceiling.to_parquet(out_dir / "perset.deployment.parquet", index=False)
     results = {"perset": {"deployment": summarize_frame(ceiling, "perset")}}
     e = results["perset"]["deployment"]["expert"]
-    print(f"ceiling val (high-win-rate slice): top1 {e['top1']:.4f} "
-          f"[{e['top1_ci'][0]:.4f}, {e['top1_ci'][1]:.4f}], "
-          f"n={e['n_picks']:,}")
+    print(
+        f"ceiling val (high-win-rate slice): top1 {e['top1']:.4f} "
+        f"[{e['top1_ci'][0]:.4f}, {e['top1_ci'][1]:.4f}], "
+        f"n={e['n_picks']:,}"
+    )
 
     comparisons = {}
     for member in ("f-full", "f-dev"):
@@ -104,16 +118,20 @@ def main():
         frame = pd.read_parquet(cached)
         comparison = ceiling_comparison(frame, ceiling)
         comparisons[member] = comparison
-        print(f"{member}: normalized top-1 "
-              f"{comparison['normalized_top1']:.4f} "
-              f"({comparison['zeroshot_top1']:.4f} / "
-              f"{comparison['ceiling_top1']:.4f}), late-draft retention "
-              f"{comparison['late_draft_retention']:.4f} over "
-              f"{comparison['n_shared_picks']:,} shared picks")
+        print(
+            f"{member}: normalized top-1 "
+            f"{comparison['normalized_top1']:.4f} "
+            f"({comparison['zeroshot_top1']:.4f} / "
+            f"{comparison['ceiling_top1']:.4f}), late-draft retention "
+            f"{comparison['late_draft_retention']:.4f} over "
+            f"{comparison['n_shared_picks']:,} shared picks"
+        )
 
     summary = {
         "context": {
-            "set": "MSH", "format": "PremierDraft", "rehearse": False,
+            "set": "MSH",
+            "format": "PremierDraft",
+            "rehearse": False,
             "snapshot_sha": MSH_SHA,
             "post_day_one": True,
             "note": (
@@ -121,18 +139,17 @@ def main():
                 "item 6): per-set ceiling trained on the frozen snapshot "
                 "with the stock recipe AFTER the zero-shot pass. Zero-shot "
                 "frames are the canonical cached parquets; no battery "
-                "member was re-run."),
+                "member was re-run."
+            ),
             "ceiling_model": model_meta["model_id"],
             "ceiling_trained_at": model_meta["trained_at"],
             "ceiling_data_etag": model_meta["data_etag"],
-            "executed_at": datetime.datetime.now().isoformat(
-                timespec="seconds"),
+            "executed_at": datetime.datetime.now().isoformat(timespec="seconds"),
         },
         "results": results,
         "ceiling_comparisons": comparisons,
     }
-    (out_dir / "summary.json").write_text(
-        json.dumps(summary, indent=2, default=str))
+    (out_dir / "summary.json").write_text(json.dumps(summary, indent=2, default=str))
     print(f"wrote {out_dir}/summary.json")
 
 

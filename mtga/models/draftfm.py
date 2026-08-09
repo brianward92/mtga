@@ -38,15 +38,20 @@ def position_features(pack_number, pick_number, picks_per_pack):
     """Numpy twin of mtga.foundation.model.position_features for one pick."""
     ppp = float(picks_per_pack)
     pool_size = pack_number * ppp + pick_number
-    return np.array([[
-        1.0 if pack_number == 0 else 0.0,
-        1.0 if pack_number == 1 else 0.0,
-        1.0 if pack_number == 2 else 0.0,
-        pick_number / ppp,
-        max(ppp - 1 - pick_number, 0.0) / ppp,
-        pool_size / 45.0,
-        min(pool_size / (3 * ppp), 1.0),
-    ]], dtype=np.float32)
+    return np.array(
+        [
+            [
+                1.0 if pack_number == 0 else 0.0,
+                1.0 if pack_number == 1 else 0.0,
+                1.0 if pack_number == 2 else 0.0,
+                pick_number / ppp,
+                max(ppp - 1 - pick_number, 0.0) / ppp,
+                pool_size / 45.0,
+                min(pool_size / (3 * ppp), 1.0),
+            ]
+        ],
+        dtype=np.float32,
+    )
 
 
 def load_assets(assets_path):
@@ -55,7 +60,8 @@ def load_assets(assets_path):
     if not assets_path.exists():
         raise FileNotFoundError(
             f"no DraftFM set assets at {assets_path} "
-            f"(run scripts/build_set_assets.py)")
+            f"(run scripts/build_set_assets.py)"
+        )
     with np.load(assets_path) as z:
         return {
             "features": z["features"].astype(np.float32),
@@ -71,8 +77,9 @@ class OnnxDraftFMModel:
     model_kind = "draftfm-zeroshot"
     fallback = False  # a real model for the set, just not set-specific
 
-    def __init__(self, version_dir, set_code, limited_type="PremierDraft",
-                 assets_path=None):
+    def __init__(
+        self, version_dir, set_code, limited_type="PremierDraft", assets_path=None
+    ):
         import onnxruntime
 
         version_dir = Path(version_dir)
@@ -84,12 +91,12 @@ class OnnxDraftFMModel:
 
         assets = load_assets(assets_path or paths.set_assets_path(set_code))
         expected = self.meta.get("manifest_hash")
-        if expected and assets["manifest_hash"] and \
-                expected != assets["manifest_hash"]:
+        if expected and assets["manifest_hash"] and expected != assets["manifest_hash"]:
             raise ValueError(
                 f"featurizer manifest mismatch for {set_code}: model "
                 f"{expected[:12]} vs assets {assets['manifest_hash'][:12]} "
-                f"(rebuild the set assets)")
+                f"(rebuild the set assets)"
+            )
 
         # Match the model's expected feature width (no-text exports use 391).
         feat_dim = self.meta.get("feat_dim")
@@ -98,20 +105,22 @@ class OnnxDraftFMModel:
 
         providers = ["CPUExecutionProvider"]
         card_encoder = onnxruntime.InferenceSession(
-            str(version_dir / "card_encoder.onnx"), providers=providers)
+            str(version_dir / "card_encoder.onnx"), providers=providers
+        )
         self.scorer = onnxruntime.InferenceSession(
-            str(version_dir / "scorer.onnx"), providers=providers)
+            str(version_dir / "scorer.onnx"), providers=providers
+        )
 
         # One-time set encode: everything at request time gathers from these.
-        self.table = card_encoder.run(
-            ["card_emb"], {"features": assets["features"]})[0]
+        self.table = card_encoder.run(["card_emb"], {"features": assets["features"]})[0]
 
         # set_ctx=False exports have no set_encoder graph at all -- not a
         # zeroed summary, an absent one (see mtga/foundation/export.py).
         set_encoder_path = version_dir / "set_encoder.onnx"
         if set_encoder_path.exists():
             set_encoder = onnxruntime.InferenceSession(
-                str(set_encoder_path), providers=providers)
+                str(set_encoder_path), providers=providers
+            )
             self.set_summary = set_encoder.run(
                 ["set_summary"],
                 {"card_emb": self.table, "rarity_ids": assets["rarity_ids"]},
@@ -119,7 +128,8 @@ class OnnxDraftFMModel:
         else:
             self.set_summary = None
         self.pool_null_input = np.load(version_dir / "constants.npz")[
-            "pool_null_input"].astype(np.float32)
+            "pool_null_input"
+        ].astype(np.float32)
 
         self.grp_to_row = {}
         for row, name in enumerate(assets["names"]):
@@ -130,29 +140,39 @@ class OnnxDraftFMModel:
         self.wr_id = int(serving.get("wr_id", 33))
         self.games_id = int(serving.get("games_id", 6))
         self.format_id = FORMAT_IDS.get(limited_type, OTHER_FORMAT_ID)
-        self.picks_per_pack = (assets["picks_per_pack"]
-                               or DEFAULT_PICKS_PER_PACK)
+        self.picks_per_pack = assets["picks_per_pack"] or DEFAULT_PICKS_PER_PACK
         ppp = self.picks_per_pack
-        self.set_scalars = np.array([[
-            len(assets["names"]) / 400.0,
-            float(ppp == 13), float(ppp == 14), float(ppp == 15),
-        ]], dtype=np.float32)
+        self.set_scalars = np.array(
+            [
+                [
+                    len(assets["names"]) / 400.0,
+                    float(ppp == 13),
+                    float(ppp == 14),
+                    float(ppp == 15),
+                ]
+            ],
+            dtype=np.float32,
+        )
 
     def _pool_inputs(self, pool_grp_ids):
-        rows = [self.grp_to_row[g] for g in pool_grp_ids
-                if g in self.grp_to_row]
+        rows = [self.grp_to_row[g] for g in pool_grp_ids if g in self.grp_to_row]
         if not rows:
             # Empty pool: the learned null token, reconstructed in-graph.
-            return (self.pool_null_input[None, None],
-                    np.zeros((1, 1), dtype=np.int64),
-                    np.zeros((1, 1), dtype=bool))
+            return (
+                self.pool_null_input[None, None],
+                np.zeros((1, 1), dtype=np.int64),
+                np.zeros((1, 1), dtype=bool),
+            )
         uniq, counts = np.unique(np.asarray(rows), return_counts=True)
-        return (self.table[uniq][None],
-                np.minimum(counts, POOL_COUNT_CAP)[None].astype(np.int64),
-                np.zeros((1, len(uniq)), dtype=bool))
+        return (
+            self.table[uniq][None],
+            np.minimum(counts, POOL_COUNT_CAP)[None].astype(np.int64),
+            np.zeros((1, len(uniq)), dtype=bool),
+        )
 
-    def score_pack(self, pack_grp_ids, pool_grp_ids, pack_number=None,
-                   pick_number=None):
+    def score_pack(
+        self, pack_grp_ids, pool_grp_ids, pack_number=None, pick_number=None
+    ):
         rows = [self.grp_to_row.get(g) for g in pack_grp_ids]
         known = sorted({r for r in rows if r is not None})
         if not known:
@@ -163,8 +183,9 @@ class OnnxDraftFMModel:
             pool_size = len(pool_grp_ids)
             pack_number = pool_size // self.picks_per_pack
             pick_number = pool_size % self.picks_per_pack
-        position = position_features(int(pack_number), int(pick_number),
-                                     self.picks_per_pack)
+        position = position_features(
+            int(pack_number), int(pick_number), self.picks_per_pack
+        )
 
         feed = {
             "pool_emb": pool_emb,

@@ -64,25 +64,51 @@ ANCHOR_TURN = 7
 SCALE_FLOOR = 1e-6
 
 FEATURES = [
-    "turn", "on_play",
-    "user_life", "oppo_life", "life_diff",
-    "user_hand_count", "oppo_hand_count", "hand_diff",
-    "user_lands_count", "oppo_lands_count", "lands_diff",
-    "user_creatures_count", "oppo_creatures_count", "creatures_diff",
-    "user_noncreatures_count", "oppo_noncreatures_count", "noncreatures_diff",
-    "user_mana_spent", "oppo_mana_spent", "user_drawn_cum",
-    "num_mulligans", "opp_num_mulligans",
-    "user_wr_bucket", "user_n_games_bucket", "library_approx",
+    "turn",
+    "on_play",
+    "user_life",
+    "oppo_life",
+    "life_diff",
+    "user_hand_count",
+    "oppo_hand_count",
+    "hand_diff",
+    "user_lands_count",
+    "oppo_lands_count",
+    "lands_diff",
+    "user_creatures_count",
+    "oppo_creatures_count",
+    "creatures_diff",
+    "user_noncreatures_count",
+    "oppo_noncreatures_count",
+    "noncreatures_diff",
+    "user_mana_spent",
+    "oppo_mana_spent",
+    "user_drawn_cum",
+    "num_mulligans",
+    "opp_num_mulligans",
+    "user_wr_bucket",
+    "user_n_games_bucket",
+    "library_approx",
 ]
 
 TURN_COLUMNS = [
-    "game_seq", "turn", "user_life", "oppo_life",
-    "user_hand_count", "oppo_hand_count",
-    "user_lands_count", "oppo_lands_count",
-    "user_creatures_count", "oppo_creatures_count",
-    "user_noncreatures_count", "oppo_noncreatures_count",
-    "user_cards_drawn_ids", "user_mana_spent", "oppo_mana_spent",
-    "on_play", "won",
+    "game_seq",
+    "turn",
+    "user_life",
+    "oppo_life",
+    "user_hand_count",
+    "oppo_hand_count",
+    "user_lands_count",
+    "oppo_lands_count",
+    "user_creatures_count",
+    "oppo_creatures_count",
+    "user_noncreatures_count",
+    "oppo_noncreatures_count",
+    "user_cards_drawn_ids",
+    "user_mana_spent",
+    "oppo_mana_spent",
+    "on_play",
+    "won",
 ]
 
 
@@ -90,13 +116,13 @@ TURN_COLUMNS = [
 class WinProbData:
     """Model-ready arrays plus per-row labels/metadata."""
 
-    X: np.ndarray             # float32 [N, len(FEATURES)] RAW feature values
-    won: np.ndarray           # float32 [N] game outcome (repeated per turn)
-    turn: np.ndarray          # int16 [N]
-    game_pos: np.ndarray      # int32 [N] row of the per-game arrays
+    X: np.ndarray  # float32 [N, len(FEATURES)] RAW feature values
+    won: np.ndarray  # float32 [N] game outcome (repeated per turn)
+    turn: np.ndarray  # int16 [N]
+    game_pos: np.ndarray  # int32 [N] row of the per-game arrays
     game_draft_id: pd.Series  # [G] split key, one per game
-    game_seq: np.ndarray      # int64 [N] join key back to the parquets
-    wr_fill: float            # median used for missing wr buckets
+    game_seq: np.ndarray  # int64 [N] join key back to the parquets
+    wr_fill: float  # median used for missing wr buckets
     game_set: np.ndarray = None  # [G] source set code per game (load_many)
 
     @property
@@ -119,8 +145,10 @@ def _verify_row_order(game_seq, turn):
         raise ValueError("turn-state parquet has no rows")
     step = np.diff(game_seq)
     if (step < 0).any():
-        raise ValueError("turn rows are not game-contiguous "
-                         "(game_seq decreases) — refusing to load")
+        raise ValueError(
+            "turn rows are not game-contiguous "
+            "(game_seq decreases) — refusing to load"
+        )
     new_game = np.empty(len(game_seq), dtype=bool)
     new_game[0] = True
     new_game[1:] = step != 0
@@ -128,8 +156,9 @@ def _verify_row_order(game_seq, turn):
         raise ValueError("games do not start at turn 1 — refusing to load")
     within = ~new_game[1:]
     if (np.diff(turn.astype(np.int32))[within] != 1).any():
-        raise ValueError("turns do not increment by 1 within a game "
-                         "— refusing to load")
+        raise ValueError(
+            "turns do not increment by 1 within a game " "— refusing to load"
+        )
     return new_game
 
 
@@ -147,11 +176,12 @@ def _cumulative_within_games(values, new_game):
 def load_games_sidecar(set_code, limited_type):
     """Games sidecar -> per-game arrays + a game_seq -> row lookup."""
     path = paths.replay_games_path(set_code, limited_type)
-    deck_cols = [c for c in pq.read_schema(path).names
-                 if c.startswith(DECK_PREFIX)]
+    deck_cols = [c for c in pq.read_schema(path).names if c.startswith(DECK_PREFIX)]
     table = pq.read_table(
-        path, columns=["game_seq", "draft_id", "num_mulligans",
-                       "opp_num_mulligans"] + deck_cols)
+        path,
+        columns=["game_seq", "draft_id", "num_mulligans", "opp_num_mulligans"]
+        + deck_cols,
+    )
     game_seq = table.column("game_seq").to_numpy()
     deck_size = np.zeros(len(game_seq), dtype=np.int32)
     for column in deck_cols:
@@ -171,8 +201,9 @@ def load_dataset(set_code, limited_type):
     """Both on-disk sources -> one WinProbData (X holds RAW feature units)."""
     path = paths.replay_turns_path(set_code, limited_type)
     table = pq.read_table(
-        path, columns=TURN_COLUMNS + ["user_n_games_bucket",
-                                      "user_game_win_rate_bucket"])
+        path,
+        columns=TURN_COLUMNS + ["user_n_games_bucket", "user_game_win_rate_bucket"],
+    )
     game_seq = table.column("game_seq").to_numpy()
     turn = table.column("turn").to_numpy().astype(np.int16)
     new_game = _verify_row_order(game_seq, turn)
@@ -180,15 +211,18 @@ def load_dataset(set_code, limited_type):
     games = load_games_sidecar(set_code, limited_type)
     game_pos = games["lookup"][game_seq]
     if (game_pos < 0).any():
-        raise ValueError("turn rows reference game_seq values missing from "
-                         "the games sidecar")
+        raise ValueError(
+            "turn rows reference game_seq values missing from " "the games sidecar"
+        )
 
     def col(name, dtype=np.float32):
         return table.column(name).to_numpy().astype(dtype)
 
-    draws = pc.list_value_length(
-        table.column("user_cards_drawn_ids").combine_chunks()
-    ).to_numpy().astype(np.int64)
+    draws = (
+        pc.list_value_length(table.column("user_cards_drawn_ids").combine_chunks())
+        .to_numpy()
+        .astype(np.int64)
+    )
     drawn_cum = _cumulative_within_games(draws, new_game).astype(np.float32)
 
     wr = table.column("user_game_win_rate_bucket").to_numpy().astype(np.float64)
@@ -203,8 +237,12 @@ def load_dataset(set_code, limited_type):
     user_noncre = col("user_noncreatures_count")
     oppo_noncre = col("oppo_noncreatures_count")
     num_mulligans = games["num_mulligans"][game_pos].astype(np.float32)
-    library = (games["deck_size"][game_pos].astype(np.float32)
-               - FULL_HAND + num_mulligans - drawn_cum)
+    library = (
+        games["deck_size"][game_pos].astype(np.float32)
+        - FULL_HAND
+        + num_mulligans
+        - drawn_cum
+    )
 
     columns = {
         "turn": turn.astype(np.float32),
@@ -236,19 +274,29 @@ def load_dataset(set_code, limited_type):
     X = np.column_stack([columns[name] for name in FEATURES]).astype(np.float32)
 
     return WinProbData(
-        X=X, won=col("won"), turn=turn,
+        X=X,
+        won=col("won"),
+        turn=turn,
         game_pos=game_pos.astype(np.int32),
-        game_draft_id=games["draft_id"], game_seq=game_seq,
+        game_draft_id=games["draft_id"],
+        game_seq=game_seq,
         wr_fill=wr_fill,
-        game_set=np.full(len(games["draft_id"]), set_code, dtype=object))
+        game_set=np.full(len(games["draft_id"]), set_code, dtype=object),
+    )
 
 
 # ---------------------------------------------------------------------------
 # v2: multi-set loading (mtga/winprob/data.py docstring has the full protocol).
 
 
-def load_many(sets, limited_type, per_set_row_cap=None, anchor_checks=None,
-              seed=17, progress=print):
+def load_many(
+    sets,
+    limited_type,
+    per_set_row_cap=None,
+    anchor_checks=None,
+    seed=17,
+    progress=print,
+):
     """Concatenate several sets' turn-state data into one WinProbData.
 
     Each set is loaded FULL (via load_dataset) so state_anchors/verify_anchors
@@ -280,10 +328,12 @@ def load_many(sets, limited_type, per_set_row_cap=None, anchor_checks=None,
         if expected:
             anchors = state_anchors(d)
             verify_anchors(anchors, expected)
-            progress(f"  {set_code}: anchors reproduce (mean_turns "
-                     f"{anchors['mean_turns']:.3f}, "
-                     f"ahead {anchors['ahead']['win_rate']:.3f}, "
-                     f"behind {anchors['behind']['win_rate']:.3f})")
+            progress(
+                f"  {set_code}: anchors reproduce (mean_turns "
+                f"{anchors['mean_turns']:.3f}, "
+                f"ahead {anchors['ahead']['win_rate']:.3f}, "
+                f"behind {anchors['behind']['win_rate']:.3f})"
+            )
 
         n_rows = d.n_rows
         idx = np.arange(n_rows)
@@ -299,11 +349,14 @@ def load_many(sets, limited_type, per_set_row_cap=None, anchor_checks=None,
         game_set_parts.append(np.full(d.n_games, set_code, dtype=object))
         wr_fills[set_code] = d.wr_fill
         load_report[set_code] = {
-            "rows_total": int(n_rows), "rows_kept": int(len(idx)),
+            "rows_total": int(n_rows),
+            "rows_kept": int(len(idx)),
             "games": int(d.n_games),
         }
-        progress(f"  {set_code}: {n_rows:,} rows / {d.n_games:,} games -> "
-                 f"{len(idx):,} rows kept")
+        progress(
+            f"  {set_code}: {n_rows:,} rows / {d.n_games:,} games -> "
+            f"{len(idx):,} rows kept"
+        )
         game_offset += d.n_games
 
     data = WinProbData(
@@ -312,7 +365,8 @@ def load_many(sets, limited_type, per_set_row_cap=None, anchor_checks=None,
         turn=np.concatenate(turns),
         game_pos=np.concatenate(game_poses).astype(np.int32),
         game_draft_id=pd.concat(
-            [pd.Series(p) for p in draft_id_parts], ignore_index=True),
+            [pd.Series(p) for p in draft_id_parts], ignore_index=True
+        ),
         game_seq=np.concatenate(seqs),
         wr_fill=float(np.mean(list(wr_fills.values()))),
         game_set=np.concatenate(game_set_parts),
@@ -338,10 +392,12 @@ def state_anchors(data, turn=ANCHOR_TURN):
         n = int(sel.sum())
         return {"n": n, "win_rate": float(data.won[sel].mean()) if n else None}
 
-    return {"mean_turns": float(data.n_rows / data.n_games),
-            "turn": int(turn),
-            "ahead": cell(at_turn & (diff > 0)),
-            "behind": cell(at_turn & (diff < 0))}
+    return {
+        "mean_turns": float(data.n_rows / data.n_games),
+        "turn": int(turn),
+        "ahead": cell(at_turn & (diff > 0)),
+        "behind": cell(at_turn & (diff < 0)),
+    }
 
 
 def verify_anchors(anchors, expected, decimals=3):
@@ -354,7 +410,8 @@ def verify_anchors(anchors, expected, decimals=3):
             raise ValueError(
                 f"anchor mismatch at {key!r}: expected {want:.{decimals}f}, "
                 f"got {'missing' if got is None else round(got, decimals)}"
-                " — data loading is broken, refusing to train")
+                " — data loading is broken, refusing to train"
+            )
     return anchors
 
 

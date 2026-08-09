@@ -39,8 +39,12 @@ from mtga.foundation import runlog
 from mtga.lands import paths
 from mtga.models.draftnet import VAL_PERMILLE, split_by_draft
 from mtga.mulligan import data as mdata
-from mtga.mulligan.model import (DEFAULT_DROPOUT, DEFAULT_HIDDEN, MulliganNet,
-                                 predict_proba)
+from mtga.mulligan.model import (
+    DEFAULT_DROPOUT,
+    DEFAULT_HIDDEN,
+    MulliganNet,
+    predict_proba,
+)
 
 MODEL_FAMILY = "_mulligan"
 
@@ -78,8 +82,7 @@ def calibration(y, p, n_bins=10):
     y = np.asarray(y, dtype=np.float64)
     p = np.asarray(p, dtype=np.float64)
     edges = np.unique(np.quantile(p, np.linspace(0, 1, n_bins + 1)))
-    which = np.clip(np.searchsorted(edges, p, side="right") - 1,
-                    0, len(edges) - 2)
+    which = np.clip(np.searchsorted(edges, p, side="right") - 1, 0, len(edges) - 2)
     table, ece = [], 0.0
     for b in range(len(edges) - 1):
         sel = which == b
@@ -87,9 +90,16 @@ def calibration(y, p, n_bins=10):
         if n == 0:
             continue
         mean_p, frac_pos = float(p[sel].mean()), float(y[sel].mean())
-        table.append({"bin": b, "lo": float(edges[b]), "hi": float(edges[b + 1]),
-                      "n": n, "mean_pred": round(mean_p, 4),
-                      "frac_won": round(frac_pos, 4)})
+        table.append(
+            {
+                "bin": b,
+                "lo": float(edges[b]),
+                "hi": float(edges[b + 1]),
+                "n": n,
+                "mean_pred": round(mean_p, 4),
+                "frac_won": round(frac_pos, 4),
+            }
+        )
         ece += (n / len(p)) * abs(mean_p - frac_pos)
     return {"ece": round(float(ece), 4), "reliability": table}
 
@@ -102,9 +112,11 @@ def log_loss(y, p, eps=1e-7):
 
 def _cell(pred, won, sel):
     n = int(sel.sum())
-    return {"n": n,
-            "mean_pred": round(float(pred[sel].mean()), 4) if n else None,
-            "win_rate": round(float(won[sel].mean()), 4) if n else None}
+    return {
+        "n": n,
+        "mean_pred": round(float(pred[sel].mean()), 4) if n else None,
+        "win_rate": round(float(won[sel].mean()), 4) if n else None,
+    }
 
 
 def sanity_tables(data, idx, pred):
@@ -112,8 +124,8 @@ def sanity_tables(data, idx, pred):
     won, on_play = data.won[idx], data.on_play[idx]
     hand_size = data.hand_size[idx]
     n_lands = np.rint(
-        data.extras[idx, mdata.EXTRA_COLUMNS.index("n_lands")]
-        * mdata.FULL_HAND).astype(int)
+        data.extras[idx, mdata.EXTRA_COLUMNS.index("n_lands")] * mdata.FULL_HAND
+    ).astype(int)
 
     by_lands = {}
     full = hand_size == mdata.FULL_HAND
@@ -121,12 +133,15 @@ def sanity_tables(data, idx, pred):
         sel = full & (n_lands == lands)
         if sel.any():
             by_lands[lands] = _cell(pred, won, sel)
-    by_size = {int(s): _cell(pred, won, hand_size == s)
-               for s in sorted(np.unique(hand_size), reverse=True)}
-    by_play = {("play" if play else "draw"): _cell(pred, won, on_play == play)
-               for play in (True, False)}
-    return {"by_n_lands_at_7": by_lands, "by_hand_size": by_size,
-            "by_on_play": by_play}
+    by_size = {
+        int(s): _cell(pred, won, hand_size == s)
+        for s in sorted(np.unique(hand_size), reverse=True)
+    }
+    by_play = {
+        ("play" if play else "draw"): _cell(pred, won, on_play == play)
+        for play in (True, False)
+    }
+    return {"by_n_lands_at_7": by_lands, "by_hand_size": by_size, "by_on_play": by_play}
 
 
 def decision_analysis(data, idx, pred, table):
@@ -173,11 +188,22 @@ def decision_analysis(data, idx, pred, table):
 def _batches(n, batch_size, rng=None):
     order = np.arange(n) if rng is None else rng.permutation(n)
     for start in range(0, n, batch_size):
-        yield order[start:start + batch_size]
+        yield order[start : start + batch_size]
 
 
-def _fit_mlp(data, tr_idx, va_idx, epochs, batch_size, lr, hidden, dropout,
-            seed, patience, progress):
+def _fit_mlp(
+    data,
+    tr_idx,
+    va_idx,
+    epochs,
+    batch_size,
+    lr,
+    hidden,
+    dropout,
+    seed,
+    patience,
+    progress,
+):
     """Shared MulliganNet training loop (train() and train_crossset()).
 
     tr_idx/va_idx are KEPT-row indices (outcome head trains/selects on kept
@@ -205,15 +231,16 @@ def _fit_mlp(data, tr_idx, va_idx, epochs, batch_size, lr, hidden, dropout,
             x = torch.from_numpy(mdata.assemble(data, rows))
             y = torch.from_numpy(data.won[rows])
             optimizer.zero_grad()
-            loss = torch.nn.functional.binary_cross_entropy_with_logits(
-                model(x), y)
+            loss = torch.nn.functional.binary_cross_entropy_with_logits(model(x), y)
             loss.backward()
             optimizer.step()
 
         p_val = predict_proba(model, data, va_idx)
         auc = roc_auc(y_val, p_val)
-        progress(f"epoch {epoch}: val auc {auc:.4f} "
-                 f"log_loss {log_loss(y_val, p_val):.4f}")
+        progress(
+            f"epoch {epoch}: val auc {auc:.4f} "
+            f"log_loss {log_loss(y_val, p_val):.4f}"
+        )
         if auc > best["auc"]:
             best = {"auc": auc, "epoch": epoch}
             best_state = {k: v.clone() for k, v in model.state_dict().items()}
@@ -228,10 +255,20 @@ def _fit_mlp(data, tr_idx, va_idx, epochs, batch_size, lr, hidden, dropout,
     return model, best["epoch"], epoch
 
 
-def train(set_code, limited_type, epochs=8, batch_size=4096, lr=1e-3,
-          hidden=DEFAULT_HIDDEN, dropout=DEFAULT_DROPOUT, seed=17,
-          patience=2, val_permille=VAL_PERMILLE, subsample=None,
-          progress=print):
+def train(
+    set_code,
+    limited_type,
+    epochs=8,
+    batch_size=4096,
+    lr=1e-3,
+    hidden=DEFAULT_HIDDEN,
+    dropout=DEFAULT_DROPOUT,
+    seed=17,
+    patience=2,
+    val_permille=VAL_PERMILLE,
+    subsample=None,
+    progress=print,
+):
     """Train and return (model, report, context) — persistence is separate."""
     rng = np.random.default_rng(seed)
 
@@ -240,7 +277,9 @@ def train(set_code, limited_type, epochs=8, batch_size=4096, lr=1e-3,
     expected = EXPECTED_ANCHORS.get((set_code, limited_type))
     if expected:
         mdata.verify_anchors(anchors, expected)
-        progress(f"anchors reproduce: { {m: round(a['win_rate'], 3) for m, a in anchors.items()} }")
+        progress(
+            f"anchors reproduce: { {m: round(a['win_rate'], 3) for m, a in anchors.items()} }"
+        )
 
     train_mask, val_mask = split_by_draft(data.draft_id, val_permille)
     table = mdata.continuation_table(data, mask=train_mask)
@@ -249,13 +288,25 @@ def train(set_code, limited_type, epochs=8, batch_size=4096, lr=1e-3,
     va_idx = np.flatnonzero(data.kept & val_mask)
     if subsample and subsample < len(tr_idx):
         tr_idx = rng.choice(tr_idx, size=subsample, replace=False)
-    progress(f"decisions: {data.n_rows:,} ({int(data.kept.sum()):,} kept) | "
-             f"train {len(tr_idx):,} / val {len(va_idx):,} kept rows | "
-             f"input dim {data.input_dim}")
+    progress(
+        f"decisions: {data.n_rows:,} ({int(data.kept.sum()):,} kept) | "
+        f"train {len(tr_idx):,} / val {len(va_idx):,} kept rows | "
+        f"input dim {data.input_dim}"
+    )
 
     model, best_epoch, epochs_ran = _fit_mlp(
-        data, tr_idx, va_idx, epochs, batch_size, lr, hidden, dropout, seed,
-        patience, progress)
+        data,
+        tr_idx,
+        va_idx,
+        epochs,
+        batch_size,
+        lr,
+        hidden,
+        dropout,
+        seed,
+        patience,
+        progress,
+    )
 
     # Outcome-head quality on held-out kept rows.
     y_val = data.won[va_idx]
@@ -286,11 +337,19 @@ def train(set_code, limited_type, epochs=8, batch_size=4096, lr=1e-3,
         "best_epoch": best_epoch,
     }
     context = {
-        "set": set_code, "format": limited_type, "kind": "mulligan-mlp-v1",
-        "input_dim": data.input_dim, "hidden": list(hidden),
-        "dropout": dropout, "extras": mdata.EXTRA_COLUMNS,
-        "seed": seed, "epochs": epochs, "epochs_ran": epochs_ran,
-        "batch_size": batch_size, "lr": lr, "val_permille": val_permille,
+        "set": set_code,
+        "format": limited_type,
+        "kind": "mulligan-mlp-v1",
+        "input_dim": data.input_dim,
+        "hidden": list(hidden),
+        "dropout": dropout,
+        "extras": mdata.EXTRA_COLUMNS,
+        "seed": seed,
+        "epochs": epochs,
+        "epochs_ran": epochs_ran,
+        "batch_size": batch_size,
+        "lr": lr,
+        "val_permille": val_permille,
         "subsample": subsample,
         "n_params": sum(p.numel() for p in model.parameters()),
     }
@@ -336,10 +395,21 @@ def _per_set_report(data, idx, pred, table, set_names):
     return out
 
 
-def train_crossset(train_sets, limited_type, held_out_sets=(), epochs=8,
-                   batch_size=4096, lr=1e-3, hidden=DEFAULT_HIDDEN,
-                   dropout=DEFAULT_DROPOUT, seed=17, patience=2,
-                   val_permille=VAL_PERMILLE, subsample=None, progress=print):
+def train_crossset(
+    train_sets,
+    limited_type,
+    held_out_sets=(),
+    epochs=8,
+    batch_size=4096,
+    lr=1e-3,
+    hidden=DEFAULT_HIDDEN,
+    dropout=DEFAULT_DROPOUT,
+    seed=17,
+    patience=2,
+    val_permille=VAL_PERMILLE,
+    subsample=None,
+    progress=print,
+):
     """v2: train ONE mulligan model across MULTIPLE sets' replay_mull data.
 
     Mirrors DraftFM's cross-set philosophy (mtga/foundation): one model over
@@ -373,11 +443,11 @@ def train_crossset(train_sets, limited_type, held_out_sets=(), epochs=8,
     for (set_code, fmt), expected in EXPECTED_ANCHORS.items():
         if fmt != limited_type or set_code not in train_sets:
             continue
-        set_anchors = mdata.mulligan_anchors(
-            data, mask=(data.set_code == set_code))
+        set_anchors = mdata.mulligan_anchors(data, mask=(data.set_code == set_code))
         mdata.verify_anchors(set_anchors, expected)
         anchor_checks[set_code] = {
-            m: round(a["win_rate"], 3) for m, a in set_anchors.items()}
+            m: round(a["win_rate"], 3) for m, a in set_anchors.items()
+        }
         progress(f"{set_code} anchors reproduce: {anchor_checks[set_code]}")
 
     train_mask, val_mask = split_by_draft(data.draft_id, val_permille)
@@ -388,13 +458,25 @@ def train_crossset(train_sets, limited_type, held_out_sets=(), epochs=8,
     if subsample and subsample < len(tr_idx):
         tr_idx = rng.choice(tr_idx, size=subsample, replace=False)
     progress(f"train sets ({len(train_sets)}): {train_sets}")
-    progress(f"decisions: {data.n_rows:,} ({int(data.kept.sum()):,} kept) | "
-             f"train {len(tr_idx):,} / val {len(va_idx):,} kept rows | "
-             f"input dim {data.input_dim}")
+    progress(
+        f"decisions: {data.n_rows:,} ({int(data.kept.sum()):,} kept) | "
+        f"train {len(tr_idx):,} / val {len(va_idx):,} kept rows | "
+        f"input dim {data.input_dim}"
+    )
 
     model, best_epoch, epochs_ran = _fit_mlp(
-        data, tr_idx, va_idx, epochs, batch_size, lr, hidden, dropout, seed,
-        patience, progress)
+        data,
+        tr_idx,
+        va_idx,
+        epochs,
+        batch_size,
+        lr,
+        hidden,
+        dropout,
+        seed,
+        patience,
+        progress,
+    )
 
     # Outcome-head quality on held-out (within-training-pool) kept rows.
     y_val = data.won[va_idx]
@@ -449,21 +531,30 @@ def train_crossset(train_sets, limited_type, held_out_sets=(), epochs=8,
             "n_kept": int(held.kept.sum()),
             "outcome_head": held_outcome,
             "decision": held_decision,
-            "per_set": _per_set_report(
-                held, held_idx, p_held, table, held_out_sets),
+            "per_set": _per_set_report(held, held_idx, p_held, table, held_out_sets),
         }
-        progress(f"zero-shot on {held_out_sets}: auc {held_outcome['auc']:.4f} "
-                f"decision_agreement {held_decision['agreement']:.4f} "
-                f"(vs in-training val auc {outcome['auc']:.4f} / "
-                f"agreement {decision['agreement']:.4f})")
+        progress(
+            f"zero-shot on {held_out_sets}: auc {held_outcome['auc']:.4f} "
+            f"decision_agreement {held_decision['agreement']:.4f} "
+            f"(vs in-training val auc {outcome['auc']:.4f} / "
+            f"agreement {decision['agreement']:.4f})"
+        )
 
     context = {
-        "train_sets": train_sets, "held_out_sets": held_out_sets,
-        "format": limited_type, "kind": "mulligan-mlp-v2-crossset",
-        "input_dim": data.input_dim, "hidden": list(hidden),
-        "dropout": dropout, "extras": mdata.EXTRA_COLUMNS,
-        "seed": seed, "epochs": epochs, "epochs_ran": epochs_ran,
-        "batch_size": batch_size, "lr": lr, "val_permille": val_permille,
+        "train_sets": train_sets,
+        "held_out_sets": held_out_sets,
+        "format": limited_type,
+        "kind": "mulligan-mlp-v2-crossset",
+        "input_dim": data.input_dim,
+        "hidden": list(hidden),
+        "dropout": dropout,
+        "extras": mdata.EXTRA_COLUMNS,
+        "seed": seed,
+        "epochs": epochs,
+        "epochs_ran": epochs_ran,
+        "batch_size": batch_size,
+        "lr": lr,
+        "val_permille": val_permille,
         "subsample": subsample,
         "n_params": sum(p.numel() for p in model.parameters()),
     }
@@ -479,8 +570,9 @@ def save_version(model, report, context, tag=None):
     out_dir = paths.MODELS_DIR / MODEL_FAMILY / tag
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    torch.save({"model": model.state_dict(), "config": context},
-               out_dir / "checkpoint.pt")
+    torch.save(
+        {"model": model.state_dict(), "config": context}, out_dir / "checkpoint.pt"
+    )
 
     mull_meta = paths.meta_path(paths.replay_mull_path(set_code, limited_type))
     data_etag = None
@@ -495,12 +587,23 @@ def save_version(model, report, context, tag=None):
     meta = {
         "model_id": f"{MODEL_FAMILY}/{tag}",
         "kind": context["kind"],
-        "arch": {"input_dim": context["input_dim"],
-                 "hidden": context["hidden"], "dropout": context["dropout"],
-                 "extras": context["extras"]},
-        "train": {k: context[k] for k in
-                  ["seed", "epochs_ran", "batch_size", "lr", "val_permille",
-                   "subsample"]},
+        "arch": {
+            "input_dim": context["input_dim"],
+            "hidden": context["hidden"],
+            "dropout": context["dropout"],
+            "extras": context["extras"],
+        },
+        "train": {
+            k: context[k]
+            for k in [
+                "seed",
+                "epochs_ran",
+                "batch_size",
+                "lr",
+                "val_permille",
+                "subsample",
+            ]
+        },
         "data_etag": data_etag,
         "manifest_hash": manifest_hash,
         "trained_at": datetime.datetime.now().isoformat(timespec="seconds"),
@@ -524,7 +627,8 @@ def ledger_run(report, context, out_dir):
     """Append the run record to the experiment ledger; returns the record."""
     record = {
         "run_id": runlog.new_run_id(
-            f"mulligan_{context['set'].lower()}_{context['format'].lower()}"),
+            f"mulligan_{context['set'].lower()}_{context['format'].lower()}"
+        ),
         "kind": context["kind"],
         "config": context,
         "metrics": {
@@ -555,8 +659,9 @@ def save_crossset_version(model, report, context, tag="v2-crossset"):
     out_dir = paths.MODELS_DIR / MODEL_FAMILY / tag
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    torch.save({"model": model.state_dict(), "config": context},
-               out_dir / "checkpoint.pt")
+    torch.save(
+        {"model": model.state_dict(), "config": context}, out_dir / "checkpoint.pt"
+    )
 
     data_etags = {}
     for set_code in context["train_sets"] + context["held_out_sets"]:
@@ -572,12 +677,23 @@ def save_crossset_version(model, report, context, tag="v2-crossset"):
     meta = {
         "model_id": f"{MODEL_FAMILY}/{tag}",
         "kind": context["kind"],
-        "arch": {"input_dim": context["input_dim"],
-                 "hidden": context["hidden"], "dropout": context["dropout"],
-                 "extras": context["extras"]},
-        "train": {k: context[k] for k in
-                  ["seed", "epochs_ran", "batch_size", "lr", "val_permille",
-                   "subsample"]},
+        "arch": {
+            "input_dim": context["input_dim"],
+            "hidden": context["hidden"],
+            "dropout": context["dropout"],
+            "extras": context["extras"],
+        },
+        "train": {
+            k: context[k]
+            for k in [
+                "seed",
+                "epochs_ran",
+                "batch_size",
+                "lr",
+                "val_permille",
+                "subsample",
+            ]
+        },
         "train_sets": context["train_sets"],
         "held_out_sets": context["held_out_sets"],
         "data_etags": data_etags,
@@ -618,8 +734,9 @@ def ledger_run_crossset(report, context, out_dir):
     if "held_out" in report:
         metrics["held_out_auc"] = report["held_out"]["outcome_head"]["auc"]
         metrics["held_out_log_loss"] = report["held_out"]["outcome_head"]["log_loss"]
-        metrics["held_out_decision_agreement"] = (
-            report["held_out"]["decision"]["agreement"])
+        metrics["held_out_decision_agreement"] = report["held_out"]["decision"][
+            "agreement"
+        ]
     record = {
         "run_id": runlog.new_run_id("mulligan_crossset"),
         "kind": context["kind"],

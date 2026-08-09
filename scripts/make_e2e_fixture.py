@@ -42,9 +42,7 @@ def load_cards_by_rarity() -> dict:
     import pyarrow.parquet as pq
 
     names = json.load(open(VOCAB))["names"]
-    table = pq.read_table(
-        CARD_STORE, columns=["grp_id", "expansion", "name", "rarity"]
-    )
+    table = pq.read_table(CARD_STORE, columns=["grp_id", "expansion", "name", "rarity"])
     table = table.filter(pc.equal(table["expansion"], "SOS"))
     by_name = {}
     for i in range(table.num_rows):
@@ -111,8 +109,10 @@ def main() -> None:
     lines = ["[UnityCrossThreadLogger]DETAILED LOGS: ENABLED"]
     # Event_Join announces the pod first — the tracker shows draft-start
     # ("waiting for pack") before the first status arrives, like the client.
-    join = {"id": "e1", "request": json.dumps(
-        {"EventName": EVENT_NAME, "EntryCurrencyType": "Gem"})}
+    join = {
+        "id": "e1",
+        "request": json.dumps({"EventName": EVENT_NAME, "EntryCurrencyType": "Gem"}),
+    }
     lines.append(f"[UnityCrossThreadLogger]==> EventJoin {json.dumps(join)}")
 
     pool: list = []

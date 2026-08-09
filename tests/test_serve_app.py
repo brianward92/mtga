@@ -5,7 +5,6 @@ from functools import partial
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
-
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "serve_app.py"
 SPEC = importlib.util.spec_from_file_location("serve_app", SCRIPT)
 serve_app = importlib.util.module_from_spec(SPEC)

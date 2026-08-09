@@ -70,7 +70,9 @@ def _pad_sparse(matrix, width):
     first = np.searchsorted(rows, np.arange(matrix.shape[0]))
     positions = np.arange(len(rows)) - first[rows]
     if len(positions) and positions.max() >= width:
-        raise ValueError(f"row exceeds {width} distinct slots (max {positions.max()+1})")
+        raise ValueError(
+            f"row exceeds {width} distinct slots (max {positions.max()+1})"
+        )
     slots = np.full((matrix.shape[0], width), PAD, dtype=np.uint16)
     out_counts = np.zeros((matrix.shape[0], width), dtype=np.uint8)
     slots[rows, positions] = cols.astype(np.uint16)
@@ -102,28 +104,32 @@ def build_shard(set_code, limited_type, force=False):
     ).fetchone()[0]
 
     pool_slots = np.lib.format.open_memmap(
-        out / "pool_slots.npy", mode="w+", dtype=np.uint16, shape=(total, POOL_SLOTS))
+        out / "pool_slots.npy", mode="w+", dtype=np.uint16, shape=(total, POOL_SLOTS)
+    )
     pool_counts = np.lib.format.open_memmap(
-        out / "pool_counts.npy", mode="w+", dtype=np.uint8, shape=(total, POOL_SLOTS))
+        out / "pool_counts.npy", mode="w+", dtype=np.uint8, shape=(total, POOL_SLOTS)
+    )
     pack_slots = np.lib.format.open_memmap(
-        out / "pack_slots.npy", mode="w+", dtype=np.uint16, shape=(total, PACK_SLOTS))
+        out / "pack_slots.npy", mode="w+", dtype=np.uint16, shape=(total, PACK_SLOTS)
+    )
     pick_pos = np.lib.format.open_memmap(
-        out / "pick_pos.npy", mode="w+", dtype=np.uint8, shape=(total,))
+        out / "pick_pos.npy", mode="w+", dtype=np.uint8, shape=(total,)
+    )
     context = np.lib.format.open_memmap(
-        out / "context.npy", mode="w+", dtype=np.uint8, shape=(total, 5))
+        out / "context.npy", mode="w+", dtype=np.uint8, shape=(total, 5)
+    )
     split = np.lib.format.open_memmap(
-        out / "split.npy", mode="w+", dtype=np.uint16, shape=(total,))
+        out / "split.npy", mode="w+", dtype=np.uint16, shape=(total,)
+    )
 
     pool_cols = ", ".join(f'"pool_{n}"' for n in vocab)
     pack_cols = ", ".join(f'"pack_card_{n}"' for n in vocab)
-    reader = con.execute(
-        f"""
+    reader = con.execute(f"""
         SELECT pick_index, draft_id, pack_number, pick_number,
                user_game_win_rate_bucket, user_n_games_bucket,
                [{pool_cols}] AS pool, [{pack_cols}] AS pack
         FROM '{parquet}' WHERE pick_index >= 0
-        """
-    )
+        """)
     offset = 0
     crc_cache = {}
     while True:
@@ -134,10 +140,10 @@ def build_shard(set_code, limited_type, force=False):
         pool = np.stack(chunk["pool"].to_numpy()).astype(np.int8)
         pack = np.stack(chunk["pack"].to_numpy()).astype(np.int8)
         slots, counts = _pad_sparse(pool, POOL_SLOTS)
-        pool_slots[offset:offset + n] = slots
-        pool_counts[offset:offset + n] = counts
+        pool_slots[offset : offset + n] = slots
+        pool_counts[offset : offset + n] = counts
         pslots, _ = _pad_sparse(np.sign(pack), PACK_SLOTS)
-        pack_slots[offset:offset + n] = pslots
+        pack_slots[offset : offset + n] = pslots
 
         picks = chunk["pick_index"].to_numpy().astype(np.uint16)
         # The picked card is not always still visible in pack_card_* for
@@ -147,19 +153,21 @@ def build_shard(set_code, limited_type, force=False):
             fix = np.flatnonzero(~has_pick)
             free = (pslots[fix] == PAD).argmax(axis=1)
             pslots[fix, free] = picks[fix]
-            pack_slots[offset:offset + n] = pslots
-        pick_pos[offset:offset + n] = (pslots == picks[:, None]).argmax(axis=1)
+            pack_slots[offset : offset + n] = pslots
+        pick_pos[offset : offset + n] = (pslots == picks[:, None]).argmax(axis=1)
 
         ctx = np.empty((n, 5), dtype=np.uint8)
         ctx[:, 0] = chunk["pack_number"].to_numpy().astype(np.uint8)
         ctx[:, 1] = chunk["pick_number"].to_numpy().astype(np.uint8)
-        ctx[:, 2] = wr_bucket_id(chunk["user_game_win_rate_bucket"].to_numpy(dtype=float))
+        ctx[:, 2] = wr_bucket_id(
+            chunk["user_game_win_rate_bucket"].to_numpy(dtype=float)
+        )
         ctx[:, 3] = games_bucket_id(chunk["user_n_games_bucket"].to_numpy())
         ctx[:, 4] = format_id
-        context[offset:offset + n] = ctx
+        context[offset : offset + n] = ctx
 
         ids = chunk["draft_id"].to_numpy()
-        split[offset:offset + n] = [
+        split[offset : offset + n] = [
             crc_cache.setdefault(d, zlib.crc32(d.encode()) % 1000) for d in ids
         ]
         offset += n
@@ -170,8 +178,11 @@ def build_shard(set_code, limited_type, force=False):
     for arr in (pool_slots, pool_counts, pack_slots, pick_pos, context, split):
         arr.flush()
     meta = {
-        "set": set_code, "format": limited_type, "rows": int(total),
-        "vocab_size": len(vocab), "source_etag": curated_meta.get("source_etag"),
+        "set": set_code,
+        "format": limited_type,
+        "rows": int(total),
+        "vocab_size": len(vocab),
+        "source_etag": curated_meta.get("source_etag"),
         "picks_per_pack": curated_meta.get("picks_per_pack"),
         "p1p1_missing": curated_meta.get("p1p1_missing"),
         "val_permille": VAL_PERMILLE,

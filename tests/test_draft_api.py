@@ -27,8 +27,7 @@ def _score(payload):
 
 
 def test_handle_score_valid_body(api_env):
-    result = _score({"set": SET, "format": FMT, "pack": [104, 101, 103],
-                     "pool": []})
+    result = _score({"set": SET, "format": FMT, "pack": [104, 101, 103], "pool": []})
     assert not isinstance(result, tuple)  # 200 path
     assert result["set"] == SET and result["format"] == FMT
     assert result["model"]["kind"] == "heuristic-ratings"
@@ -39,10 +38,10 @@ def test_handle_score_valid_body(api_env):
     assert [c["rank"] for c in cards] == [1, 2, 3]  # response sorted by rank
     # Empty pool -> pure quality: grp 101 (GIH .62) on top (see test_heuristic).
     assert cards[0]["grp_id"] == 101
-    assert cards[0]["name"] == CARD_A            # identity from the card store
+    assert cards[0]["name"] == CARD_A  # identity from the card store
     assert cards[0]["rarity"] == "common"
     assert cards[0]["image_small"].endswith("101-small.jpg")
-    assert cards[0]["gih_wr"] == 0.62            # stats from the ratings cache
+    assert cards[0]["gih_wr"] == 0.62  # stats from the ratings cache
     assert sum(c["prob"] for c in cards) == pytest.approx(1.0)
 
 
@@ -78,18 +77,21 @@ def test_handle_score_empty_pack_is_400(api_env):
     assert _score({"set": SET})[1] == 400  # missing pack entirely
 
 
-@pytest.mark.parametrize("payload", [
-    None,
-    [],
-    {"pack": 7},
-    {"pack": ["not-an-int"]},
-    {"pack": [True]},
-    {"pack": [1.5]},
-    {"pack": [-1]},
-    {"pack": [101], "pool": {}},
-    {"pack": [101], "set": 7},
-    {"pack": [101], "format": []},
-])
+@pytest.mark.parametrize(
+    "payload",
+    [
+        None,
+        [],
+        {"pack": 7},
+        {"pack": ["not-an-int"]},
+        {"pack": [True]},
+        {"pack": [1.5]},
+        {"pack": [-1]},
+        {"pack": [101], "pool": {}},
+        {"pack": [101], "set": 7},
+        {"pack": [101], "format": []},
+    ],
+)
 def test_handle_score_malformed_payload_is_400(api_env, payload):
     body, status = _score(payload)
     assert status == 400
@@ -132,8 +134,7 @@ def test_health_round_trip_over_http(api_env):
 
         # Unknown routes 404 as JSON, not a stack trace.
         try:
-            urllib.request.urlopen(f"http://127.0.0.1:{port}/api/v1/nope",
-                                   timeout=10)
+            urllib.request.urlopen(f"http://127.0.0.1:{port}/api/v1/nope", timeout=10)
             raise AssertionError("expected HTTP 404")
         except urllib.error.HTTPError as err:
             assert err.code == 404

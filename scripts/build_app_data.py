@@ -104,9 +104,9 @@ def resolve_default_set_codes(cards_df, sets_df):
     sets_with_dates["released_at"] = pd.to_datetime(
         sets_with_dates["released_at"], errors="coerce"
     )
-    baseline_dates = sets_with_dates[
-        sets_with_dates["set"].isin(baseline)
-    ]["released_at"].dropna()
+    baseline_dates = sets_with_dates[sets_with_dates["set"].isin(baseline)][
+        "released_at"
+    ].dropna()
     min_release_date = baseline_dates.min() if not baseline_dates.empty else None
 
     if "set_type" in sets_with_dates.columns:
@@ -189,7 +189,10 @@ def write_initial_index(path, template_path, manifest, default_set_payload):
         (item for item in manifest["sets"] if item["setCode"] == default_set_code),
         {"setCode": default_set_code, "setName": default_set_code},
     )
-    cards = [dict(zip(default_set_payload["fields"], row)) for row in default_set_payload["cards"]]
+    cards = [
+        dict(zip(default_set_payload["fields"], row))
+        for row in default_set_payload["cards"]
+    ]
     cards = sorted(
         cards,
         key=lambda card: collector_sort_key(card.get("collectorNumber")),
@@ -348,7 +351,9 @@ def resolve_thumbnail_cache_metadata(output_dir, app_sets):
     thumbnail_set_codes = []
     for set_code, card_rows in app_sets.items():
         image_rows = [
-            row for row in card_rows if row[image_small_index] or row[image_normal_index]
+            row
+            for row in card_rows
+            if row[image_small_index] or row[image_normal_index]
         ]
         if not image_rows:
             continue
@@ -482,7 +487,9 @@ if __name__ == "__main__":
         manifest["thumbnailSetCodes"] = thumbnail_set_codes
     write_json(manifest_path, manifest, indent=2)
     write_bootstrap(bootstrap_path, manifest, set_payloads[default_set_code])
-    write_initial_index(index_path, index_template_path, manifest, set_payloads[default_set_code])
+    write_initial_index(
+        index_path, index_template_path, manifest, set_payloads[default_set_code]
+    )
 
     print(f"Wrote manifest for {len(manifest_sets):,} sets to {manifest_path}")
     print(f"Wrote default bootstrap payload to {bootstrap_path}")

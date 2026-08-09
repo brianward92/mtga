@@ -37,9 +37,12 @@ def main():
     con = duckdb.connect()
     draft_id = args.draft_id
     if draft_id is None:
-        ids = [r[0] for r in con.execute(
-            f"SELECT DISTINCT draft_id FROM '{parquet}' USING SAMPLE 2000 ROWS"
-        ).fetchall()]
+        ids = [
+            r[0]
+            for r in con.execute(
+                f"SELECT DISTINCT draft_id FROM '{parquet}' USING SAMPLE 2000 ROWS"
+            ).fetchall()
+        ]
         val_ids = [d for d in ids if zlib.crc32(d.encode()) % 1000 < VAL_PERMILLE]
         rng = np.random.default_rng(args.seed)
         draft_id = val_ids[int(rng.integers(len(val_ids)))]
@@ -61,8 +64,10 @@ def main():
     model = registry.resolve(set_code, args.limited_type)
     header_rank = rows[0][3] or "?"
     record = f"{rows[0][4]}-{rows[0][5]}"
-    print(f"draft {draft_id} | {set_code} {args.limited_type} | rank {header_rank} "
-          f"| event record {record}\nmodel: {model.model_id}\n")
+    print(
+        f"draft {draft_id} | {set_code} {args.limited_type} | rank {header_rank} "
+        f"| event record {record}\nmodel: {model.model_id}\n"
+    )
 
     pool, agree, total = [], 0, 0
     for pack_number, pick_number, pick_index, *_rest, pack_counts in rows:
@@ -87,9 +92,11 @@ def main():
             f"({f'{s.ev:+.1f}' if s.ev is not None else '?'})"
             for s in top
         )
-        print(f"P{int(pack_number) + 1}P{int(pick_number) + 1:>2} {mark} "
-              f"human: {vocab[pick_index] if pick_index >= 0 else '?':<30} "
-              f"(model rank {human_rank})  model: {top_str}")
+        print(
+            f"P{int(pack_number) + 1}P{int(pick_number) + 1:>2} {mark} "
+            f"human: {vocab[pick_index] if pick_index >= 0 else '?':<30} "
+            f"(model rank {human_rank})  model: {top_str}"
+        )
         if human_grp is not None:
             pool.append(human_grp)
 

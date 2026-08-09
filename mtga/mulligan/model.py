@@ -17,13 +17,11 @@ DEFAULT_DROPOUT = 0.1
 
 
 class MulliganNet(nn.Module):
-    def __init__(self, input_dim, hidden=DEFAULT_HIDDEN,
-                 dropout=DEFAULT_DROPOUT):
+    def __init__(self, input_dim, hidden=DEFAULT_HIDDEN, dropout=DEFAULT_DROPOUT):
         super().__init__()
         layers, previous = [], input_dim
         for width in hidden:
-            layers += [nn.Linear(previous, width), nn.ReLU(),
-                       nn.Dropout(dropout)]
+            layers += [nn.Linear(previous, width), nn.ReLU(), nn.Dropout(dropout)]
             previous = width
         layers.append(nn.Linear(previous, 1))
         self.net = nn.Sequential(*layers)
@@ -39,7 +37,7 @@ def predict_proba(model, data, idx, batch_size=8192):
     out = np.empty(len(idx), dtype=np.float64)
     with torch.no_grad():
         for start in range(0, len(idx), batch_size):
-            rows = idx[start:start + batch_size]
+            rows = idx[start : start + batch_size]
             x = torch.from_numpy(assemble(data, rows))
-            out[start:start + len(rows)] = torch.sigmoid(model(x)).numpy()
+            out[start : start + len(rows)] = torch.sigmoid(model(x)).numpy()
     return out

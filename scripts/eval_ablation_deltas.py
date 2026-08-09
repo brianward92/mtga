@@ -51,8 +51,12 @@ RUN_DIRS = {
 # (name_a, name_b, label) -- delta reported is A minus B, matching the
 # existing prose ("A-notext vs. Full", "A-noUB vs. A-noctx").
 DELTAS = [
-    ("full", "a_notext", "text_penalty"),   # Full - A-notext = cost of dropping text
-    ("a_noctx", "a_noub", "ub_penalty"),    # A-noctx - A-noUB = cost of dropping licensed-IP training sets
+    ("full", "a_notext", "text_penalty"),  # Full - A-notext = cost of dropping text
+    (
+        "a_noctx",
+        "a_noub",
+        "ub_penalty",
+    ),  # A-noctx - A-noUB = cost of dropping licensed-IP training sets
 ]
 
 
@@ -82,11 +86,14 @@ def main():
             frame_a = load_expert(resolved[name_a], s)
             frame_b = load_expert(resolved[name_b], s)
             point, lo, hi = evalproto.paired_bootstrap_diff(
-                frame_a, frame_b, evalproto.top1)
+                frame_a, frame_b, evalproto.top1
+            )
             report[label][s] = {"point": point, "ci": [lo, hi]}
             sig = "outside 0" if (lo > 0 or hi < 0) else "CONTAINS 0"
-            print(f"  {s}: {point:+.4f} ({100 * point:+.1f}pp) "
-                  f"CI [{lo:+.4f}, {hi:+.4f}] ({sig})")
+            print(
+                f"  {s}: {point:+.4f} ({100 * point:+.1f}pp) "
+                f"CI [{lo:+.4f}, {hi:+.4f}] ({sig})"
+            )
         dev_mean = sum(report[label][s]["point"] for s in DEV_SETS) / 3
         print(f"  dev-mean: {dev_mean:+.4f} ({100 * dev_mean:+.1f}pp)")
         report[label]["dev_mean"] = dev_mean

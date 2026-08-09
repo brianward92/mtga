@@ -13,13 +13,13 @@ from mtga.lands import paths
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 
 spec = importlib.util.spec_from_file_location(
-    "build_data_manifest", SCRIPTS / "build_data_manifest.py")
+    "build_data_manifest", SCRIPTS / "build_data_manifest.py"
+)
 bdm = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(bdm)
 
 
-def _write_raw(set_code=SET, fmt=FMT, payload=b"raw,rows\n1,2\n",
-               etag='"abc123"'):
+def _write_raw(set_code=SET, fmt=FMT, payload=b"raw,rows\n1,2\n", etag='"abc123"'):
     dest = paths.raw_dataset_path("draft", set_code, fmt)
     dest.parent.mkdir(parents=True, exist_ok=True)
     with gzip.open(dest, "wb") as fh:
@@ -35,10 +35,10 @@ def corpus_on_disk(data_root):
     curated = paths.curated_path("draft", SET, FMT)
     curated.parent.mkdir(parents=True, exist_ok=True)
     with open(paths.meta_path(curated), "w") as fh:
-        json.dump({"source_etag": '"abc123"', "rows": 8,
-                   "schema_era": "modern"}, fh)
-    paths.FEATURIZER_MANIFEST.write_text(json.dumps(
-        {"content_hash": "manifest-hash-1"}))
+        json.dump({"source_etag": '"abc123"', "rows": 8, "schema_era": "modern"}, fh)
+    paths.FEATURIZER_MANIFEST.write_text(
+        json.dumps({"content_hash": "manifest-hash-1"})
+    )
     paths.CARDFEATS_PARQUET.write_bytes(b"not-really-parquet")
     paths.TEXT_EMB_CACHE.parent.mkdir(parents=True, exist_ok=True)
     paths.TEXT_EMB_CACHE.write_bytes(b"not-really-npz")
@@ -55,9 +55,11 @@ def test_build_records_etag_sha_size_rows_and_features(corpus_on_disk):
     assert entry["rows"] == 8
     assert manifest["features"]["featurizer_manifest_hash"] == "manifest-hash-1"
     assert manifest["features"]["cardfeats_sha256"] == bdm.file_sha256(
-        paths.CARDFEATS_PARQUET)
+        paths.CARDFEATS_PARQUET
+    )
     assert manifest["features"]["text_emb_sha256"] == bdm.file_sha256(
-        paths.TEXT_EMB_CACHE)
+        paths.TEXT_EMB_CACHE
+    )
     assert manifest["content_hash"] == bdm.content_hash(manifest)
 
 
@@ -76,7 +78,8 @@ def test_build_refuses_eval_only_raw_data(corpus_on_disk):
     assert manifest["eval_only"]["MSH"]["present"] is True
     assert len(manifest["eval_only"]["MSH"]["files"]) == 1
     assert [e["filename"] for e in manifest["files"]] == [
-        f"draft_data_public.{SET}.{FMT}.csv.gz"]
+        f"draft_data_public.{SET}.{FMT}.csv.gz"
+    ]
 
 
 def test_check_passes_then_catches_drift(corpus_on_disk, capsys):

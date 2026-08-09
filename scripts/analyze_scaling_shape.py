@@ -47,11 +47,14 @@ def main():
     names = [r["rung"] for r in ladder]
 
     a, b, r2, resid = fit_loglinear(xs, ys)
-    print("Log-linear fit: dev_mean_top1(%) = "
-          f"{a:.3f} + {b:.3f} * log2(train_picks_M)")
+    print(
+        "Log-linear fit: dev_mean_top1(%) = " f"{a:.3f} + {b:.3f} * log2(train_picks_M)"
+    )
     print(f"  slope = {b:.3f} pp per doubling of training picks")
-    print(f"  R^2   = {r2:.4f}  (n={len(xs)} nested-ladder rungs, "
-          f"{MAIN_LADDER[0]}..{MAIN_LADDER[-1]})")
+    print(
+        f"  R^2   = {r2:.4f}  (n={len(xs)} nested-ladder rungs, "
+        f"{MAIN_LADDER[0]}..{MAIN_LADDER[-1]})"
+    )
     print()
     print(f"{'rung':6}{'picks(M)':>12}{'top1(%)':>10}{'fit(%)':>10}{'resid(pp)':>12}")
     for name, r, x, y, e in zip(names, ladder, xs, ys, resid):
@@ -60,12 +63,15 @@ def main():
 
     print()
     print("Per-segment doublings-normalized delta (raw pp / log2 picks ratio):")
-    for (n0, r0), (n1, r1) in zip(list(zip(names, ladder))[:-1],
-                                   list(zip(names, ladder))[1:]):
+    for (n0, r0), (n1, r1) in zip(
+        list(zip(names, ladder))[:-1], list(zip(names, ladder))[1:]
+    ):
         dbl = math.log2(r1["train_picks"] / r0["train_picks"])
         dy = 100 * (r1["dev_mean_top1"] - r0["dev_mean_top1"])
-        print(f"  {n0}->{n1}: +{dy:.2f}pp over {dbl:.3f} doublings "
-              f"= {dy/dbl:.3f} pp/doubling")
+        print(
+            f"  {n0}->{n1}: +{dy:.2f}pp over {dbl:.3f} doublings "
+            f"= {dy/dbl:.3f} pp/doubling"
+        )
 
 
 if __name__ == "__main__":

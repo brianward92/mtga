@@ -27,37 +27,53 @@ def create_parser():
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--seed", type=int, default=17)
     parser.add_argument("--patience", type=int, default=2)
-    parser.add_argument("--val-permille", type=int,
-                        default=draftnet.VAL_PERMILLE)
-    parser.add_argument("--subsample", type=int, default=3_000_000,
-                        help="cap on training rows (0 = all)")
-    parser.add_argument("--tag", default=None,
-                        help="artifact dir name (default: v1-<set>)")
+    parser.add_argument("--val-permille", type=int, default=draftnet.VAL_PERMILLE)
+    parser.add_argument(
+        "--subsample",
+        type=int,
+        default=3_000_000,
+        help="cap on training rows (0 = all)",
+    )
+    parser.add_argument(
+        "--tag", default=None, help="artifact dir name (default: v1-<set>)"
+    )
     return parser
 
 
 def main():
     args = create_parser().parse_args()
     models, report, context = wtrain.train(
-        args.set_code.upper(), args.limited_type, epochs=args.epochs,
-        batch_size=args.batch_size, lr=args.lr, seed=args.seed,
-        patience=args.patience, val_permille=args.val_permille,
+        args.set_code.upper(),
+        args.limited_type,
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        lr=args.lr,
+        seed=args.seed,
+        patience=args.patience,
+        val_permille=args.val_permille,
         subsample=args.subsample or None,
     )
     out_dir = wtrain.save_version(models, report, context, tag=args.tag)
 
     mean, std = context["_scaler"]
-    econ = economics.compute(models["mlp"], mean, std, context["_data"],
-                             context["_val_idx"], seed=args.seed)
+    econ = economics.compute(
+        models["mlp"], mean, std, context["_data"], context["_val_idx"], seed=args.seed
+    )
     economics.save(econ, out_dir)
 
     record = wtrain.ledger_run(report, context, out_dir, economics=econ)
     print(f"saved {out_dir}")
     print(f"ledgered {record['run_id']}")
-    print(json.dumps({"anchors": report["anchors"],
-                      "models": report["models"],
-                      "nonlinearity_gap": report["nonlinearity_gap"]},
-                     indent=2))
+    print(
+        json.dumps(
+            {
+                "anchors": report["anchors"],
+                "models": report["models"],
+                "nonlinearity_gap": report["nonlinearity_gap"],
+            },
+            indent=2,
+        )
+    )
     print()
     print(economics.render_table(econ))
 

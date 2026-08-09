@@ -69,7 +69,9 @@ def _card_matrix(con, parquet, prefix, names):
     """Card-count columns for one prefix as an int8 matrix (rows x cards)."""
     cols = ", ".join(_quote(f"{prefix}{n}") for n in names)
     table = con.execute(f"SELECT {cols} FROM '{parquet}'").fetch_arrow_table()
-    return np.column_stack([table.column(i).to_numpy() for i in range(table.num_columns)])
+    return np.column_stack(
+        [table.column(i).to_numpy() for i in range(table.num_columns)]
+    )
 
 
 def game_card_metrics(set_code, limited_type, prior_strength=None):
@@ -79,9 +81,11 @@ def game_card_metrics(set_code, limited_type, prior_strength=None):
     names = None
     # Column order is identical across prefixes (asserted at curation time);
     # recover it from the parquet schema for the first prefix.
-    schema = con.execute(f"SELECT * FROM '{parquet}' LIMIT 0").fetch_arrow_table().schema
+    schema = (
+        con.execute(f"SELECT * FROM '{parquet}' LIMIT 0").fetch_arrow_table().schema
+    )
     prefix = GAME_CARD_PREFIXES[0]
-    names = [f.name[len(prefix):] for f in schema if f.name.startswith(prefix)]
+    names = [f.name[len(prefix) :] for f in schema if f.name.startswith(prefix)]
 
     won = (
         con.execute(f"SELECT won FROM '{parquet}'")
@@ -99,7 +103,13 @@ def game_card_metrics(set_code, limited_type, prior_strength=None):
     gns = deck & ~gih
 
     result = pd.DataFrame({"name": names})
-    for label, cond in [("gp", deck), ("oh", oh), ("gd", drawn), ("gih", gih), ("gns", gns)]:
+    for label, cond in [
+        ("gp", deck),
+        ("oh", oh),
+        ("gd", drawn),
+        ("gih", gih),
+        ("gns", gns),
+    ]:
         games = cond.sum(axis=0)
         wins = (cond & won[:, None]).sum(axis=0)
         with np.errstate(invalid="ignore"):
@@ -126,12 +136,10 @@ def draft_card_metrics(set_code, limited_type):
     min_pick = con.execute(f"SELECT MIN(pick_number) FROM '{parquet}'").fetchone()[0]
     offset = 1 if min_pick == 0 else 0
 
-    ata = con.execute(
-        f"""
+    ata = con.execute(f"""
         SELECT pick_index, AVG(pick_number) + {offset} AS ata, COUNT(*) AS pick_count
         FROM '{parquet}' WHERE pick_index >= 0 GROUP BY pick_index
-        """
-    ).df().set_index("pick_index")
+        """).df().set_index("pick_index")
 
     alsa = np.full(len(names), np.nan)
     seen = np.zeros(len(names), dtype=np.int64)
@@ -144,13 +152,11 @@ def draft_card_metrics(set_code, limited_type):
         outer = ", ".join(
             f"AVG(m{i} + {offset}.0), COUNT(m{i})" for i in range(len(batch))
         )
-        row = con.execute(
-            f"""
+        row = con.execute(f"""
             SELECT {outer} FROM (
                 SELECT {last_seen} FROM '{parquet}' GROUP BY draft_id, pack_number
             )
-            """
-        ).fetchone()
+            """).fetchone()
         for i in range(len(batch)):
             alsa[start + i] = row[2 * i] if row[2 * i] is not None else np.nan
             seen[start + i] = row[2 * i + 1]
@@ -167,13 +173,11 @@ def draft_card_metrics(set_code, limited_type):
 def color_metrics(set_code, limited_type, prior_strength=None):
     parquet = paths.curated_path("game", set_code, limited_type)
     con = duckdb.connect()
-    frame = con.execute(
-        f"""
+    frame = con.execute(f"""
         SELECT main_colors, COUNT(*) AS games,
                SUM(CASE WHEN won THEN 1 ELSE 0 END) AS wins
         FROM '{parquet}' GROUP BY main_colors ORDER BY games DESC
-        """
-    ).df()
+        """).df()
     con.close()
     frame["wr"] = frame["wins"] / frame["games"]
     frame["wr_shrunk"], _, _ = shrink(frame["wins"], frame["games"], prior_strength)
@@ -215,8 +219,18 @@ def load_latest_metrics(set_code, limited_type):
 def report(set_code, limited_type, top=20):
     """Terminal demo: the top cards by shrunk GIH WR with context columns."""
     frame = load_latest_metrics(set_code, limited_type)
-    cols = ["name", "rarity", "color_identity", "gih_wr_shrunk", "gih_wr", "gih_games",
-            "oh_wr", "iwd", "alsa", "ata"]
+    cols = [
+        "name",
+        "rarity",
+        "color_identity",
+        "gih_wr_shrunk",
+        "gih_wr",
+        "gih_games",
+        "oh_wr",
+        "iwd",
+        "alsa",
+        "ata",
+    ]
     frame = frame.sort_values("gih_wr_shrunk", ascending=False).head(top)
     with pd.option_context("display.width", 200, "display.max_columns", 30):
         print(frame[cols].round(4).to_string(index=False))

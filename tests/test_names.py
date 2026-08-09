@@ -11,8 +11,8 @@ def test_norm_casefolds_and_strips():
 
 def test_norm_composes_nfc():
     decomposed = "Bespoke Bo\u0304"  # o + combining macron (NFD)
-    composed = "Bespoke B\u014d"     # precomposed o-macron (NFC)
-    assert decomposed != composed    # sanity: distinct code points going in
+    composed = "Bespoke B\u014d"  # precomposed o-macron (NFC)
+    assert decomposed != composed  # sanity: distinct code points going in
     assert names.norm(decomposed) == names.norm(composed) == "bespoke bō"
 
 

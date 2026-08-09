@@ -47,9 +47,13 @@ from mtga.lands import corpus
 DEV_SETS = ["BRO", "TMT", "SOS"]
 
 
-def ratio_cluster_bootstrap(frame_a, frame_b, stat_fn=evalproto.top1,
-                            b=evalproto.BOOTSTRAP_B,
-                            seed=evalproto.BOOTSTRAP_SEED):
+def ratio_cluster_bootstrap(
+    frame_a,
+    frame_b,
+    stat_fn=evalproto.top1,
+    b=evalproto.BOOTSTRAP_B,
+    seed=evalproto.BOOTSTRAP_SEED,
+):
     """95% percentile CI on stat_fn(A) / stat_fn(B), whole-draft cluster
     resampling with SHARED resample indices across A and B.
 
@@ -70,7 +74,8 @@ def ratio_cluster_bootstrap(frame_a, frame_b, stat_fn=evalproto.top1,
     if drafts_a != drafts_b:
         raise ValueError(
             "frames are not aligned on identical drafts -- run "
-            "evalproto.align_on_picks(expert_a, expert_b) first")
+            "evalproto.align_on_picks(expert_a, expert_b) first"
+        )
 
     groups_a = evalproto._draft_groups(frame_a)
     groups_b = evalproto._draft_groups(frame_b)
@@ -95,13 +100,17 @@ def ratio_cluster_bootstrap(frame_a, frame_b, stat_fn=evalproto.top1,
     return point, float(lo), float(hi), int(b - len(valid))
 
 
-def normalized_score(zeroshot_dir, set_code, limited_type="PremierDraft",
-                     version="latest", split="val"):
+def normalized_score(
+    zeroshot_dir, set_code, limited_type="PremierDraft", version="latest", split="val"
+):
     """One dev-trio set's aligned normalized score + supporting counts."""
     zs_path = Path(zeroshot_dir) / f"{set_code}.{limited_type}.parquet"
     zeroshot = evalproto.validate(pd.read_parquet(zs_path))
-    ceiling = evalproto.validate(predict.per_set_model_predictions(
-        set_code, limited_type, version=version, split=split))
+    ceiling = evalproto.validate(
+        predict.per_set_model_predictions(
+            set_code, limited_type, version=version, split=split
+        )
+    )
 
     # Step 3: restrict both to the expert slice BEFORE aligning (matches how
     # every other headline number in the paper is scoped). Note
@@ -122,10 +131,12 @@ def normalized_score(zeroshot_dir, set_code, limited_type="PremierDraft",
     pick_keys = ["draft_id", "pack_number", "pick_number"]
     assert not zs_expert.duplicated(pick_keys).any(), (
         "zeroshot expert frame has duplicate (draft_id, pack, pick) rows -- "
-        "align_on_picks would silently cross-product")
+        "align_on_picks would silently cross-product"
+    )
     assert not ceil_expert.duplicated(pick_keys).any(), (
         "ceiling expert frame has duplicate (draft_id, pack, pick) rows -- "
-        "align_on_picks would silently cross-product")
+        "align_on_picks would silently cross-product"
+    )
 
     aligned_zs, aligned_ceil = evalproto.align_on_picks(zs_expert, ceil_expert)
 
@@ -140,14 +151,17 @@ def normalized_score(zeroshot_dir, set_code, limited_type="PremierDraft",
         "n_aligned_picks": int(len(aligned_zs)),
         "n_aligned_drafts": n_aligned_drafts,
         "aligned_drafts_over_ceiling_val_drafts": (
-            n_aligned_drafts / n_ceil_drafts if n_ceil_drafts else float("nan")),
+            n_aligned_drafts / n_ceil_drafts if n_ceil_drafts else float("nan")
+        ),
     }
     if not len(aligned_zs):
-        result.update(zeroshot_top1_aligned=float("nan"),
-                      ceiling_top1_aligned=float("nan"),
-                      normalized_score=float("nan"),
-                      normalized_score_ci=[float("nan"), float("nan")],
-                      degenerate_resamples=None)
+        result.update(
+            zeroshot_top1_aligned=float("nan"),
+            ceiling_top1_aligned=float("nan"),
+            normalized_score=float("nan"),
+            normalized_score_ci=[float("nan"), float("nan")],
+            degenerate_resamples=None,
+        )
         return result
 
     zs_top1 = evalproto.top1(aligned_zs)
@@ -165,14 +179,16 @@ def normalized_score(zeroshot_dir, set_code, limited_type="PremierDraft",
 
 def create_parser():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--run", required=True,
-                        help="F-dev run dir containing zeroshot/*.parquet")
+    parser.add_argument(
+        "--run", required=True, help="F-dev run dir containing zeroshot/*.parquet"
+    )
     parser.add_argument("--sets", default=",".join(DEV_SETS))
     parser.add_argument("--formats", default="PremierDraft")
     parser.add_argument("--version", default="latest")
     parser.add_argument("--split", default="val")
-    parser.add_argument("--out", default=None,
-                        help="default: <run>/zeroshot/normalized_score.json")
+    parser.add_argument(
+        "--out", default=None, help="default: <run>/zeroshot/normalized_score.json"
+    )
     return parser
 
 
@@ -181,8 +197,10 @@ def main():
     sets = [s.strip().upper() for s in args.sets.split(",")]
     bad = set(sets) & corpus.EVAL_ONLY
     if bad:
-        raise SystemExit(f"{bad} is EVAL_ONLY -- MSH goes through "
-                         f"scripts/run_frozen_eval.py, never this script")
+        raise SystemExit(
+            f"{bad} is EVAL_ONLY -- MSH goes through "
+            f"scripts/run_frozen_eval.py, never this script"
+        )
     formats = [f.strip() for f in args.formats.split(",")]
     zeroshot_dir = Path(args.run) / "zeroshot"
 
@@ -190,8 +208,9 @@ def main():
     for set_code in sets:
         for fmt in formats:
             key = f"{set_code}.{fmt}"
-            r = normalized_score(zeroshot_dir, set_code, fmt,
-                                 version=args.version, split=args.split)
+            r = normalized_score(
+                zeroshot_dir, set_code, fmt, version=args.version, split=args.split
+            )
             per_set[key] = r
             print(
                 f"{key}: aligned n_picks={r['n_aligned_picks']:,} "
@@ -202,18 +221,32 @@ def main():
                 f"/ ceiling top1 {r['ceiling_top1_aligned']:.4f} "
                 f"= normalized score {r['normalized_score']:.4f} "
                 f"(CI {r['normalized_score_ci'][0]:.4f}-"
-                f"{r['normalized_score_ci'][1]:.4f})", flush=True)
+                f"{r['normalized_score_ci'][1]:.4f})",
+                flush=True,
+            )
 
     premier_keys = [k for k in per_set if k.endswith(".PremierDraft")]
-    dev_mean = (sum(per_set[k]["normalized_score"] for k in premier_keys)
-               / len(premier_keys)) if premier_keys else float("nan")
+    dev_mean = (
+        (sum(per_set[k]["normalized_score"] for k in premier_keys) / len(premier_keys))
+        if premier_keys
+        else float("nan")
+    )
     print(f"dev-trio mean aligned normalized score (Premier): {dev_mean:.4f}")
 
     out_path = Path(args.out) if args.out else (zeroshot_dir / "normalized_score.json")
-    out_path.write_text(json.dumps(
-        {"run": str(args.run), "version": args.version, "split": args.split,
-         "per_set": per_set, "dev_mean_normalized_score": dev_mean},
-        indent=2, default=str))
+    out_path.write_text(
+        json.dumps(
+            {
+                "run": str(args.run),
+                "version": args.version,
+                "split": args.split,
+                "per_set": per_set,
+                "dev_mean_normalized_score": dev_mean,
+            },
+            indent=2,
+            default=str,
+        )
+    )
     print(f"wrote {out_path}")
 
 

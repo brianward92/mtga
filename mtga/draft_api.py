@@ -52,8 +52,11 @@ class DataHub:
             else 0
         )
         ratings_mtimes = tuple(
-            link.stat().st_mtime if (link := self._ratings_link(set_code, fmt)).exists()
-            else 0
+            (
+                link.stat().st_mtime
+                if (link := self._ratings_link(set_code, fmt)).exists()
+                else 0
+            )
             for fmt in config.FORMATS
         )
         key = (set_code, store_mtime, ratings_mtimes)
@@ -106,8 +109,9 @@ class DataHub:
         from a clunky five-drop. Missing parquet degrades to {} rather than
         failing the request — advice without synergy still beats no advice.
         """
-        if not (paths.CARD_STORE_PARQUET.exists()
-                and paths.SCRYFALL_CARDS_PARQUET.exists()):
+        if not (
+            paths.CARD_STORE_PARQUET.exists() and paths.SCRYFALL_CARDS_PARQUET.exists()
+        ):
             return {}
 
         store_mtime = paths.CARD_STORE_PARQUET.stat().st_mtime
@@ -191,8 +195,7 @@ class DataHub:
         ):
             return self.stats(set_code, "PremierDraft")
         mtimes = tuple(
-            p.stat().st_mtime if p.exists() else 0
-            for p in [metrics_link, ratings_link]
+            p.stat().st_mtime if p.exists() else 0 for p in [metrics_link, ratings_link]
         )
         key = (set_code, limited_type, mtimes)
         cached = self._ratings.get(key)
@@ -209,7 +212,9 @@ class DataHub:
                 stats[row.name] = {
                     "gih_wr": _clean(row.gih_wr),
                     "gih_wr_shrunk": _clean(row.gih_wr_shrunk),
-                    "gih_n": int(row.gih_games) if row.gih_games == row.gih_games else 0,
+                    "gih_n": (
+                        int(row.gih_games) if row.gih_games == row.gih_games else 0
+                    ),
                     "oh_wr": _clean(row.oh_wr),
                     "gd_wr": _clean(row.gd_wr),
                     "iwd": _clean(row.iwd),
@@ -249,15 +254,26 @@ class DataHub:
         self._p1p1 = {key: table}
         return table
 
-    def card_payload(self, set_code, limited_type, grp_ids, evs=None, probs=None,
-                     ranks=None):
+    def card_payload(
+        self, set_code, limited_type, grp_ids, evs=None, probs=None, ranks=None
+    ):
         cards = self.cards(set_code)
         stats = self.stats(set_code, limited_type)["stats"]
         rows = []
         for i, grp_id in enumerate(grp_ids):
-            info = cards.get(grp_id) or self.global_cards().get(grp_id) or {
-                "grp_id": grp_id, "name": None, "colors": None, "rarity": None,
-                "mana_value": None, "image_small": None, "image_normal": None}
+            info = (
+                cards.get(grp_id)
+                or self.global_cards().get(grp_id)
+                or {
+                    "grp_id": grp_id,
+                    "name": None,
+                    "colors": None,
+                    "rarity": None,
+                    "mana_value": None,
+                    "image_small": None,
+                    "image_normal": None,
+                }
+            )
             row = dict(info)
             row.update(stats.get(info.get("name"), {}) or {})
             if evs is not None:
@@ -285,8 +301,12 @@ def handle_health():
             "model_kind": model.model_kind,
             "fallback": model.fallback,
         }
-    return {"ok": True, "uptime_s": round(time.time() - START_TIME, 1), "sets": sets,
-            "attribution": config.ATTRIBUTION}
+    return {
+        "ok": True,
+        "uptime_s": round(time.time() - START_TIME, 1),
+        "sets": sets,
+        "attribution": config.ATTRIBUTION,
+    }
 
 
 def handle_sets():
@@ -313,14 +333,19 @@ def handle_models():
             with open(meta_file) as file:
                 meta = json.load(file)
             metrics_file = meta_file.parent / "metrics.json"
-            entry = {"model_id": meta["model_id"], "kind": meta["kind"],
-                     "trained_at": meta.get("trained_at"),
-                     "is_latest": (meta_file.parent.parent / "latest").resolve()
-                     == meta_file.parent.resolve()}
+            entry = {
+                "model_id": meta["model_id"],
+                "kind": meta["kind"],
+                "trained_at": meta.get("trained_at"),
+                "is_latest": (meta_file.parent.parent / "latest").resolve()
+                == meta_file.parent.resolve(),
+            }
             if metrics_file.exists():
                 with open(metrics_file) as file:
                     report = json.load(file)
-                entry["top1_top_quartile"] = report.get("val_top_quartile", {}).get("top1")
+                entry["top1_top_quartile"] = report.get("val_top_quartile", {}).get(
+                    "top1"
+                )
             versions.append(entry)
     return {"models": versions, "attribution": config.ATTRIBUTION}
 
@@ -346,9 +371,13 @@ def handle_ratings(params):
     for row in rows:
         row["ev_p1p1"] = p1p1.get(row["grp_id"])
     return {
-        "set": set_code, "format": fmt,
-        "model": {"id": model.model_id, "kind": model.model_kind,
-                  "fallback": model.fallback},
+        "set": set_code,
+        "format": fmt,
+        "model": {
+            "id": model.model_id,
+            "kind": model.model_kind,
+            "fallback": model.fallback,
+        },
         "stats_source": HUB.stats(set_code, fmt)["source"],
         "cards": rows,
         "attribution": config.ATTRIBUTION,
@@ -408,8 +437,9 @@ def handle_deck(body):
 
     identity = HUB.cards(set_code)
     text = HUB.card_text(set_code)
-    stats = {row["grp_id"]: row
-             for row in HUB.card_payload(set_code, fmt, sorted(set(deck)))}
+    stats = {
+        row["grp_id"]: row for row in HUB.card_payload(set_code, fmt, sorted(set(deck)))
+    }
 
     cards = []
     unknown = []
@@ -420,27 +450,30 @@ def handle_deck(body):
             unknown.append(grp_id)
             continue
         stat = stats.get(grp_id, {})
-        cards.append({
-            "grp_id": grp_id,
-            "name": (info or {}).get("name") or stat.get("name"),
-            "mana_cost": card_text.get("mana_cost", ""),
-            "type_line": card_text.get("type_line", ""),
-            "oracle_text": card_text.get("oracle_text", ""),
-            "gih_wr": stat.get("gih_wr_shrunk") or stat.get("gih_wr"),
-            "alsa": stat.get("alsa"),
-        })
+        cards.append(
+            {
+                "grp_id": grp_id,
+                "name": (info or {}).get("name") or stat.get("name"),
+                "mana_cost": card_text.get("mana_cost", ""),
+                "type_line": card_text.get("type_line", ""),
+                "oracle_text": card_text.get("oracle_text", ""),
+                "gih_wr": stat.get("gih_wr_shrunk") or stat.get("gih_wr"),
+                "alsa": stat.get("alsa"),
+            }
+        )
 
-    advice = deck_advisor.advise(cards, deck_size=deck_size,
-                                 land_slots=land_slots)
-    advice.update({
-        "set": set_code,
-        "format": fmt,
-        "deck_size": deck_size,
-        "land_slots": land_slots,
-        "unknown_grp_ids": unknown,
-        "has_card_text": bool(text),
-        "attribution": config.ATTRIBUTION,
-    })
+    advice = deck_advisor.advise(cards, deck_size=deck_size, land_slots=land_slots)
+    advice.update(
+        {
+            "set": set_code,
+            "format": fmt,
+            "deck_size": deck_size,
+            "land_slots": land_slots,
+            "unknown_grp_ids": unknown,
+            "has_card_text": bool(text),
+            "attribution": config.ATTRIBUTION,
+        }
+    )
     return advice
 
 
@@ -498,20 +531,27 @@ def handle_score(body):
         return {"error": "set not provided and could not be inferred"}, 400
 
     model = registry.resolve(set_code, fmt)
-    scores = model.score_pack(pack, pool, payload.get("pack_number"),
-                              payload.get("pick_number"))
+    scores = model.score_pack(
+        pack, pool, payload.get("pack_number"), payload.get("pick_number")
+    )
     by_grp = {s.grp_id: s for s in scores}
     ordered = sorted(pack, key=lambda g: by_grp[g].rank)
     rows = HUB.card_payload(
-        set_code, fmt, ordered,
+        set_code,
+        fmt,
+        ordered,
         evs=[by_grp[g].ev for g in ordered],
         probs=[by_grp[g].prob for g in ordered],
         ranks=[by_grp[g].rank for g in ordered],
     )
     return {
-        "set": set_code, "format": fmt,
-        "model": {"id": model.model_id, "kind": model.model_kind,
-                  "fallback": model.fallback},
+        "set": set_code,
+        "format": fmt,
+        "model": {
+            "id": model.model_id,
+            "kind": model.model_kind,
+            "fallback": model.fallback,
+        },
         "cards": rows,
         "attribution": config.ATTRIBUTION,
     }

@@ -7,7 +7,6 @@ from pathlib import Path
 
 import requests
 
-
 REQUEST_TIMEOUT = 20
 DEFAULT_WORKERS = 6
 HEADERS = {
@@ -93,7 +92,9 @@ def resolve_cache_dir(args, app_data_dir):
 
 def select_set_codes(manifest, args):
     manifest_sets = manifest.get("sets") or []
-    known_codes = [set_meta["setCode"] for set_meta in manifest_sets if set_meta.get("setCode")]
+    known_codes = [
+        set_meta["setCode"] for set_meta in manifest_sets if set_meta.get("setCode")
+    ]
     known_set = set(known_codes)
 
     if args.all:

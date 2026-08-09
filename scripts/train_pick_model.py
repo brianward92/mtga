@@ -19,13 +19,18 @@ def create_parser():
     parser.add_argument("--epochs", type=int, default=20)
     parser.add_argument("--batch-size", type=int, default=1024)
     parser.add_argument("--lr", type=float, default=1e-3)
-    parser.add_argument("--hidden", default="512,512",
-                        help="comma widths; empty string = logistic baseline")
+    parser.add_argument(
+        "--hidden",
+        default="512,512",
+        help="comma widths; empty string = logistic baseline",
+    )
     parser.add_argument("--dropout", type=float, default=draftnet.DEFAULT_DROPOUT)
-    parser.add_argument("--min-wr-bucket", type=float,
-                        default=draftnet.DEFAULT_MIN_WR_BUCKET)
-    parser.add_argument("--min-games-bucket", type=int,
-                        default=draftnet.DEFAULT_MIN_GAMES_BUCKET)
+    parser.add_argument(
+        "--min-wr-bucket", type=float, default=draftnet.DEFAULT_MIN_WR_BUCKET
+    )
+    parser.add_argument(
+        "--min-games-bucket", type=int, default=draftnet.DEFAULT_MIN_GAMES_BUCKET
+    )
     parser.add_argument("--seed", type=int, default=17)
     parser.add_argument("--tag", default=None)
     parser.add_argument("--promote", action="store_true")
@@ -58,15 +63,24 @@ def run_one(args, set_code, limited_type):
 
     hidden = [int(w) for w in args.hidden.split(",") if w.strip()] or []
     model, report, context = draftnet.train(
-        set_code, limited_type, epochs=args.epochs, batch_size=args.batch_size,
-        lr=args.lr, hidden=hidden, dropout=args.dropout,
-        min_wr_bucket=args.min_wr_bucket, min_games_bucket=args.min_games_bucket,
+        set_code,
+        limited_type,
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        lr=args.lr,
+        hidden=hidden,
+        dropout=args.dropout,
+        min_wr_bucket=args.min_wr_bucket,
+        min_games_bucket=args.min_games_bucket,
         seed=args.seed,
     )
     out_dir = draftnet.save_version(model, report, context, tag=args.tag)
     print(f"saved {out_dir}")
-    print(json.dumps({k: report[k] for k in ["val", "val_top_quartile", "baselines"]},
-                     indent=2))
+    print(
+        json.dumps(
+            {k: report[k] for k in ["val", "val_top_quartile", "baselines"]}, indent=2
+        )
+    )
     if args.promote or args.force_promote:
         draftnet.promote(out_dir, force=args.force_promote)
 

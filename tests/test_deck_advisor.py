@@ -22,11 +22,17 @@ from mtga.deck_advisor import (
 
 
 def card(name, cost, tline="Creature — Hero", text="", **kw):
-    return {"name": name, "mana_cost": cost, "type_line": tline,
-            "oracle_text": text, **kw}
+    return {
+        "name": name,
+        "mana_cost": cost,
+        "type_line": tline,
+        "oracle_text": text,
+        **kw,
+    }
 
 
 # --- castability -------------------------------------------------------------
+
 
 class TestCastability:
     def test_hybrid_pip_is_payable_from_either_half(self):
@@ -61,6 +67,7 @@ class TestCastability:
 
 # --- pip weight and colors ---------------------------------------------------
 
+
 class TestColors:
     def test_pip_weight_counts_each_hybrid_half(self):
         weights = pip_weights([card("hybrid", "{2}{R/W}")])
@@ -71,8 +78,7 @@ class TestColors:
         assert weights["R"] == 3
 
     def test_deck_colors_picks_the_two_heaviest(self):
-        cards = [card("a", "{R}"), card("b", "{R}"), card("c", "{U}"),
-                 card("d", "{G}")]
+        cards = [card("a", "{R}"), card("b", "{R}"), card("c", "{U}"), card("d", "{G}")]
         assert deck_colors(cards) == ["R", "U"]
 
     def test_ties_break_in_wubrg_order(self):
@@ -80,6 +86,7 @@ class TestColors:
 
 
 # --- land split --------------------------------------------------------------
+
 
 class TestLandSplit:
     def test_split_follows_pip_weight_not_card_count(self):
@@ -113,13 +120,16 @@ class TestLandSplit:
 
 # --- curve -------------------------------------------------------------------
 
+
 def test_mana_curve_uses_front_face_mana_value():
-    curve = mana_curve([card("a", "{1}{R}"), card("b", "{3}{R}{R}"),
-                        card("c", "{1}{R}")])
+    curve = mana_curve(
+        [card("a", "{1}{R}"), card("b", "{3}{R}{R}"), card("c", "{1}{R}")]
+    )
     assert curve == {2: 2, 5: 1}
 
 
 # --- synergy -----------------------------------------------------------------
+
 
 class TestSynergy:
     def test_landcycling_detected(self):
@@ -135,30 +145,43 @@ class TestSynergy:
         assert "artifact_payoff" in synergy_tags(text)
 
     def test_single_card_theme_is_not_reported_as_a_deck_theme(self):
-        notes = synergy_notes([
-            card("Thor", "{3}{R}{R}",
-                 text="Whenever you cast a noncreature spell, deal damage."),
-            card("Bear", "{2}{G}", text="Vanilla."),
-        ])
+        notes = synergy_notes(
+            [
+                card(
+                    "Thor",
+                    "{3}{R}{R}",
+                    text="Whenever you cast a noncreature spell, deal damage.",
+                ),
+                card("Bear", "{2}{G}", text="Vanilla."),
+            ]
+        )
         assert "noncreature_payoff" not in notes
 
     def test_two_cards_make_a_theme(self):
-        notes = synergy_notes([
-            card("Thor", "{3}{R}{R}",
-                 text="Whenever you cast a noncreature spell, deal damage."),
-            card("Plan", "{2}{R}",
-                 text="Whenever you cast a noncreature spell, create Treasure."),
-        ])
+        notes = synergy_notes(
+            [
+                card(
+                    "Thor",
+                    "{3}{R}{R}",
+                    text="Whenever you cast a noncreature spell, deal damage.",
+                ),
+                card(
+                    "Plan",
+                    "{2}{R}",
+                    text="Whenever you cast a noncreature spell, create Treasure.",
+                ),
+            ]
+        )
         assert "noncreature_payoff" in notes
         assert sorted(notes["noncreature_payoff"]["cards"]) == ["Plan", "Thor"]
 
     def test_landcycling_reported_even_as_a_single_card(self):
-        notes = synergy_notes([card("Kree", "{4}{R}",
-                                    text="Basic landcycling {2}")])
+        notes = synergy_notes([card("Kree", "{4}{R}", text="Basic landcycling {2}")])
         assert "landcycling" in notes
 
 
 # --- cuts --------------------------------------------------------------------
+
 
 class TestCuts:
     def test_cuts_the_lowest_win_rate_first(self):
@@ -183,7 +206,7 @@ class TestCuts:
 
     def test_alsa_stands_in_when_win_rate_is_missing(self):
         spells = [
-            card("late", "{2}{R}", alsa=8.8),   # table passes it
+            card("late", "{2}{R}", alsa=8.8),  # table passes it
             card("early", "{2}{R}", alsa=3.1),
         ]
         cuts = cut_candidates(spells, target=1)
@@ -200,33 +223,70 @@ class TestCuts:
 
 # --- end to end --------------------------------------------------------------
 
+
 def test_advise_on_the_real_msh_deck():
     """The 41-card UR artifacts deck submitted on 2026-07-30."""
     deck = [
-        card("Thor, God of Thunder", "{3}{R}{R}",
-             "Legendary Creature — God",
-             "Flying\nWhenever you cast a noncreature spell, Thor deals damage "
-             "equal to that spell's mana value to any target."),
+        card(
+            "Thor, God of Thunder",
+            "{3}{R}{R}",
+            "Legendary Creature — God",
+            "Flying\nWhenever you cast a noncreature spell, Thor deals damage "
+            "equal to that spell's mana value to any target.",
+        ),
         card("Mjolnir, Hammer of Thor", "{3}{R}", "Legendary Artifact — Equipment"),
-        card("The Scarlet Witch", "{2}{R}", "Legendary Creature — Mutant",
-             "Instant and sorcery spells you cast with mana value 4 or greater "
-             "cost {X} less to cast."),
-        card("Death to Our Enemies", "{2}{R}", "Enchantment — Plan",
-             "Whenever you cast a noncreature spell, create a tapped Treasure."),
-        card("Iron Man, Master of Machines", "{2}{U}{R}",
-             "Legendary Artifact Creature — Human",
-             "Iron Man gets +1/+0 for each other artifact you control."),
-        card("War Machine, Legacy of Iron", "{2}{R/W}",
-             "Legendary Artifact Creature — Human"),
-        card("Kree Sentinel", "{4}{R}", "Artifact Creature — Kree Robot",
-             "Reach\nBasic landcycling {2}", gih_wr=0.522),
-        card("Lightning Strike", "{1}{R}", "Instant",
-             "deals 3 damage to any target", gih_wr=0.543),
-        card("Futurist Forge", "{1}{U}", "Artifact",
-             "When this artifact enters, draw a card.", gih_wr=0.568),
+        card(
+            "The Scarlet Witch",
+            "{2}{R}",
+            "Legendary Creature — Mutant",
+            "Instant and sorcery spells you cast with mana value 4 or greater "
+            "cost {X} less to cast.",
+        ),
+        card(
+            "Death to Our Enemies",
+            "{2}{R}",
+            "Enchantment — Plan",
+            "Whenever you cast a noncreature spell, create a tapped Treasure.",
+        ),
+        card(
+            "Iron Man, Master of Machines",
+            "{2}{U}{R}",
+            "Legendary Artifact Creature — Human",
+            "Iron Man gets +1/+0 for each other artifact you control.",
+        ),
+        card(
+            "War Machine, Legacy of Iron",
+            "{2}{R/W}",
+            "Legendary Artifact Creature — Human",
+        ),
+        card(
+            "Kree Sentinel",
+            "{4}{R}",
+            "Artifact Creature — Kree Robot",
+            "Reach\nBasic landcycling {2}",
+            gih_wr=0.522,
+        ),
+        card(
+            "Lightning Strike",
+            "{1}{R}",
+            "Instant",
+            "deals 3 damage to any target",
+            gih_wr=0.543,
+        ),
+        card(
+            "Futurist Forge",
+            "{1}{U}",
+            "Artifact",
+            "When this artifact enters, draw a card.",
+            gih_wr=0.568,
+        ),
         card("Aerial Doombot", "{U}", "Artifact Creature — Robot", gih_wr=0.576),
-        card("Falcon, Winged Wonder", "{4}{U}", "Legendary Creature — Human",
-             gih_wr=0.567),
+        card(
+            "Falcon, Winged Wonder",
+            "{4}{U}",
+            "Legendary Creature — Human",
+            gih_wr=0.567,
+        ),
         card("Villainous Hideout", "", "Land", "{T}: Add {C}."),
         card("Shang-Chi, Master of Kung Fu", "{1}{G}", "Legendary Creature"),
     ]

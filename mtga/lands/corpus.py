@@ -18,8 +18,8 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class SetSpec:
     code: str
-    formats: tuple            # which draft files exist on S3
-    schema_era: str           # "match_buckets" | "match_buckets_rank" | "modern"
+    formats: tuple  # which draft files exist on S3
+    schema_era: str  # "match_buckets" | "match_buckets_rank" | "modern"
     tar_in_gzip: bool = False  # gz actually wraps a ustar tarball
     p1p1_missing: bool = False
     picks_per_pack: int = 14  # expected; store builder verifies empirically
@@ -28,37 +28,119 @@ class SetSpec:
 
 
 CORPUS = {  # release order — this ordering IS the scaling-curve ordering
-    "STX": SetSpec("STX", ("PremierDraft", "TradDraft"), "match_buckets", tar_in_gzip=True, p1p1_missing=True, picks_per_pack=15, bonus_sheets=("STA",)),
-    "AFR": SetSpec("AFR", ("PremierDraft",), "match_buckets", tar_in_gzip=True, p1p1_missing=True),
+    "STX": SetSpec(
+        "STX",
+        ("PremierDraft", "TradDraft"),
+        "match_buckets",
+        tar_in_gzip=True,
+        p1p1_missing=True,
+        picks_per_pack=15,
+        bonus_sheets=("STA",),
+    ),
+    "AFR": SetSpec(
+        "AFR", ("PremierDraft",), "match_buckets", tar_in_gzip=True, p1p1_missing=True
+    ),
     "MID": SetSpec("MID", ("PremierDraft",), "match_buckets_rank", tar_in_gzip=True),
-    "VOW": SetSpec("VOW", ("PremierDraft",), "match_buckets_rank", tar_in_gzip=True),  # QuickDraft is opt-in only, see EXTRAS
+    "VOW": SetSpec(
+        "VOW", ("PremierDraft",), "match_buckets_rank", tar_in_gzip=True
+    ),  # QuickDraft is opt-in only, see EXTRAS
     "NEO": SetSpec("NEO", ("PremierDraft", "TradDraft"), "modern"),
     "SNC": SetSpec("SNC", ("PremierDraft", "TradDraft"), "modern"),
-    "HBG": SetSpec("HBG", ("PremierDraft", "TradDraft"), "modern", notes="Alchemy/digital-only; 5 'A-' names; needs digital Scryfall rows"),
-    "DMU": SetSpec("DMU", ("PremierDraft", "TradDraft"), "modern", notes="Sol'kanar case mismatch"),
-    "BRO": SetSpec("BRO", ("PremierDraft", "TradDraft"), "modern", bonus_sheets=("BRR",)),
+    "HBG": SetSpec(
+        "HBG",
+        ("PremierDraft", "TradDraft"),
+        "modern",
+        notes="Alchemy/digital-only; 5 'A-' names; needs digital Scryfall rows",
+    ),
+    "DMU": SetSpec(
+        "DMU", ("PremierDraft", "TradDraft"), "modern", notes="Sol'kanar case mismatch"
+    ),
+    "BRO": SetSpec(
+        "BRO", ("PremierDraft", "TradDraft"), "modern", bonus_sheets=("BRR",)
+    ),
     "ONE": SetSpec("ONE", ("PremierDraft", "TradDraft"), "modern"),
-    "SIR": SetSpec("SIR", ("PremierDraft", "TradDraft"), "modern", bonus_sheets=("SIS",)),
-    "MOM": SetSpec("MOM", ("PremierDraft", "TradDraft"), "modern", bonus_sheets=("MUL",)),
+    "SIR": SetSpec(
+        "SIR", ("PremierDraft", "TradDraft"), "modern", bonus_sheets=("SIS",)
+    ),
+    "MOM": SetSpec(
+        "MOM", ("PremierDraft", "TradDraft"), "modern", bonus_sheets=("MUL",)
+    ),
     "LTR": SetSpec("LTR", ("PremierDraft", "TradDraft"), "modern"),
-    "WOE": SetSpec("WOE", ("PremierDraft", "TradDraft"), "modern", bonus_sheets=("WOT",)),
+    "WOE": SetSpec(
+        "WOE", ("PremierDraft", "TradDraft"), "modern", bonus_sheets=("WOT",)
+    ),
     "LCI": SetSpec("LCI", ("PremierDraft", "TradDraft"), "modern"),
-    "KTK": SetSpec("KTK", ("PremierDraft", "TradDraft"), "modern", picks_per_pack=15, notes="2014 flashback"),
-    "MKM": SetSpec("MKM", ("PremierDraft", "TradDraft"), "modern", bonus_sheets=("SPG", "PLST")),
-    "OTJ": SetSpec("OTJ", ("PremierDraft", "TradDraft"), "modern", bonus_sheets=("OTP", "BIG", "SPG")),
-    "MH3": SetSpec("MH3", ("PremierDraft", "TradDraft"), "modern", bonus_sheets=("SPG", "M3C")),
-    "BLB": SetSpec("BLB", ("PremierDraft", "TradDraft"), "modern", bonus_sheets=("SPG",)),
-    "DSK": SetSpec("DSK", ("PremierDraft", "TradDraft"), "modern", bonus_sheets=("SPG",)),
-    "FDN": SetSpec("FDN", ("PremierDraft", "TradDraft"), "modern", bonus_sheets=("SPG",)),
-    "PIO": SetSpec("PIO", ("PremierDraft", "TradDraft"), "modern", notes="digital-only masters, 403-card pool"),
-    "DFT": SetSpec("DFT", ("PremierDraft", "TradDraft"), "modern", bonus_sheets=("SPG",)),
-    "TDM": SetSpec("TDM", ("PremierDraft", "TradDraft"), "modern", bonus_sheets=("SPG",)),
-    "FIN": SetSpec("FIN", ("PremierDraft", "TradDraft"), "modern", bonus_sheets=("FCA",)),
-    "EOE": SetSpec("EOE", ("PremierDraft", "TradDraft"), "modern", bonus_sheets=("EOS", "SPG")),
-    "TLA": SetSpec("TLA", ("PremierDraft", "TradDraft"), "modern", p1p1_missing=True, bonus_sheets=("TLE",)),
-    "ECL": SetSpec("ECL", ("PremierDraft", "TradDraft"), "modern", p1p1_missing=True, bonus_sheets=("SPG",)),
-    "TMT": SetSpec("TMT", ("PremierDraft", "TradDraft"), "modern", p1p1_missing=True, bonus_sheets=("PZA",), notes="'Bespoke B?' ASCII mangle"),
-    "SOS": SetSpec("SOS", ("PremierDraft", "TradDraft"), "modern", bonus_sheets=("SOA", "SPG")),
+    "KTK": SetSpec(
+        "KTK",
+        ("PremierDraft", "TradDraft"),
+        "modern",
+        picks_per_pack=15,
+        notes="2014 flashback",
+    ),
+    "MKM": SetSpec(
+        "MKM", ("PremierDraft", "TradDraft"), "modern", bonus_sheets=("SPG", "PLST")
+    ),
+    "OTJ": SetSpec(
+        "OTJ",
+        ("PremierDraft", "TradDraft"),
+        "modern",
+        bonus_sheets=("OTP", "BIG", "SPG"),
+    ),
+    "MH3": SetSpec(
+        "MH3", ("PremierDraft", "TradDraft"), "modern", bonus_sheets=("SPG", "M3C")
+    ),
+    "BLB": SetSpec(
+        "BLB", ("PremierDraft", "TradDraft"), "modern", bonus_sheets=("SPG",)
+    ),
+    "DSK": SetSpec(
+        "DSK", ("PremierDraft", "TradDraft"), "modern", bonus_sheets=("SPG",)
+    ),
+    "FDN": SetSpec(
+        "FDN", ("PremierDraft", "TradDraft"), "modern", bonus_sheets=("SPG",)
+    ),
+    "PIO": SetSpec(
+        "PIO",
+        ("PremierDraft", "TradDraft"),
+        "modern",
+        notes="digital-only masters, 403-card pool",
+    ),
+    "DFT": SetSpec(
+        "DFT", ("PremierDraft", "TradDraft"), "modern", bonus_sheets=("SPG",)
+    ),
+    "TDM": SetSpec(
+        "TDM", ("PremierDraft", "TradDraft"), "modern", bonus_sheets=("SPG",)
+    ),
+    "FIN": SetSpec(
+        "FIN", ("PremierDraft", "TradDraft"), "modern", bonus_sheets=("FCA",)
+    ),
+    "EOE": SetSpec(
+        "EOE", ("PremierDraft", "TradDraft"), "modern", bonus_sheets=("EOS", "SPG")
+    ),
+    "TLA": SetSpec(
+        "TLA",
+        ("PremierDraft", "TradDraft"),
+        "modern",
+        p1p1_missing=True,
+        bonus_sheets=("TLE",),
+    ),
+    "ECL": SetSpec(
+        "ECL",
+        ("PremierDraft", "TradDraft"),
+        "modern",
+        p1p1_missing=True,
+        bonus_sheets=("SPG",),
+    ),
+    "TMT": SetSpec(
+        "TMT",
+        ("PremierDraft", "TradDraft"),
+        "modern",
+        p1p1_missing=True,
+        bonus_sheets=("PZA",),
+        notes="'Bespoke B?' ASCII mangle",
+    ),
+    "SOS": SetSpec(
+        "SOS", ("PremierDraft", "TradDraft"), "modern", bonus_sheets=("SOA", "SPG")
+    ),
 }
 
 EXCLUDED = {  # never downloaded/curated for training
@@ -73,9 +155,12 @@ EVAL_ONLY = {"MSH"}  # hard gate: never trained on, never expanded by --corpus
 # extras_jobs(), so they can never silently leak into the default corpus.
 EXTRAS = {
     "VOW.QuickDraft": SetSpec(
-        "VOW", ("QuickDraft",), "match_buckets_rank", tar_in_gzip=True,
+        "VOW",
+        ("QuickDraft",),
+        "match_buckets_rank",
+        tar_in_gzip=True,
         notes="human picks in bot pods; off-distribution wheel dynamics vs "
-              "PremierDraft. A-extras candidate only, never in TRAINING_SETS.",
+        "PremierDraft. A-extras candidate only, never in TRAINING_SETS.",
     ),
 }
 
@@ -94,7 +179,9 @@ def corpus_jobs(requested=None):
     sets and anything outside the registry are refused with a ValueError so
     the --corpus scripts can never touch the held-out set by accident.
     """
-    codes = TRAINING_SETS if requested is None else [c.strip().upper() for c in requested]
+    codes = (
+        TRAINING_SETS if requested is None else [c.strip().upper() for c in requested]
+    )
     excluded = {code.upper(): reason for code, reason in EXCLUDED.items()}
     pairs = []
     for code in codes:
@@ -120,7 +207,9 @@ def extras_jobs(requested=None):
     pairs = []
     for key in keys:
         if key not in EXTRAS:
-            raise ValueError(f"{key} is not a registered extra (know: {sorted(EXTRAS)})")
+            raise ValueError(
+                f"{key} is not a registered extra (know: {sorted(EXTRAS)})"
+            )
         spec = EXTRAS[key]
         pairs.extend((spec.code, fmt) for fmt in spec.formats)
     return pairs

@@ -55,7 +55,11 @@ def test_ensure_decoded_extracts_single_csv_member(data_root):
     with gzip.open(decoded, "rb") as fh:
         assert fh.read() == CSV_BYTES
     assert etl.read_header(decoded) == [
-        "expansion", "draft_id", "pack_number", "pick_number", "pick"
+        "expansion",
+        "draft_id",
+        "pack_number",
+        "pick_number",
+        "pick",
     ]
     # Sidecar records the SOURCE file's etag; no .part debris left behind.
     meta = json.loads(paths.meta_path(decoded).read_text())
@@ -87,7 +91,8 @@ def test_ensure_decoded_is_idempotent_until_source_etag_changes(data_root):
 def test_ensure_decoded_without_raw_sidecar_always_reextracts(data_root):
     raw = write_raw(
         paths.raw_dataset_path("draft", "STX", "PremierDraft"),
-        tar_gz_bytes(), etag=None,
+        tar_gz_bytes(),
+        etag=None,
     )
     decoded = decode.ensure_decoded(raw)
     decoded.write_bytes(b"marker")

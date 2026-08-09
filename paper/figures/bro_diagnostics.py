@@ -35,7 +35,10 @@ def main():
     report = json.loads(Path(args.report).read_text())
     bonus = report["bonus_slice"]
     strat = report["bonus_slice_stratified_gap"]
-    labels = ["bonus-sheet\npresent\n(early picks)", "bonus-sheet\nabsent\n(late picks)"]
+    labels = [
+        "bonus-sheet\npresent\n(early picks)",
+        "bonus-sheet\nabsent\n(late picks)",
+    ]
     keys = ["bonus_present", "bonus_absent"]
     ys = [100 * bonus[k]["top1"] for k in keys]
     los = [100 * bonus[k]["top1"] - 100 * bonus[k]["ci"][0] for k in keys]
@@ -44,12 +47,25 @@ def main():
 
     fig, ax = plt.subplots(figsize=(3.2, 3.0), dpi=200)
     xs = [0, 1]
-    ax.bar(xs, ys, width=0.55, color=BAR, yerr=[los, his], capsize=4,
-           error_kw={"lw": 1.2, "ecolor": INK})
+    ax.bar(
+        xs,
+        ys,
+        width=0.55,
+        color=BAR,
+        yerr=[los, his],
+        capsize=4,
+        error_kw={"lw": 1.2, "ecolor": INK},
+    )
     for x, y, n in zip(xs, ys, ns):
-        ax.annotate(f"{y:.1f}%\n(n={n:,})", xy=(x, y), xytext=(0, 8),
-                    textcoords="offset points", ha="center", fontsize=7.5,
-                    color=INK)
+        ax.annotate(
+            f"{y:.1f}%\n(n={n:,})",
+            xy=(x, y),
+            xytext=(0, 8),
+            textcoords="offset points",
+            ha="center",
+            fontsize=7.5,
+            color=INK,
+        )
 
     ax.set_xticks(xs)
     ax.set_xticklabels(labels, fontsize=8)
@@ -62,8 +78,13 @@ def main():
     ax.annotate(
         f"{diff:.1f}pp raw gap\n{strat_pt:.1f}pp pick-depth-adjusted\n"
         f"(CI {strat_lo:.1f}-{strat_hi:.1f})",
-        xy=(0.5, max(ys) + 8), xycoords=("axes fraction", "data"),
-        ha="center", va="bottom", fontsize=7.5, color=MUTED)
+        xy=(0.5, max(ys) + 8),
+        xycoords=("axes fraction", "data"),
+        ha="center",
+        va="bottom",
+        fontsize=7.5,
+        color=MUTED,
+    )
 
     ax.grid(True, axis="y", color="#e5e7eb", lw=0.6, zorder=0)
     for side in ("top", "right"):

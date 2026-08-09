@@ -58,9 +58,17 @@ def data_root(tmp_path, monkeypatch):
     }
     for name, value in layout.items():
         monkeypatch.setattr(paths, name, value)
-    for name in ["RAW_DIR", "CARDS_DIR", "CARD_RATINGS_DIR", "COLOR_RATINGS_DIR",
-                 "CURATED_DIR", "METRICS_DIR", "MODELS_DIR",
-                 "SCRYFALL_PROCESSED_DIR", "FEATURES_DIR"]:
+    for name in [
+        "RAW_DIR",
+        "CARDS_DIR",
+        "CARD_RATINGS_DIR",
+        "COLOR_RATINGS_DIR",
+        "CURATED_DIR",
+        "METRICS_DIR",
+        "MODELS_DIR",
+        "SCRYFALL_PROCESSED_DIR",
+        "FEATURES_DIR",
+    ]:
         layout[name].mkdir(parents=True, exist_ok=True)
 
     # The registry cache key omits the data root itself (it hashes symlink
@@ -142,8 +150,7 @@ def stub_ort(monkeypatch):
     import onnxruntime
 
     _synth.StubOrtSession.last_scorer_feeds = None
-    monkeypatch.setattr(onnxruntime, "InferenceSession",
-                        _synth.StubOrtSession)
+    monkeypatch.setattr(onnxruntime, "InferenceSession", _synth.StubOrtSession)
     return _synth.StubOrtSession
 
 
@@ -166,8 +173,15 @@ def make_onnx_version(data_root):
     The network is Linear(4,4) with zero weights and a fixed bias, so the
     score of vocab slot i is exactly bias[i] regardless of the pool.
     """
-    def factory(set_code=_synth.SET, limited_type=_synth.FMT, tag="v1",
-                bias=(3.0, 2.0, 1.0, 0.0), point_latest=True, top1=None):
+
+    def factory(
+        set_code=_synth.SET,
+        limited_type=_synth.FMT,
+        tag="v1",
+        bias=(3.0, 2.0, 1.0, 0.0),
+        point_latest=True,
+        top1=None,
+    ):
         import json
 
         import torch
@@ -180,15 +194,23 @@ def make_onnx_version(data_root):
             linear.weight.zero_()
             linear.bias.copy_(torch.tensor(bias, dtype=torch.float32))
         torch.onnx.export(
-            linear, torch.zeros(1, n), str(out_dir / "model.onnx"),
-            input_names=["pool"], output_names=["scores"],
+            linear,
+            torch.zeros(1, n),
+            str(out_dir / "model.onnx"),
+            input_names=["pool"],
+            output_names=["scores"],
             dynamic_axes={"pool": {0: "batch"}, "scores": {0: "batch"}},
             opset_version=17,
         )
         vocab_entries = [
-            {"index": i, "name": name, "grp_id": _synth.GRP[name],
-             "grp_ids": _synth.ALIASES_A if name == _synth.CARD_A
-             else [_synth.GRP[name]]}
+            {
+                "index": i,
+                "name": name,
+                "grp_id": _synth.GRP[name],
+                "grp_ids": (
+                    _synth.ALIASES_A if name == _synth.CARD_A else [_synth.GRP[name]]
+                ),
+            }
             for i, name in enumerate(_synth.VOCAB)
         ]
         meta = {

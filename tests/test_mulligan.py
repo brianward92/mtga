@@ -66,7 +66,8 @@ def training_raw_two_sets(training_raw):
     """
     dest2 = paths.raw_dataset_path("replay", SET2, _synth.FMT)
     _synth.write_replay_csv(
-        dest2, games=_synth.mulligan_training_games(n=30, draft_prefix="ts2_"))
+        dest2, games=_synth.mulligan_training_games(n=30, draft_prefix="ts2_")
+    )
     _curate_replay(SET2)
     return _synth.SET, SET2
 
@@ -86,8 +87,7 @@ def training_raw_two_sets_colliding(training_raw):
 def test_feature_columns_match_frozen_layout():
     columns = mdata.feature_columns()
     assert len(columns) == 391
-    for needed in ["type_land", "type_creature", "cmc_scaled", "pip_r",
-                   "color_w"]:
+    for needed in ["type_land", "type_creature", "cmc_scaled", "pip_r", "color_w"]:
         assert needed in columns
 
 
@@ -105,22 +105,30 @@ def test_arena_row_lookup_maps_every_printing(data_root):
 
 def test_load_dataset_hand_computed(mulligan_data):
     data = mulligan_data
-    assert data.n_rows == 8            # rg3's subset anomaly dropped
+    assert data.n_rows == 8  # rg3's subset anomaly dropped
     assert data.hand_rows.shape == (8, 7) and (data.hand_rows >= 0).all()
-    assert data.kept.tolist() == [True, False, True, False, False, True,
-                                  True, True]
+    assert data.kept.tolist() == [True, False, True, False, False, True, True, True]
     assert data.hand_size.tolist() == [7, 7, 6, 7, 6, 5, 7, 7]
     assert data.input_dim == 3 * 391 + len(mdata.EXTRA_COLUMNS)
 
     ex = dict(zip(mdata.EXTRA_COLUMNS, data.extras[0]))  # rg0 kept row
     assert ex["on_play"] == 1.0
-    assert [ex["hand_size_7"], ex["hand_size_6"], ex["hand_size_5"],
-            ex["hand_size_le4"]] == [1.0, 0.0, 0.0, 0.0]
+    assert [
+        ex["hand_size_7"],
+        ex["hand_size_6"],
+        ex["hand_size_5"],
+        ex["hand_size_le4"],
+    ] == [1.0, 0.0, 0.0, 0.0]
     assert ex["n_lands"] == pytest.approx(3 / 7)
     assert ex["n_cheap"] == pytest.approx(3 / 7)
     assert ex["color_match"] == pytest.approx(0.4)
-    assert [ex["deck_w"], ex["deck_u"], ex["deck_b"], ex["deck_r"],
-            ex["deck_g"]] == pytest.approx([0.2, 0.2, 0.0, 0.4, 0.2])
+    assert [
+        ex["deck_w"],
+        ex["deck_u"],
+        ex["deck_b"],
+        ex["deck_r"],
+        ex["deck_g"],
+    ] == pytest.approx([0.2, 0.2, 0.0, 0.4, 0.2])
     assert ex["deck_lands"] == 0.0
 
     # rg2's kept-at-5 row: one-hot lands in the 5 slot.
@@ -135,8 +143,8 @@ def test_assemble_pools_hand_and_deck(mulligan_data):
     columns = mdata.feature_columns()
     land, cmc = columns.index("type_land"), columns.index("cmc_scaled")
     creature = columns.index("type_creature")
-    assert x[0, land] == pytest.approx(3 / 7)          # hand mean pool
-    assert x[0, 391 + cmc] == pytest.approx(5 / 8)     # hand max pool: D cmc 5
+    assert x[0, land] == pytest.approx(3 / 7)  # hand mean pool
+    assert x[0, 391 + cmc] == pytest.approx(5 / 8)  # hand max pool: D cmc 5
     assert x[0, 2 * 391 + creature] == pytest.approx(3 / 5)  # deck mean pool
 
 
@@ -187,7 +195,7 @@ def test_decision_analysis_cells(mulligan_data):
     table = mdata.continuation_table(data)  # every threshold falls back to 0.0
     pred = np.full(data.n_rows, 0.5)
     result = mtrain.decision_analysis(data, idx, pred, table)
-    assert result["model_keep_rate"] == 1.0        # 0.5 > 0.0 everywhere
+    assert result["model_keep_rate"] == 1.0  # 0.5 > 0.0 everywhere
     assert result["human_keep_rate"] == pytest.approx(5 / 8)
     assert result["agreement"] == pytest.approx(5 / 8)
     assert result["cells"]["human_keep_model_keep"]["n"] == 5
@@ -216,8 +224,17 @@ def test_train_smoke_artifacts_and_ledger(training_raw, tmp_path, monkeypatch):
     from mtga.foundation import runlog
 
     model, report, context = mtrain.train(
-        _synth.SET, _synth.FMT, epochs=2, batch_size=16, lr=1e-2,
-        hidden=(8,), seed=3, patience=3, val_permille=500, progress=lambda *_: None)
+        _synth.SET,
+        _synth.FMT,
+        epochs=2,
+        batch_size=16,
+        lr=1e-2,
+        hidden=(8,),
+        seed=3,
+        patience=3,
+        val_permille=500,
+        progress=lambda *_: None,
+    )
 
     assert report["n_decisions"] == 48 and report["n_kept"] == 40
     assert report["n_train"] == 17 and report["n_val_kept"] == 23
@@ -227,20 +244,25 @@ def test_train_smoke_artifacts_and_ledger(training_raw, tmp_path, monkeypatch):
     assert report["anchors"]["0"]["n"] == 32 and report["anchors"]["1"]["n"] == 8
     # Train-split continuation: mulled games 5/10/15/20; 10 and 20 won.
     assert report["continuation"]["pooled"][0] == {
-        "hand_size": 7, "n": 4, "win_rate": 0.5}
+        "hand_size": 7,
+        "n": 4,
+        "win_rate": 0.5,
+    }
     assert report["decision"]["thresholds"] == {
-        "7_play": 0.5, "7_draw": 0.5, "6_play": 0.5, "6_draw": 0.5}
+        "7_play": 0.5,
+        "7_draw": 0.5,
+        "6_play": 0.5,
+        "6_draw": 0.5,
+    }
     assert 0.0 <= report["decision"]["agreement"] <= 1.0
-    assert set(report["sanity"]) == {"by_n_lands_at_7", "by_hand_size",
-                                     "by_on_play"}
+    assert set(report["sanity"]) == {"by_n_lands_at_7", "by_hand_size", "by_on_play"}
     # 23 kept val rows, of which 4 (mulled games 0/25/30/35) kept at 6.
     assert report["sanity"]["by_n_lands_at_7"][3]["n"] == 19
     assert report["sanity"]["by_hand_size"][6]["n"] == 4
 
     out_dir = mtrain.save_version(model, report, context, tag="v1-test")
     assert out_dir == paths.MODELS_DIR / "_mulligan" / "v1-test"
-    for artifact in ["checkpoint.pt", "meta.json", "metrics.json",
-                     "continuation.json"]:
+    for artifact in ["checkpoint.pt", "meta.json", "metrics.json", "continuation.json"]:
         assert (out_dir / artifact).exists()
     with open(out_dir / "meta.json") as fh:
         meta = json.load(fh)
@@ -251,8 +273,9 @@ def test_train_smoke_artifacts_and_ledger(training_raw, tmp_path, monkeypatch):
 
     # The checkpoint round-trips into a fresh net.
     checkpoint = torch.load(out_dir / "checkpoint.pt", weights_only=False)
-    fresh = MulliganNet(checkpoint["config"]["input_dim"],
-                        hidden=tuple(checkpoint["config"]["hidden"]))
+    fresh = MulliganNet(
+        checkpoint["config"]["input_dim"], hidden=tuple(checkpoint["config"]["hidden"])
+    )
     fresh.load_state_dict(checkpoint["model"])
 
     monkeypatch.setattr(runlog, "LEDGER", tmp_path / "ledger.jsonl")
@@ -280,10 +303,10 @@ def test_load_datasets_concatenates_sets(training_raw_two_sets):
     assert multi.n_rows == single1.n_rows + single2.n_rows
     assert multi.input_dim == single1.input_dim == single2.input_dim
     assert multi.set_names == [set1, set2]
-    assert (multi.set_code[:single1.n_rows] == set1).all()
-    assert (multi.set_code[single1.n_rows:] == set2).all()
-    assert (multi.set_index[:single1.n_rows] == 0).all()
-    assert (multi.set_index[single1.n_rows:] == 1).all()
+    assert (multi.set_code[: single1.n_rows] == set1).all()
+    assert (multi.set_code[single1.n_rows :] == set2).all()
+    assert (multi.set_index[: single1.n_rows] == 0).all()
+    assert (multi.set_index[single1.n_rows :] == 1).all()
 
     # A batch straddling both sets assembles identically to each set's own
     # single-set assemble(), row for row — the point of keeping deck_counts/
@@ -291,25 +314,31 @@ def test_load_datasets_concatenates_sets(training_raw_two_sets):
     n1 = single1.n_rows
     mixed_idx = np.array([0, 1, n1, n1 + 1, 2])
     got = mdata.assemble(multi, mixed_idx)
-    want = np.concatenate([
-        mdata.assemble(single1, np.array([0])),
-        mdata.assemble(single1, np.array([1])),
-        mdata.assemble(single2, np.array([0])),
-        mdata.assemble(single2, np.array([1])),
-        mdata.assemble(single1, np.array([2])),
-    ], axis=0)
+    want = np.concatenate(
+        [
+            mdata.assemble(single1, np.array([0])),
+            mdata.assemble(single1, np.array([1])),
+            mdata.assemble(single2, np.array([0])),
+            mdata.assemble(single2, np.array([1])),
+            mdata.assemble(single1, np.array([2])),
+        ],
+        axis=0,
+    )
     np.testing.assert_allclose(got, want)
 
     # Per-set masking on the concatenated pool reproduces the single-set
     # anchors/continuation-table computations exactly.
-    assert (mdata.mulligan_anchors(multi, mask=(multi.set_code == set2))
-           == mdata.mulligan_anchors(single2))
-    assert (mdata.continuation_table(multi, mask=(multi.set_code == set1))
-           == mdata.continuation_table(single1))
+    assert mdata.mulligan_anchors(
+        multi, mask=(multi.set_code == set2)
+    ) == mdata.mulligan_anchors(single2)
+    assert mdata.continuation_table(
+        multi, mask=(multi.set_code == set1)
+    ) == mdata.continuation_table(single1)
 
 
 def test_load_datasets_prefixes_draft_id_against_collisions(
-        training_raw_two_sets_colliding):
+    training_raw_two_sets_colliding,
+):
     # SET and SET2 both wrote "mull00".."mull29" -- a real collision. A
     # draft_id legitimately repeats WITHIN a set (one row per candidate
     # hand: keep + mulligan decisions on the same draft), so the invariant
@@ -348,12 +377,21 @@ def test_train_crossset_checks_anchors_per_set(training_raw_two_sets, monkeypatc
     monkeypatch.setitem(mtrain.EXPECTED_ANCHORS, (set1, _synth.FMT), {0: 0.999})
     with pytest.raises(ValueError, match="anchor mismatch"):
         mtrain.train_crossset(
-            [set1, set2], _synth.FMT, epochs=1, batch_size=16, hidden=(8,),
-            seed=3, patience=1, val_permille=500, progress=lambda *_: None)
+            [set1, set2],
+            _synth.FMT,
+            epochs=1,
+            batch_size=16,
+            hidden=(8,),
+            seed=3,
+            patience=1,
+            val_permille=500,
+            progress=lambda *_: None,
+        )
 
 
 def test_train_crossset_smoke_held_out_and_artifacts(
-        training_raw_two_sets, tmp_path, monkeypatch):
+    training_raw_two_sets, tmp_path, monkeypatch
+):
     set1, set2 = training_raw_two_sets
 
     # A correct per-set anchor entry should reproduce and be reported back,
@@ -363,14 +401,25 @@ def test_train_crossset_smoke_held_out_and_artifacts(
     monkeypatch.setitem(mtrain.EXPECTED_ANCHORS, (set1, _synth.FMT), correct)
 
     model, report, context = mtrain.train_crossset(
-        [set1], _synth.FMT, held_out_sets=[set2], epochs=2, batch_size=16,
-        lr=1e-2, hidden=(8,), seed=3, patience=3, val_permille=500,
-        progress=lambda *_: None)
+        [set1],
+        _synth.FMT,
+        held_out_sets=[set2],
+        epochs=2,
+        batch_size=16,
+        lr=1e-2,
+        hidden=(8,),
+        seed=3,
+        patience=3,
+        val_permille=500,
+        progress=lambda *_: None,
+    )
 
     assert report["anchors"][set1] == correct
     assert report["train_sets"] == [set1] and report["held_out_sets"] == [set2]
     assert report["n_decisions"] == mdata.load_dataset(set1, _synth.FMT).n_rows
-    assert report["n_decisions"] == 48 and report["n_kept"] == 40  # same 40-game shape as v1
+    assert (
+        report["n_decisions"] == 48 and report["n_kept"] == 40
+    )  # same 40-game shape as v1
     assert 0.0 <= report["outcome_head"]["auc"] <= 1.0
     assert 0.0 <= report["decision"]["agreement"] <= 1.0
     # per_set_val only ever covers TRAINING sets (set2 never enters the split).
@@ -389,8 +438,7 @@ def test_train_crossset_smoke_held_out_and_artifacts(
 
     out_dir = mtrain.save_crossset_version(model, report, context, tag="v2-test")
     assert out_dir == paths.MODELS_DIR / "_mulligan" / "v2-test"
-    for artifact in ["checkpoint.pt", "meta.json", "metrics.json",
-                     "continuation.json"]:
+    for artifact in ["checkpoint.pt", "meta.json", "metrics.json", "continuation.json"]:
         assert (out_dir / artifact).exists()
     with open(out_dir / "meta.json") as fh:
         meta = json.load(fh)
@@ -408,6 +456,8 @@ def test_train_crossset_smoke_held_out_and_artifacts(
     logged = json.loads(lines[0])
     assert logged["run_id"] == record["run_id"]
     assert logged["metrics"]["held_out_auc"] == held["outcome_head"]["auc"]
-    assert (logged["metrics"]["held_out_decision_agreement"]
-           == held["decision"]["agreement"])
+    assert (
+        logged["metrics"]["held_out_decision_agreement"]
+        == held["decision"]["agreement"]
+    )
     assert logged["artifacts"]["checkpoint_sha256"]

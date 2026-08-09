@@ -58,10 +58,17 @@ def rank_by_name(cards):
     return {info["name"]: grp for grp, info in cards.items()}
 
 
-_LATEX_SPECIAL = str.maketrans({
-    "&": r"\&", "%": r"\%", "$": r"\$", "#": r"\#",
-    "_": r"\_", "{": r"\{", "}": r"\}",
-})
+_LATEX_SPECIAL = str.maketrans(
+    {
+        "&": r"\&",
+        "%": r"\%",
+        "$": r"\$",
+        "#": r"\#",
+        "_": r"\_",
+        "{": r"\{",
+        "}": r"\}",
+    }
+)
 
 
 def tex_escape(name):
@@ -83,10 +90,19 @@ def hero_panel(lines):
     cards = HUB.cards("SOS")
     name_to_grp = rank_by_name(cards)
     pack_names = [
-        "Bogwater Lumaret", "Deluge Virtuoso", "Elemental Mascot",
-        "Emeritus of Ideation", "Expressive Firedancer", "Fractal Anomaly",
-        "Glorious Decay", "Island", "Lumaret's Favor", "Masterful Flourish",
-        "Quandrix Charm", "Royal Treatment", "Shattered Acolyte",
+        "Bogwater Lumaret",
+        "Deluge Virtuoso",
+        "Elemental Mascot",
+        "Emeritus of Ideation",
+        "Expressive Firedancer",
+        "Fractal Anomaly",
+        "Glorious Decay",
+        "Island",
+        "Lumaret's Favor",
+        "Masterful Flourish",
+        "Quandrix Charm",
+        "Royal Treatment",
+        "Shattered Acolyte",
     ]
     pack_grp = [name_to_grp[n] for n in pack_names]
     scores = {s.grp_id: s.ev for s in model.score_pack(pack_grp, [])}
@@ -111,11 +127,12 @@ def hero_panel(lines):
         r"\newcommand{\VHeroRunnerOnePct}{%s}" % format_pct(runner1_vs_top),
         r"\newcommand{\VHeroRunnerTwoName}{%s}" % tex_escape(cards[r2_grp]["name"]),
         r"\newcommand{\VHeroRunnerTwoPct}{%s}" % format_pct(runner2_vs_runner1),
-        r"\newcommand{\VHeroModelVersion}{%s}"
-        % model.model_id.split("/")[-1],
+        r"\newcommand{\VHeroModelVersion}{%s}" % model.model_id.split("/")[-1],
     ]
-    print(f"hero: top={cards[top_grp]['name']} ev={top_ev:.3f} "
-          f"dominance={dominance:.4f} pct={pct:.1f}")
+    print(
+        f"hero: top={cards[top_grp]['name']} ev={top_ev:.3f} "
+        f"dominance={dominance:.4f} pct={pct:.1f}"
+    )
 
 
 def bro_tierlist_panel(lines):
@@ -130,8 +147,7 @@ def bro_tierlist_panel(lines):
 
     top_ev = table[name_to_grp[top_name]]
     top_pct = p1p1_percentile(table, top_ev)
-    runner_pcts = [p1p1_percentile(table, table[name_to_grp[n]])
-                   for n in runner_names]
+    runner_pcts = [p1p1_percentile(table, table[name_to_grp[n]]) for n in runner_names]
 
     lines += [
         r"\newcommand{\VBroEv}{%s}" % format_ev(top_ev),
@@ -142,8 +158,10 @@ def bro_tierlist_panel(lines):
         r"\newcommand{\VBroRunnerTwoPercentile}{%.1f}" % runner_pcts[1],
         r"\newcommand{\VBroModelVersion}{%s}" % model.model_id.split("/")[-1],
     ]
-    print(f"bro tier list: top={top_name} ev={top_ev:.3f} pct={top_pct:.1f} "
-          f"runners_pct={runner_pcts}")
+    print(
+        f"bro tier list: top={top_name} ev={top_ev:.3f} pct={top_pct:.1f} "
+        f"runners_pct={runner_pcts}"
+    )
 
 
 def close_call_panel(lines):
@@ -152,10 +170,18 @@ def close_call_panel(lines):
     cards = HUB.cards("SOS")
     name_to_grp = rank_by_name(cards)
     pack_names = [
-        "Sundering Archaic", "Flow State", "Pursue the Past",
-        "Inkshape Demonstrator", "Killian's Confidence", "Feed the Swarm",
-        "Shared Roots", "Lluwen, Exchange Student", "Rubble Rouser",
-        "Knockout Maneuver", "Teacher's Pest", "Forum Necroscribe",
+        "Sundering Archaic",
+        "Flow State",
+        "Pursue the Past",
+        "Inkshape Demonstrator",
+        "Killian's Confidence",
+        "Feed the Swarm",
+        "Shared Roots",
+        "Lluwen, Exchange Student",
+        "Rubble Rouser",
+        "Knockout Maneuver",
+        "Teacher's Pest",
+        "Forum Necroscribe",
         "Abigale, Poet Laureate",
     ]
     pack_grp = [name_to_grp[n] for n in pack_names]
@@ -178,9 +204,11 @@ def close_call_panel(lines):
         r"\newcommand{\VCCRunnerPct}{%d}" % runner_pct,
         r"\newcommand{\VCCModelVersion}{%s}" % model.model_id.split("/")[-1],
     ]
-    print(f"close call: {cards[a_grp]['name']}={a_ev:.3f} vs "
-          f"{cards[b_grp]['name']}={b_ev:.3f} split={split_a}/{split_b}, "
-          f"runner={cards[c_grp]['name']}={c_ev:.3f} pct={runner_pct}")
+    print(
+        f"close call: {cards[a_grp]['name']}={a_ev:.3f} vs "
+        f"{cards[b_grp]['name']}={b_ev:.3f} split={split_a}/{split_b}, "
+        f"runner={cards[c_grp]['name']}={c_ev:.3f} pct={runner_pct}"
+    )
 
 
 def tmt_tierlist_panel(lines):
@@ -196,8 +224,7 @@ def tmt_tierlist_panel(lines):
 
     top_ev = table[name_to_grp[top_name]]
     top_pct = p1p1_percentile(table, top_ev)
-    runner_pcts = [p1p1_percentile(table, table[name_to_grp[n]])
-                   for n in runner_names]
+    runner_pcts = [p1p1_percentile(table, table[name_to_grp[n]]) for n in runner_names]
 
     lines += [
         r"\newcommand{\VTmtEv}{%s}" % format_ev(top_ev),
@@ -208,8 +235,10 @@ def tmt_tierlist_panel(lines):
         r"\newcommand{\VTmtRunnerTwoPercentile}{%.1f}" % runner_pcts[1],
         r"\newcommand{\VTmtModelVersion}{%s}" % model.model_id.split("/")[-1],
     ]
-    print(f"tmt tier list: top={top_name} ev={top_ev:.3f} pct={top_pct:.1f} "
-          f"runners_pct={runner_pcts}")
+    print(
+        f"tmt tier list: top={top_name} ev={top_ev:.3f} pct={top_pct:.1f} "
+        f"runners_pct={runner_pcts}"
+    )
 
 
 def gallery_panel(lines):
@@ -219,12 +248,24 @@ def gallery_panel(lines):
     behaviour, not a zero-shot-accuracy claim; the paper's zero-shot
     numbers are the dev-trio/MSH rows only)."""
     picks = [
-        ("LTR", "ltr", "Andúril, Flame of the West",
-         ["Horn of Gondor", "Orcish Bowmasters"]),
-        ("LCI", "lci", "Bonehoard Dracosaur",
-         ["Aclazotz, Deepest Betrayal", "Temple of the Dead"]),
-        ("DMU", "dmu", "Sheoldred, the Apocalypse",
-         ["Sphinx of Clear Skies", "Archangel of Wrath"]),
+        (
+            "LTR",
+            "ltr",
+            "Andúril, Flame of the West",
+            ["Horn of Gondor", "Orcish Bowmasters"],
+        ),
+        (
+            "LCI",
+            "lci",
+            "Bonehoard Dracosaur",
+            ["Aclazotz, Deepest Betrayal", "Temple of the Dead"],
+        ),
+        (
+            "DMU",
+            "dmu",
+            "Sheoldred, the Apocalypse",
+            ["Sphinx of Clear Skies", "Archangel of Wrath"],
+        ),
     ]
     model_version = None
     for set_code, macro_prefix, top_name, runner_names in picks:
@@ -235,21 +276,24 @@ def gallery_panel(lines):
         name_to_grp = rank_by_name(cards)
         top_ev = table[name_to_grp[top_name]]
         top_pct = p1p1_percentile(table, top_ev)
-        runner_pcts = [p1p1_percentile(table, table[name_to_grp[n]])
-                       for n in runner_names]
+        runner_pcts = [
+            p1p1_percentile(table, table[name_to_grp[n]]) for n in runner_names
+        ]
         cap = macro_prefix.capitalize()
         lines += [
             r"\newcommand{\VGal%sEv}{%s}" % (cap, format_ev(top_ev)),
             r"\newcommand{\VGal%sPercentile}{%.1f}" % (cap, top_pct),
-            r"\newcommand{\VGal%sRunnerOneName}{%s}" % (cap, tex_escape(runner_names[0])),
-            r"\newcommand{\VGal%sRunnerOnePercentile}{%.1f}"
-            % (cap, runner_pcts[0]),
-            r"\newcommand{\VGal%sRunnerTwoName}{%s}" % (cap, tex_escape(runner_names[1])),
-            r"\newcommand{\VGal%sRunnerTwoPercentile}{%.1f}"
-            % (cap, runner_pcts[1]),
+            r"\newcommand{\VGal%sRunnerOneName}{%s}"
+            % (cap, tex_escape(runner_names[0])),
+            r"\newcommand{\VGal%sRunnerOnePercentile}{%.1f}" % (cap, runner_pcts[0]),
+            r"\newcommand{\VGal%sRunnerTwoName}{%s}"
+            % (cap, tex_escape(runner_names[1])),
+            r"\newcommand{\VGal%sRunnerTwoPercentile}{%.1f}" % (cap, runner_pcts[1]),
         ]
-        print(f"gallery {set_code}: top={top_name} ev={top_ev:.3f} "
-              f"pct={top_pct:.1f} runners_pct={runner_pcts}")
+        print(
+            f"gallery {set_code}: top={top_name} ev={top_ev:.3f} "
+            f"pct={top_pct:.1f} runners_pct={runner_pcts}"
+        )
     lines.append(r"\newcommand{\VGalModelVersion}{%s}" % model_version)
 
 

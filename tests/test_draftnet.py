@@ -55,7 +55,9 @@ def test_build_model_shape():
     model = draftnet.build_model(6, hidden=[8, 4], dropout=0.0)
     linears = [m for m in model if isinstance(m, torch.nn.Linear)]
     assert [(l.in_features, l.out_features) for l in linears] == [
-        (6, 8), (8, 4), (4, 6),
+        (6, 8),
+        (8, 4),
+        (4, 6),
     ]
     model.eval()
     out = model(torch.zeros(3, 6))
@@ -76,9 +78,12 @@ def test_baseline_agreement_argmax_and_argmin():
     # argmax of [3,1,2] over each pack: row0 -> 0, row1 -> 2: both match.
     assert draftnet.baseline_agreement(pack, picks, np.array([3.0, 1.0, 2.0])) == 1.0
     # ALSA-style: argmin of [1,3,2]: row0 -> 0, row1 -> 2: both match.
-    assert draftnet.baseline_agreement(
-        pack, picks, np.array([1.0, 3.0, 2.0]), take_min=True
-    ) == 1.0
+    assert (
+        draftnet.baseline_agreement(
+            pack, picks, np.array([1.0, 3.0, 2.0]), take_min=True
+        )
+        == 1.0
+    )
 
 
 def test_baseline_agreement_nan_cards_never_chosen():
@@ -87,9 +92,10 @@ def test_baseline_agreement_nan_cards_never_chosen():
     # argmax: NaN -> -inf, so row0 must choose card 1, missing pick 0.
     assert draftnet.baseline_agreement(pack, np.array([0, 2]), values) == 0.5
     # argmin: NaN -> +inf, so row0 must still choose card 1 (not the NaN).
-    assert draftnet.baseline_agreement(
-        pack, np.array([1, 1]), values, take_min=True
-    ) == 1.0
+    assert (
+        draftnet.baseline_agreement(pack, np.array([1, 1]), values, take_min=True)
+        == 1.0
+    )
 
 
 # -- end-to-end train smoke ---------------------------------------------------
@@ -116,19 +122,30 @@ def _signal_draft_rows():
     for draft_id in train_ids + val_ids:
         pool = {}
         for pick_number in range(6):
-            in_pack = sorted(rng.choice(len(VOCAB), rng.integers(2, 5),
-                                        replace=False))
+            in_pack = sorted(rng.choice(len(VOCAB), rng.integers(2, 5), replace=False))
             best = VOCAB[in_pack[0]]
-            rows.append(dict(
-                draft_id=draft_id, pack_number=1, pick_number=pick_number,
-                pick=best, pack={VOCAB[j]: 1 for j in in_pack},
-                pool=dict(pool),
-            ))
+            rows.append(
+                dict(
+                    draft_id=draft_id,
+                    pack_number=1,
+                    pick_number=pick_number,
+                    pick=best,
+                    pack={VOCAB[j]: 1 for j in in_pack},
+                    pool=dict(pool),
+                )
+            )
             pool[best] = pool.get(best, 0) + 1
     for pick_number in range(6):  # filtered out: wr bucket below 0.55
-        rows.append(dict(draft_id="lowskill", pack_number=1,
-                         pick_number=pick_number, pick=VOCAB[0],
-                         pack={VOCAB[0]: 1}, wr_bucket=0.40))
+        rows.append(
+            dict(
+                draft_id="lowskill",
+                pack_number=1,
+                pick_number=pick_number,
+                pick=VOCAB[0],
+                pack={VOCAB[0]: 1},
+                wr_bucket=0.40,
+            )
+        )
     return rows
 
 
@@ -152,7 +169,12 @@ def test_load_pick_arrays_applies_skill_filter(signal_curated):
 
 def test_train_save_promote_and_serve(signal_curated, card_store):
     model, report, context = draftnet.train(
-        SET, FMT, epochs=2, batch_size=32, hidden=[8], seed=17,
+        SET,
+        FMT,
+        epochs=2,
+        batch_size=32,
+        hidden=[8],
+        seed=17,
         progress=lambda *a: None,
     )
     assert report["n_train"] == 180 and report["n_val"] == 18
@@ -175,8 +197,12 @@ def test_train_save_promote_and_serve(signal_curated, card_store):
     assert meta["model_id"] == f"{SET}/{FMT}/vtest"
     assert meta["data_etag"] == "etag-draft-1"  # provenance chain from raw
     entry = meta["vocab"][0]
-    assert entry == {"index": 0, "name": CARD_A, "grp_id": 101,
-                     "grp_ids": [101, 201, 301]}
+    assert entry == {
+        "index": 0,
+        "name": CARD_A,
+        "grp_id": 101,
+        "grp_ids": [101, 201, 301],
+    }
     assert json.loads((out_dir / "metrics.json").read_text())["n_val"] == 18
 
     # First promotion has no incumbent -> always promoted.

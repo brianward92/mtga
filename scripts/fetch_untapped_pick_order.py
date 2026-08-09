@@ -21,7 +21,6 @@ from pathlib import Path
 import re
 import urllib.request
 
-
 BASE_URL = "https://mtga.untapped.gg/limited/draft"
 RANK_CODES = ("b", "s", "g", "p")
 
@@ -51,8 +50,23 @@ class VisibleTierParser(HTMLParser):
     """Read the visible Tier S..F card order from the rendered HTML."""
 
     _CARD_LINK = re.compile(r"[?&]includingCards=(\d+)(?:&|$)")
-    _TIERS = {"S", "A+", "A", "A-", "B+", "B", "B-", "C+", "C",
-              "C-", "D+", "D", "D-", "F", "?"}
+    _TIERS = {
+        "S",
+        "A+",
+        "A",
+        "A-",
+        "B+",
+        "B",
+        "B-",
+        "C+",
+        "C",
+        "C-",
+        "D+",
+        "D",
+        "D-",
+        "F",
+        "?",
+    }
 
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
@@ -179,9 +193,7 @@ def normalize_snapshot(html: str, url: str, fetched_at: str | None = None) -> di
     stats_response = ssr["limitedCardStatsResp"]
     stats = stats_response["data"]["data"]
     draft_response = ssr["limitedDraftInfo"]
-    draft_rows = {
-        int(row["title_id"]): row for row in draft_response["data"]
-    }
+    draft_rows = {int(row["title_id"]): row for row in draft_response["data"]}
 
     normalized = []
     for order, (title_id, tier) in enumerate(visible, start=1):
@@ -189,17 +201,19 @@ def normalize_snapshot(html: str, url: str, fetched_at: str | None = None) -> di
         if not identity or not identity["name"]:
             continue
         offer = draft_rows.get(title_id)
-        normalized.append({
-            "order": order,
-            "tier": tier,
-            "title_id": title_id,
-            **identity,
-            **aggregate_card_stats(stats.get(str(title_id))),
-            "avg_pick_chosen": weighted_offer_metric(offer, "avg_pick_chosen"),
-            "avg_last_offered": weighted_offer_metric(
-                offer, "avg_last_pick_offered"
-            ),
-        })
+        normalized.append(
+            {
+                "order": order,
+                "tier": tier,
+                "title_id": title_id,
+                **identity,
+                **aggregate_card_stats(stats.get(str(title_id))),
+                "avg_pick_chosen": weighted_offer_metric(offer, "avg_pick_chosen"),
+                "avg_last_offered": weighted_offer_metric(
+                    offer, "avg_last_pick_offered"
+                ),
+            }
+        )
 
     return {
         "schema_version": 1,
@@ -233,9 +247,7 @@ def main(argv=None) -> None:
         html = response.read().decode("utf-8")
     payload = normalize_snapshot(html, url)
     if payload["set"].upper() != args.set_code.upper():
-        raise ValueError(
-            f"requested {args.set_code}, page payload is {payload['set']}"
-        )
+        raise ValueError(f"requested {args.set_code}, page payload is {payload['set']}")
     args.out.parent.mkdir(parents=True, exist_ok=True)
     tmp = args.out.with_suffix(args.out.suffix + ".part")
     tmp.write_text(json.dumps(payload, indent=2) + "\n")

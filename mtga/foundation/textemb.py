@@ -32,6 +32,7 @@ EMBED_DIM = 384
 # ---------------------------------------------------------------------------
 # Normalization.
 
+
 def mask_self_names(name, type_line, text):
     """Replace the card's own name(s) in oracle text with "~".
 
@@ -86,9 +87,11 @@ def normalize_oracle(name, type_line, oracle_front, oracle_back=None):
 # ---------------------------------------------------------------------------
 # Embedding cache.
 
+
 def _load_encoder():
     """Import sentence-transformers lazily; tests monkeypatch this."""
     from sentence_transformers import SentenceTransformer
+
     return SentenceTransformer(MODEL_NAME)
 
 
@@ -97,8 +100,10 @@ def _read_cache(cache_path):
     if not os.path.exists(cache_path):
         return {}
     with np.load(cache_path, allow_pickle=False) as z:
-        if (str(z["normalization_version"]) != NORMALIZATION_VERSION
-                or str(z["model"]) != MODEL_NAME):
+        if (
+            str(z["normalization_version"]) != NORMALIZATION_VERSION
+            or str(z["model"]) != MODEL_NAME
+        ):
             return {}
         cached_names = [str(n) for n in z["names"]]
         vectors = np.asarray(z["vectors"], dtype=np.float32)
@@ -113,8 +118,11 @@ def _write_cache(cache_path, entries):
     np.savez(
         tmp,
         names=np.array(ordered),
-        vectors=np.stack([entries[n] for n in ordered]).astype(np.float32)
-        if ordered else np.zeros((0, EMBED_DIM), dtype=np.float32),
+        vectors=(
+            np.stack([entries[n] for n in ordered]).astype(np.float32)
+            if ordered
+            else np.zeros((0, EMBED_DIM), dtype=np.float32)
+        ),
         normalization_version=NORMALIZATION_VERSION,
         model=MODEL_NAME,
     )
@@ -156,8 +164,7 @@ def embed_names(query_names, cache_path=None, texts_by_name=None):
             ) from err
         texts = _embed_texts(missing, display, texts_by_name)
         vectors = np.asarray(
-            encoder.encode(texts, normalize_embeddings=True,
-                           convert_to_numpy=True),
+            encoder.encode(texts, normalize_embeddings=True, convert_to_numpy=True),
             dtype=np.float32,
         )
         cache.update(zip(missing, vectors))
@@ -169,8 +176,7 @@ def embed_names(query_names, cache_path=None, texts_by_name=None):
 def _embed_texts(missing_norms, display, texts_by_name):
     """Embed strings for the missing names (caller-provided or Scryfall)."""
     if texts_by_name is not None:
-        provided = {names_mod.norm_17lands(k): v
-                    for k, v in texts_by_name.items()}
+        provided = {names_mod.norm_17lands(k): v for k, v in texts_by_name.items()}
         absent = [display[n] for n in missing_norms if n not in provided]
         if absent:
             raise KeyError(f"texts_by_name lacks entries for: {absent}")
@@ -180,7 +186,8 @@ def _embed_texts(missing_norms, display, texts_by_name):
 
     inputs = featurize.embed_inputs([display[n] for n in missing_norms])
     return [
-        normalize_oracle(spec["name"], spec["type_line"],
-                         spec["oracle_front"], spec["oracle_back"])
+        normalize_oracle(
+            spec["name"], spec["type_line"], spec["oracle_front"], spec["oracle_back"]
+        )
         for spec in (inputs[display[n]] for n in missing_norms)
     ]

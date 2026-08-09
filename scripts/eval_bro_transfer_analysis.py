@@ -38,8 +38,9 @@ DEV_SETS = ["BRO", "TMT", "SOS"]
 
 def create_parser():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--run", required=True,
-                        help="F-dev run dir (contains zeroshot/*.parquet)")
+    parser.add_argument(
+        "--run", required=True, help="F-dev run dir (contains zeroshot/*.parquet)"
+    )
     parser.add_argument("--format", default="PremierDraft")
     parser.add_argument("--out", default=None, help="optional json report path")
     return parser
@@ -57,6 +58,7 @@ def load_expert_frames(run_dir, fmt):
 
 
 # -- A: per-(pack,pick) curve comparison -------------------------------------
+
 
 def _nanwavg(values, weights):
     """Weighted mean skipping (value, weight) pairs where either is NaN.
@@ -96,12 +98,19 @@ def curve_comparison(experts):
     """
     curves = {s: evalproto.per_pick_curve(experts[s]) for s in DEV_SETS}
 
-    wide = curves["BRO"][["pack_number", "pick_number", "top1", "random_floor", "n"]].rename(
-        columns={"top1": "top1_bro", "random_floor": "floor_bro", "n": "n_bro"})
+    wide = curves["BRO"][
+        ["pack_number", "pick_number", "top1", "random_floor", "n"]
+    ].rename(columns={"top1": "top1_bro", "random_floor": "floor_bro", "n": "n_bro"})
     for s in ("TMT", "SOS"):
-        c = curves[s][["pack_number", "pick_number", "top1", "random_floor", "n"]].rename(
-            columns={"top1": f"top1_{s.lower()}", "random_floor": f"floor_{s.lower()}",
-                     "n": f"n_{s.lower()}"})
+        c = curves[s][
+            ["pack_number", "pick_number", "top1", "random_floor", "n"]
+        ].rename(
+            columns={
+                "top1": f"top1_{s.lower()}",
+                "random_floor": f"floor_{s.lower()}",
+                "n": f"n_{s.lower()}",
+            }
+        )
         wide = wide.merge(c, on=["pack_number", "pick_number"], how="outer")
     wide = wide.sort_values(["pack_number", "pick_number"]).reset_index(drop=True)
     wide["top1_tmtsos_mean"] = wide[["top1_tmt", "top1_sos"]].mean(axis=1)
@@ -112,21 +121,42 @@ def curve_comparison(experts):
     wide["lift_tmtsos_mean"] = wide[["lift_tmt", "lift_sos"]].mean(axis=1)
     wide["lift_gap"] = wide["lift_tmtsos_mean"] - wide["lift_bro"]
 
-    per_pack = wide.groupby("pack_number").apply(
-        lambda g: pd.Series({
-            "mean_top1_bro": _nanwavg(g["top1_bro"], g["n_bro"]),
-            "mean_top1_tmtsos": _nanwavg(
-                g["top1_tmtsos_mean"], (g["n_tmt"].fillna(0) + g["n_sos"].fillna(0)) / 2),
-            "mean_gap": _nanwavg(
-                g["gap"],
-                (g["n_bro"].fillna(0) + g["n_tmt"].fillna(0) + g["n_sos"].fillna(0)) / 3),
-            "mean_lift_gap": _nanwavg(
-                g["lift_gap"],
-                (g["n_bro"].fillna(0) + g["n_tmt"].fillna(0) + g["n_sos"].fillna(0)) / 3),
-            "n_cells": len(g),
-            "n_cells_comparable": int(g["gap"].notna().sum()),
-        }), include_groups=False,
-    ).reset_index()
+    per_pack = (
+        wide.groupby("pack_number")
+        .apply(
+            lambda g: pd.Series(
+                {
+                    "mean_top1_bro": _nanwavg(g["top1_bro"], g["n_bro"]),
+                    "mean_top1_tmtsos": _nanwavg(
+                        g["top1_tmtsos_mean"],
+                        (g["n_tmt"].fillna(0) + g["n_sos"].fillna(0)) / 2,
+                    ),
+                    "mean_gap": _nanwavg(
+                        g["gap"],
+                        (
+                            g["n_bro"].fillna(0)
+                            + g["n_tmt"].fillna(0)
+                            + g["n_sos"].fillna(0)
+                        )
+                        / 3,
+                    ),
+                    "mean_lift_gap": _nanwavg(
+                        g["lift_gap"],
+                        (
+                            g["n_bro"].fillna(0)
+                            + g["n_tmt"].fillna(0)
+                            + g["n_sos"].fillna(0)
+                        )
+                        / 3,
+                    ),
+                    "n_cells": len(g),
+                    "n_cells_comparable": int(g["gap"].notna().sum()),
+                }
+            ),
+            include_groups=False,
+        )
+        .reset_index()
+    )
 
     def _corr(g, col):
         g = g.dropna(subset=[col])
@@ -139,14 +169,18 @@ def curve_comparison(experts):
     overall_corr = _corr(wide, "gap")
     overall_lift_corr = _corr(wide, "lift_gap")
 
-    return {"cells": wide, "per_pack": per_pack,
-            "gap_pick_corr_by_pack": trend_by_pack,
-            "gap_pick_corr_overall": overall_corr,
-            "lift_gap_pick_corr_by_pack": lift_trend_by_pack,
-            "lift_gap_pick_corr_overall": overall_lift_corr}
+    return {
+        "cells": wide,
+        "per_pack": per_pack,
+        "gap_pick_corr_by_pack": trend_by_pack,
+        "gap_pick_corr_overall": overall_corr,
+        "lift_gap_pick_corr_by_pack": lift_trend_by_pack,
+        "lift_gap_pick_corr_overall": overall_lift_corr,
+    }
 
 
 # -- B: bonus-sheet-slice accuracy -------------------------------------------
+
 
 def bro_bonus_sheet_names():
     """Canonical 63-name BRR retro-artifact bonus-sheet list (raw Scryfall
@@ -184,15 +218,20 @@ def bro_pack_bonus_flags(bonus_names):
     pick; has_bonus = the pack offered >= 1 BRR bonus-sheet card."""
     parquet = paths.curated_path("draft", "BRO", "PremierDraft")
     con = duckdb.connect()
-    all_cols = con.execute(
-        f"DESCRIBE SELECT * FROM '{parquet}' LIMIT 0").df()["column_name"]
+    all_cols = con.execute(f"DESCRIBE SELECT * FROM '{parquet}' LIMIT 0").df()[
+        "column_name"
+    ]
     name_set = set(bonus_names)
-    pack_cols = [c for c in all_cols
-                if c.startswith("pack_card_") and c[len("pack_card_"):] in name_set]
-    found = {c[len("pack_card_"):] for c in pack_cols}
+    pack_cols = [
+        c
+        for c in all_cols
+        if c.startswith("pack_card_") and c[len("pack_card_") :] in name_set
+    ]
+    found = {c[len("pack_card_") :] for c in pack_cols}
     if found != name_set:
         raise RuntimeError(
-            f"missing pack_card_ columns for bonus names: {name_set - found}")
+            f"missing pack_card_ columns for bonus names: {name_set - found}"
+        )
     sum_expr = " + ".join(f'"{c}"' for c in pack_cols)
     query = f"""
         SELECT draft_id, pack_number, pick_number,
@@ -211,15 +250,22 @@ def bonus_slice_accuracy(bro_expert, bonus_flags):
     if len(merged) != len(bro_expert):
         raise RuntimeError(
             f"(draft_id, pack_number, pick_number) join dropped rows: "
-            f"{len(bro_expert)} -> {len(merged)}")
+            f"{len(bro_expert)} -> {len(merged)}"
+        )
 
     out = {}
-    for label, frame in [("bonus_present", merged[merged["has_bonus"]]),
-                         ("bonus_absent", merged[~merged["has_bonus"]])]:
+    for label, frame in [
+        ("bonus_present", merged[merged["has_bonus"]]),
+        ("bonus_absent", merged[~merged["has_bonus"]]),
+    ]:
         point, lo, hi = evalproto.cluster_bootstrap(frame, evalproto.top1)
-        out[label] = {"top1": point, "ci": [lo, hi], "n_picks": len(frame),
-                      "n_drafts": int(frame["draft_id"].nunique()),
-                      "frac_of_picks": len(frame) / len(merged)}
+        out[label] = {
+            "top1": point,
+            "ci": [lo, hi],
+            "n_picks": len(frame),
+            "n_drafts": int(frame["draft_id"].nunique()),
+            "frac_of_picks": len(frame) / len(merged),
+        }
     return out, merged
 
 
@@ -234,7 +280,8 @@ def pick_number_confound(merged):
     mean_pick_absent = merged.loc[~merged["has_bonus"], "pick_number"].mean()
     return {
         "has_bonus_rate_by_pick_number": {
-            int(k): float(v) for k, v in rate_by_pick.items()},
+            int(k): float(v) for k, v in rate_by_pick.items()
+        },
         "mean_pick_number_present": float(mean_pick_present),
         "mean_pick_number_absent": float(mean_pick_absent),
     }
@@ -268,6 +315,7 @@ def stratified_bonus_gap(frame):
 
 # -- reporting ----------------------------------------------------------------
 
+
 def main():
     args = create_parser().parse_args()
     experts_raw = load_expert_frames(args.run, args.format)
@@ -282,49 +330,72 @@ def main():
     print("== headline (expert slice, F-dev zero-shot) ==")
     for s in DEV_SETS:
         h = headline[s]
-        print(f"  {s}: top1={h['top1']:.4f} (CI {h['ci'][0]:.4f}-"
-              f"{h['ci'][1]:.4f}) n={h['n_picks']:,}")
-    print(f"  BRO gap vs mean(TMT,SOS): {gap_vs_others:.4f} "
-          f"({100 * gap_vs_others:.1f}pp)")
+        print(
+            f"  {s}: top1={h['top1']:.4f} (CI {h['ci'][0]:.4f}-"
+            f"{h['ci'][1]:.4f}) n={h['n_picks']:,}"
+        )
+    print(
+        f"  BRO gap vs mean(TMT,SOS): {gap_vs_others:.4f} "
+        f"({100 * gap_vs_others:.1f}pp)"
+    )
 
     print("\n== A: per-(pack,pick) curve comparison ==")
     curve = curve_comparison(experts)
     print(curve["per_pack"].to_string(index=False))
     print("raw-top1 gap~pick_number corr within pack:", curve["gap_pick_corr_by_pack"])
     print("raw-top1 gap~pick_number corr overall:", curve["gap_pick_corr_overall"])
-    print("lift-over-floor gap~pick_number corr within pack (corrects for BRO's "
-          "15-card vs. TMT/SOS's 14-card pack):", curve["lift_gap_pick_corr_by_pack"])
-    print("lift-over-floor gap~pick_number corr overall:", curve["lift_gap_pick_corr_overall"])
+    print(
+        "lift-over-floor gap~pick_number corr within pack (corrects for BRO's "
+        "15-card vs. TMT/SOS's 14-card pack):",
+        curve["lift_gap_pick_corr_by_pack"],
+    )
+    print(
+        "lift-over-floor gap~pick_number corr overall:",
+        curve["lift_gap_pick_corr_overall"],
+    )
 
     print("\n== B: bonus-sheet-slice accuracy ==")
     brr_names, cardfeats_brr_names = bro_bonus_sheet_names()
-    print(f"BRR bonus-sheet names: {len(brr_names)} (raw Scryfall 'brr' printings, "
-          f"all present in BRO's curated vocab)")
-    print(f"cardfeats-derived 'set==brr' names: {len(cardfeats_brr_names)} "
-          f"(undercount vs. the true {len(brr_names)}, see docstring)")
+    print(
+        f"BRR bonus-sheet names: {len(brr_names)} (raw Scryfall 'brr' printings, "
+        f"all present in BRO's curated vocab)"
+    )
+    print(
+        f"cardfeats-derived 'set==brr' names: {len(cardfeats_brr_names)} "
+        f"(undercount vs. the true {len(brr_names)}, see docstring)"
+    )
 
     bonus_flags = bro_pack_bonus_flags(brr_names)
     bonus_result, merged = bonus_slice_accuracy(experts["BRO"], bonus_flags)
     for label in ("bonus_present", "bonus_absent"):
         b = bonus_result[label]
-        print(f"  {label}: top1={b['top1']:.4f} (CI {b['ci'][0]:.4f}-{b['ci'][1]:.4f}) "
-              f"n_picks={b['n_picks']:,} ({100 * b['frac_of_picks']:.1f}% of picks) "
-              f"n_drafts={b['n_drafts']:,}")
+        print(
+            f"  {label}: top1={b['top1']:.4f} (CI {b['ci'][0]:.4f}-{b['ci'][1]:.4f}) "
+            f"n_picks={b['n_picks']:,} ({100 * b['frac_of_picks']:.1f}% of picks) "
+            f"n_drafts={b['n_drafts']:,}"
+        )
     diff = bonus_result["bonus_absent"]["top1"] - bonus_result["bonus_present"]["top1"]
     print(f"  bonus_absent - bonus_present top1: {diff:.4f} ({100 * diff:.1f}pp)")
 
     print("\n== B.1: pick-depth confound in has_bonus ==")
     confound = pick_number_confound(merged)
-    print(f"  mean pick_number: present={confound['mean_pick_number_present']:.2f} "
-          f"absent={confound['mean_pick_number_absent']:.2f}")
-    print(f"  has_bonus rate by pick_number: {confound['has_bonus_rate_by_pick_number']}")
+    print(
+        f"  mean pick_number: present={confound['mean_pick_number_present']:.2f} "
+        f"absent={confound['mean_pick_number_absent']:.2f}"
+    )
+    print(
+        f"  has_bonus rate by pick_number: {confound['has_bonus_rate_by_pick_number']}"
+    )
 
     print("\n== B.2: pick-number-stratified bonus gap (corrects the B confound) ==")
     strat_point, strat_lo, strat_hi = evalproto.cluster_bootstrap(
-        merged, stratified_bonus_gap)
-    print(f"  stratified bonus_absent - bonus_present top1: {strat_point:.4f} "
-          f"(CI {strat_lo:.4f}-{strat_hi:.4f}) ({100 * strat_point:.1f}pp), "
-          f"vs. raw pooled {100 * diff:.1f}pp")
+        merged, stratified_bonus_gap
+    )
+    print(
+        f"  stratified bonus_absent - bonus_present top1: {strat_point:.4f} "
+        f"(CI {strat_lo:.4f}-{strat_hi:.4f}) ({100 * strat_point:.1f}pp), "
+        f"vs. raw pooled {100 * diff:.1f}pp"
+    )
 
     report = {
         "run": str(args.run),
@@ -332,7 +403,9 @@ def main():
         "gap_vs_others": gap_vs_others,
         "pick_number_confound": confound,
         "bonus_slice_stratified_gap": {
-            "point": strat_point, "ci": [strat_lo, strat_hi]},
+            "point": strat_point,
+            "ci": [strat_lo, strat_hi],
+        },
         "per_pack": curve["per_pack"].to_dict(orient="records"),
         "gap_pick_corr_by_pack": curve["gap_pick_corr_by_pack"],
         "gap_pick_corr_overall": curve["gap_pick_corr_overall"],

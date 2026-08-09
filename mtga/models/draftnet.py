@@ -42,8 +42,12 @@ def load_vocab(set_code, limited_type):
         return json.load(file)["names"]
 
 
-def load_pick_arrays(set_code, limited_type, min_wr_bucket=DEFAULT_MIN_WR_BUCKET,
-                     min_games_bucket=DEFAULT_MIN_GAMES_BUCKET):
+def load_pick_arrays(
+    set_code,
+    limited_type,
+    min_wr_bucket=DEFAULT_MIN_WR_BUCKET,
+    min_games_bucket=DEFAULT_MIN_GAMES_BUCKET,
+):
     """Curated draft parquet -> (pool int8 [n,N], pack int8 [n,N], picks, meta df)."""
     parquet = paths.curated_path("draft", set_code, limited_type)
     vocab = load_vocab(set_code, limited_type)
@@ -66,13 +70,11 @@ def load_pick_arrays(set_code, limited_type, min_wr_bucket=DEFAULT_MIN_WR_BUCKET
 
     pool = matrix("pool_")
     pack = matrix("pack_card_")
-    meta = con.execute(
-        f"""
+    meta = con.execute(f"""
         SELECT pick_index, draft_id, pack_number, pick_number,
                user_game_win_rate_bucket, user_n_games_bucket
         FROM '{parquet}' WHERE {where}
-        """
-    ).df()
+        """).df()
     con.close()
 
     picks = meta["pick_index"].to_numpy().astype(np.int64)
@@ -81,11 +83,13 @@ def load_pick_arrays(set_code, limited_type, min_wr_bucket=DEFAULT_MIN_WR_BUCKET
 
 def split_by_draft(draft_ids, val_permille=VAL_PERMILLE):
     """Deterministic train/val membership by crc32 of draft_id."""
-    unique = draft_ids.unique() if hasattr(draft_ids, "unique") else np.unique(draft_ids)
-    is_val_id = {
-        d: (zlib.crc32(d.encode()) % 1000) < val_permille for d in unique
-    }
-    mask = np.fromiter((is_val_id[d] for d in draft_ids), dtype=bool, count=len(draft_ids))
+    unique = (
+        draft_ids.unique() if hasattr(draft_ids, "unique") else np.unique(draft_ids)
+    )
+    is_val_id = {d: (zlib.crc32(d.encode()) % 1000) < val_permille for d in unique}
+    mask = np.fromiter(
+        (is_val_id[d] for d in draft_ids), dtype=bool, count=len(draft_ids)
+    )
     return ~mask, mask
 
 
@@ -96,8 +100,12 @@ def build_model(n_cards, hidden=None, dropout=DEFAULT_DROPOUT):
     layers = []
     previous = n_cards
     for width in hidden:
-        layers += [nn.Linear(previous, width), nn.BatchNorm1d(width), nn.ReLU(),
-                   nn.Dropout(dropout)]
+        layers += [
+            nn.Linear(previous, width),
+            nn.BatchNorm1d(width),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+        ]
         previous = width
     layers.append(nn.Linear(previous, n_cards))
     return nn.Sequential(*layers)
@@ -122,7 +130,9 @@ def evaluate(model, pool, pack, picks, batch_size=4096):
     loss_sum = 0.0
     with torch.no_grad():
         for idx in _batches(len(picks), batch_size):
-            pool_t = torch.from_numpy(np.minimum(pool[idx], POOL_CAP).astype(np.float32))
+            pool_t = torch.from_numpy(
+                np.minimum(pool[idx], POOL_CAP).astype(np.float32)
+            )
             pack_t = torch.from_numpy(pack[idx].astype(np.float32))
             target = torch.from_numpy(picks[idx])
             logits = masked_logits(model(pool_t), pack_t)
@@ -138,17 +148,28 @@ def evaluate(model, pool, pack, picks, batch_size=4096):
 
 def baseline_agreement(pack, picks, card_values, take_min=False):
     """Zero-parameter baseline: argmax (or argmin) of a static per-card value."""
-    values = np.where(np.isnan(card_values), -np.inf if not take_min else np.inf,
-                      card_values)
+    values = np.where(
+        np.isnan(card_values), -np.inf if not take_min else np.inf, card_values
+    )
     masked = np.where(pack > 0, values[None, :], -np.inf if not take_min else np.inf)
     choice = masked.argmin(axis=1) if take_min else masked.argmax(axis=1)
     return float((choice == picks).mean())
 
 
-def train(set_code, limited_type, epochs=20, batch_size=1024, lr=1e-3, hidden=None,
-          dropout=DEFAULT_DROPOUT, min_wr_bucket=DEFAULT_MIN_WR_BUCKET,
-          min_games_bucket=DEFAULT_MIN_GAMES_BUCKET, seed=17, patience=3,
-          progress=print):
+def train(
+    set_code,
+    limited_type,
+    epochs=20,
+    batch_size=1024,
+    lr=1e-3,
+    hidden=None,
+    dropout=DEFAULT_DROPOUT,
+    min_wr_bucket=DEFAULT_MIN_WR_BUCKET,
+    min_games_bucket=DEFAULT_MIN_GAMES_BUCKET,
+    seed=17,
+    patience=3,
+    progress=print,
+):
     """Train and return (model, eval_report, context) — persistence is separate."""
     import torch
 
@@ -166,7 +187,9 @@ def train(set_code, limited_type, epochs=20, batch_size=1024, lr=1e-3, hidden=No
 
     tr_idx = np.flatnonzero(train_mask)
     va = {
-        "pool": pool[val_mask], "pack": pack[val_mask], "picks": picks[val_mask],
+        "pool": pool[val_mask],
+        "pack": pack[val_mask],
+        "picks": picks[val_mask],
     }
 
     model = build_model(len(vocab), hidden, dropout)
@@ -181,7 +204,9 @@ def train(set_code, limited_type, epochs=20, batch_size=1024, lr=1e-3, hidden=No
             if len(idx) < 2:
                 continue  # BatchNorm1d can't train on a 1-row batch
             rows = tr_idx[idx]
-            pool_t = torch.from_numpy(np.minimum(pool[rows], POOL_CAP).astype(np.float32))
+            pool_t = torch.from_numpy(
+                np.minimum(pool[rows], POOL_CAP).astype(np.float32)
+            )
             pack_t = torch.from_numpy(pack[rows].astype(np.float32))
             target = torch.from_numpy(picks[rows])
             optimizer.zero_grad()
@@ -191,8 +216,10 @@ def train(set_code, limited_type, epochs=20, batch_size=1024, lr=1e-3, hidden=No
             optimizer.step()
 
         val = evaluate(model, **va)
-        progress(f"epoch {epoch}: val top1 {val['top1']:.4f} top3 {val['top3']:.4f} "
-                 f"log_loss {val['log_loss']:.4f}")
+        progress(
+            f"epoch {epoch}: val top1 {val['top1']:.4f} top3 {val['top3']:.4f} "
+            f"log_loss {val['log_loss']:.4f}"
+        )
         if val["top1"] > best["top1"]:
             best, stale = val, 0
             best_state = {k: v.clone() for k, v in model.state_dict().items()}
@@ -248,11 +275,19 @@ def train(set_code, limited_type, epochs=20, batch_size=1024, lr=1e-3, hidden=No
     )
 
     context = {
-        "set": set_code, "format": limited_type, "vocab": vocab,
-        "hidden": hidden or DEFAULT_HIDDEN, "dropout": dropout,
-        "filters": {"min_wr_bucket": min_wr_bucket,
-                    "min_games_bucket": min_games_bucket},
-        "seed": seed, "epochs_ran": epoch, "batch_size": batch_size, "lr": lr,
+        "set": set_code,
+        "format": limited_type,
+        "vocab": vocab,
+        "hidden": hidden or DEFAULT_HIDDEN,
+        "dropout": dropout,
+        "filters": {
+            "min_wr_bucket": min_wr_bucket,
+            "min_games_bucket": min_games_bucket,
+        },
+        "seed": seed,
+        "epochs_ran": epoch,
+        "batch_size": batch_size,
+        "lr": lr,
     }
     return model, report, context
 
@@ -270,9 +305,13 @@ def save_version(model, report, context, tag=None):
     model.eval()
     dummy = torch.zeros(1, len(vocab), dtype=torch.float32)
     torch.onnx.export(
-        model, dummy, str(out_dir / "model.onnx"),
-        input_names=["pool"], output_names=["scores"],
-        dynamic_axes={"pool": {0: "batch"}, "scores": {0: "batch"}}, opset_version=17,
+        model,
+        dummy,
+        str(out_dir / "model.onnx"),
+        input_names=["pool"],
+        output_names=["scores"],
+        dynamic_axes={"pool": {0: "batch"}, "scores": {0: "batch"}},
+        opset_version=17,
     )
     torch.save(model.state_dict(), out_dir / "checkpoint.pt")
 
@@ -282,8 +321,12 @@ def save_version(model, report, context, tag=None):
 
     canonical, aliases, _ = cardstore.name_resolution(set_code)
     vocab_entries = [
-        {"index": i, "name": n, "grp_id": canonical.get(n),
-         "grp_ids": aliases.get(n, [])}
+        {
+            "index": i,
+            "name": n,
+            "grp_id": canonical.get(n),
+            "grp_ids": aliases.get(n, []),
+        }
         for i, n in enumerate(vocab)
     ]
 
@@ -296,8 +339,11 @@ def save_version(model, report, context, tag=None):
     meta = {
         "model_id": f"{set_code}/{limited_type}/{tag}",
         "kind": "draftnet-mlp",
-        "arch": {"hidden": context["hidden"], "dropout": context["dropout"],
-                 "pool_cap": POOL_CAP},
+        "arch": {
+            "hidden": context["hidden"],
+            "dropout": context["dropout"],
+            "pool_cap": POOL_CAP,
+        },
         "filters": context["filters"],
         "train": {k: context[k] for k in ["seed", "epochs_ran", "batch_size", "lr"]},
         "data_etag": data_etag,
@@ -324,8 +370,10 @@ def promote(out_dir, tolerance=0.005, force=False):
             incumbent = json.load(file)["val_top_quartile"]["top1"]
 
     if not force and incumbent is not None and candidate < incumbent - tolerance:
-        print(f"NOT promoted: candidate top-quartile top1 {candidate:.4f} < "
-              f"incumbent {incumbent:.4f} - {tolerance}")
+        print(
+            f"NOT promoted: candidate top-quartile top1 {candidate:.4f} < "
+            f"incumbent {incumbent:.4f} - {tolerance}"
+        )
         return False
 
     tmp = latest.parent / ".latest.tmp"
@@ -333,6 +381,8 @@ def promote(out_dir, tolerance=0.005, force=False):
         tmp.unlink()
     tmp.symlink_to(out_dir.name)
     tmp.replace(latest)
-    print(f"promoted {out_dir.name} -> latest "
-          f"(top-quartile top1 {candidate:.4f}, incumbent {incumbent})")
+    print(
+        f"promoted {out_dir.name} -> latest "
+        f"(top-quartile top1 {candidate:.4f}, incumbent {incumbent})"
+    )
     return True

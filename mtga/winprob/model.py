@@ -50,7 +50,7 @@ def predict_proba(model, Xs, columns, batch_size=65536):
     out = np.empty(len(Xs), dtype=np.float64)
     with torch.no_grad():
         for start in range(0, len(Xs), batch_size):
-            chunk = Xs[start:start + batch_size][:, cols]
+            chunk = Xs[start : start + batch_size][:, cols]
             logits = model(torch.from_numpy(np.ascontiguousarray(chunk)))
-            out[start:start + len(chunk)] = torch.sigmoid(logits).numpy()
+            out[start : start + len(chunk)] = torch.sigmoid(logits).numpy()
     return out

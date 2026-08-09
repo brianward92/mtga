@@ -37,16 +37,21 @@ from mtga.lands import config, corpus, names as names_mod, paths
 def create_parser():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--set", required=True, dest="set_code")
-    parser.add_argument("--out", default=None,
-                        help="default: paths.set_assets_path(SET)")
-    parser.add_argument("--allow-missing-text", action="store_true",
-                        help="zero-fill text embeddings that are not in the "
-                             "cache instead of failing")
+    parser.add_argument(
+        "--out", default=None, help="default: paths.set_assets_path(SET)"
+    )
+    parser.add_argument(
+        "--allow-missing-text",
+        action="store_true",
+        help="zero-fill text embeddings that are not in the "
+        "cache instead of failing",
+    )
     return parser
 
 
 # ---------------------------------------------------------------------------
 # Universe: name -> [grp_ids].
+
 
 def universe(set_code):
     """Ordered {name: [grp_ids]} for one set's draftable card universe."""
@@ -55,7 +60,8 @@ def universe(set_code):
     # Names: curated vocab, then card store expansion rows, then the cached
     # 17Lands card_ratings (the only source that knows a brand-new set).
     for vocab_file in sorted(
-            (paths.CURATED_DIR / "draft").glob(f"{set_code}.*.vocab.json")):
+        (paths.CURATED_DIR / "draft").glob(f"{set_code}.*.vocab.json")
+    ):
         for name in json.loads(vocab_file.read_text())["names"]:
             grp_lists.setdefault(name, [])
 
@@ -68,8 +74,7 @@ def universe(set_code):
 
     rated = []
     for fmt in config.FORMATS:
-        link = paths.latest_symlink(
-            paths.card_ratings_path(set_code, fmt, "x"))
+        link = paths.latest_symlink(paths.card_ratings_path(set_code, fmt, "x"))
         if not link.exists():
             continue
         with open(link) as fh:
@@ -101,6 +106,7 @@ def universe(set_code):
 # ---------------------------------------------------------------------------
 # Features through the frozen manifest.
 
+
 def feature_table(set_code, names, allow_missing_text=False):
     """(features fp16 [N, 775], rarity_ids uint8 [N], manifest, text_missing).
 
@@ -128,8 +134,7 @@ def feature_table(set_code, names, allow_missing_text=False):
     fresh = [names[i] for i in range(len(names)) if i not in have]
     if fresh:
         prefer = {n: [set_code] for n in fresh}
-        matrix, _ = featurize.featurize(fresh, manifest,
-                                        prefer_sets_by_name=prefer)
+        matrix, _ = featurize.featurize(fresh, manifest, prefer_sets_by_name=prefer)
         for row, name in zip(matrix, fresh):
             struct[names.index(name)] = row
 
@@ -149,7 +154,7 @@ def feature_table(set_code, names, allow_missing_text=False):
 
     rarity_block = next(b for b in manifest["blocks"] if b["name"] == "rarity")
     r0, width = rarity_block["start"], len(rarity_block["columns"])
-    rarity_ids = struct[:, r0:r0 + width].argmax(axis=1).astype(np.uint8)
+    rarity_ids = struct[:, r0 : r0 + width].argmax(axis=1).astype(np.uint8)
 
     features = np.concatenate([struct, text], axis=1).astype(np.float16)
     return features, rarity_ids, manifest, text_missing
@@ -172,10 +177,12 @@ def build(set_code, out_path=None, allow_missing_text=False):
     if not grp_lists:
         raise FileNotFoundError(
             f"no card universe for {set_code}: need a curated vocab, card "
-            f"store rows, or a cached card_ratings JSON")
+            f"store rows, or a cached card_ratings JSON"
+        )
     names = list(grp_lists)
     features, rarity_ids, manifest, text_missing = feature_table(
-        set_code, names, allow_missing_text=allow_missing_text)
+        set_code, names, allow_missing_text=allow_missing_text
+    )
 
     out_path = out_path or paths.set_assets_path(set_code)
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -191,10 +198,13 @@ def build(set_code, out_path=None, allow_missing_text=False):
         text_missing=json.dumps(text_missing),
         built_at=datetime.datetime.now().isoformat(timespec="seconds"),
     )
-    return {"path": out_path, "n_cards": len(names),
-            "n_grp_ids": sum(len(g) for g in grp_lists.values()),
-            "manifest_hash": manifest["content_hash"],
-            "text_missing": text_missing}
+    return {
+        "path": out_path,
+        "n_cards": len(names),
+        "n_grp_ids": sum(len(g) for g in grp_lists.values()),
+        "manifest_hash": manifest["content_hash"],
+        "text_missing": text_missing,
+    }
 
 
 def main(argv=None):
@@ -204,19 +214,21 @@ def main(argv=None):
 
     out = Path(args.out) if args.out else None
     try:
-        result = build(set_code, out,
-                       allow_missing_text=args.allow_missing_text)
-    except (FileNotFoundError, featurize.UnmatchedNamesError,
-            RuntimeError) as err:
+        result = build(set_code, out, allow_missing_text=args.allow_missing_text)
+    except (FileNotFoundError, featurize.UnmatchedNamesError, RuntimeError) as err:
         print(f"FAILED: {err}", file=sys.stderr)
         sys.exit(2)
-    print(f"{set_code}: {result['n_cards']} cards, "
-          f"{result['n_grp_ids']} grpIds -> {result['path']} "
-          f"(manifest {result['manifest_hash'][:12]})")
+    print(
+        f"{set_code}: {result['n_cards']} cards, "
+        f"{result['n_grp_ids']} grpIds -> {result['path']} "
+        f"(manifest {result['manifest_hash'][:12]})"
+    )
     if result["text_missing"]:
-        print(f"WARNING: {len(result['text_missing'])} name(s) zero-filled "
-              f"text embeddings: {result['text_missing'][:5]} ...",
-              file=sys.stderr)
+        print(
+            f"WARNING: {len(result['text_missing'])} name(s) zero-filled "
+            f"text embeddings: {result['text_missing'][:5]} ...",
+            file=sys.stderr,
+        )
 
 
 if __name__ == "__main__":

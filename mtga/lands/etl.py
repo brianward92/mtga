@@ -66,7 +66,9 @@ REQUIRED_DRAFT_COLUMNS = ("expansion", "draft_id", "pack_number", "pick_number",
 # meta columns, then the card columns, then the two skill buckets (which
 # 17Lands writes after the pool_ block), then pick_index.
 _DRAFT_TRAILING_META = ("user_n_games_bucket", "user_game_win_rate_bucket")
-_DRAFT_LEADING_META = tuple(c for c in DRAFT_META_TYPES if c not in _DRAFT_TRAILING_META)
+_DRAFT_LEADING_META = tuple(
+    c for c in DRAFT_META_TYPES if c not in _DRAFT_TRAILING_META
+)
 
 GAME_META_TYPES = {
     "expansion": "VARCHAR",
@@ -108,7 +110,7 @@ def classify_columns(header, card_prefixes, meta_types):
                 matched = prefix
                 break
         if matched:
-            cards_by_prefix[matched].append(column[len(matched):])
+            cards_by_prefix[matched].append(column[len(matched) :])
             columns[column] = "TINYINT"
         else:
             columns[column] = meta_types.get(column, "VARCHAR")
@@ -130,7 +132,7 @@ def _columns_struct(columns):
 
 
 def detect_schema_era(header):
-    """"match_buckets" (STX/AFR) | "match_buckets_rank" (MID/VOW) | "modern"."""
+    """ "match_buckets" (STX/AFR) | "match_buckets_rank" (MID/VOW) | "modern"."""
     if "user_n_matches_bucket" in header:
         return "match_buckets_rank" if "user_rank" in header else "match_buckets"
     return "modern"
@@ -147,8 +149,11 @@ def _draft_select_exprs(header):
     header are emitted as typed NULLs.
     """
     present = set(header)
-    alias_source = {canon: old for old, canon in DRAFT_META_ALIASES.items()
-                    if old in present and canon not in present}
+    alias_source = {
+        canon: old
+        for old, canon in DRAFT_META_ALIASES.items()
+        if old in present and canon not in present
+    }
 
     def canonical(name):
         if name in present:
@@ -214,11 +219,15 @@ def curate_draft(set_code, limited_type, force=False):
 
     header = read_header(source)
     era = detect_schema_era(header)
-    columns, cards = classify_columns(header, [PACK_PREFIX, POOL_PREFIX], DRAFT_META_TYPES)
+    columns, cards = classify_columns(
+        header, [PACK_PREFIX, POOL_PREFIX], DRAFT_META_TYPES
+    )
     for old, canonical in DRAFT_META_ALIASES.items():
         if old in columns:
             columns[old] = DRAFT_META_TYPES[canonical]
-    available = set(header) | {DRAFT_META_ALIASES[c] for c in header if c in DRAFT_META_ALIASES}
+    available = set(header) | {
+        DRAFT_META_ALIASES[c] for c in header if c in DRAFT_META_ALIASES
+    }
     missing = [c for c in REQUIRED_DRAFT_COLUMNS if c not in available]
     if missing:
         raise ValueError(f"required draft columns missing from {source}: {missing}")
@@ -231,10 +240,10 @@ def curate_draft(set_code, limited_type, force=False):
 
     out.parent.mkdir(parents=True, exist_ok=True)
     con = _connect()
-    con.execute(
-        "CREATE TEMP TABLE vocab (name VARCHAR, idx INTEGER)"
+    con.execute("CREATE TEMP TABLE vocab (name VARCHAR, idx INTEGER)")
+    con.executemany(
+        "INSERT INTO vocab VALUES (?, ?)", list(zip(vocab, range(len(vocab))))
     )
-    con.executemany("INSERT INTO vocab VALUES (?, ?)", list(zip(vocab, range(len(vocab)))))
 
     columns_arg = _columns_struct(columns)
     select_cols = ", ".join(_draft_select_exprs(header))
@@ -263,15 +272,22 @@ def curate_draft(set_code, limited_type, force=False):
             {"set": set_code, "format": limited_type, "names": vocab}, file, indent=2
         )
     _write_curated_meta(
-        out, raw_etag, rows,
+        out,
+        raw_etag,
+        rows,
         schema_era=era,
         p1p1_missing=not p1p1_rows,
         picks_per_pack=None if max_pick is None else int(max_pick) + 1,
     )
     if unmatched:
         print(f"WARNING: {unmatched}/{rows} picks did not match the vocabulary")
-    return {"status": "CURATED", "path": str(out), "rows": rows, "vocab": len(vocab),
-            "schema_era": era}
+    return {
+        "status": "CURATED",
+        "path": str(out),
+        "rows": rows,
+        "vocab": len(vocab),
+        "schema_era": era,
+    }
 
 
 def curate_game(set_code, limited_type, force=False):

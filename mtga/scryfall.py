@@ -42,12 +42,14 @@ def get_download_url(data_type, refresh=False):
                 # 2026-07-29 Scryfall API change: bulk objects dropped
                 # `download_uri` (single JSON array) in favor of
                 # `jsonl_download_uri` (gzipped JSONL). Accept either.
-                download_url = item.get("download_uri") \
-                    or item.get("jsonl_download_uri")
+                download_url = item.get("download_uri") or item.get(
+                    "jsonl_download_uri"
+                )
                 if download_url is None:
                     raise ValueError(
                         f"`{data_type}` entry has no download uri "
-                        f"(keys: {sorted(item)})")
+                        f"(keys: {sorted(item)})"
+                    )
         if download_url is None:
             raise ValueError(f"No `{data_type}` entries!")
         _DOWNLOAD_URLS[data_type] = download_url

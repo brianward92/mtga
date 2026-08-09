@@ -36,8 +36,9 @@ def shard(curated_draft):
     con.close()
 
     index = {name: i for i, name in enumerate(VOCAB)}
-    by_key = {(r["draft_id"], r["pick_number"]): r
-              for r in hand_draft_rows(pick_base=0)}
+    by_key = {
+        (r["draft_id"], r["pick_number"]): r for r in hand_draft_rows(pick_base=0)
+    }
     n = len(meta)
     pool_slots = np.full((n, POOL_SLOTS), int(PAD), dtype=np.uint16)
     pool_counts = np.zeros((n, POOL_SLOTS), dtype=np.uint8)
@@ -52,7 +53,7 @@ def shard(curated_draft):
             pool_slots[i, j] = slot
             pool_counts[i, j] = count
         pack = sorted(index[nm] for nm, c in hand["pack"].items() if c)
-        pack_slots[i, :len(pack)] = pack
+        pack_slots[i, : len(pack)] = pack
         pick_pos[i] = pack.index(int(row["pick_index"]))
         context[i] = [row["pack_number"], row["pick_number"], 33, 5, 0]
         split[i] = zlib.crc32(row["draft_id"].encode()) % 1000
@@ -65,14 +66,25 @@ def shard(curated_draft):
     np.save(out / "pick_pos.npy", pick_pos)
     np.save(out / "context.npy", context)
     np.save(out / "split.npy", split)
-    (out / "meta.json").write_text(json.dumps({
-        "set": SET, "format": FMT, "rows": n, "vocab_size": len(VOCAB),
-        "source_etag": "etag-draft-1", "picks_per_pack": 14,
-        "p1p1_missing": False, "val_permille": 50,
-    }))
-    np.savez(out / "features.npz",
-             features=np.zeros((len(VOCAB), 8), dtype=np.float16),
-             rarity_ids=np.zeros(len(VOCAB), dtype=np.uint8))
+    (out / "meta.json").write_text(
+        json.dumps(
+            {
+                "set": SET,
+                "format": FMT,
+                "rows": n,
+                "vocab_size": len(VOCAB),
+                "source_etag": "etag-draft-1",
+                "picks_per_pack": 14,
+                "p1p1_missing": False,
+                "val_permille": 50,
+            }
+        )
+    )
+    np.savez(
+        out / "features.npz",
+        features=np.zeros((len(VOCAB), 8), dtype=np.float16),
+        rarity_ids=np.zeros(len(VOCAB), dtype=np.uint8),
+    )
     return out
 
 
@@ -82,8 +94,9 @@ def test_random_baseline_contract_and_determinism(shard):
     assert len(frame) == 8  # the unknown-pick row (pick_index -1) is excluded
     assert (frame["target_rank"] >= 1).all()
     assert (frame["target_rank"] <= frame["pack_size"].clip(lower=1)).all()
-    np.testing.assert_allclose(frame["pick_prob"],
-                               1.0 / frame["pack_size"].clip(lower=1))
+    np.testing.assert_allclose(
+        frame["pick_prob"], 1.0 / frame["pack_size"].clip(lower=1)
+    )
     again = predict.baseline_predictions(SET, FMT, "random")
     assert frame.equals(again)  # frozen seed => byte-identical
 
@@ -124,6 +137,7 @@ def test_unknown_kind_is_refused(shard):
 # invariant to T (a monotonic rescale can't change the argmax), and T only
 # ever flattens or sharpens the distribution, never a random perturbation.
 
+
 @pytest.fixture
 def tiny_draftfm(shard):
     """A real (untrained, tiny) DraftFM instance matching the shard's
@@ -140,22 +154,21 @@ def tiny_draftfm(shard):
 def test_temperature_rejects_nonpositive(shard, tiny_draftfm):
     for bad in (0.0, -1.0, -0.001):
         with pytest.raises(ValueError, match="temperature must be > 0"):
-            predict.foundation_predictions(tiny_draftfm, SET, FMT,
-                                           temperature=bad)
+            predict.foundation_predictions(tiny_draftfm, SET, FMT, temperature=bad)
 
 
 def test_temperature_preserves_target_rank(shard, tiny_draftfm):
     """Dividing logits by a positive constant is monotonic: WHICH candidate
     is the human's rank cannot change, only the reported confidence."""
-    base = predict.foundation_predictions(tiny_draftfm, SET, FMT,
-                                          temperature=1.0)
+    base = predict.foundation_predictions(tiny_draftfm, SET, FMT, temperature=1.0)
     for t in (0.3, 0.7, 2.5, 5.0):
-        scaled = predict.foundation_predictions(tiny_draftfm, SET, FMT,
-                                                temperature=t)
-        assert (scaled["target_rank"].to_numpy()
-                == base["target_rank"].to_numpy()).all(), (
+        scaled = predict.foundation_predictions(tiny_draftfm, SET, FMT, temperature=t)
+        assert (
+            scaled["target_rank"].to_numpy() == base["target_rank"].to_numpy()
+        ).all(), (
             f"target_rank changed at T={t}: temperature scaling must be "
-            "rank-invariant by construction")
+            "rank-invariant by construction"
+        )
 
 
 def test_temperature_monotonically_reshapes_confidence(shard, tiny_draftfm):
@@ -165,10 +178,12 @@ def test_temperature_monotonically_reshapes_confidence(shard, tiny_draftfm):
     mathematical certainty for any positive-logit rescale, so a violation
     means the implementation isn't actually doing temperature scaling."""
     ts = [0.3, 0.7, 1.0, 1.5, 3.0]
-    frames = {t: predict.foundation_predictions(tiny_draftfm, SET, FMT,
-                                                temperature=t)
-             for t in ts}
+    frames = {
+        t: predict.foundation_predictions(tiny_draftfm, SET, FMT, temperature=t)
+        for t in ts
+    }
     top_prob_means = [frames[t]["top_prob"].mean() for t in ts]
     for a, b in zip(top_prob_means, top_prob_means[1:]):
-        assert a >= b - 1e-6, (
-            f"mean top_prob must be non-increasing as T grows: {top_prob_means}")
+        assert (
+            a >= b - 1e-6
+        ), f"mean top_prob must be non-increasing as T grows: {top_prob_means}"

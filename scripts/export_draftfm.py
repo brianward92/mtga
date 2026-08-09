@@ -24,21 +24,34 @@ from mtga.lands import paths
 
 def create_parser():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--run", required=True,
-                        help="training run dir containing best.pt")
+    parser.add_argument(
+        "--run", required=True, help="training run dir containing best.pt"
+    )
     parser.add_argument("--checkpoint", default="best.pt")
     parser.add_argument("--tag", required=True, help="version dir name")
-    parser.add_argument("--out-root", default=None,
-                        help=f"default: {paths.MODELS_DIR / '_foundation'}")
-    parser.add_argument("--wr-id", type=int, default=33,
-                        help="serving skill bucket id (33 ~ 0.66 wr)")
-    parser.add_argument("--games-id", type=int, default=6,
-                        help="serving games bucket id (6 = 1000 games)")
-    parser.add_argument("--manifest-hash", default=None,
-                        help="featurizer manifest content hash "
-                             "(default: read from the data root's manifest)")
-    parser.add_argument("--promote", action="store_true",
-                        help="repoint <out-root>/latest at this version")
+    parser.add_argument(
+        "--out-root", default=None, help=f"default: {paths.MODELS_DIR / '_foundation'}"
+    )
+    parser.add_argument(
+        "--wr-id", type=int, default=33, help="serving skill bucket id (33 ~ 0.66 wr)"
+    )
+    parser.add_argument(
+        "--games-id",
+        type=int,
+        default=6,
+        help="serving games bucket id (6 = 1000 games)",
+    )
+    parser.add_argument(
+        "--manifest-hash",
+        default=None,
+        help="featurizer manifest content hash "
+        "(default: read from the data root's manifest)",
+    )
+    parser.add_argument(
+        "--promote",
+        action="store_true",
+        help="repoint <out-root>/latest at this version",
+    )
     return parser
 
 
@@ -65,21 +78,27 @@ def main():
     checkpoint = Path(args.run) / args.checkpoint
     if not checkpoint.exists():
         sys.exit(f"no checkpoint at {checkpoint}")
-    out_root = Path(args.out_root) if args.out_root else (
-        paths.MODELS_DIR / "_foundation")
+    out_root = (
+        Path(args.out_root) if args.out_root else (paths.MODELS_DIR / "_foundation")
+    )
     out_dir = out_root / args.tag
     manifest_hash = resolve_manifest_hash(args.manifest_hash)
 
-    meta = export.export_version(checkpoint, out_dir, args.wr_id,
-                                 args.games_id, manifest_hash)
+    meta = export.export_version(
+        checkpoint, out_dir, args.wr_id, args.games_id, manifest_hash
+    )
     report = meta["validation"]
     print(f"exported {meta['model_id']} -> {out_dir}")
-    print(f"  checkpoint {meta['checkpoint_sha256'][:12]} "
-          f"(step {meta['checkpoint_step']}, "
-          f"val_top1 {meta['checkpoint_val_top1']})")
+    print(
+        f"  checkpoint {meta['checkpoint_sha256'][:12]} "
+        f"(step {meta['checkpoint_step']}, "
+        f"val_top1 {meta['checkpoint_val_top1']})"
+    )
     print(f"  serving condition: wr_id {args.wr_id}, games_id {args.games_id}")
-    print(f"  validation max |torch - ort| = {report['max_abs_diff']:.3e} "
-          f"< {report['tolerance']:.0e}  {report['cases']}")
+    print(
+        f"  validation max |torch - ort| = {report['max_abs_diff']:.3e} "
+        f"< {report['tolerance']:.0e}  {report['cases']}"
+    )
     if args.promote:
         latest = promote(out_dir)
         print(f"  promoted: {latest} -> {out_dir.name}")

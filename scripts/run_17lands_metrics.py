@@ -10,11 +10,20 @@ def create_parser():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sets", default=",".join(config.TRACKED_SETS))
     parser.add_argument("--formats", default=",".join(config.FORMATS))
-    parser.add_argument("--prior-strength", type=float, default=None,
-                        help="override the method-of-moments shrinkage prior")
-    parser.add_argument("--as-of", default=None, help="date stamp override (YYYY-MM-DD)")
-    parser.add_argument("--report", action="store_true",
-                        help="print the top-20 table for each set/format and exit")
+    parser.add_argument(
+        "--prior-strength",
+        type=float,
+        default=None,
+        help="override the method-of-moments shrinkage prior",
+    )
+    parser.add_argument(
+        "--as-of", default=None, help="date stamp override (YYYY-MM-DD)"
+    )
+    parser.add_argument(
+        "--report",
+        action="store_true",
+        help="print the top-20 table for each set/format and exit",
+    )
     parser.add_argument("--force", action="store_true")
     return parser
 
@@ -46,8 +55,9 @@ def main():
                     if dated.stat().st_mtime >= curated_meta.stat().st_mtime:
                         print(f"skip {set_code} {fmt}: metrics newer than curated data")
                         continue
-            metrics.build_metrics(set_code, fmt, prior_strength=args.prior_strength,
-                                  as_of=args.as_of)
+            metrics.build_metrics(
+                set_code, fmt, prior_strength=args.prior_strength, as_of=args.as_of
+            )
 
 
 if __name__ == "__main__":

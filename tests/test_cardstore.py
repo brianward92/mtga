@@ -10,7 +10,9 @@ def test_canonical_prefers_in_set_booster(card_store):
     # non-booster (201), and an out-of-set printing (301).
     assert canonical[CARD_A] == 101
     assert attrs[CARD_A] == {
-        "rarity": "common", "color_identity": "R", "mana_value": 1.0,
+        "rarity": "common",
+        "color_identity": "R",
+        "mana_value": 1.0,
     }
 
 

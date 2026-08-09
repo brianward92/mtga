@@ -3,6 +3,5 @@
 
 from mtga.lands import cardstore
 
-
 if __name__ == "__main__":
     cardstore.build_card_store()
