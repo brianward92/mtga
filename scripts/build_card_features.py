@@ -31,36 +31,55 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 def create_parser():
     parser = argparse.ArgumentParser(
-        description="Build the frozen DraftFM card feature table.")
+        description="Build the frozen DraftFM card feature table."
+    )
     parser.add_argument(
-        "--sets", nargs="+", metavar="SET",
-        help="Set codes to build from (default: every curated vocab on disk).")
+        "--sets",
+        nargs="+",
+        metavar="SET",
+        help="Set codes to build from (default: every curated vocab on disk).",
+    )
     parser.add_argument(
-        "--manifest-out", type=Path, default=None,
-        help=f"Manifest path (default: {paths.FEATURIZER_MANIFEST}).")
+        "--holdout",
+        nargs="*",
+        default=[],
+        metavar="SET",
+        help="Encode these sets into the output table but exclude them from "
+        "manifest vocabulary fitting (for whole-set evaluation).",
+    )
     parser.add_argument(
-        "--features-out", type=Path, default=None,
-        help=f"Features parquet path (default: {paths.CARDFEATS_PARQUET}).")
+        "--manifest-out",
+        type=Path,
+        default=None,
+        help=f"Manifest path (default: {paths.FEATURIZER_MANIFEST}).",
+    )
     parser.add_argument(
-        "--embed", action="store_true",
-        help="Also extend the text-embedding cache (needs .venv-embed).")
+        "--features-out",
+        type=Path,
+        default=None,
+        help=f"Features parquet path (default: {paths.CARDFEATS_PARQUET}).",
+    )
+    parser.add_argument(
+        "--embed",
+        action="store_true",
+        help="Also extend the text-embedding cache (needs .venv-embed).",
+    )
     return parser
 
 
 def discover_sets():
     """Set codes with at least one curated vocab sidecar on disk."""
     vocab_dir = paths.CURATED_DIR / "draft"
-    return sorted({p.name.split(".")[0]
-                   for p in vocab_dir.glob("*.vocab.json")})
+    return sorted({p.name.split(".")[0] for p in vocab_dir.glob("*.vocab.json")})
 
 
 def vocab_names(set_code):
     """Union of names across every format's vocab sidecar for one set."""
-    found = sorted((paths.CURATED_DIR / "draft").glob(
-        f"{set_code}.*.vocab.json"))
+    found = sorted((paths.CURATED_DIR / "draft").glob(f"{set_code}.*.vocab.json"))
     if not found:
         raise FileNotFoundError(
-            f"no curated vocab for {set_code} under {paths.CURATED_DIR / 'draft'}")
+            f"no curated vocab for {set_code} under {paths.CURATED_DIR / 'draft'}"
+        )
     union = set()
     for path in found:
         with open(path) as fh:
@@ -80,7 +99,10 @@ def _git_describe():
     try:
         out = subprocess.run(
             ["git", "-C", str(REPO_ROOT), "describe", "--always", "--dirty"],
-            capture_output=True, text=True, timeout=10)
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
         return out.stdout.strip() or "unknown"
     except OSError:
         return "unknown"
@@ -99,18 +121,37 @@ def main(argv=None):
     # case-sensitivity). Mirrors corpus.corpus_jobs, which upper-cases too.
     set_codes = [c.strip().upper() for c in set_codes]
     if not set_codes:
-        print(f"no curated vocabs under {paths.CURATED_DIR / 'draft'}",
-              file=sys.stderr)
+        print(f"no curated vocabs under {paths.CURATED_DIR / 'draft'}", file=sys.stderr)
         sys.exit(2)
-    banned = set(set_codes) & corpus.EVAL_ONLY
+    holdout = {c.strip().upper() for c in args.holdout}
+    unknown_holdout = holdout - set(set_codes)
+    if unknown_holdout:
+        print(
+            f"holdout sets are not in --sets/on disk: " f"{sorted(unknown_holdout)}",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+    training_codes = [c for c in set_codes if c not in holdout]
+    if not training_codes:
+        print(
+            "at least one non-holdout set is required to fit the manifest",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+    banned = set(training_codes) & corpus.EVAL_ONLY
     if banned:
-        print(f"{sorted(banned)} are EVAL_ONLY: the featurizer manifest is "
-              f"built from training sets only", file=sys.stderr)
+        print(
+            f"{sorted(banned)} are EVAL_ONLY: the featurizer manifest is "
+            f"built from training sets only; pass them via --holdout to "
+            f"encode without fitting",
+            file=sys.stderr,
+        )
         sys.exit(2)
 
-    names_by_set = {code: vocab_names(code) for code in set_codes}
+    output_names_by_set = {code: vocab_names(code) for code in set_codes}
+    names_by_set = {code: output_names_by_set[code] for code in training_codes}
     prefer = {}
-    for code, set_names in names_by_set.items():
+    for code, set_names in output_names_by_set.items():
         for name in set_names:
             prefer.setdefault(name, []).append(code)
     all_names = sorted(prefer, key=names.norm_17lands)
@@ -120,15 +161,18 @@ def main(argv=None):
     try:
         manifest = featurize.build_manifest(names_by_set, cards, faces)
         matrix, provenance = featurize.featurize(
-            all_names, manifest, cards, faces, prefer_sets_by_name=prefer)
+            all_names, manifest, cards, faces, prefer_sets_by_name=prefer
+        )
     except featurize.UnmatchedNamesError as err:
         print(f"UNMATCHED NAMES — hard fail:\n{err}", file=sys.stderr)
         sys.exit(2)
 
     featurize.save_manifest(manifest, manifest_out)
-    print(f"manifest: {manifest_out} (hash {manifest['content_hash'][:12]}, "
-          f"{len(manifest['subtype_vocab'])} subtypes, "
-          f"{len(manifest['keyword_vocab'])} keywords)")
+    print(
+        f"manifest: {manifest_out} (hash {manifest['content_hash'][:12]}, "
+        f"{len(manifest['subtype_vocab'])} subtypes, "
+        f"{len(manifest['keyword_vocab'])} keywords)"
+    )
 
     columns = featurize.manifest_columns(manifest)
     frame = pd.DataFrame(matrix, columns=columns)
@@ -143,6 +187,8 @@ def main(argv=None):
         "version": manifest["version"],
         "created": datetime.now(timezone.utc).isoformat(),
         "sets": set_codes,
+        "manifest_sets": training_codes,
+        "holdout_sets": sorted(holdout),
         "n_names": len(all_names),
         "n_features": manifest["n_features"],
         "manifest_path": str(manifest_out),
@@ -158,8 +204,10 @@ def main(argv=None):
     if args.embed:
         try:
             vectors = textemb.embed_names(all_names, paths.TEXT_EMB_CACHE)
-            print(f"embeddings: {paths.TEXT_EMB_CACHE} "
-                  f"[{vectors.shape[0]} x {vectors.shape[1]}]")
+            print(
+                f"embeddings: {paths.TEXT_EMB_CACHE} "
+                f"[{vectors.shape[0]} x {vectors.shape[1]}]"
+            )
         except RuntimeError as err:
             print(f"WARNING: embeddings not built — {err}", file=sys.stderr)
 

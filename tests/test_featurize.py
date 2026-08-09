@@ -18,24 +18,69 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 # ---------------------------------------------------------------------------
 # Synthetic Scryfall fixtures (processor schema: run_scryfall_processor.py).
 
-def card(name, id_=None, set_="tst", rarity="common",
-         type_line="Creature — Human", mana_cost="{1}", cmc=1.0, colors="",
-         color_identity="", oracle_text=None, power=None, toughness=None,
-         loyalty=None, keywords="", layout="normal", digital=False):
-    return dict(id=id_ or f"scry-{name.lower().replace(' ', '-')}-{set_}",
-                name=name, set=set_, rarity=rarity, type_line=type_line,
-                mana_cost=mana_cost, cmc=cmc, colors=colors,
-                color_identity=color_identity, oracle_text=oracle_text,
-                power=power, toughness=toughness, loyalty=loyalty,
-                keywords=keywords, layout=layout, digital=digital)
+
+def card(
+    name,
+    id_=None,
+    set_="tst",
+    rarity="common",
+    type_line="Creature — Human",
+    mana_cost="{1}",
+    cmc=1.0,
+    colors="",
+    color_identity="",
+    oracle_text=None,
+    power=None,
+    toughness=None,
+    loyalty=None,
+    keywords="",
+    layout="normal",
+    digital=False,
+):
+    return dict(
+        id=id_ or f"scry-{name.lower().replace(' ', '-')}-{set_}",
+        name=name,
+        set=set_,
+        rarity=rarity,
+        type_line=type_line,
+        mana_cost=mana_cost,
+        cmc=cmc,
+        colors=colors,
+        color_identity=color_identity,
+        oracle_text=oracle_text,
+        power=power,
+        toughness=toughness,
+        loyalty=loyalty,
+        keywords=keywords,
+        layout=layout,
+        digital=digital,
+    )
 
 
-def face(card_id, index, name, mana_cost="", type_line="", oracle_text=None,
-         colors="", power=None, toughness=None, loyalty=None):
-    return dict(card_id=card_id, face_index=index, name=name,
-                mana_cost=mana_cost, type_line=type_line,
-                oracle_text=oracle_text, colors=colors, power=power,
-                toughness=toughness, loyalty=loyalty)
+def face(
+    card_id,
+    index,
+    name,
+    mana_cost="",
+    type_line="",
+    oracle_text=None,
+    colors="",
+    power=None,
+    toughness=None,
+    loyalty=None,
+):
+    return dict(
+        card_id=card_id,
+        face_index=index,
+        name=name,
+        mana_cost=mana_cost,
+        type_line=type_line,
+        oracle_text=oracle_text,
+        colors=colors,
+        power=power,
+        toughness=toughness,
+        loyalty=loyalty,
+    )
 
 
 def write_scryfall(cards, faces=(), released=None):
@@ -43,75 +88,178 @@ def write_scryfall(cards, faces=(), released=None):
     released = released or {}
     pd.DataFrame(cards).to_parquet(paths.SCRYFALL_CARDS_PARQUET, index=False)
     sets = sorted({c["set"] for c in cards})
-    pd.DataFrame([
-        {"set": s, "set_name": s.upper(), "set_type": "expansion",
-         "released_at": released.get(s, "2024-01-01"), "digital": False}
-        for s in sets
-    ]).to_parquet(paths.SCRYFALL_SETS_PARQUET, index=False)
-    pd.DataFrame(list(faces) or None,
-                 columns=["card_id", "face_index", "name", "mana_cost",
-                          "type_line", "oracle_text", "colors", "power",
-                          "toughness", "loyalty"]
-                 ).to_parquet(paths.SCRYFALL_FACES_PARQUET, index=False)
+    pd.DataFrame(
+        [
+            {
+                "set": s,
+                "set_name": s.upper(),
+                "set_type": "expansion",
+                "released_at": released.get(s, "2024-01-01"),
+                "digital": False,
+            }
+            for s in sets
+        ]
+    ).to_parquet(paths.SCRYFALL_SETS_PARQUET, index=False)
+    pd.DataFrame(
+        list(faces) or None,
+        columns=[
+            "card_id",
+            "face_index",
+            "name",
+            "mana_cost",
+            "type_line",
+            "oracle_text",
+            "colors",
+            "power",
+            "toughness",
+            "loyalty",
+        ],
+    ).to_parquet(paths.SCRYFALL_FACES_PARQUET, index=False)
 
 
 def hand_cards():
     """Cards covering the featurizer edge cases, plus their face rows."""
     cards = [
-        card("Blazing Torrent", type_line="Instant", mana_cost="{X}{R}",
-             cmc=1.0, colors="R", color_identity="R", rarity="uncommon",
-             oracle_text="Blazing Torrent deals X damage to any target."),
-        card("Moon Howler // Night Terror", type_line=(
-             "Creature — Human Werewolf // Creature — Nightmare"),
-             mana_cost=None, cmc=2.0, colors="", color_identity="G",
-             layout="transform", keywords="Trample",
-             oracle_text=None, power=None, toughness=None),
-        card("Bright Hall // Shimmering Cavern",
-             type_line="Creature — Wall // Land", mana_cost=None, cmc=3.0,
-             colors="", color_identity="W", layout="modal_dfc"),
-        card("Formless Mass", type_line="Creature — Ooze",
-             mana_cost="{3}{B}", cmc=4.0, colors="B", color_identity="B",
-             power="*", toughness="3",
-             oracle_text=("When Formless Mass enters, draw a card.\n"
-                          "{T}: Add {B}.")),
-        card("Steel Trinket", type_line="Artifact", mana_cost="{2}",
-             cmc=2.0, rarity="rare", oracle_text="{T}: Scry 1."),
-        card("Twinsoul Guard", type_line="Creature — Spirit Soldier",
-             mana_cost="{W/U}{W/U}", cmc=2.0, colors="U,W",
-             color_identity="U,W", power="2", toughness="2",
-             keywords="Flying,Weirdworking"),
-        card("Praetor's Edict", type_line="Sorcery", mana_cost="{1}{B/P}",
-             cmc=2.0, colors="B", color_identity="B", rarity="mythic",
-             oracle_text="Destroy target creature."),
+        card(
+            "Blazing Torrent",
+            type_line="Instant",
+            mana_cost="{X}{R}",
+            cmc=1.0,
+            colors="R",
+            color_identity="R",
+            rarity="uncommon",
+            oracle_text="Blazing Torrent deals X damage to any target.",
+        ),
+        card(
+            "Moon Howler // Night Terror",
+            type_line=("Creature — Human Werewolf // Creature — Nightmare"),
+            mana_cost=None,
+            cmc=2.0,
+            colors="",
+            color_identity="G",
+            layout="transform",
+            keywords="Trample",
+            oracle_text=None,
+            power=None,
+            toughness=None,
+        ),
+        card(
+            "Bright Hall // Shimmering Cavern",
+            type_line="Creature — Wall // Land",
+            mana_cost=None,
+            cmc=3.0,
+            colors="",
+            color_identity="W",
+            layout="modal_dfc",
+        ),
+        card(
+            "Formless Mass",
+            type_line="Creature — Ooze",
+            mana_cost="{3}{B}",
+            cmc=4.0,
+            colors="B",
+            color_identity="B",
+            power="*",
+            toughness="3",
+            oracle_text=("When Formless Mass enters, draw a card.\n" "{T}: Add {B}."),
+        ),
+        card(
+            "Steel Trinket",
+            type_line="Artifact",
+            mana_cost="{2}",
+            cmc=2.0,
+            rarity="rare",
+            oracle_text="{T}: Scry 1.",
+        ),
+        card(
+            "Twinsoul Guard",
+            type_line="Creature — Spirit Soldier",
+            mana_cost="{W/U}{W/U}",
+            cmc=2.0,
+            colors="U,W",
+            color_identity="U,W",
+            power="2",
+            toughness="2",
+            keywords="Flying,Weirdworking",
+        ),
+        card(
+            "Praetor's Edict",
+            type_line="Sorcery",
+            mana_cost="{1}{B/P}",
+            cmc=2.0,
+            colors="B",
+            color_identity="B",
+            rarity="mythic",
+            oracle_text="Destroy target creature.",
+        ),
     ]
     # Eight fillers push Flying over the keyword vocab threshold (>= 8).
     cards += [
-        card(f"Filler Bird {i}", type_line="Creature — Bird",
-             mana_cost="{1}{W}", cmc=2.0, colors="W", color_identity="W",
-             power="1", toughness="1", keywords="Flying")
+        card(
+            f"Filler Bird {i}",
+            type_line="Creature — Bird",
+            mana_cost="{1}{W}",
+            cmc=2.0,
+            colors="W",
+            color_identity="W",
+            power="1",
+            toughness="1",
+            keywords="Flying",
+        )
         for i in range(8)
     ]
     faces = [
-        face("scry-moon-howler-//-night-terror-tst", 0, "Moon Howler",
-             mana_cost="{1}{G}", type_line="Creature — Human Werewolf",
-             colors="G", power="2", toughness="2",
-             oracle_text="At the beginning of each upkeep, transform Moon Howler."),
-        face("scry-moon-howler-//-night-terror-tst", 1, "Night Terror",
-             type_line="Creature — Nightmare", colors="B", power="5",
-             toughness="5", oracle_text="Night Terror attacks each combat."),
-        face("scry-bright-hall-//-shimmering-cavern-tst", 0, "Bright Hall",
-             mana_cost="{2}{W}", type_line="Creature — Wall", colors="W",
-             power="0", toughness="4"),
-        face("scry-bright-hall-//-shimmering-cavern-tst", 1,
-             "Shimmering Cavern", type_line="Land",
-             oracle_text="{T}: Add {W}."),
+        face(
+            "scry-moon-howler-//-night-terror-tst",
+            0,
+            "Moon Howler",
+            mana_cost="{1}{G}",
+            type_line="Creature — Human Werewolf",
+            colors="G",
+            power="2",
+            toughness="2",
+            oracle_text="At the beginning of each upkeep, transform Moon Howler.",
+        ),
+        face(
+            "scry-moon-howler-//-night-terror-tst",
+            1,
+            "Night Terror",
+            type_line="Creature — Nightmare",
+            colors="B",
+            power="5",
+            toughness="5",
+            oracle_text="Night Terror attacks each combat.",
+        ),
+        face(
+            "scry-bright-hall-//-shimmering-cavern-tst",
+            0,
+            "Bright Hall",
+            mana_cost="{2}{W}",
+            type_line="Creature — Wall",
+            colors="W",
+            power="0",
+            toughness="4",
+        ),
+        face(
+            "scry-bright-hall-//-shimmering-cavern-tst",
+            1,
+            "Shimmering Cavern",
+            type_line="Land",
+            oracle_text="{T}: Add {W}.",
+        ),
     ]
     return cards, faces
 
 
-HAND_NAMES = ["Blazing Torrent", "Moon Howler", "Bright Hall",
-              "Formless Mass", "Steel Trinket", "Twinsoul Guard",
-              "Praetor's Edict"] + [f"Filler Bird {i}" for i in range(8)]
+HAND_NAMES = [
+    "Blazing Torrent",
+    "Moon Howler",
+    "Bright Hall",
+    "Formless Mass",
+    "Steel Trinket",
+    "Twinsoul Guard",
+    "Praetor's Edict",
+] + [f"Filler Bird {i}" for i in range(8)]
 
 
 @pytest.fixture
@@ -131,15 +279,22 @@ def featurized(manifest, names):
 # ---------------------------------------------------------------------------
 # Manifest: frozen dims, vocab rules, stable ordering + hash.
 
+
 def big_universe():
     """141 subtype candidates (Zebra on 10 cards beats 140 singletons)."""
     cards = []
     for i in range(140):
         zebra = " Zebra" if i < 10 else ""
         kw = "Flying" if i < 8 else ("Cascade" if i < 15 else "")
-        cards.append(card(f"Card {i:03d}",
-                          type_line=f"Creature — Sub{i:03d}{zebra}",
-                          power="1", toughness="1", keywords=kw))
+        cards.append(
+            card(
+                f"Card {i:03d}",
+                type_line=f"Creature — Sub{i:03d}{zebra}",
+                power="1",
+                toughness="1",
+                keywords=kw,
+            )
+        )
     return cards
 
 
@@ -151,7 +306,8 @@ def test_manifest_frozen_dims_and_vocab_rules(data_root):
     # Subtype vocab caps at 128, ranked by unique-card count then name.
     assert len(manifest["subtype_vocab"]) == 128
     assert manifest["subtype_vocab"] == (
-        ["Zebra"] + [f"Sub{i:03d}" for i in range(127)])
+        ["Zebra"] + [f"Sub{i:03d}" for i in range(127)]
+    )
 
     # Keyword vocab: >= 8 unique cards (Flying: 8 in, Cascade: 7 out).
     assert manifest["keyword_vocab"] == ["Flying"]
@@ -195,6 +351,7 @@ def test_manifest_roundtrips_through_json(hand_universe, data_root):
 
 # ---------------------------------------------------------------------------
 # Featurize: hand-built cards.
+
 
 def test_x_spell(hand_universe):
     frame, _ = featurized(hand_universe, ["Blazing Torrent"])
@@ -240,8 +397,13 @@ def test_power_star_creature(hand_universe):
     assert row["power_scaled"] == 0.0
     assert row["toughness_scaled"] == 3 / 8 and row["toughness_star"] == 0.0
     # Text flags: trigger + ETB + draw + activated + mana ability; 2 lines.
-    for flag in ["flag_triggered", "flag_etb", "flag_draw",
-                 "flag_activated", "flag_mana_ability"]:
+    for flag in [
+        "flag_triggered",
+        "flag_etb",
+        "flag_draw",
+        "flag_activated",
+        "flag_mana_ability",
+    ]:
         assert row[flag] == 1.0, flag
     assert row["text_lines"] == pytest.approx(2 / 6)
     assert row["text_len"] > 0.0
@@ -283,8 +445,7 @@ def test_phyrexian_pip(hand_universe):
 
 def test_unmatched_name_hard_fails(hand_universe):
     with pytest.raises(featurize.UnmatchedNamesError) as excinfo:
-        featurize.featurize(["Blazing Torrent", "Not A Real Card"],
-                            hand_universe)
+        featurize.featurize(["Blazing Torrent", "Not A Real Card"], hand_universe)
     assert "Not A Real Card" in str(excinfo.value)
     assert excinfo.value.names == ["Not A Real Card"]
 
@@ -292,17 +453,25 @@ def test_unmatched_name_hard_fails(hand_universe):
 def test_printing_preference(data_root):
     """In-expansion beats newer printings; paper beats newer digital."""
     write_scryfall(
-        [card("Dual Print", set_="tst", rarity="common"),
-         card("Dual Print", set_="new", rarity="mythic"),
-         card("Paper First", set_="old", rarity="uncommon"),
-         card("Paper First", set_="dig", rarity="rare", digital=True)],
-        released={"tst": "2023-01-01", "new": "2025-06-01",
-                  "old": "2020-01-01", "dig": "2025-01-01"},
+        [
+            card("Dual Print", set_="tst", rarity="common"),
+            card("Dual Print", set_="new", rarity="mythic"),
+            card("Paper First", set_="old", rarity="uncommon"),
+            card("Paper First", set_="dig", rarity="rare", digital=True),
+        ],
+        released={
+            "tst": "2023-01-01",
+            "new": "2025-06-01",
+            "old": "2020-01-01",
+            "dig": "2025-01-01",
+        },
     )
     manifest = featurize.build_manifest({"TST": ["Dual Print", "Paper First"]})
     _, prov = featurize.featurize(
-        ["Dual Print", "Paper First"], manifest,
-        prefer_sets_by_name={"Dual Print": ["TST"], "Paper First": ["TST"]})
+        ["Dual Print", "Paper First"],
+        manifest,
+        prefer_sets_by_name={"Dual Print": ["TST"], "Paper First": ["TST"]},
+    )
     by_name = {p["name"]: p for p in prov}
     assert by_name["Dual Print"]["set"] == "tst"
     assert by_name["Dual Print"]["in_expansion"] is True
@@ -312,8 +481,10 @@ def test_printing_preference(data_root):
 
 def test_digital_only_falls_back_to_newest_digital(data_root):
     write_scryfall(
-        [card("Arena Only", set_="ydg", digital=True),
-         card("Arena Only", set_="yol", digital=True)],
+        [
+            card("Arena Only", set_="ydg", digital=True),
+            card("Arena Only", set_="yol", digital=True),
+        ],
         released={"ydg": "2022-01-01", "yol": "2023-01-01"},
     )
     manifest = featurize.build_manifest({"TST": ["Arena Only"]})
@@ -348,9 +519,11 @@ def test_back_face_name_matches(hand_universe):
 # ---------------------------------------------------------------------------
 # scripts/build_card_features.py end-to-end on the synthetic universe.
 
+
 def _load_script():
     spec = importlib.util.spec_from_file_location(
-        "build_card_features", SCRIPTS / "build_card_features.py")
+        "build_card_features", SCRIPTS / "build_card_features.py"
+    )
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -408,6 +581,27 @@ def test_build_script_refuses_msh(data_root, capsys):
         script.main(["--sets", "MSH"])
     assert excinfo.value.code == 2
     assert "EVAL_ONLY" in capsys.readouterr().err
+
+
+def test_build_script_encodes_holdout_without_fitting_it(data_root):
+    cards, faces = hand_cards()
+    cards.append(card("Held Out Card", set_="msh", keywords="Secret Keyword"))
+    write_scryfall(cards, faces)
+    _write_vocab("TST", "PremierDraft", HAND_NAMES)
+    _write_vocab("MSH", "PremierDraft", ["Held Out Card"])
+
+    script = _load_script()
+    script.main(["--sets", "TST", "MSH", "--holdout", "MSH"])
+
+    manifest = featurize.load_manifest()
+    assert manifest["training_sets"] == ["TST"]
+    assert "Secret Keyword" not in manifest["keyword_vocab"]
+    frame = pd.read_parquet(paths.CARDFEATS_PARQUET)
+    assert "held out card" in set(frame["name_norm"])
+    with open(paths.meta_path(paths.CARDFEATS_PARQUET)) as fh:
+        meta = json.load(fh)
+    assert meta["manifest_sets"] == ["TST"]
+    assert meta["holdout_sets"] == ["MSH"]
 
 
 def test_build_script_discovers_sets_from_disk(data_root):

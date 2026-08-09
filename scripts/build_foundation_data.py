@@ -19,10 +19,25 @@ from mtga.lands import corpus, names, paths
 def create_parser():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sets", default=None, help="comma list; default corpus")
-    parser.add_argument("--extras", default="",
-                         help="comma-separated corpus.EXTRAS keys to append "
-                              "(opt-in ablation shards, e.g. VOW.QuickDraft; "
-                              "never included by default)")
+    parser.add_argument(
+        "--extras",
+        default="",
+        help="comma-separated corpus.EXTRAS keys to append "
+        "(opt-in ablation shards, e.g. VOW.QuickDraft; "
+        "never included by default)",
+    )
+    parser.add_argument(
+        "--features-only",
+        action="store_true",
+        help="refresh features.npz in existing shards without rebuilding "
+        "their memmapped pick arrays",
+    )
+    parser.add_argument(
+        "--eval-sets",
+        default="",
+        help="comma-separated held-out set codes to refresh from existing "
+        "shard directories; valid only with --features-only",
+    )
     parser.add_argument("--force", action="store_true")
     return parser
 
@@ -57,7 +72,7 @@ def load_feature_lookup():
         struct_part = struct[rows]
         text_part = emb_matrix[erows]
         features = np.concatenate([struct_part, text_part], axis=1).astype(np.float16)
-        rarity_ids = struct_part[:, r0:r0 + n_rarity].argmax(axis=1).astype(np.uint8)
+        rarity_ids = struct_part[:, r0 : r0 + n_rarity].argmax(axis=1).astype(np.uint8)
         return features, rarity_ids
 
     return manifest, table_for
@@ -73,6 +88,22 @@ def main():
     if args.extras:
         extra_keys = [e.strip() for e in args.extras.split(",") if e.strip()]
         pairs += corpus.extras_jobs(extra_keys)
+    eval_sets = {s.strip().upper() for s in args.eval_sets.split(",") if s.strip()}
+    if eval_sets and not args.features_only:
+        raise SystemExit("--eval-sets requires --features-only")
+    for code in sorted(eval_sets):
+        prefix = f"{code}."
+        found = sorted(
+            p
+            for p in (paths.DATA_ROOT / "foundation" / "shards").glob(f"{code}.*")
+            if p.is_dir()
+        )
+        if not found:
+            raise SystemExit(f"no existing shard directories found for {code}")
+        pairs.extend((code, p.name[len(prefix) :]) for p in found)
+
+    # Preserve caller order while refusing an accidental duplicate refresh.
+    pairs = list(dict.fromkeys(pairs))
 
     manifest, table_for = load_feature_lookup()
     for set_code, fmt in pairs:
@@ -84,12 +115,21 @@ def main():
         features, rarity_ids = table_for(vocab)
         out = dataset.shard_dir(set_code, fmt)
         out.mkdir(parents=True, exist_ok=True)
-        np.savez(out / "features.npz", features=features, rarity_ids=rarity_ids,
-                 names=np.array(vocab, dtype=object),
-                 manifest_hash=manifest["content_hash"])
+        np.savez(
+            out / "features.npz",
+            features=features,
+            rarity_ids=rarity_ids,
+            names=np.array(vocab, dtype=object),
+            manifest_hash=manifest["content_hash"],
+        )
+        if args.features_only:
+            print(f"{set_code} {fmt}: FEATURES REFRESHED " f"(vocab {len(vocab)})")
+            continue
         result = dataset.build_shard(set_code, fmt, force=args.force)
-        print(f"{set_code} {fmt}: {result['status']} "
-              f"({result.get('rows', '-')} rows, vocab {len(vocab)})")
+        print(
+            f"{set_code} {fmt}: {result['status']} "
+            f"({result.get('rows', '-')} rows, vocab {len(vocab)})"
+        )
 
 
 if __name__ == "__main__":
