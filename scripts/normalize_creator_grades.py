@@ -39,11 +39,20 @@ CYCLE_EXPANSIONS = {
 SOURCES = [
     # (source key, relative path, value column name in the input)
     ("nizzahon", "nizzahon/hob_grades_20260803.csv", "Card Grade"),
-    ("limited_resources", "limited-resources/data/lr865_hob_grades_20260804.csv", "Card Grade"),
+    (
+        "limited_resources",
+        "limited-resources/data/lr865_hob_grades_20260804.csv",
+        "Card Grade",
+    ),
     ("draftsim_review", "draftsim/draftsim_grades_20260803.tsv", "Card Grade"),
     ("draftsim_pickorder", "draftsim/draftsim_pickorder_20260806.tsv", "Card Rating"),
-    ("limited_level_ups", "Chord_O_Calls/Chord_O_Calls_grades_20260805.tsv", "Card Grade"),
+    (
+        "limited_level_ups",
+        "Chord_O_Calls/Chord_O_Calls_grades_20260805.tsv",
+        "Card Grade",
+    ),
     ("cardgamebase", "cardgamebase/cardgamebase_grades_20260801.tsv", "Card Grade"),
+    ("nicolai_bola", "nicolai-bola/nicolai-bola_grades_20260809.tsv", "Card Grade"),
 ]
 
 
@@ -84,7 +93,9 @@ def main() -> None:
             if key_ in CYCLE_EXPANSIONS:
                 for member in CYCLE_EXPANSIONS[key_]:
                     matched.append((canonical[fold(member)], grade))
-                fuzzy[raw_name] = f"expanded to {len(CYCLE_EXPANSIONS[key_])} cycle members"
+                fuzzy[raw_name] = (
+                    f"expanded to {len(CYCLE_EXPANSIONS[key_])} cycle members"
+                )
                 continue
             canon = canonical.get(key_)
             if canon is None:
