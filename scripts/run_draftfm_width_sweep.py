@@ -47,6 +47,13 @@ def validate_assets(data_root, expected_holdout):
     if not manifest_path.exists():
         raise SystemExit(f"missing feature manifest: {manifest_path}")
     manifest = json.loads(manifest_path.read_text())
+    recorded_holdout = set(manifest.get("holdout_sets", []))
+    if recorded_holdout != set(expected_holdout):
+        raise SystemExit(
+            "feature manifest holdouts do not match the sweep: "
+            f"manifest={sorted(recorded_holdout)}, "
+            f"sweep={sorted(expected_holdout)}"
+        )
     trained = set(manifest.get("training_sets", []))
     leaked = trained & set(expected_holdout)
     if leaked:
@@ -74,6 +81,17 @@ def validate_assets(data_root, expected_holdout):
             f"stale={stale_features[:5]}"
         )
     return manifest
+
+
+def git_revision():
+    result = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return result.stdout.strip()
 
 
 def parameter_count(width):
@@ -120,6 +138,7 @@ def main(argv=None):
     plan = {
         "name": args.name,
         "created_utc": datetime.now(timezone.utc).isoformat(),
+        "git_revision": git_revision(),
         "data_root": str(data_root),
         "holdout_sets": list(holdout),
         "training_manifest_hash": manifest["content_hash"],
