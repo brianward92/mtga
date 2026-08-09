@@ -373,7 +373,66 @@ def cluster_bootstrap_means(frame, b=BOOTSTRAP_B, seed=BOOTSTRAP_SEED):
     return result
 
 
-def selftest_bootstrap(frame, b=100, seed=BOOTSTRAP_SEED, tol=1e-9):
+def cluster_bootstrap_ece(frame, b=BOOTSTRAP_B, seed=BOOTSTRAP_SEED, bins=None):
+    """Cluster bootstrap CI for top-label ECE, on the same by-draft resamples.
+
+    ECE is not a mean over picks, so the sums/counts kernel above does not
+    apply. Two facts make it affordable anyway.
+
+    First, evalproto's binned ECE collapses to a difference of sums: a bin
+    contributes ``(n_bin/N) * |mean(correct) - mean(confidence)|``, which is
+    ``|sum(correct) - sum(confidence)| / N``. So only the per-(draft, bin) sum
+    of ``correct - confidence`` and the per-draft pick count are needed, and a
+    resample is a matrix-vector product against the draft multiplicities.
+
+    Second, the bin EDGES are held at the full-sample equal-mass edges rather
+    than recomputed per resample. That is the documented approximation here:
+    it isolates sampling variability in the bin statistics instead of also
+    jittering the boundaries. selftest_bootstrap measures the resulting CI
+    discrepancy against the literal evalproto estimator on a subsample.
+
+    Draws are regenerated from the same seed and the same draft count, so they
+    are the identical resamples the mean statistics use.
+    """
+    bins = bins or evalproto.ECE_BINS
+    confidence = frame["top_prob"].to_numpy(dtype=np.float64)
+    correct = (frame["target_rank"].to_numpy() == 1).astype(np.float64)
+    codes, uniques = pd.factorize(frame["draft_id"], sort=False)
+    n = len(uniques)
+    total = len(frame)
+    if n == 0 or total == 0:
+        return {
+            "point": float("nan"),
+            "lo": float("nan"),
+            "hi": float("nan"),
+            "reps": np.full(b, np.nan),
+        }
+
+    # Full-sample equal-mass bin assignment, matching evalproto.ece exactly.
+    order = np.argsort(confidence, kind="stable")
+    edges = np.linspace(0, total, bins + 1).astype(int)
+    bin_of_position = np.repeat(np.arange(bins), np.diff(edges))
+    bin_id = np.empty(total, dtype=np.int64)
+    bin_id[order] = bin_of_position
+
+    flat = codes.astype(np.int64) * bins + bin_id
+    deltas = np.bincount(
+        flat, weights=correct - confidence, minlength=n * bins
+    ).reshape(n, bins)
+    per_draft = np.bincount(codes, minlength=n).astype(np.float64)
+
+    point = float(np.abs(deltas.sum(axis=0)).sum() / total)
+    rng = np.random.default_rng(seed)
+    reps = np.empty(b)
+    for i in range(b):
+        chosen = rng.integers(0, n, size=n)
+        multiplicity = np.bincount(chosen, minlength=n).astype(np.float64)
+        reps[i] = np.abs(multiplicity @ deltas).sum() / (multiplicity @ per_draft)
+    low, high = np.percentile(reps, [2.5, 97.5])
+    return {"point": point, "lo": float(low), "hi": float(high), "reps": reps}
+
+
+def selftest_bootstrap(frame, b=100, seed=BOOTSTRAP_SEED, tol=1e-9, ece_tol=2e-3):
     """Assert the fast kernel reproduces evalproto.cluster_bootstrap."""
     fast = cluster_bootstrap_means(frame, b=b, seed=seed)
     reference = {
@@ -400,6 +459,35 @@ def selftest_bootstrap(frame, b=100, seed=BOOTSTRAP_SEED, tol=1e-9):
                 f"{(point, low, high)} vs fast "
                 f"{(got['point'], got['lo'], got['hi'])}"
             )
+
+    # ECE: the fixed-edge kernel is an approximation of the literal estimator,
+    # so this check reports the discrepancy rather than demanding zero.
+    reference_ece = evalproto.cluster_bootstrap(frame, evalproto.ece, b=b, seed=seed)
+    fast_ece = cluster_bootstrap_ece(frame, b=b, seed=seed)
+    point, low, high = reference_ece
+    deltas = {
+        "point": abs(point - fast_ece["point"]),
+        "lo": abs(low - fast_ece["lo"]),
+        "hi": abs(high - fast_ece["hi"]),
+    }
+    report["ece"] = {
+        "reference": [point, low, high],
+        "fast": [fast_ece["point"], fast_ece["lo"], fast_ece["hi"]],
+        "max_abs_delta": max(deltas.values()),
+        "tolerance": ece_tol,
+        "note": "fixed full-sample equal-mass bin edges across resamples",
+    }
+    if deltas["point"] > tol:
+        raise SystemExit(
+            f"ECE point estimate FAILED: reference {point} vs fast "
+            f"{fast_ece['point']} (must match evalproto.ece exactly)"
+        )
+    if max(deltas.values()) > ece_tol:
+        raise SystemExit(
+            f"ECE bootstrap CI discrepancy {max(deltas.values()):.2e} exceeds "
+            f"{ece_tol:.2e}: reference {reference_ece} vs fast "
+            f"{(fast_ece['point'], fast_ece['lo'], fast_ece['hi'])}"
+        )
     return report
 
 
@@ -610,12 +698,12 @@ def read_predictions(preds_dir, tag, set_code):
 def block_metrics(frame, b, seed):
     """One reporting cell: point estimates, CIs, ECE, and bootstrap reps."""
     boot = cluster_bootstrap_means(frame, b=b, seed=seed)
+    boot["ece"] = cluster_bootstrap_ece(frame, b=b, seed=seed)
     row = {
         "n_picks": int(len(frame)),
         "n_drafts": int(pd.unique(frame["draft_id"]).size),
-        "ece": evalproto.ece(frame),
     }
-    for name in ("top1", "top3", "log_loss"):
+    for name in ("top1", "top3", "log_loss", "ece"):
         row[name] = boot[name]["point"]
         row[f"{name}_lo"] = boot[name]["lo"]
         row[f"{name}_hi"] = boot[name]["hi"]
@@ -660,10 +748,14 @@ def format_nats(row, name):
     return f"{row[name]:.4f} " f"[{row[f'{name}_lo']:.4f}, {row[f'{name}_hi']:.4f}]"
 
 
+def format_ece(row):
+    return f"{row['ece']:.4f} [{row['ece_lo']:.4f}, {row['ece_hi']:.4f}]"
+
+
 def markdown_table(rows, models):
     lines = [
         "| slice | picks | model | n picks | n drafts | top-1 % [95% CI] | "
-        "top-3 % [95% CI] | log loss [95% CI] | ECE |",
+        "top-3 % [95% CI] | log loss [95% CI] | ECE [95% CI] |",
         "|---|---|---|---|---|---|---|---|---|",
     ]
     for slice_name in ("all", "expert"):
@@ -683,7 +775,7 @@ def markdown_table(rows, models):
                     f"| {slice_name} | {policy} | {tag} | {row['n_picks']:,} | "
                     f"{row['n_drafts']:,} | {format_pct(row, 'top1')} | "
                     f"{format_pct(row, 'top3')} | {format_nats(row, 'log_loss')} | "
-                    f"{row['ece']:.4f} |"
+                    f"{format_ece(row)} |"
                 )
     return lines
 
@@ -938,9 +1030,8 @@ def phase_report(args):
                     "picks": policy,
                     "n_picks": int(sum(r["n_picks"] for r in per_set)),
                     "n_drafts": int(sum(r["n_drafts"] for r in per_set)),
-                    "ece": float(np.mean([r["ece"] for r in per_set])),
                 }
-                for name in ("top1", "top3", "log_loss"):
+                for name in ("top1", "top3", "log_loss", "ece"):
                     stacked = np.mean([set_reps[k][name] for k in keys], axis=0)
                     low, high = np.percentile(stacked, [2.5, 97.5])
                     row[name] = float(np.mean([r[name] for r in per_set]))
@@ -1012,6 +1103,12 @@ def phase_report(args):
         f"Featurizer manifest: `{manifest_sha}`  ",
         f"Bootstrap: cluster by draft, B={args.bootstrap}, seed={args.seed}  ",
         "",
+        "Every 95% CI in this report is a percentile cluster bootstrap over "
+        f"drafts on the same B={args.bootstrap} resamples (seed {args.seed}). "
+        f"ECE uses {evalproto.ECE_BINS} equal-mass bins whose edges are fixed "
+        "at the full-sample values across resamples; the run's self-test "
+        "reports the resulting CI discrepancy against the literal estimator.",
+        "",
         "BRO, FDN, and MSH are whole-set **development** environments for this "
         "rebuild, not untouched final tests. They informed architecture "
         "selection, so these numbers are optimistic relative to a "
@@ -1079,14 +1176,49 @@ def phase_report(args):
             )
     (reports / "summary.md").write_text("\n".join(lines) + "\n")
 
+    # Phase B derives everything from the cached parquets, so their integrity
+    # is the whole chain of custody: re-verify the hashes phase A recorded.
+    mismatches = []
+    for meta in metas:
+        path = preds_dir / meta["model_id"] / f"{meta['set']}.{meta['format']}.parquet"
+        actual = runlog.file_sha256(path)
+        if actual != meta["parquet_sha256"]:
+            mismatches.append(
+                {
+                    "file": str(path),
+                    "recorded": meta["parquet_sha256"],
+                    "actual": actual,
+                }
+            )
+    if mismatches:
+        raise SystemExit(
+            f"prediction parquet sha256 mismatch on {len(mismatches)} file(s): "
+            f"{mismatches[0]['file']} — the cache changed since phase A"
+        )
+
     provenance = {
         "protocol": PROTOCOL_TAG,
         "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
         "git_sha": runlog.git_sha(),
         "platform": platform.platform(),
-        "bootstrap": {"b": args.bootstrap, "seed": args.seed},
+        "bootstrap": {
+            "b": args.bootstrap,
+            "seed": args.seed,
+            "unit": "draft",
+            "method": "percentile cluster bootstrap",
+            "ece_bins": evalproto.ECE_BINS,
+            "ece_bin_edges": "fixed at full-sample equal-mass values",
+        },
         "featurizer_manifest_sha": manifest_sha,
         "bootstrap_selftest_vs_evalproto": selftest,
+        "phase_a": {
+            "rerun_from_cache_only": True,
+            "code_commit": args.phase_a_code_commit or None,
+            "parquet_sha256_verified": True,
+            "n_parquets_verified": len(metas),
+            "valid_input_assets": args.phase_a_inputs or None,
+            "note": args.phase_a_note or None,
+        },
         "checkpoints": {
             m["model_id"]: {
                 "run_id": m["run_id"],
@@ -1155,6 +1287,17 @@ def create_parser():
     report.add_argument("--seed", type=int, default=BOOTSTRAP_SEED)
     report.add_argument("--selftest-b", type=int, default=100)
     report.add_argument("--require-plots", action="store_true")
+    report.add_argument(
+        "--phase-a-code-commit",
+        default="",
+        help="commit whose code produced the cached prediction parquets",
+    )
+    report.add_argument(
+        "--phase-a-inputs",
+        default="",
+        help="the only asset set a future phase A re-run may be pointed at",
+    )
+    report.add_argument("--phase-a-note", default="", help="chain-of-custody note")
     report.set_defaults(func=phase_report)
     return parser
 

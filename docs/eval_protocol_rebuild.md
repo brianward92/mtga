@@ -122,7 +122,7 @@ model's `target_rank` be `1 + #{candidates with strictly greater logit}`.
 - **Top-label ECE**: expected calibration error of the model's own argmax.
   Confidence is the probability of the argmax candidate; accuracy is whether
   that argmax matched the human pick. **15 equal-mass bins** (equal pick count
-  per bin, not equal width), weighted by bin size. Point estimate only.
+  per bin, not equal width), weighted by bin size.
 
 Top-1 uses the rank definition, not `argmax`, so that a tie with the human's
 card counts as agreement. The two definitions can differ only on exact
@@ -155,10 +155,11 @@ as the sole headline.
 ## 7. Confidence intervals
 
 Percentile **cluster bootstrap with the draft as the resampling unit**,
-**B = 1000** resamples, fixed seed, on top-1, top-3, and mean log loss. Drafts
-are drawn with replacement, `n` from `n`, and the statistic is recomputed on
-the resampled collection of whole drafts; the 2.5th and 97.5th percentiles form
-the interval.
+**B = 1000** resamples, fixed seed, on **every reported metric** — top-1,
+top-3, mean log loss, and ECE. Drafts are drawn with replacement, `n` from
+`n`, and the statistic is recomputed on the resampled collection of whole
+drafts; the 2.5th and 97.5th percentiles form the interval. All four metrics
+share the identical resamples, so their intervals are mutually consistent.
 
 The reference implementation is `mtga.foundation.evalproto.cluster_bootstrap`,
 which materializes a resampled frame per iteration and is not affordable at
@@ -170,8 +171,25 @@ Group order (first appearance) and the per-iteration draw
 self-test asserts the two agree to floating-point tolerance on a subsample
 before any full-population number is produced.
 
-ECE is not bootstrapped, matching v0.1: a binned statistic is out of the
-mean-decomposable family above, and it is reported as a point estimate.
+ECE needs its own kernel, because a binned statistic is outside the
+mean-decomposable family above. Two facts make it affordable. First, the
+binned ECE collapses to a difference of sums — a bin contributes
+`(n_bin/N) * |mean(correct) - mean(confidence)|`, which is
+`|sum(correct) - sum(confidence)| / N` — so only the per-(draft, bin) sum of
+`correct - confidence` and the per-draft pick count are needed, and a resample
+is a matrix-vector product against the draft multiplicities. Second, the bin
+**edges are held fixed** at the full-sample equal-mass values rather than
+recomputed per resample.
+
+That fixed-edge choice is the one approximation in the interval machinery. It
+isolates sampling variability in the bin statistics instead of also jittering
+the boundaries, and recomputing edges per resample costs an O(N) sort-and-scan
+per iteration, which is not affordable at 12.6M picks. The ECE **point
+estimate is still exactly `evalproto.ece`** — the rail asserts that — and the
+self-test measures the CI discrepancy against the literal
+`evalproto.cluster_bootstrap(frame, evalproto.ece)` on a subsample, failing if
+it exceeds 2e-3 absolute. The measured discrepancy is recorded in
+`reports/provenance.json` for every run.
 
 ## 8. By-position agreement
 
