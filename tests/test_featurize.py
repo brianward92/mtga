@@ -595,6 +595,7 @@ def test_build_script_encodes_holdout_without_fitting_it(data_root):
 
     manifest = featurize.load_manifest()
     assert manifest["training_sets"] == ["TST"]
+    assert manifest["holdout_sets"] == ["MSH"]
     assert "Secret Keyword" not in manifest["keyword_vocab"]
     frame = pd.read_parquet(paths.CARDFEATS_PARQUET)
     assert "held out card" in set(frame["name_norm"])

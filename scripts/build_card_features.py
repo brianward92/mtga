@@ -160,6 +160,7 @@ def main(argv=None):
     cards, faces = featurize.load_scryfall()
     try:
         manifest = featurize.build_manifest(names_by_set, cards, faces)
+        manifest["holdout_sets"] = sorted(holdout)
         matrix, provenance = featurize.featurize(
             all_names, manifest, cards, faces, prefer_sets_by_name=prefer
         )
