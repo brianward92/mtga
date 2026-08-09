@@ -115,7 +115,12 @@ DISPLAY = {
     "limited_resources": "Limited Resources",
     "limited_level_ups": "Limited Level-Ups",
     "nicolai_bola": "NicolaiBolas",
+    "draftfm": "DraftFM",
 }
+# The paper's tab:creator-agreement excludes the pick order, so the review is
+# labelled plainly "Draftsim" there; tab:hob-expert-sources, which lists both
+# products, is where the "(set review)" qualifier is needed.
+DISPLAY["draftsim_review"] = "Draftsim"
 
 
 def primary(grade):
@@ -193,6 +198,30 @@ def load_sources(paths, drop):
     return letters, underlying, kinds, dropped, excluded
 
 
+def load_sealed(specs, drop):
+    """Ingest a sealed forecast as KEY=PATH.
+
+    The published letters ARE the frozen mapping and are used verbatim -- they
+    are never re-derived here. Metrics 3-5 use the sealed `rank` column
+    (1 = best), negated so that higher is better like every other source. A
+    `display_only_basic` flag, if present, is honoured in addition to `--drop`.
+    """
+    letters, underlying, kinds = {}, {}, {}
+    for spec in specs:
+        key, path = spec.split("=", 1)
+        lets, under = {}, {}
+        with open(path) as f:
+            for row in csv.DictReader(f):
+                name = row["name"]
+                basic = row.get("display_only_basic", "").strip().lower() == "true"
+                if name in drop or basic:
+                    continue
+                lets[name] = row["letter"].strip()
+                under[name] = -float(row["rank"])
+        letters[key], underlying[key], kinds[key] = lets, under, "sealed"
+    return letters, underlying, kinds
+
+
 def top_set(scores, pool, k, inclusive):
     ranked = sorted(pool, key=lambda c: -scores[c])
     cut = scores[ranked[min(k, len(ranked)) - 1]]
@@ -240,35 +269,34 @@ def band_report(letters, kinds):
         for letter, _ in BANDS:
             got = 100.0 * counts[letter] / n
             want = n_target[letter]
-            mark = "  <-- target" if kinds[src] == "numeric" else ""
+            banded = kinds[src] in ("numeric", "sealed")
             lines.append(
                 f"    {letter:<2} {counts[letter]:>4}  {got:5.1f}%"
-                + (f"  target {want:>2}%{mark}" if kinds[src] == "numeric" else "")
+                + (f"  target {want:>2}%" if banded else "")
             )
     return lines
+
+
+def latex_row(r):
+    """One row in tab:creator-agreement's column order and precision."""
+    a = DISPLAY.get(r["source_a"], r["source_a"].replace("_", " "))
+    b = DISPLAY.get(r["source_b"], r["source_b"].replace("_", " "))
+    return (
+        f"{a} vs.\\ {b} & {r['matched_n']} & {r['exact_match_rate']:.3f} & "
+        f"{r['within_one_rate']:.3f} & {r['spearman_rho']:.3f} & "
+        f"{r['kendall_tau_b']:.3f} & {r['top10_overlap']} \\\\"
+    )
 
 
 def latex_block(results, separable):
     """Metrics ordered clearest to least clear; separable rows fenced off."""
     head = [
         r"\hline",
-        r"Pair & $n$ & Exact & Within one & Spearman & "
-        r"Kendall $\tau_b$ & Top-10 \\",
+        r"Pair & $n$ & Exact & Within one & Spearman & Rank agr. & Top-10 \\",
         r"\hline",
     ]
-
-    def row(r):
-        a = DISPLAY.get(r["source_a"], r["source_a"].replace("_", " "))
-        b = DISPLAY.get(r["source_b"], r["source_b"].replace("_", " "))
-        pair = f"{a} vs.\\ {b}"
-        return (
-            f"{pair} & {r['matched_n']} & {r['exact_match_rate']:.3f} & "
-            f"{r['within_one_rate']:.3f} & {r['spearman_rho']:.3f} & "
-            f"{r['kendall_tau_b']:.3f} & {r['top10_overlap']} \\\\"
-        )
-
-    main = [row(r) for r in results if not separable(r)]
-    held = [row(r) for r in results if separable(r)]
+    main = [latex_row(r) for r in results if not separable(r)]
+    held = [latex_row(r) for r in results if separable(r)]
     return "\n".join(head + main + ([r"\hline"] + held if held else []) + [r"\hline"])
 
 
@@ -278,11 +306,23 @@ def main():
     ap.add_argument("--out-dir", required=True)
     ap.add_argument("--drop", action="append", default=list(BASIC_LANDS))
     ap.add_argument("--separable", default="draftsim_pickorder")
+    ap.add_argument(
+        "--sealed",
+        action="append",
+        default=[],
+        help="KEY=PATH of a sealed forecast (name/letter/rank columns). Its "
+        "published letters are used verbatim; ranks come from the rank column.",
+    )
     args = ap.parse_args()
 
     letters, underlying, kinds, dropped, excluded = load_sources(
         args.grades, set(args.drop)
     )
+    s_letters, s_underlying, s_kinds = load_sealed(args.sealed, set(args.drop))
+    letters.update(s_letters)
+    underlying.update(s_underlying)
+    kinds.update(s_kinds)
+    sealed_keys = set(s_letters)
     for src, names in sorted(dropped.items()):
         print(f"note: {src} dropped {len(names)} non-draftable name(s)")
     for src, items in sorted(excluded.items()):
@@ -292,9 +332,18 @@ def main():
     for line in band_report(letters, kinds):
         print(line)
 
+    def kind_of(a, b):
+        if sealed_keys & {a, b}:
+            return "sealed_vs_pickorder" if args.separable in (a, b) else "sealed"
+        return "pickorder" if args.separable in (a, b) else "creator"
+
+    # A sealed forecast is never paired with the separable source: the pick
+    # order is fenced out of the paper's agreement table, so that cell would
+    # have nowhere to go and would invite a comparison Brian has not framed.
     results = [
-        compare(a, b, letters, underlying)
+        compare(a, b, letters, underlying) | {"pair_kind": kind_of(a, b)}
         for a, b in itertools.combinations(sorted(letters), 2)
+        if kind_of(a, b) != "sealed_vs_pickorder"
     ]
     results.sort(key=lambda r: -r["exact_match_rate"])
 
@@ -310,6 +359,13 @@ def main():
     tex = f"{args.out_dir}/agreement_letters_table.tex"
     with open(tex, "w") as f:
         f.write(latex_block(results, separable) + "\n")
+
+    sealed_rows = [r for r in results if r["pair_kind"] == "sealed"]
+    if sealed_rows:
+        sealed_tex = f"{args.out_dir}/agreement_sealed_rows.tex"
+        with open(sealed_tex, "w") as f:
+            f.write("\n".join(latex_row(r) for r in sealed_rows) + "\n")
+        print(f"wrote {sealed_tex} ({len(sealed_rows)} rows for tab:creator-agreement)")
 
     print()
     hdr = f"{'pair':<46}{'n':>5}{'exact':>8}{'w/in 1':>8}{'rho':>8}{'tau_b':>8}{'top10':>8}"
