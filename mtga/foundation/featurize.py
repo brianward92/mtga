@@ -538,15 +538,18 @@ def _clip(x):
 # Phase (a): the frozen manifest.
 
 
-def build_manifest(names_by_set, cards=None, faces=None):
+def build_manifest(names_by_set, cards=None, faces=None, allow_eval_only=False):
     """Freeze vocabularies + layout from the given TRAINING sets only.
 
     names_by_set: {set_code: [17Lands names]}. EVAL_ONLY sets (MSH) are
     refused — the zero-shot contract is that MSH cards featurize through a
-    manifest they never influenced.
+    manifest they never influenced. allow_eval_only=True waives that for a
+    FINAL all-data model that deliberately spends the held-out set; it
+    invalidates every zero-shot claim about the sets it lets in, so a
+    development manifest must never set it.
     """
     banned = set(names_by_set) & corpus.EVAL_ONLY
-    if banned:
+    if banned and not allow_eval_only:
         raise ValueError(
             f"manifest must never be built from EVAL_ONLY sets: {sorted(banned)}"
         )

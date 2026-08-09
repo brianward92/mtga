@@ -9,6 +9,7 @@ train_draftfm.py --name a_extras --holdout BRO,TMT,SOS --extras VOW.QuickDraft
 
 import argparse
 
+from mtga.foundation.dataset import shard_dir
 from mtga.foundation.train import TrainConfig, train
 from mtga.lands import corpus
 
@@ -28,6 +29,14 @@ def create_parser():
     )
     parser.add_argument(
         "--holdout", default="", help="comma set codes excluded from training"
+    )
+    parser.add_argument(
+        "--include-eval-only",
+        default="",
+        metavar="SETS",
+        help="comma-separated corpus.EVAL_ONLY set codes to ADD to the "
+        "training corpus, from their existing shard dirs. FINAL all-data "
+        "models only: it spends the zero-shot holdout for good.",
     )
     parser.add_argument("--seed", type=int, default=17)
     parser.add_argument("--batch-size", type=int, default=8192)
@@ -69,8 +78,21 @@ def main():
     if args.extras:
         extra_keys = [e.strip() for e in args.extras.split(",") if e.strip()]
         pairs += corpus.extras_jobs(extra_keys)
+    requested_eval_only = [
+        s.strip().upper() for s in args.include_eval_only.split(",") if s.strip()
+    ]
+    for code in requested_eval_only:
+        if code not in corpus.EVAL_ONLY:
+            raise SystemExit(
+                f"--include-eval-only takes EVAL_ONLY codes only, not {code}"
+            )
+        found = sorted(p for p in shard_dir(code, "*").parent.glob(f"{code}.*"))
+        if not found:
+            raise SystemExit(f"no existing shard directories found for {code}")
+        pairs += [(code, p.name[len(code) + 1 :]) for p in found if p.is_dir()]
     holdout = {s.strip().upper() for s in args.holdout.split(",") if s.strip()}
     pairs = [(s, f) for s, f in pairs if s not in holdout]
+    pairs = list(dict.fromkeys(pairs))
 
     config = TrainConfig(
         name=args.name,

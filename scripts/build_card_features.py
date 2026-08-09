@@ -48,6 +48,21 @@ def create_parser():
         "manifest vocabulary fitting (for whole-set evaluation).",
     )
     parser.add_argument(
+        "--scryfall-sets",
+        nargs="*",
+        default=[],
+        metavar="SET",
+        help="Expansions with no curated vocab yet (pre-release): take their "
+        "card names from the Scryfall parquet. Always held out from manifest "
+        "fitting — an unreleased set never contributes vocabulary.",
+    )
+    parser.add_argument(
+        "--allow-eval-only",
+        action="store_true",
+        help="Let corpus.EVAL_ONLY sets (MSH) fit the manifest. FINAL "
+        "all-data models only: it spends the zero-shot holdout for good.",
+    )
+    parser.add_argument(
         "--manifest-out",
         type=Path,
         default=None,
@@ -71,6 +86,16 @@ def discover_sets():
     """Set codes with at least one curated vocab sidecar on disk."""
     vocab_dir = paths.CURATED_DIR / "draft"
     return sorted({p.name.split(".")[0] for p in vocab_dir.glob("*.vocab.json")})
+
+
+def scryfall_names(set_code, cards):
+    """Every card name printed in one Scryfall expansion, deduplicated."""
+    rows = cards[cards["set"].str.lower() == set_code.lower()]
+    if not len(rows):
+        raise FileNotFoundError(
+            f"no Scryfall rows for set {set_code} in " f"{paths.SCRYFALL_CARDS_PARQUET}"
+        )
+    return sorted(set(rows["name"]))
 
 
 def vocab_names(set_code):
@@ -123,7 +148,11 @@ def main(argv=None):
     if not set_codes:
         print(f"no curated vocabs under {paths.CURATED_DIR / 'draft'}", file=sys.stderr)
         sys.exit(2)
-    holdout = {c.strip().upper() for c in args.holdout}
+    # Pre-release expansions carry no curated vocab and no picks; they are
+    # encoded through the frozen manifest and can never fit it.
+    scryfall_codes = [c.strip().upper() for c in args.scryfall_sets]
+    set_codes += [c for c in scryfall_codes if c not in set_codes]
+    holdout = {c.strip().upper() for c in args.holdout} | set(scryfall_codes)
     unknown_holdout = holdout - set(set_codes)
     if unknown_holdout:
         print(
@@ -139,7 +168,7 @@ def main(argv=None):
         )
         sys.exit(2)
     banned = set(training_codes) & corpus.EVAL_ONLY
-    if banned:
+    if banned and not args.allow_eval_only:
         print(
             f"{sorted(banned)} are EVAL_ONLY: the featurizer manifest is "
             f"built from training sets only; pass them via --holdout to "
@@ -147,8 +176,16 @@ def main(argv=None):
             file=sys.stderr,
         )
         sys.exit(2)
+    if banned:
+        print(f"WARNING: fitting the manifest on EVAL_ONLY sets {sorted(banned)}")
 
-    output_names_by_set = {code: vocab_names(code) for code in set_codes}
+    cards, faces = featurize.load_scryfall()
+    output_names_by_set = {
+        code: (
+            scryfall_names(code, cards) if code in scryfall_codes else vocab_names(code)
+        )
+        for code in set_codes
+    }
     names_by_set = {code: output_names_by_set[code] for code in training_codes}
     prefer = {}
     for code, set_names in output_names_by_set.items():
@@ -157,9 +194,10 @@ def main(argv=None):
     all_names = sorted(prefer, key=names.norm_17lands)
     print(f"sets: {', '.join(set_codes)} -> {len(all_names)} unique names")
 
-    cards, faces = featurize.load_scryfall()
     try:
-        manifest = featurize.build_manifest(names_by_set, cards, faces)
+        manifest = featurize.build_manifest(
+            names_by_set, cards, faces, allow_eval_only=args.allow_eval_only
+        )
         manifest["holdout_sets"] = sorted(holdout)
         matrix, provenance = featurize.featurize(
             all_names, manifest, cards, faces, prefer_sets_by_name=prefer
