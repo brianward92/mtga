@@ -33,15 +33,8 @@ BOOTSTRAP_SEED = 20260707
 ECE_BINS = 15
 
 REQUIRED_COLUMNS = [
-    "draft_id",
-    "pack_number",
-    "pick_number",
-    "pack_size",
-    "wr_bucket",
-    "n_games_bucket",
-    "target_rank",
-    "pick_prob",
-    "top_prob",
+    "draft_id", "pack_number", "pick_number", "pack_size", "wr_bucket",
+    "n_games_bucket", "target_rank", "pick_prob", "top_prob",
 ]
 
 
@@ -67,7 +60,6 @@ def non_forced(frame):
 
 
 # -- point statistics --------------------------------------------------------
-
 
 def top1(frame):
     return float((frame["target_rank"] == 1).mean())
@@ -106,7 +98,6 @@ def ece(frame, bins=ECE_BINS):
 
 # -- cluster bootstrap (drafts, not picks, are the sampling unit) -----------
 
-
 def _draft_groups(frame):
     """Row indices grouped by draft_id, in first-appearance order."""
     codes, _ = pd.factorize(frame["draft_id"], sort=False)
@@ -134,9 +125,8 @@ def cluster_bootstrap(frame, stat_fn, b=BOOTSTRAP_B, seed=BOOTSTRAP_SEED):
     return point, float(lo), float(hi)
 
 
-def paired_bootstrap_diff(
-    frame_a, frame_b, stat_fn, b=BOOTSTRAP_B, seed=BOOTSTRAP_SEED
-):
+def paired_bootstrap_diff(frame_a, frame_b, stat_fn, b=BOOTSTRAP_B,
+                          seed=BOOTSTRAP_SEED):
     """CI on stat_fn(A) - stat_fn(B) with SHARED draft resamples.
 
     Frames must cover the same drafts (typically the same picks scored by two
@@ -188,25 +178,22 @@ def intraclass_correlation(frame):
     ss_within = ss_total - ss_between
     ms_between = ss_between / max(n_groups - 1, 1)
     ms_within = ss_within / max(n_total - n_groups, 1)
-    k_bar = (n_total - (k**2).sum() / n_total) / max(n_groups - 1, 1)
+    k_bar = (n_total - (k ** 2).sum() / n_total) / max(n_groups - 1, 1)
     icc = (ms_between - ms_within) / (ms_between + (k_bar - 1) * ms_within)
     return float(max(icc, 0.0))
 
 
 # -- structured analyses -----------------------------------------------------
 
-
 def per_pick_curve(frame):
     """Top-1 and the random floor per (pack_number, pick_number) cell."""
     grouped = frame.groupby(["pack_number", "pick_number"])
     curve = grouped.apply(
-        lambda g: pd.Series(
-            {
-                "top1": (g["target_rank"] == 1).mean(),
-                "random_floor": (1.0 / g["pack_size"]).mean(),
-                "n": len(g),
-            }
-        ),
+        lambda g: pd.Series({
+            "top1": (g["target_rank"] == 1).mean(),
+            "random_floor": (1.0 / g["pack_size"]).mean(),
+            "n": len(g),
+        }),
         include_groups=False,
     )
     return curve.reset_index()
@@ -240,16 +227,10 @@ def summarize(frame, label=""):
     (``pack_size == 1``) are scored trivially -- the model's argmax is the
     lone candidate -- which deflates both calibration numbers.
     """
-    result = {
-        "label": label,
-        "n_picks": len(frame),
-        "n_drafts": frame["draft_id"].nunique(),
-    }
-    for name, fn in [
-        ("top1", top1),
-        ("top3", lambda f: topk(f, 3)),
-        ("log_loss", log_loss),
-    ]:
+    result = {"label": label, "n_picks": len(frame),
+              "n_drafts": frame["draft_id"].nunique()}
+    for name, fn in [("top1", top1), ("top3", lambda f: topk(f, 3)),
+                     ("log_loss", log_loss)]:
         point, lo, hi = cluster_bootstrap(frame, fn)
         result[name] = point
         result[f"{name}_ci"] = [lo, hi]
