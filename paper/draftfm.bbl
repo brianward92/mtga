@@ -1,0 +1,111 @@
+\begin{thebibliography}{15}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Bertram(2025)]{bertram2025}
+Timo Bertram.
+\newblock {UrzaGPT}: {LoRA}-tuned large language models for card selection in
+  collectible card games.
+\newblock arXiv:2508.08382, 2025.
+\newblock URL \url{https://arxiv.org/abs/2508.08382}.
+
+\bibitem[Bertram et~al.(2021)Bertram, F{\"u}rnkranz, and
+  M{\"u}ller]{bertram2021}
+Timo Bertram, Johannes F{\"u}rnkranz, and Martin M{\"u}ller.
+\newblock Predicting human card selection in {Magic: The Gathering} with
+  contextual preference ranking.
+\newblock arXiv:2105.11864, 2021.
+\newblock URL \url{https://arxiv.org/abs/2105.11864}.
+
+\bibitem[Bertram et~al.(2024{\natexlab{a}})Bertram, F{\"u}rnkranz, and
+  M{\"u}ller]{bertram2024a}
+Timo Bertram, Johannes F{\"u}rnkranz, and Martin M{\"u}ller.
+\newblock Learning with generalised card representations for {Magic: The
+  Gathering}.
+\newblock In \emph{Proceedings of the {IEEE} Conference on Games ({CoG})},
+  2024{\natexlab{a}}.
+\newblock URL \url{https://arxiv.org/abs/2407.05879}.
+
+\bibitem[Bertram et~al.(2024{\natexlab{b}})Bertram, F{\"u}rnkranz, and
+  M{\"u}ller]{bertram2024b}
+Timo Bertram, Johannes F{\"u}rnkranz, and Martin M{\"u}ller.
+\newblock Contrastive learning of preferences with a contextual {InfoNCE} loss.
+\newblock arXiv:2407.05898, 2024{\natexlab{b}}.
+\newblock URL \url{https://arxiv.org/abs/2407.05898}.
+
+\bibitem[Bommasani et~al.(2021)]{bommasani2021}
+Rishi Bommasani et~al.
+\newblock On the opportunities and risks of foundation models.
+\newblock arXiv:2108.07258, 2021.
+\newblock URL \url{https://arxiv.org/abs/2108.07258}.
+
+\bibitem[Brooks(2024)]{brooks2024statistical}
+Daniel~J. Brooks.
+\newblock statistical-drafting: Neural-network draft models for {Magic: the
+  Gathering}.
+\newblock \url{https://github.com/danieljbrooks/statistical-drafting}, 2024.
+\newblock Deployed at \url{https://statisticaldrafting.com}; MIT license.
+
+\bibitem[Czerner(2025)]{czerner2025puder}
+Philipp Czerner.
+\newblock puder: A neural network drafting {Magic: the Gathering}.
+\newblock \url{https://nicze.de/philipp/articles/puder/}, 2025.
+\newblock Code: \url{https://github.com/suyjuris/puder}.
+
+\bibitem[{Draftsim}(2026)]{draftsimratings}
+{Draftsim}.
+\newblock Draftsim card ratings.
+\newblock \url{https://draftsim.com/ratings/}, 2026.
+\newblock Initial set ratings are hand-made by human experts.
+
+\bibitem[Lee et~al.(2019)]{lee2019}
+Juho Lee et~al.
+\newblock Set transformer: A framework for attention-based
+  permutation-invariant neural networks.
+\newblock arXiv:1810.00825, 2019.
+\newblock URL \url{https://arxiv.org/abs/1810.00825}.
+
+\bibitem[McFadden(1974)]{mcfadden1974}
+Daniel McFadden.
+\newblock Conditional logit analysis of qualitative choice behavior.
+\newblock In Paul Zarembka, editor, \emph{Frontiers in Econometrics}, pages
+  105--142. Academic Press, 1974.
+\newblock URL \url{https://eml.berkeley.edu/~mcfadden/dlmcv10.html}.
+
+\bibitem[Rigaux and Kashima(2026)]{rigaux2026}
+Tomas Rigaux and Hisashi Kashima.
+\newblock Predicting drafted deck strength for {Magic: the Gathering}.
+\newblock arXiv:2607.04782, 2026.
+\newblock URL \url{https://arxiv.org/abs/2607.04782}.
+
+\bibitem[Vaswani et~al.(2017)]{vaswani2017}
+Ashish Vaswani et~al.
+\newblock Attention is all you need.
+\newblock arXiv:1706.03762, 2017.
+\newblock URL \url{https://arxiv.org/abs/1706.03762}.
+
+\bibitem[Ward et~al.(2021)Ward, Brooks, Troha, Mills, and Khakhalin]{ward2021}
+Henry~N. Ward, Daniel~J. Brooks, Dan Troha, Bobby Mills, and Arseny~S.
+  Khakhalin.
+\newblock {AI} solutions for drafting in {Magic: the Gathering}.
+\newblock arXiv:2009.00655, 2021.
+\newblock URL \url{https://arxiv.org/abs/2009.00655}.
+
+\bibitem[Xia et~al.(2023)Xia, Yang, Ruan, Xing, and Xu]{xia2023}
+Wannian Xia, Yiming Yang, Jingqing Ruan, Dengpeng Xing, and Bo~Xu.
+\newblock Cardsformer: Grounding language to learn a generalizable policy in
+  {Hearthstone}.
+\newblock In \emph{{ECAI} 2023 -- 26th European Conference on Artificial
+  Intelligence}, pages 2720--2727, 2023.
+\newblock URL \url{https://doi.org/10.3233/FAIA230581}.
+
+\bibitem[Xiao et~al.(2023)Xiao, Liu, Zhang, and Muennighoff]{xiao2023}
+Shitao Xiao, Zheng Liu, Peitian Zhang, and Niklas Muennighoff.
+\newblock {C-Pack}: Packaged resources to advance general {Chinese} embedding.
+\newblock arXiv:2309.07597, 2023.
+\newblock URL \url{https://arxiv.org/abs/2309.07597}.
+
+\end{thebibliography}
