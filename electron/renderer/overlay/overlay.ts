@@ -3,7 +3,7 @@
  * Displays deck tracking information during matches
  */
 
-import { escapeHtml, renderManaCost } from './shared'
+import { effectiveZoom, escapeHtml, renderManaCost } from './shared'
 import { initDraftView, isDraftActive, cycleDraftDensity } from './draft-view'
 import { initWindowControls } from './window-controls'
 import { initCalibratePanel } from './calibrate'
@@ -104,8 +104,26 @@ function init(): void {
   initDraftView()
   initWindowControls()
   initCalibratePanel()
+  initArenaScale()
   loadCardData()
   loadWinRate()
+}
+
+/**
+ * Content zoom while glued to Arena: main derives a scale from the Arena
+ * window's size and pushes it here; CSS zoom keeps every measurement
+ * (getBoundingClientRect, innerHeight) in the same DIP space as the window
+ * bounds, which webFrame.setZoomFactor would not. The synthetic resize kicks
+ * the draft view's content-height sync after the reflow.
+ */
+function initArenaScale(): void {
+  window.mtgaTracker?.onOverlayScale?.((scale: number) => {
+    document.documentElement.style.setProperty('zoom', String(scale))
+    // Mirror for stylesheets: viewport units don't shrink with zoom, so
+    // e.g. .overlay's height divides by this to keep painting window-sized
+    document.documentElement.style.setProperty('--overlay-zoom', String(scale))
+    window.dispatchEvent(new Event('resize'))
+  })
 }
 
 /**
@@ -208,16 +226,18 @@ function showTooltip(cardRow: HTMLElement, card: CardInDeck): void {
   // Position INSIDE the panel: the window is exactly the panel's size, so
   // anything placed outside it (the old "to the left of the row" position)
   // is clipped and never visible. Prefer just below the row; flip above
-  // when there's no room.
+  // when there's no room. Rects are in zoomed viewport px while style
+  // lengths render multiplied by the zoom — divide the rect math once.
+  const z = effectiveZoom()
   const rect = cardRow.getBoundingClientRect()
   const overlayRect = overlay.getBoundingClientRect()
 
   const left = 8
-  let top = rect.bottom - overlayRect.top + 4
+  let top = (rect.bottom - overlayRect.top) / z + 4
 
-  const maxTop = overlayRect.height - cardTooltip.offsetHeight - 8
+  const maxTop = overlayRect.height / z - cardTooltip.offsetHeight - 8
   if (top > maxTop) {
-    top = rect.top - overlayRect.top - cardTooltip.offsetHeight - 4
+    top = (rect.top - overlayRect.top) / z - cardTooltip.offsetHeight - 4
   }
   if (top < 0) top = 0
 

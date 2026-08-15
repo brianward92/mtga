@@ -36,6 +36,9 @@ import {
 } from '../overlay/conviction'
 import { flamesFromPercentile } from '../overlay/flames'
 import { convictionCapped } from '../overlay/model-tag'
+import { modelGradeFromPercentile, type ModelGrade } from '../overlay/grades'
+import { arenaDisplayOrder } from './display-order'
+import { intersects } from './hover'
 
 // ---------------------------------------------------------------------------
 // Payload types (mirror main/index.ts)
@@ -45,6 +48,8 @@ interface DraftCardRow {
   grpId: number
   name: string | null
   rarity: string | null
+  colors: string | null
+  type: string | null
   evP1p1: number | null
   ev: number | null
   prob: number | null
@@ -96,6 +101,12 @@ let serverStatus: ServerStatusPayload = { status: 'red', model: null }
 /** True between a pick and the next pack — badges hide (stale otherwise). */
 let cleared = false
 let calibrate: { active: boolean; count: number } = { active: false, count: 14 }
+/** Regions Arena's hover preview is predicted to cover (window px). */
+let hoverRegions: Rect[] = []
+/** Cells (display order) main detected as covered by Arena UI. */
+let coveredCells = new Set<number>()
+/** True while an Arena modal's scrim covers the pack. */
+let covered = false
 
 const root = document.getElementById('badgeRoot')!
 
@@ -133,6 +144,14 @@ interface ChipModel {
   pct: string | null
   top: boolean
   heuristic: boolean
+  /** Set-relative P1P1 grade letter (null when the set curve is unknown). */
+  grade: ModelGrade | null
+  /** 1-based rank within this pack by live EV; null before scores arrive. */
+  rank: number | null
+}
+
+function gradeOf(row: DraftCardRow): ModelGrade | null {
+  return modelGradeFromPercentile(setPctFor(row))?.grade ?? null
 }
 
 /**
@@ -152,7 +171,10 @@ function buildChips(cards: DraftCardRow[]): Array<ChipModel | null> {
       const pct = setPctFor(row)
       const rating = pct !== null ? flamesFromPercentile(pct * 100, { heuristic }) : null
       if (!rating) return null
-      return { rarity: row.rarity, flames: rating.flames, label: null, pct: null, top: false, heuristic }
+      return {
+        rarity: row.rarity, flames: rating.flames, label: null, pct: null, top: false, heuristic,
+        grade: gradeOf(row), rank: null
+      }
     })
   }
 
@@ -185,7 +207,9 @@ function buildChips(cards: DraftCardRow[]): Array<ChipModel | null> {
         label: conviction.label,
         pct: conviction.showPct ? formatDominancePct(conviction.dominance) : null,
         top: true,
-        heuristic
+        heuristic,
+        grade: gradeOf(row),
+        rank: 1
       }
     }
 
@@ -203,7 +227,9 @@ function buildChips(cards: DraftCardRow[]): Array<ChipModel | null> {
       label: isTop ? rating?.label ?? null : null,
       pct: h2h !== null ? formatDominancePct(h2h) : null,
       top: isTop,
-      heuristic
+      heuristic,
+      grade: gradeOf(row),
+      rank: position >= 0 && ranked[position].ev !== null ? position + 1 : null
     }
   })
 }
@@ -225,13 +251,50 @@ function positionStyle(rect: Rect): string {
     `width:${rect.width.toFixed(1)}px;height:${rect.height.toFixed(1)}px`
 }
 
-function chipHtml(chip: ChipModel, rect: Rect): string {
-  const label = chip.label ? `<span class="b-label">${chip.label}</span>` : ''
+/** Strength tier that drives the card frame colour. */
+function tierClass(chip: ChipModel): string {
+  if (chip.top) return 'tier-top'
+  const g = chip.grade
+  if (g) {
+    if (g.startsWith('A')) return 'tier-a'
+    if (g.startsWith('B')) return 'tier-b'
+    if (g.startsWith('C')) return 'tier-c'
+    return 'tier-d'
+  }
+  const f = chip.flames ?? 0
+  return f >= 4 ? 'tier-a' : f >= 3 ? 'tier-b' : f >= 2 ? 'tier-c' : 'tier-d'
+}
+
+function chipHtml(chip: ChipModel, rect: Rect, cell: number): string {
+  const label = '' // conviction label lives on the frame's bottom-right corner
+  const grade = chip.grade ? `<span class="b-grade">${chip.grade}</span>` : ''
   const flames = chip.flames !== null ? flamesHtml(chip.flames) : ''
   const pct = chip.pct ? `<span class="b-pct">${chip.pct}</span>` : ''
   const heur = chip.heuristic ? '<span class="b-heur">≈</span>' : ''
-  const classes = ['badge-chip', rarityClass(chip.rarity), chip.top ? 'top' : 'dim'].join(' ')
-  return `<div class="${classes}" style="${positionStyle(rect)}">${label}${flames}${pct}${heur}</div>`
+  const classes = ['badge-chip', rarityClass(chip.rarity), tierClass(chip), chip.top ? 'top' : 'dim',
+    underHover(rect, cell) ? 'behind' : ''].join(' ')
+  // Centered on the card and sized to content (a fixed width clips the grade).
+  const style = `left:${(rect.x + rect.width / 2).toFixed(1)}px;top:${rect.y.toFixed(1)}px;` +
+    `height:${rect.height.toFixed(1)}px;max-width:${(rect.width * 1.25).toFixed(1)}px`
+  return `<div class="${classes}" style="${style}">${label}${grade}${flames}${pct}${heur}</div>`
+}
+
+/**
+ * Frame that surrounds the whole card face, tinted by strength, with a rank
+ * tag (top three only) in the bottom-left corner — over the artist credit,
+ * never the name, mana cost, or P/T. Radius tracks Arena's card corner.
+ */
+function underHover(rect: Rect, cell: number): boolean {
+  return coveredCells.has(cell) || hoverRegions.some(r => intersects(r, rect))
+}
+
+function frameHtml(chip: ChipModel, card: Rect, cell: number): string {
+  const radius = Math.max(4, card.width * 0.045)
+  const rank = chip.rank !== null && chip.rank <= 3
+    ? `<span class="b-rank">#${chip.rank}</span>` : ''
+  const label = chip.label ? `<span class="b-label">${chip.label}</span>` : ''
+  const classes = ['card-frame', tierClass(chip), chip.top ? 'top' : '', underHover(card, cell) ? 'behind' : ''].join(' ')
+  return `<div class="${classes}" style="${positionStyle(card)};border-radius:${radius.toFixed(1)}px">${rank}${label}</div>`
 }
 
 function renderGhosts(view: { width: number; height: number }): void {
@@ -252,6 +315,7 @@ function render(): void {
 
   const view = { width: window.innerWidth, height: window.innerHeight }
   if (view.width <= 0 || view.height <= 0) return
+  root.classList.toggle('covered', covered)
 
   if (calibrate.active) {
     renderGhosts(view)
@@ -268,8 +332,15 @@ function render(): void {
   const cards = currentPack.cards
   const layout = packLayout(view, cards.length, config)
   const chips = buildChips(cards)
-  root.innerHTML = chips
-    .map((chip, i) => (chip && layout.cards[i] ? chipHtml(chip, layout.cards[i].badge) : ''))
+  // Layout cells are Arena's on-screen order, not the log's PackCards order.
+  const order = arenaDisplayOrder(cards)
+  root.innerHTML = order
+    .map((cardIndex, cell) => {
+      const chip = chips[cardIndex]
+      const slot = layout.cards[cell]
+      if (!chip || !slot) return ''
+      return frameHtml(chip, slot.card, cell) + chipHtml(chip, slot.badge, cell)
+    })
     .join('')
 }
 
@@ -280,8 +351,13 @@ function render(): void {
 function init(): void {
   if (!window.mtgaTracker) return
 
-  // Main re-bounds this window whenever Arena moves/resizes
-  window.addEventListener('resize', render)
+  // Main re-bounds this window whenever Arena moves/resizes; coalesce the
+  // resize storm during a live drag-resize into one paint per frame.
+  let resizeRaf = 0
+  window.addEventListener('resize', () => {
+    if (resizeRaf) return
+    resizeRaf = requestAnimationFrame(() => { resizeRaf = 0; render() })
+  })
 
   // Renders skipped while hidden happen here instead, once visible
   document.addEventListener('visibilitychange', () => {
@@ -291,6 +367,14 @@ function init(): void {
   window.mtgaTracker.onBadgeView((data: unknown) => {
     const view = data as { config?: unknown }
     config = normalizeCalibration(view?.config)
+    render()
+  })
+
+  window.mtgaTracker.onBadgeLayer((data: unknown) => {
+    const payload = data as { regions?: Rect[]; cells?: number[]; covered?: boolean }
+    hoverRegions = Array.isArray(payload?.regions) ? payload.regions : []
+    coveredCells = new Set(Array.isArray(payload?.cells) ? payload.cells : [])
+    covered = payload?.covered === true
     render()
   })
 
@@ -314,8 +398,11 @@ function init(): void {
 
   window.mtgaTracker.onDraftPack((data: unknown) => {
     const pack = data as DraftPackPayload
+    // A refresh of the same pack (stats/art arrived) keeps its live scores.
+    const samePack = !!currentScores && !pack.isTierList &&
+      currentScores.pack === pack.pack && currentScores.pick === pack.pick
     currentPack = pack
-    if (!pack.isTierList) currentScores = null
+    if (!pack.isTierList && !samePack) currentScores = null
     cleared = false
     render()
   })

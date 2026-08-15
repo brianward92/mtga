@@ -35,9 +35,13 @@ ICON_ICNS="${APP_OUT}/Contents/Resources/icon.icns"
 NATIVE="node_modules/better-sqlite3/build/Release/better_sqlite3.node"
 STAGE="$(mktemp -d)"
 
+# The canonical binary lives at Electron's ABI (postinstall electron-rebuild;
+# vitest uses the better-sqlite3-node alias instead), so "restore" means
+# putting the Electron-ABI binary back — keeping `npm run dev` working even
+# if the deploy aborts mid-flip.
 restore_host_native() {
   rm -rf "$STAGE"
-  npm rebuild better-sqlite3 >/dev/null 2>&1 || true
+  npx electron-rebuild --force --only better-sqlite3 >/dev/null 2>&1 || true
 }
 trap restore_host_native EXIT
 
@@ -50,7 +54,13 @@ file "$NATIVE" | grep -q 'arm64' || {
   exit 1
 }
 cp "$NATIVE" "$STAGE/better_sqlite3.node"
-npm rebuild better-sqlite3 >/dev/null
+# On the arm64 host the staged binary IS the host Electron-ABI binary, so no
+# restore rebuild is needed; narrow the trap to stage cleanup only (the full
+# trap's forced rebuild exists for aborts before this point).
+if [ "$(uname -m)" != "arm64" ]; then
+  npx electron-rebuild --force --only better-sqlite3 >/dev/null
+fi
+trap 'rm -rf "$STAGE"' EXIT
 
 ssh "$HOST" "rm -rf '$REMOTE_STAGE' && mkdir -p '$REMOTE_STAGE'"
 scp "$ASAR" "$INFO" "$ICON_PNG" "$ICON_ICNS" "$STAGE/better_sqlite3.node" "$HOST:$REMOTE_STAGE/"

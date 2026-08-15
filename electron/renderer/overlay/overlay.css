@@ -122,7 +122,11 @@ body {
 .overlay {
   position: relative;
   width: 100%;
-  height: 100vh;
+  /* Viewport units ignore CSS zoom but still render multiplied by it, so a
+     plain 100vh paints zoom x window-height and clips when the panel is
+     glued to Arena at zoom > 1. --overlay-zoom mirrors the applied zoom
+     (renderer/overlay/overlay.ts initArenaScale). */
+  height: calc(100vh / var(--overlay-zoom, 1));
   display: flex;
   flex-direction: column;
   background: var(--panel-bg);

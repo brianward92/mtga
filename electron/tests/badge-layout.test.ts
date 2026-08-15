@@ -44,7 +44,7 @@ describe('rowsForCount', () => {
 })
 
 describe('packLayout geometry', () => {
-  const config = DEFAULT_CALIBRATION
+  const config = { ...DEFAULT_CALIBRATION, maxCols: 8, lastRowAlign: "center" as const }
 
   for (const view of VIEWS) {
     for (const n of [8, 14, 15]) {
@@ -155,7 +155,7 @@ describe('calibration config normalize/merge', () => {
   it('rounds maxCols to an integer and validates lastRowAlign', () => {
     expect(normalizeCalibration({ maxCols: 7.6 }).maxCols).toBe(8)
     expect(normalizeCalibration({ lastRowAlign: 'left' }).lastRowAlign).toBe('left')
-    expect(normalizeCalibration({ lastRowAlign: 'diagonal' }).lastRowAlign).toBe('center')
+    expect(normalizeCalibration({ lastRowAlign: 'diagonal' }).lastRowAlign).toBe(DEFAULT_CALIBRATION.lastRowAlign)
   })
 
   it('merges a partial patch over a base config', () => {
@@ -277,7 +277,7 @@ describe('nearestCalibrationBucket', () => {
 })
 
 describe('packLayout keeps card size constant as a pack is drafted down', () => {
-  const config = DEFAULT_CALIBRATION
+  const config = { ...DEFAULT_CALIBRATION, maxCols: 8, lastRowAlign: "center" as const }
   const view = { width: 1600, height: 900 }
 
   // Arena does not grow the cards as the pack empties; only the grid shrinks.

@@ -1,0 +1,4 @@
+build/native/
+release/
+dist/
+node_modules/

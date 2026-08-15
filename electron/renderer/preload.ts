@@ -111,6 +111,10 @@ contextBridge.exposeInMainWorld('mtgaTracker', {
   onOverlayVisibility: (callback: (data: unknown) => void) => {
     ipcRenderer.on('overlay-visibility', (_event, data) => callback(data))
   },
+  // Content zoom while the panel is glued to Arena (applied as CSS zoom)
+  onOverlayScale: (callback: (scale: number) => void) => {
+    ipcRenderer.on('overlay-scale', (_event, scale: number) => callback(scale))
+  },
 
   // Badge overlay event listeners
   onBadgesEnabled: (callback: (data: unknown) => void) => {
@@ -124,6 +128,9 @@ contextBridge.exposeInMainWorld('mtgaTracker', {
   },
   onCalibrateMode: (callback: (data: unknown) => void) => {
     ipcRenderer.on('calibrate-mode', (_event, data) => callback(data))
+  },
+  onBadgeLayer: (callback: (data: unknown) => void) => {
+    ipcRenderer.on('badge-layer', (_event, data) => callback(data))
   },
 
   // Cleanup
@@ -145,10 +152,12 @@ contextBridge.exposeInMainWorld('mtgaTracker', {
     ipcRenderer.removeAllListeners('detailed-logs')
     ipcRenderer.removeAllListeners('density-cycle')
     ipcRenderer.removeAllListeners('overlay-visibility')
+    ipcRenderer.removeAllListeners('overlay-scale')
     ipcRenderer.removeAllListeners('badges-enabled')
     ipcRenderer.removeAllListeners('badges-accessibility')
     ipcRenderer.removeAllListeners('badge-view')
     ipcRenderer.removeAllListeners('calibrate-mode')
+    ipcRenderer.removeAllListeners('badge-layer')
   }
 })
 
@@ -179,8 +188,8 @@ declare global {
       overlayResizeEnd: () => void
       overlaySetSize: (width: number | null, height: number | null, animate?: boolean) => void
       setOverlayDensity: (density: string) => void
-      getOverlayPrefs: () => Promise<{ draftDensity: string; autoHideDashboard: boolean }>
-      setOverlayPrefs: (patch: { autoHideDashboard?: boolean }) => void
+      getOverlayPrefs: () => Promise<{ draftDensity: string; autoHideDashboard: boolean; followArena: boolean }>
+      setOverlayPrefs: (patch: { autoHideDashboard?: boolean; followArena?: boolean }) => void
       hideOverlay: () => void
       toggleOverlay: () => Promise<boolean>
       getOverlayVisible: () => Promise<boolean>
@@ -209,10 +218,12 @@ declare global {
       onDetailedLogs: (callback: (data: unknown) => void) => void
       onDensityCycle: (callback: () => void) => void
       onOverlayVisibility: (callback: (data: unknown) => void) => void
+      onOverlayScale: (callback: (scale: number) => void) => void
       onBadgesEnabled: (callback: (data: unknown) => void) => void
       onBadgesAccessibility: (callback: (data: unknown) => void) => void
       onBadgeView: (callback: (data: unknown) => void) => void
       onCalibrateMode: (callback: (data: unknown) => void) => void
+      onBadgeLayer: (callback: (data: unknown) => void) => void
       removeAllListeners: () => void
     }
   }

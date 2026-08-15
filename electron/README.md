@@ -9,6 +9,33 @@ prod web service.
 ## Features
 
 - **Deck Tracker Overlay**: See remaining cards in your deck during matches
+- **Arena Glue**: The panel snaps magnetically to screen and Arena edges,
+  follows the Arena window when it moves, and rescales with it when it
+  resizes (Untapped-style). Toggle via the menu-bar item ("Glue Overlay to
+  Arena"); when Arena isn't running the panel free-floats where you left it.
+- **Card Badges**: Per-card overlays drawn on Arena's pack grid — a frame
+  around each card tinted by strength, a chip with the model grade, flame
+  rating and head-to-head %, #1/#2/#3 rank tags and the LEAN/SLAM label on the
+  top pick. Toggle via the menu-bar item ("Show Card Badges"); they only draw
+  while Arena (or the assistant) is the front app. Cards are matched to screen
+  cells using Arena's display order (rarity, then colour, then name), not the
+  log order. If the grid doesn't line up for your window size, run "Calibrate
+  Card Badges" once.
+- **Arena Layer Detection**: Arena's hover preview and modals (Options…) are
+  drawn inside Arena's own window, so no overlay can sit between them and the
+  pack. Instead the app captures Arena's window (our overlays are excluded),
+  keeps a "clear" baseline of the pack and per-cell diffs each frame: badges
+  under a preview of any shape lift, the whole set lifts under a modal scrim
+  or when the pack isn't on screen (Home, deck list), and the panel steps
+  aside when covered. Needs macOS **Screen Recording** for the app (menu bar
+  → "Arena Layer Detection: needs Screen Recording…" opens the pane; relaunch
+  after granting). Without it, a geometric prediction of the hover preview is
+  used instead.
+- **Smooth Arena following**: a bundled native helper
+  (`native/arena-window-watch.swift`, built by `npm run build`) streams the
+  Arena window frame at ~30 Hz via CGWindowList, so the panel and badges ride
+  along with a live drag/resize instead of snapping afterwards. AppleScript
+  polling remains as the fallback (and needs Accessibility).
 - **Win/Loss Tracking**: Automatic match history with statistics
 - **Collection Tracking**: Syncs your MTGA collection from game logs
 - **Inventory Tracking**: Gems, gold, wildcards, vault progress
@@ -74,7 +101,13 @@ calibration and Quit remain available from the menu bar.
 - **Cmd+Q**: Quit the app and stop the tracker cleanly
 - **Cmd+Shift+D**: Cycle Verdict, Full, and Mini draft views
 - **Three-line button**: Cycle the same draft views without a shortcut
-- **Drag header**: Reposition the overlay
+- **Drag header**: Reposition the overlay — it snaps to screen edges, and to
+  the Arena window's edges (inside corners or docked flush outside) while
+  Arena is tracked. Wherever you drop it becomes its anchor: the panel then
+  rides along with Arena moves/resizes until you toggle "Glue Overlay to
+  Arena" off in the menu bar. Locating the Arena window needs the
+  **Accessibility** permission (System Settings > Privacy & Security >
+  Accessibility), same as badge calibration.
 
 Automatic draft updates use `showInactive()` and do not take focus from Arena.
 An intentional launch, Dock click, menu-bar click, or overlay click focuses the
@@ -117,6 +150,20 @@ MTGA logs are read from the canonical detailed log:
 Set the `MTGA_LOG_PATH` env var to point at a different file for replay testing.
 The legacy `~/Library/Application Support/com.wizards.mtga/Logs/Logs/UTC_Log - *.log`
 directory is still tailed as a secondary source (config: `watchLegacyLogs`).
+
+For testing without a running Arena, `MTGA_FAKE_ARENA_FILE` can point at a
+JSON file (`{"x":0,"y":33,"width":1512,"height":949}`); geometry probes read
+it instead of System Events, and rewriting the file "moves" the window.
+
+### Native module ABIs (better-sqlite3)
+
+The canonical `node_modules/better-sqlite3` binary is compiled for
+**Electron's** ABI (a `postinstall` electron-rebuild keeps it that way), so
+`npm run dev` works after any install. Vitest runs under system Node, so
+`vitest.config.ts` aliases `better-sqlite3` to `better-sqlite3-node` — a
+second npm-alias install of the same package at the system-Node ABI. Both
+`npm test` and `npm run dev` therefore work back-to-back with no rebuild
+dance; `deploy:mbp` stages from (and restores) the Electron-ABI binary.
 
 ## Architecture
 

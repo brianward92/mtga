@@ -8,9 +8,10 @@
  * - IPC communication with renderer processes
  */
 
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, screen, shell } from 'electron'
+import { appendFileSync, existsSync, mkdirSync, readdirSync, renameSync } from 'fs'
+import { homedir } from 'os'
 import { join } from 'path'
-import { existsSync, mkdirSync, readdirSync, renameSync } from 'fs'
 import { LogWatcher } from './parser/watcher'
 import { LogParser } from './parser/index'
 import { DraftSessionSnapshot, DraftPickRecord } from './parser/draft-parser'
@@ -22,6 +23,8 @@ import {
   isOverlayPresented,
   hideOverlay,
   moveOverlay,
+  setOverlaySnapRectProvider,
+  getFollowZoom,
   resizeOverlay,
   saveOverlayBounds,
   applyDraftDensity,
@@ -31,21 +34,25 @@ import {
   saveBadgeCalibration,
   DraftDensity
 } from './windows/overlay'
+import { PanelFollow } from './windows/panel-follow'
 import {
   createBadgeWindow,
   setBadgeWindowRect,
   showBadgeWindow,
   hideBadgeWindow
 } from './windows/badges'
-import { ArenaGeometryPoller, ArenaRect } from './arena-geometry'
+import { ArenaGeometryPoller, ArenaRect, HelperFrame, probeArenaWindow } from './arena-geometry'
 import {
   normalizeCalibration,
   applyCalibrationOp,
   aspectBucketOf,
   nearestCalibrationBucket,
   CalibrationConfig,
-  CalibrationOp
+  CalibrationOp,
+  packLayout
 } from '../renderer/badges/layout'
+import { hoveredCardIndex, predictPopout, intersects } from '../renderer/badges/hover'
+import { detectOcclusion, scaleRect, cardness, CARDNESS_MIN, ABS_DARK as ABS_DARK_FLOOR, screenCaptureGranted, frameFromBytes, type GrayFrame } from './windows/occlusion'
 import { initCardArtCache, cachedArtUrl } from './utils/card-art-cache'
 import { installApplicationMenu } from './windows/menu'
 import { StatusTray } from './status-tray'
@@ -204,6 +211,35 @@ const draftRuntime = {
 /** Polls the Arena window rect (osascript) while a draft/calibration is live. */
 const arenaPoller = new ArenaGeometryPoller()
 
+// Panel snapping: screen edges always; Arena edges only while its rect is live
+setOverlaySnapRectProvider(() => (arenaPoller.isFound() ? arenaPoller.lastKnown : null))
+
+// Glue the panel to Arena: follow moves, rescale with resizes (tray-toggleable)
+const panelFollow = new PanelFollow({
+  getWindow: () => overlayWindow,
+  isEnabled: () => getOverlayUiPrefs().followArena,
+  getArena: () => (arenaPoller.isFound() ? arenaPoller.lastKnown : null)
+})
+
+// Follow needs a faster tick than the badge default for a glued feel.
+const ARENA_POLL_MS = 1000
+
+/**
+ * Single authority over whether the Arena geometry poller runs: badges want
+ * it during a live draft, calibration always, and the glued panel whenever
+ * it is on screen. Idempotent — call after any of those inputs change.
+ */
+function syncArenaPollerDemand(): void {
+  const badgesWant = !isReplaying && badgesEnabled() && draftRuntime.session?.state === 'active'
+  const panelWant = getOverlayUiPrefs().followArena && isOverlayPresented(overlayWindow)
+  const want = badgeRuntime.calibrating || badgesWant || panelWant
+  if (want && !arenaPoller.isRunning()) {
+    arenaPoller.start(ARENA_POLL_MS)
+  } else if (!want && arenaPoller.isRunning()) {
+    arenaPoller.stop()
+  }
+}
+
 const badgeRuntime = {
   calibrating: false,
   calibrateCount: 14,
@@ -226,6 +262,9 @@ function badgesEnabled(): boolean {
  */
 function sendDraftEvent(channel: string, payload: unknown): void {
   overlayWindow?.webContents.send(channel, payload)
+  if (channel === 'draft-scores') {
+    console.log(`[Badges] draft-scores → badge window visible=${badgeWindow?.isVisible()} calibrating=${badgeRuntime.calibrating}`)
+  }
   if (
     badgeWindow &&
     !badgeWindow.isDestroyed() &&
@@ -251,9 +290,10 @@ function resyncBadgeWindow(): void {
   const picked = draftRuntime.session?.picks.some(
     p => p.pack === pack.pack && p.pick === pack.pick
   )
-  if (picked) return
+  if (picked) { console.log('[Badges] resync: current pack already picked, skipping'); return }
   contents.send('draft-pack', pack)
   const scores = draftRuntime.lastScores
+  console.log(`[Badges] resync p${pack.pack}p${pack.pick}: scores ${scores ? `p${scores.pack}p${scores.pick}` : 'none'}`)
   if (scores && scores.pack === pack.pack && scores.pick === pack.pick) {
     contents.send('draft-scores', scores)
   }
@@ -287,6 +327,9 @@ function pushBadgeView(): void {
 function badgesWantedNow(): boolean {
   if (badgeRuntime.calibrating) return true
   if (isReplaying || !badgesEnabled()) return false
+  // Badges paint over Arena's cards; when another app is in front they would
+  // paint over that app instead, so they only show while Arena is frontmost.
+  if (!arenaPoller.arenaFrontmost) return false
   return draftRuntime.session?.state === 'active'
 }
 
@@ -306,14 +349,14 @@ function autoMiniPanel(): void {
 }
 
 function startBadgesForDraft(): void {
+  syncArenaPollerDemand() // draft went active — poller demand changed
   if (!badgesEnabled()) return
-  arenaPoller.start()
   autoMiniPanel()
 }
 
 function stopBadgesAfterDraft(): void {
-  if (badgeRuntime.calibrating) return // calibration keeps the poller alive
-  arenaPoller.stop()
+  syncArenaPollerDemand() // keeps running if calibrating or the panel is glued
+  if (badgeRuntime.calibrating) return
   if (badgeWindow) hideBadgeWindow(badgeWindow)
 }
 
@@ -338,16 +381,19 @@ function startBadgeCalibration(): void {
   }
   badgeRuntime.calibrating = true
   badgeRuntime.calibrateConfig = resolveBadgeConfig(arenaPoller.lastKnown)
-  arenaPoller.start()
+  syncArenaPollerDemand()
 
   // The helper controls live in the (interactive) panel window: make sure it
   // is visible and tall enough — Mini is 64px, the helper needs ~420.
   if (overlayWindow && !overlayWindow.isDestroyed()) {
     showOverlay(overlayWindow)
     sendOverlayVisibility()
+    // The helper needs ~420 CSS px; the window budget is CSS px x zoom
+    const helperHeight = Math.round(420 * getFollowZoom())
     badgeRuntime.preCalibrateHeight = overlayWindow.getBounds().height
-    if (badgeRuntime.preCalibrateHeight < 420) {
-      resizeOverlay(overlayWindow, { height: 420 }, true)
+    if (badgeRuntime.preCalibrateHeight < helperHeight) {
+      resizeOverlay(overlayWindow, { height: helperHeight }, true)
+      panelFollow.noteReshape() // animated resize — re-anchor once settled
     }
   }
 
@@ -380,35 +426,225 @@ function endBadgeCalibration(save: boolean): void {
   // content-hugging densities re-sync themselves after the helper hides).
   if (overlayWindow && !overlayWindow.isDestroyed() && badgeRuntime.preCalibrateHeight !== null) {
     resizeOverlay(overlayWindow, { height: badgeRuntime.preCalibrateHeight }, true)
+    panelFollow.noteReshape()
   }
   badgeRuntime.preCalibrateHeight = null
 
+  syncArenaPollerDemand() // calibration over — poller stays only if still wanted
   const draftActive = draftRuntime.session?.state === 'active'
   if (draftActive && badgesEnabled()) {
     pushBadgeView() // back to the persisted config
-  } else {
-    arenaPoller.stop()
-    if (badgeWindow) hideBadgeWindow(badgeWindow)
+  } else if (badgeWindow) {
+    hideBadgeWindow(badgeWindow)
   }
+}
+
+// ============================================================================
+// Arena layer awareness: hover pop-out prediction + modal (scrim) detection
+// ============================================================================
+
+const layerRuntime = {
+  fallbackTimer: null as NodeJS.Timeout | null,
+  lastKey: '',
+  panelFaded: false,
+  /** "Clear" pack frame (nothing hovered, not dark) for per-cell diffs. */
+  baseline: null as GrayFrame | null,
+  baselineLum: 0,
+  baselineCardness: 0,
+  /** Wall-clock of the last helper frame; stale => fall back to prediction. */
+  lastFrameAt: 0,
+  /** Cached layout for the current (rect, pack) so frames don't recompute it. */
+  layoutKey: '',
+  layoutCache: null as ReturnType<typeof packLayout> | null
+}
+
+const LAYER_DEBUG = process.env.MTGA_LAYER_DEBUG === '1'
+function layerDebug(msg: string): void {
+  if (!LAYER_DEBUG) return
+  try { appendFileSync(join(homedir(), '.mtga-tracker', 'layer-debug.log'), `${new Date().toISOString()} ${msg}\n`) } catch { /* ignore */ }
+}
+
+function badgeLayerActive(): boolean {
+  return !!badgeWindow && !badgeWindow.isDestroyed() && badgeWindow.isVisible() &&
+    !badgeRuntime.calibrating && !!arenaPoller.lastKnown && !!draftRuntime.lastPack
+}
+
+function setPanelFaded(faded: boolean): void {
+  if (layerRuntime.panelFaded === faded) return
+  layerRuntime.panelFaded = faded
+  if (overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.setOpacity(faded ? 0 : 1)
+}
+
+function sendLayerState(cells: number[], regions: Array<{ x: number; y: number; width: number; height: number }>, covered: boolean): void {
+  const key = `${covered ? 1 : 0}|${cells.join(',')}|` +
+    regions.map(r => [r.x, r.y, r.width, r.height].map(Math.round).join(',')).join(';')
+  if (key === layerRuntime.lastKey) return
+  layerRuntime.lastKey = key
+  badgeWindow?.webContents.send('badge-layer', { cells, regions, covered })
+}
+
+function resetLayerBaseline(): void {
+  layerRuntime.baseline = null
+  layerRuntime.baselineLum = 0
+  layerRuntime.baselineCardness = 0
+}
+
+function currentLayout(rect: ArenaRect, count: number): ReturnType<typeof packLayout> {
+  const key = `${rect.width}x${rect.height}:${count}:${badgeRuntime.calibrating ? 'c' : 'p'}`
+  if (layerRuntime.layoutKey !== key || !layerRuntime.layoutCache) {
+    layerRuntime.layoutKey = key
+    layerRuntime.layoutCache = packLayout({ width: rect.width, height: rect.height }, count, resolveBadgeConfig(rect))
+  }
+  return layerRuntime.layoutCache
+}
+
+function panelRectIn(rect: ArenaRect): { x: number; y: number; width: number; height: number } | null {
+  if (!overlayWindow || overlayWindow.isDestroyed() || !isOverlayPresented(overlayWindow)) return null
+  const b = overlayWindow.getBounds()
+  return { x: b.x - rect.x, y: b.y - rect.y, width: b.width, height: b.height }
+}
+
+function clearLayerState(): void {
+  sendLayerState([], [], false)
+  setPanelFaded(false)
+}
+
+/**
+ * Frame-driven layer detection: called for every helper frame (≤12 fps, only
+ * when Arena's content changed). Decides which badges Arena's own UI is drawn
+ * over — hover previews of any shape, modal scrims, or no pack on screen.
+ */
+function onArenaFrame(hf: HelperFrame): void {
+  layerRuntime.lastFrameAt = Date.now()
+  if (!badgeLayerActive()) { clearLayerState(); return }
+  const rect = arenaPoller.lastKnown!
+  const pack = draftRuntime.lastPack!
+  const view = { width: rect.width, height: rect.height }
+  const layout = currentLayout(rect, pack.cards.length)
+  const cellRects = layout.cards.map(c => c.card)
+  const cursor = screen.getCursorScreenPoint()
+  const local = { x: cursor.x - rect.x, y: cursor.y - rect.y }
+  const hoveredIdx = hoveredCardIndex(local, cellRects)
+  const panel = panelRectIn(rect)
+
+  const frame = frameFromBytes(hf.width, hf.height, hf.data)
+  const fsize = { width: frame.width, height: frame.height }
+  const packPx = scaleRect(layout.pack, view, fsize)
+  const cellsPx = cellRects.map(r => scaleRect(r, view, fsize))
+  const panelPx = panel ? scaleRect(panel, view, fsize) : null
+  const result = detectOcclusion(frame, layerRuntime.baseline, packPx, cellsPx, panelPx)
+
+  const packLum = meanLum(frame, packPx)
+  const score = cardness(frame, packPx, cellsPx) ?? 0
+  const packOnScreen = score >= CARDNESS_MIN && packLum !== null && packLum >= ABS_DARK_FLOOR
+  if (LAYER_DEBUG) { const b = badgeWindow!.getBounds(); layerDebug(`badgeWin ${b.x},${b.y} ${b.width}x${b.height} arena ${rect.x},${rect.y} ${rect.width}x${rect.height} opacity=${badgeWindow!.getOpacity()} pack=${pack.cards.length} scores=${draftRuntime.lastScores ? 'y' : 'n'}`) }
+  layerDebug(`frame ${frame.width}x${frame.height} hovered=${hoveredIdx} lum=${packLum?.toFixed(1)} base=${layerRuntime.baselineLum.toFixed(1)} cardness=${score.toFixed(1)} covered=${result.packCovered} cells=[${result.coveredCells}] panel=${result.extraCovered}`)
+
+  const sizeChanged = layerRuntime.baseline !== null &&
+    (frame.width !== layerRuntime.baseline.width || frame.height !== layerRuntime.baseline.height)
+  if (packOnScreen && hoveredIdx < 0 &&
+      (layerRuntime.baseline === null || sizeChanged || score >= layerRuntime.baselineCardness * 0.9)) {
+    layerRuntime.baseline = frame
+    layerRuntime.baselineLum = packLum!
+    layerRuntime.baselineCardness = score
+  }
+
+  if (!packOnScreen && (hoveredIdx < 0 || result.packCovered)) {
+    sendLayerState([], [], true)
+    setPanelFaded(result.packCovered)
+    return
+  }
+  if (layerRuntime.baseline) {
+    const cells = result.coveredCells.filter(i => i !== hoveredIdx)
+    sendLayerState(cells, [], result.packCovered)
+    setPanelFaded(result.extraCovered || result.packCovered)
+    return
+  }
+  // No baseline yet: prediction until one is captured.
+  predictionTick(hoveredIdx, cellRects, view, panel)
+}
+
+function predictionTick(
+  hoveredIdx: number,
+  cellRects: Array<{ x: number; y: number; width: number; height: number }>,
+  view: { width: number; height: number },
+  panel: { x: number; y: number; width: number; height: number } | null
+): void {
+  const regions = hoveredIdx >= 0 ? predictPopout(cellRects[hoveredIdx], view) : []
+  sendLayerState([], regions, false)
+  setPanelFaded(!!panel && regions.some(r => intersects(r, panel!)))
+}
+
+/**
+ * Fallback tick (10Hz) when no frame stream is available (no Screen Recording
+ * / helper missing): cursor-driven prediction. Also clears state when badges
+ * go away without a final frame.
+ */
+function layerFallbackTick(): void {
+  if (!badgeLayerActive()) { clearLayerState(); return }
+  if (Date.now() - layerRuntime.lastFrameAt < 1500) return // stream is live
+  const rect = arenaPoller.lastKnown!
+  const pack = draftRuntime.lastPack!
+  const view = { width: rect.width, height: rect.height }
+  const layout = currentLayout(rect, pack.cards.length)
+  const cellRects = layout.cards.map(c => c.card)
+  const cursor = screen.getCursorScreenPoint()
+  const hoveredIdx = hoveredCardIndex({ x: cursor.x - rect.x, y: cursor.y - rect.y }, cellRects)
+  predictionTick(hoveredIdx, cellRects, view, panelRectIn(rect))
+}
+
+function meanLum(frame: GrayFrame, r: { x: number; y: number; width: number; height: number }): number | null {
+  const x0 = Math.max(0, Math.floor(r.x)), y0 = Math.max(0, Math.floor(r.y))
+  const x1 = Math.min(frame.width, Math.ceil(r.x + r.width)), y1 = Math.min(frame.height, Math.ceil(r.y + r.height))
+  if (x1 <= x0 || y1 <= y0) return null
+  let sum = 0, n = 0
+  for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) { sum += frame.data[y * frame.width + x]; n++ }
+  return n ? sum / n : null
+}
+
+function setupLayerAwareness(): void {
+  arenaPoller.on('frame', (frame: HelperFrame) => onArenaFrame(frame))
+  arenaPoller.on('capture', () => refreshStatusTray())
+  if (!layerRuntime.fallbackTimer) layerRuntime.fallbackTimer = setInterval(layerFallbackTick, 100)
 }
 
 /** Wire the geometry poller once: bounds-follow, hide-on-lost, setup card. */
 function setupArenaGeometry(): void {
+  let lastBadgeSize = ''
   arenaPoller.on('geometry', (rect: ArenaRect) => {
     if (badgeWindow && !badgeWindow.isDestroyed()) {
       setBadgeWindowRect(badgeWindow, rect)
-      pushBadgeView()
+      // The calibration config only depends on the window SIZE; a pure move at
+      // 30Hz must not re-send it (each send is a full badge re-render).
+      const sizeKey = `${rect.width}x${rect.height}`
+      if (sizeKey !== lastBadgeSize) {
+        lastBadgeSize = sizeKey
+        pushBadgeView()
+      }
       if (badgesWantedNow()) {
         const wasVisible = badgeWindow.isVisible()
         showBadgeWindow(badgeWindow)
         if (!wasVisible) resyncBadgeWindow() // it saw no events while hidden
       }
     }
+    panelFollow.handleGeometry(rect)
     if (badgeRuntime.calibrating) sendCalibrateState()
+  })
+
+  arenaPoller.on('frontmost', (front: boolean) => {
+    if (!badgeWindow || badgeWindow.isDestroyed()) return
+    if (!front) {
+      if (!badgeRuntime.calibrating) hideBadgeWindow(badgeWindow)
+    } else if (badgesWantedNow() && arenaPoller.lastKnown) {
+      const wasVisible = badgeWindow.isVisible()
+      showBadgeWindow(badgeWindow)
+      if (!wasVisible) resyncBadgeWindow()
+    }
   })
 
   arenaPoller.on('lost', () => {
     if (badgeWindow) hideBadgeWindow(badgeWindow)
+    panelFollow.handleLost()
     if (badgeRuntime.calibrating) sendCalibrateState()
   })
 
@@ -419,9 +655,11 @@ function setupArenaGeometry(): void {
   })
 }
 
-/** Push the overlay's visibility into the menu-bar state. */
+/** Push the overlay's visibility into the menu-bar state + follow machinery. */
 function sendOverlayVisibility(): void {
   refreshStatusTray()
+  syncArenaPollerDemand()
+  panelFollow.refresh()
 }
 
 function refreshStatusTray(): void {
@@ -439,8 +677,19 @@ function refreshStatusTray(): void {
           pick: pack?.pick ?? null
         }
       : null,
-    overlayVisible: isOverlayPresented(overlayWindow)
+    overlayVisible: isOverlayPresented(overlayWindow),
+    followArena: getOverlayUiPrefs().followArena,
+    badgesEnabled: badgesEnabled(),
+    layerDetection: arenaPoller.captureOn || screenCaptureGranted()
   })
+}
+
+/** Tray/prefs toggle for gluing the panel to the Arena window. */
+function setFollowArenaPref(enabled: boolean): void {
+  setOverlayUiPrefs({ followArena: enabled })
+  syncArenaPollerDemand()
+  panelFollow.refresh()
+  refreshStatusTray()
 }
 
 function toggleOverlayFromTray(): void {
@@ -460,7 +709,12 @@ function setupStatusTray(): void {
   statusTray = new StatusTray({
     showOverlay: showOverlayFromAppSurface,
     toggleOverlay: toggleOverlayFromTray,
-    calibrateBadges: startBadgeCalibration
+    calibrateBadges: startBadgeCalibration,
+    toggleBadges: () => toggleBadges(),
+    grantScreenRecording: () => {
+      void shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture')
+    },
+    toggleFollowArena: () => setFollowArenaPref(!getOverlayUiPrefs().followArena)
   })
   refreshStatusTray()
 }
@@ -499,10 +753,18 @@ async function createWindows(): Promise<void> {
     if (detailedLogsEnabled === false) {
       overlayWindow?.webContents.send('detailed-logs', { enabled: false })
     }
+    // Late-loading renderer missed any 'overlay-scale' pushes
+    if (getFollowZoom() !== 1) {
+      overlayWindow?.webContents.send('overlay-scale', getFollowZoom())
+    }
   })
 
   overlayWindow.on('show', sendOverlayVisibility)
   overlayWindow.on('hide', sendOverlayVisibility)
+
+  // The initial activateOverlay above ran before these listeners attached:
+  // sync the poller demand (glued panel wants geometry from the start).
+  syncArenaPollerDemand()
   overlayWindow.on('minimize', sendOverlayVisibility)
   overlayWindow.on('restore', sendOverlayVisibility)
 
@@ -550,7 +812,8 @@ function setupLogParser(): void {
 
   // Match start
   logParser.on('match-start', (data) => {
-    overlayWindow?.webContents.send('match-start', data)
+    // Historical replay must not splash old results / stale state on the panel.
+    if (!isReplaying) overlayWindow?.webContents.send('match-start', data)
     currentMatchId = data.matchId
     lastTurnNumber = 0
     lastOpponentLife = 20
@@ -575,7 +838,8 @@ function setupLogParser(): void {
 
   // Match end
   logParser.on('match-end', (data) => {
-    overlayWindow?.webContents.send('match-end', data)
+    // Historical replay must not splash old results / stale state on the panel.
+    if (!isReplaying) overlayWindow?.webContents.send('match-end', data)
 
     // Derive win condition from match reason and game state
     const winCondition = deriveWinCondition(data.result, data.reason, lastOpponentLife, lastPlayerLife)
@@ -601,7 +865,8 @@ function setupLogParser(): void {
 
   // Game state updates (for deck tracker)
   logParser.on('game-state', (data) => {
-    overlayWindow?.webContents.send('game-state', data)
+    // Historical replay must not splash old results / stale state on the panel.
+    if (!isReplaying) overlayWindow?.webContents.send('game-state', data)
     // Track for win condition derivation
     if (data.turnNumber > 0) lastTurnNumber = data.turnNumber
     if (data.playerLife > 0) lastPlayerLife = data.playerLife
@@ -911,7 +1176,15 @@ async function ensureRatings(snapshot: DraftSessionSnapshot): Promise<void> {
       cards: buildCardRows(draftRuntime.lastPack.cards.map(c => c.grpId))
     }
     draftRuntime.lastPack = refreshed
-    if (!isReplaying) sendDraftEvent('draft-pack', refreshed)
+    if (!isReplaying) {
+      sendDraftEvent('draft-pack', refreshed)
+      // Scores may already have landed for this pack; a pack refresh must not
+      // leave the renderers without them.
+      const scores = draftRuntime.lastScores
+      if (scores && scores.pack === refreshed.pack && scores.pick === refreshed.pick) {
+        sendDraftEvent('draft-scores', scores)
+      }
+    }
   }
 }
 
@@ -945,6 +1218,7 @@ function sendTierList(snapshot: DraftSessionSnapshot): void {
     }))
   }
   draftRuntime.lastPack = payload
+  resetLayerBaseline()
   if (!isReplaying) sendDraftEvent('draft-pack', payload)
 }
 
@@ -976,6 +1250,9 @@ function handleDraftStart(snapshot: DraftSessionSnapshot): void {
     if (overlayWindow) {
       showOverlay(overlayWindow)
       setOverlayMode(overlayWindow, 'draft')
+      // Reshape first: sendOverlayVisibility triggers an anchor refresh,
+      // which must defer to the settle timer, not read mid-animation bounds
+      panelFollow.noteReshape()
       sendOverlayVisibility()
     }
     sendDraftEvent('draft-start', draftStartPayload(snapshot))
@@ -1008,21 +1285,39 @@ function handleDraftPack(snapshot: DraftSessionSnapshot): void {
 }
 
 /** POST /score for the current pack; re-sort rows when it resolves. */
+/** Retry schedule for a missed /score while the same pack is still live. */
+const SCORE_RETRY_DELAYS_MS = [700, 1500, 3000, 6000, 12000]
+
 async function requestScores(snapshot: DraftSessionSnapshot): Promise<void> {
   if (!serverClient || !snapshot.currentPack) return
   const { pack, pick, grpIds } = snapshot.currentPack
+  const stillLive = (): boolean => {
+    const live = draftRuntime.session?.currentPack
+    return !!live && live.pack === pack && live.pick === pick
+  }
 
-  // Pool excludes what's in this pack: score against picks so far
-  const result = await serverClient.score({
+  // Pool excludes what's in this pack: score against picks so far. The first
+  // attempt is short (the UI renders from cached stats meanwhile); a miss —
+  // e.g. slow .local resolution on the first request after launch — retries
+  // with a longer timeout for as long as this pack is the one on screen.
+  const req = {
     set: snapshot.set,
     format: snapshot.format ?? 'PremierDraft',
     pack: grpIds,
     pool: snapshot.pool,
     packNumber: pack,
     pickNumber: pick
-  })
+  }
+  console.log(`[Score] request p${pack}p${pick} (${grpIds.length} cards)`)
+  let result = await serverClient.score(req)
+  for (let attempt = 0; !result && attempt < SCORE_RETRY_DELAYS_MS.length; attempt++) {
+    await new Promise(resolve => setTimeout(resolve, SCORE_RETRY_DELAYS_MS[attempt]))
+    if (!stillLive() || draftRuntime.lastScores?.pack === pack && draftRuntime.lastScores?.pick === pick) return
+    result = await serverClient.score(req, 3000)
+  }
 
   updateServerStatus()
+  console.log(`[Score] p${pack}p${pick} ${result ? `ok: ${result.cards.length} cards, model ${result.model?.id}` : 'no result after retries'}`)
   if (!result) return
 
   // The server can infer the set from the pack — learn it for ratings/caching
@@ -1061,6 +1356,8 @@ async function requestScores(snapshot: DraftSessionSnapshot): Promise<void> {
   const live = draftRuntime.session?.currentPack
   if (!isReplaying && live && live.pack === pack && live.pick === pick) {
     sendDraftEvent('draft-scores', payload)
+  } else {
+    console.log(`[Score] p${pack}p${pick} not surfaced (replaying=${isReplaying}, live=${live ? `p${live.pack}p${live.pick}` : 'none'})`)
   }
 }
 
@@ -1153,7 +1450,10 @@ function handleDraftEnd(snapshot: DraftSessionSnapshot): void {
     // safety net in case the renderer never does.
     if (draftRuntime.endTimer) clearTimeout(draftRuntime.endTimer)
     draftRuntime.endTimer = setTimeout(() => {
-      if (overlayWindow) setOverlayMode(overlayWindow, 'match')
+      if (overlayWindow) {
+        setOverlayMode(overlayWindow, 'match')
+        panelFollow.noteReshape()
+      }
       draftRuntime.endTimer = null
     }, 15_000)
   }
@@ -1173,6 +1473,7 @@ function surfaceActiveDraft(): void {
   if (overlayWindow) {
     showOverlay(overlayWindow)
     setOverlayMode(overlayWindow, 'draft')
+    panelFollow.noteReshape() // before the visibility refresh reads bounds
     sendOverlayVisibility()
   }
   sendDraftEvent('draft-start', draftStartPayload(snapshot))
@@ -1460,43 +1761,63 @@ ipcMain.handle('get-draft-state', () => {
 // ============================================================================
 // IPC Handlers - Overlay window controls (manual drag/resize/density)
 // ============================================================================
-// The overlay is focusable:false (it must never steal focus or keystrokes
-// from Arena), which on macOS also kills native window dragging — so the
-// renderer drives moves and resizes explicitly through these channels.
+// The overlay is frameless (no native title bar to drag) and passive draft
+// updates must never steal focus from Arena, so the renderer drives moves
+// and resizes explicitly through these channels. User gestures are reported
+// to panelFollow: a drag in progress always beats an Arena-follow move, and
+// the anchor is recaptured where the user let go.
 
 ipcMain.handle('overlay-drag-start', () => {
   if (!overlayWindow || overlayWindow.isDestroyed()) return null
+  panelFollow.noteUserActivity()
   return overlayWindow.getBounds()
 })
 
 ipcMain.on('overlay-move', (_, pos: { x: number; y: number }) => {
   if (overlayWindow && typeof pos?.x === 'number' && typeof pos?.y === 'number') {
+    panelFollow.noteUserActivity()
     moveOverlay(overlayWindow, pos.x, pos.y)
   }
 })
 
 ipcMain.on('overlay-move-end', () => {
-  if (overlayWindow) saveOverlayBounds(overlayWindow)
+  if (overlayWindow) {
+    saveOverlayBounds(overlayWindow)
+    panelFollow.noteUserGestureEnd()
+  }
 })
 
 ipcMain.handle('overlay-resize-start', () => {
   if (!overlayWindow || overlayWindow.isDestroyed()) return null
+  panelFollow.noteUserActivity()
   return overlayWindow.getBounds()
 })
 
 ipcMain.on('overlay-resize', (_, size: { width?: number; height?: number }) => {
-  if (overlayWindow && size) resizeOverlay(overlayWindow, size, false)
+  if (overlayWindow && size) {
+    panelFollow.noteUserActivity()
+    resizeOverlay(overlayWindow, size, false)
+  }
 })
 
 ipcMain.on('overlay-resize-end', () => {
-  if (overlayWindow) saveOverlayBounds(overlayWindow)
+  if (overlayWindow) {
+    saveOverlayBounds(overlayWindow)
+    panelFollow.noteUserGestureEnd()
+  }
 })
 
 // Content-height sync: in verdict/mini densities the renderer measures the
-// panel and asks the window to match (anchored top-left).
+// panel and asks the window to match. Anchored at the Arena-glued corner
+// when one exists (a bottom-docked panel grows upward), else top-left.
 ipcMain.on('overlay-set-size', (_, size: { width?: number | null; height?: number | null; animate?: boolean }) => {
   if (overlayWindow && size) {
-    resizeOverlay(overlayWindow, { width: size.width, height: size.height }, !!size.animate)
+    resizeOverlay(
+      overlayWindow,
+      { width: size.width, height: size.height },
+      !!size.animate,
+      panelFollow.getAnchorSides()
+    )
   }
 })
 
@@ -1504,13 +1825,17 @@ ipcMain.on('overlay-density', (_, data: { density?: string }) => {
   const density: DraftDensity =
     data?.density === 'full' || data?.density === 'mini' ? data.density : 'verdict'
   applyDraftDensity(overlayWindow, density)
+  panelFollow.noteReshape()
 })
 
 ipcMain.handle('overlay-get-prefs', () => getOverlayUiPrefs())
 
-ipcMain.on('overlay-set-prefs', (_, patch: { autoHideDashboard?: boolean }) => {
+ipcMain.on('overlay-set-prefs', (_, patch: { autoHideDashboard?: boolean; followArena?: boolean }) => {
   if (patch && typeof patch.autoHideDashboard === 'boolean') {
     setOverlayUiPrefs({ autoHideDashboard: patch.autoHideDashboard })
+  }
+  if (patch && typeof patch.followArena === 'boolean') {
+    setFollowArenaPref(patch.followArena)
   }
 })
 
@@ -1545,14 +1870,16 @@ ipcMain.handle('badges-state', () => ({
   accessibilityIssue: badgeRuntime.accessibilityIssue
 }))
 
-// Badge overlay toggle retained for future in-overlay controls.
-ipcMain.handle('badges-toggle', () => {
+ipcMain.handle('badges-toggle', () => toggleBadges())
+
+/** Flip the per-card badge overlay on/off (menu bar + renderer share this). */
+function toggleBadges(): boolean {
   const enabled = !badgesEnabled()
   setOverlayUiPrefs({ badgesEnabled: enabled })
 
   const draftActive = draftRuntime.session?.state === 'active'
   if (enabled && draftActive && !isReplaying) {
-    arenaPoller.start()
+    syncArenaPollerDemand()
     autoMiniPanel()
     if (badgeWindow && arenaPoller.lastKnown) {
       setBadgeWindowRect(badgeWindow, arenaPoller.lastKnown)
@@ -1563,15 +1890,19 @@ ipcMain.handle('badges-toggle', () => {
   } else if (!enabled) {
     stopBadgesAfterDraft() // no-op while calibrating
   }
+  refreshStatusTray()
   return enabled
-})
+}
 
 // Dashboard setup card's "Test again" button (Accessibility permission)
 ipcMain.handle('badges-test-access', async () => {
-  const probe = await arenaPoller.pollOnce()
-  const ok = probe !== null && probe.status !== 'no-accessibility'
+  // pollOnce dedups against an in-flight poller tick and returns null on the
+  // collision — now that the poller runs near-constantly, probe directly so
+  // the "test again" button never misreports a working setup as broken.
+  const probe = (await arenaPoller.pollOnce()) ?? (await probeArenaWindow())
+  const ok = probe.status !== 'no-accessibility'
   if (ok) badgeRuntime.accessibilityIssue = false
-  return { ok, arenaFound: probe?.status === 'found' }
+  return { ok, arenaFound: probe.status === 'found' }
 })
 
 // Dashboard button + View menu entry
@@ -1604,7 +1935,10 @@ ipcMain.on('draft-dismiss', () => {
     clearTimeout(draftRuntime.endTimer)
     draftRuntime.endTimer = null
   }
-  if (overlayWindow) setOverlayMode(overlayWindow, 'match')
+  if (overlayWindow) {
+    setOverlayMode(overlayWindow, 'match')
+    panelFollow.noteReshape()
+  }
 })
 
 // ============================================================================
@@ -1661,6 +1995,7 @@ app.whenReady().then(async () => {
   setupLogParser()
   setupLogWatcher()
   setupArenaGeometry()
+  setupLayerAwareness()
   await createWindows()
 
   // macOS: Dock icon click reopens the overlay without stealing Arena focus.
@@ -1709,6 +2044,7 @@ function cleanup(): void {
   logWatcher?.stop()
   serverClient?.stop()
   arenaPoller.stop()
+  panelFollow.dispose()
   statusTray?.destroy()
   statusTray = null
   if (draftRuntime.endTimer) {

@@ -8,9 +8,9 @@
  * window aspect and UI scale, so EVERY constant lives in CalibrationConfig
  * and is user-tunable in calibration mode.
  *
- * Row-major order (left→right, top→bottom) is ASSUMED to match the order of
- * the log's PackCards list — the numbered ghosts in calibration mode exist
- * precisely to verify this against a real pack.
+ * Cells are row-major (left→right, top→bottom) in Arena's DISPLAY order —
+ * see display-order.ts for the mapping from the log's PackCards order. The
+ * numbered ghosts in calibration mode exist to verify the grid geometry.
  */
 
 export interface Rect {
@@ -51,23 +51,25 @@ export interface CalibrationConfig {
 }
 
 /**
- * Starting point for the user's calibration draft. The pack area sits in
- * roughly the left ~75% x upper ~80% of the window (right side is Arena's
- * pick/pool rail, top is the event header); cards run in rows of up to 8.
- * All of these are guesses until calibrated — that is the point of the mode.
+ * Starting point for the user's calibration draft, measured against Arena's
+ * default windowed size on a MacBook (1512x949 pt): the pack sits in a
+ * left-aligned 5-column grid (5/5/4 for 14 cards) starting ~11% in from the
+ * left and ~19% down, with the right ~35% of the window being Arena's
+ * pick/pool rail. Wider windows may fit more columns — calibration mode
+ * exists to tune all of this against a real pack.
  */
 export const DEFAULT_CALIBRATION: CalibrationConfig = {
-  packLeft: 0.035,
-  packTop: 0.14,
-  packWidth: 0.71,
-  packHeight: 0.72,
-  maxCols: 8,
-  lastRowAlign: 'center',
-  rowGap: 0.08,
-  colGap: 0.06,
+  packLeft: 0.11,
+  packTop: 0.188,
+  packWidth: 0.552,
+  packHeight: 0.723,
+  maxCols: 5,
+  lastRowAlign: 'left',
+  rowGap: 0.066,
+  colGap: 0.093,
   cardAspect: 63 / 88,
-  badgeOffsetY: 0.02,
-  badgeWidth: 120,
+  badgeOffsetY: 0.075,
+  badgeWidth: 140,
   badgeHeight: 28,
   refCount: 14
 }
@@ -113,7 +115,10 @@ export function normalizeCalibration(raw: unknown): CalibrationConfig {
   }
   return {
     ...numeric,
-    lastRowAlign: src.lastRowAlign === 'left' ? 'left' : 'center'
+    lastRowAlign:
+      src.lastRowAlign === 'left' || src.lastRowAlign === 'center'
+        ? src.lastRowAlign
+        : DEFAULT_CALIBRATION.lastRowAlign
   }
 }
 
@@ -200,7 +205,7 @@ export interface CardSlot {
 export interface PackLayout {
   /** The configured pack area rect (calibration frame). */
   pack: Rect
-  /** One slot per card, in row-major order (matches PackCards order). */
+  /** One slot per card, in row-major order (Arena display order). */
   cards: CardSlot[]
 }
 

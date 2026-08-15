@@ -37,7 +37,18 @@ body {
 .badge-root {
   position: fixed;
   inset: 0;
+  transition: opacity 70ms ease-out;
 }
+/* An Arena modal (Options, etc.) is over the pack: step out of its way */
+.badge-root.covered { opacity: 0; }
+
+/* Under Arena's hover preview: get out of the way, softly */
+.card-frame,
+.badge-chip { transition: opacity 60ms ease-out; }
+.card-frame.behind,
+.badge-chip.behind,
+.badge-chip.dim.behind,
+.badge-chip.top.behind { opacity: 0 !important; }
 
 /* ---- Live badge chips ---------------------------------------------------- */
 
@@ -54,6 +65,7 @@ body {
   padding: 0 8px;
   white-space: nowrap;
   overflow: visible;
+  transform: translateX(-50%);
 }
 
 /* Rarity tint on the chip edge — the card itself is right below, no name needed */
@@ -96,23 +108,79 @@ body {
   color: var(--text-muted);
 }
 
-/* Band label pill floats just above the top pick's chip */
+/* Conviction label (LEAN/SLAM/…) — bottom-right corner of the top pick's frame */
 .b-label {
   position: absolute;
-  bottom: calc(100% + 3px);
-  left: 50%;
-  transform: translateX(-50%);
+  bottom: -1px;
+  right: -1px;
   background: var(--chip-bg);
-  border: 1px solid rgba(110, 231, 168, 0.45);
-  border-radius: 9px;
+  border: 1px solid rgba(110, 231, 168, 0.5);
+  border-radius: 8px 0 8px 0;
   padding: 2px 8px;
-  font-size: 9px;
-  font-weight: 700;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.4;
   text-transform: uppercase;
   letter-spacing: 1px;
   color: var(--accent-ev);
   white-space: nowrap;
 }
+
+/* ---- Card frames: surround the whole card face, tinted by strength ------- */
+
+.card-frame {
+  position: absolute;
+  border: 2px solid transparent;
+  pointer-events: none;
+}
+.card-frame.tier-top {
+  border-color: rgba(110, 231, 168, 0.95);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), 0 0 14px 3px rgba(110, 231, 168, 0.55),
+    inset 0 0 12px rgba(110, 231, 168, 0.25);
+}
+.card-frame.tier-a {
+  border-color: rgba(110, 231, 168, 0.7);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5), 0 0 8px rgba(110, 231, 168, 0.3);
+}
+.card-frame.tier-b {
+  border-color: rgba(120, 190, 240, 0.65);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+.card-frame.tier-c {
+  border-color: rgba(230, 230, 240, 0.35);
+}
+.card-frame.tier-d {
+  border-color: rgba(120, 120, 130, 0.35);
+  box-shadow: inset 0 0 0 100vmax rgba(0, 0, 0, 0.28); /* dim weak cards */
+}
+
+.b-rank {
+  position: absolute;
+  bottom: -1px;
+  left: -1px;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+  background: var(--chip-bg);
+  border: 1px solid rgba(110, 231, 168, 0.5);
+  border-radius: 0 8px 0 8px;
+  color: var(--accent-ev);
+  white-space: nowrap;
+}
+
+/* Grade letter inside the chip, coloured by tier */
+.b-grade {
+  font-size: 11px;
+  font-weight: 800;
+  padding-right: 2px;
+  color: var(--text-primary);
+}
+.badge-chip.tier-a .b-grade,
+.badge-chip.tier-top .b-grade { color: var(--accent-ev); }
+.badge-chip.tier-b .b-grade { color: #9ed0f5; }
+.badge-chip.tier-c .b-grade { color: var(--text-secondary); }
+.badge-chip.tier-d .b-grade { color: var(--text-muted); }
 
 /* ---- Calibration ghosts -------------------------------------------------- */
 

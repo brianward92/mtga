@@ -2,6 +2,15 @@ import { BrowserWindow, screen } from 'electron'
 import { join } from 'path'
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
 import { homedir } from 'os'
+import {
+  AnchorSides,
+  PANEL_MIN_HEIGHT as MIN_HEIGHT,
+  PANEL_MIN_WIDTH as MIN_WIDTH,
+  Rect,
+  clampPanelSize,
+  snapAxis,
+  snapCandidates
+} from './panel-anchor'
 
 // Position storage file location
 const CONFIG_DIR = join(homedir(), '.mtga-tracker')
@@ -25,6 +34,8 @@ export interface OverlayUiPrefs {
   autoHideDashboard: boolean
   /** Arena-anchored badge overlay (flame chips drawn on the pack cards). */
   badgesEnabled: boolean
+  /** Glue the panel to the Arena window: follow moves, rescale on resize. */
+  followArena: boolean
 }
 
 /**
@@ -39,12 +50,9 @@ interface StoredPositions {
   badgeCalibrations?: Record<string, Record<string, unknown>>
 }
 
-// Manual drag/resize limits. The renderer drives moves/resizes through IPC so
-// the frameless panel has predictable grips — clamp whatever it asks for.
-const MIN_WIDTH = 240
-const MIN_HEIGHT = 36
-const MAX_WIDTH = 720
-const MAX_HEIGHT = 1200
+// Manual drag/resize limits live in panel-anchor.ts (pure, shared with the
+// Arena-follow math); the renderer drives moves/resizes through IPC so the
+// frameless panel has predictable grips — clamp whatever it asks for.
 
 /** Width of the draft panel in verdict/mini densities (full uses saved bounds). */
 export const COMPACT_DRAFT_WIDTH = 300
@@ -122,7 +130,8 @@ export function getOverlayUiPrefs(): OverlayUiPrefs {
   return {
     draftDensity: normalizeDensity(ui.draftDensity),
     autoHideDashboard: ui.autoHideDashboard === true,
-    badgesEnabled: ui.badgesEnabled === true
+    badgesEnabled: ui.badgesEnabled === true,
+    followArena: ui.followArena !== false // glue to Arena by default
   }
 }
 
@@ -165,10 +174,56 @@ function boundsForMode(mode: OverlayMode): OverlayPosition {
   return defaultBounds(mode)
 }
 
+/**
+ * Content zoom while glued to Arena (1 = unscaled). Main owns the value; the
+ * renderer mirrors it as CSS zoom via the 'overlay-scale' channel. CSS zoom
+ * (not webContents.setZoomFactor) keeps the renderer's content-height sync
+ * honest: getBoundingClientRect of zoomed content stays in the same DIP
+ * space as window bounds.
+ */
+let followZoom = 1
+
+export function getFollowZoom(): number {
+  return followZoom
+}
+
+export function setFollowZoom(window: BrowserWindow, zoom: number): void {
+  followZoom = zoom
+  if (!window.isDestroyed()) {
+    window.webContents.send('overlay-scale', zoom)
+  }
+}
+
+// Arena-follow moves are programmatic: the debounced move/resize save must
+// not persist them as the user's chosen spot (poll-frequency write spam,
+// Arena-derived coordinates). Timestamp beats a boolean because the window's
+// 'move' event arrives async after setBounds.
+let lastFollowBoundsAt = 0
+const FOLLOW_SAVE_SUPPRESS_MS = 700
+
+/** Bounds applied by the Arena-follow loop (never routed through snapping). */
+export function applyFollowBounds(window: BrowserWindow, bounds: Rect): void {
+  if (window.isDestroyed()) return
+  lastFollowBoundsAt = Date.now()
+  window.setBounds({
+    x: Math.round(bounds.x),
+    y: Math.round(bounds.y),
+    width: Math.round(bounds.width),
+    height: Math.round(bounds.height)
+  }, false)
+}
+
 function clampSize(width: number, height: number): { width: number; height: number } {
+  return clampPanelSize(width, height, followZoom)
+}
+
+/** Scale a stored (unzoomed baseline) size for the current content zoom. */
+function scaleForZoom(bounds: OverlayPosition): OverlayPosition {
   return {
-    width: Math.round(Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, width))),
-    height: Math.round(Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, height)))
+    x: bounds.x,
+    y: bounds.y,
+    width: Math.round(bounds.width * followZoom),
+    height: Math.round(bounds.height * followZoom)
   }
 }
 
@@ -192,7 +247,9 @@ function draftBoundsForDensity(density: DraftDensity): OverlayPosition {
  * Persist the window's current bounds for the active mode.
  * In draft verdict/mini densities the height is content-driven and the width
  * fixed, so only x/y are updated — the saved draft size stays the
- * full-density size the user chose.
+ * full-density size the user chose. Sizes are stored at zoom 1 (divided out
+ * of the current follow zoom) so a restart, which starts unzoomed, restores
+ * the size the user actually chose.
  */
 export function saveOverlayBounds(window: BrowserWindow): void {
   if (window.isDestroyed()) return
@@ -207,32 +264,58 @@ export function saveOverlayBounds(window: BrowserWindow): void {
   savePosition(currentMode, {
     x: bounds.x,
     y: bounds.y,
-    width: bounds.width,
-    height: bounds.height
+    width: Math.round(bounds.width / followZoom),
+    height: Math.round(bounds.height / followZoom)
   })
+}
+
+// Magnetic snapping (candidates + threshold live in panel-anchor.ts): while
+// dragging, edges near a screen work-area edge — or the Arena window's edges
+// when the geometry poller has a live fix — pull the panel flush.
+let snapRectProvider: (() => Rect | null) | null = null
+
+/** Wire a source of the Arena window rect (main wires the geometry poller). */
+export function setOverlaySnapRectProvider(provider: () => Rect | null): void {
+  snapRectProvider = provider
 }
 
 /** Move the window (manual drag: absolute position, already rAF-throttled by renderer). */
 export function moveOverlay(window: BrowserWindow, x: number, y: number): void {
   if (window.isDestroyed()) return
-  window.setPosition(Math.round(x), Math.round(y))
+
+  const { width, height } = window.getBounds()
+  const display = screen.getDisplayNearestPoint({ x: Math.round(x), y: Math.round(y) })
+  const candidates = snapCandidates(
+    display.workArea,
+    { width, height },
+    snapRectProvider?.() ?? null
+  )
+
+  window.setPosition(
+    Math.round(snapAxis(x, candidates.x)),
+    Math.round(snapAxis(y, candidates.y))
+  )
 }
 
 /**
- * Resize the window anchored at its top-left corner, clamped to sane limits.
- * Used both by the manual bottom-right resize grip and by the renderer's
- * content-height sync in verdict/mini densities.
+ * Resize the window, clamped to sane limits. Anchored at the top-left by
+ * default (the manual bottom-right grip needs that); programmatic
+ * content-height syncs pass the Arena-glued corner instead so a panel docked
+ * at Arena's bottom/right edge grows away from that edge, not off it.
  */
 export function resizeOverlay(
   window: BrowserWindow,
   size: { width?: number | null; height?: number | null },
-  animate = false
+  animate = false,
+  anchorAt: AnchorSides | null = null
 ): void {
   if (window.isDestroyed()) return
   const bounds = window.getBounds()
   const target = clampSize(size.width ?? bounds.width, size.height ?? bounds.height)
   if (target.width === bounds.width && target.height === bounds.height) return
-  window.setBounds({ x: bounds.x, y: bounds.y, ...target }, animate)
+  const x = anchorAt?.hSide === 'right' ? bounds.x + bounds.width - target.width : bounds.x
+  const y = anchorAt?.vSide === 'bottom' ? bounds.y + bounds.height - target.height : bounds.y
+  window.setBounds({ x, y, ...target }, animate)
 }
 
 /**
@@ -245,11 +328,10 @@ export function applyDraftDensity(window: BrowserWindow | null, density: DraftDe
   if (!window || window.isDestroyed() || currentMode !== 'draft') return
 
   const bounds = window.getBounds()
-  const target = density === 'full'
-    ? draftBoundsForDensity('full')
-    : draftBoundsForDensity(density)
-  // Keep the panel where the user put it — only the size changes
-  const size = clampSize(target.width, target.height)
+  const target = draftBoundsForDensity(density)
+  // Keep the panel where the user put it — only the size changes. Stored
+  // sizes are the zoom-1 baseline; scale them for the current Arena glue.
+  const size = clampSize(target.width * followZoom, target.height * followZoom)
   window.setBounds({ x: bounds.x, y: bounds.y, ...size }, true)
 }
 
@@ -306,13 +388,18 @@ export function createOverlayWindow(): BrowserWindow {
     overlayWindow.loadFile(join(__dirname, '../renderer/overlay/index.html'))
   }
 
-  // Save position (for the active mode) when window is moved or resized
+  // Save position (for the active mode) when window is moved or resized —
+  // but not when the Arena-follow loop moved it (those are not the user's
+  // chosen spot, and they arrive at poll frequency).
   let saveTimeout: NodeJS.Timeout | null = null
   const debouncedSave = () => {
+    if (Date.now() - lastFollowBoundsAt < FOLLOW_SAVE_SUPPRESS_MS) return
     if (saveTimeout) {
       clearTimeout(saveTimeout)
     }
     saveTimeout = setTimeout(() => {
+      // Re-check: a follow move may have landed after this timer was armed
+      if (Date.now() - lastFollowBoundsAt < FOLLOW_SAVE_SUPPRESS_MS) return
       saveOverlayBounds(overlayWindow)
     }, 500)  // Debounce saves by 500ms
   }
@@ -342,8 +429,10 @@ export function setOverlayMode(window: BrowserWindow, mode: OverlayMode): void {
   saveOverlayBounds(window)
   currentMode = mode
 
-  const target = mode === 'draft' ? draftBoundsForDensity(draftDensity) : boundsForMode('match')
-  window.setBounds(target, true)
+  const target = scaleForZoom(
+    mode === 'draft' ? draftBoundsForDensity(draftDensity) : boundsForMode('match')
+  )
+  window.setBounds({ x: target.x, y: target.y, ...clampSize(target.width, target.height) }, true)
 
   // Mode transitions always land interactive — belt and braces
   window.setIgnoreMouseEvents(false)
@@ -351,6 +440,10 @@ export function setOverlayMode(window: BrowserWindow, mode: OverlayMode): void {
 
 export function getOverlayMode(): OverlayMode {
   return currentMode
+}
+
+export function getDraftDensity(): DraftDensity {
+  return draftDensity
 }
 
 export function showOverlay(window: BrowserWindow): void {

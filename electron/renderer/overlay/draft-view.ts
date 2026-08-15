@@ -14,7 +14,7 @@
  * (license requirement).
  */
 
-import { escapeHtml, renderManaCost, renderManaSymbol, formatWinRate, formatRelativeAge } from './shared'
+import { effectiveZoom, escapeHtml, renderManaCost, renderManaSymbol, formatWinRate, formatRelativeAge } from './shared'
 import { Density, nextDensity, normalizeDensity, densityClass, densityTitle, DENSITY_CYCLE } from './density'
 import { FlameRating, flamesFromPercentile } from './flames'
 import { convictionCapped, modelTag, modelVersionTag } from './model-tag'
@@ -877,7 +877,8 @@ function renderPackTable(rows: DraftCardRow[]): void {
         el.classList.add('row-enter')
         return
       }
-      const delta = old - el.getBoundingClientRect().top
+      // Rect deltas are zoomed viewport px; the transform renders x zoom
+      const delta = (old - el.getBoundingClientRect().top) / effectiveZoom()
       if (delta !== 0) {
         el.style.transition = 'none'
         el.style.transform = `translateY(${delta}px)`

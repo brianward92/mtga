@@ -5,21 +5,25 @@
   "main": "dist/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
-    "build": "electron-vite build",
+    "build": "npm run build:native && electron-vite build",
     "preview": "electron-vite preview",
     "package": "electron-builder",
     "deploy:mbp": "bash scripts/deploy-mbp.sh",
     "typecheck": "tsc --noEmit",
+    "build:native": "bash scripts/build-native.sh",
     "test": "vitest run",
-    "e2e": "node tests/e2e/drive.mjs"
+    "e2e": "node tests/e2e/drive.mjs",
+    "postinstall": "electron-rebuild -f -w better-sqlite3 || echo '[postinstall] electron-rebuild skipped (dev deps absent or offline); npm run dev needs it, prod installs do not'"
   },
   "dependencies": {
     "better-sqlite3": "^11.6.0",
-    "chokidar": "^4.0.3"
+    "chokidar": "^4.0.3",
+    "onnxruntime-node": "^1.27.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.10.2",
+    "better-sqlite3-node": "npm:better-sqlite3@^11.6.0",
     "electron": "^33.2.1",
     "electron-builder": "^25.1.8",
     "electron-rebuild": "^3.2.9",
@@ -38,6 +42,10 @@
       {
         "from": "build/icon.png",
         "to": "icon.png"
+      },
+      {
+        "from": "build/native",
+        "to": "native"
       }
     ],
     "mac": {

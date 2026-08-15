@@ -12,12 +12,19 @@ export interface StatusTrayState {
     pick: number | null
   } | null
   overlayVisible: boolean
+  followArena: boolean
+  badgesEnabled: boolean
+  /** Screen Recording granted → Arena modal detection for badges works. */
+  layerDetection: boolean
 }
 
 export interface StatusTrayActions {
   showOverlay: () => void
   toggleOverlay: () => void
   calibrateBadges: () => void
+  toggleBadges: () => void
+  grantScreenRecording: () => void
+  toggleFollowArena: () => void
 }
 
 // Monochrome stacked-card mark. macOS recolors template images for the
@@ -59,7 +66,10 @@ export class StatusTray {
       serverStatus: 'red',
       model: null,
       draft: null,
-      overlayVisible: false
+      overlayVisible: false,
+      followArena: true,
+      badgesEnabled: false,
+      layerDetection: false
     }
     this.tray = new Tray(menuIcon())
     if (process.platform === 'darwin') {
@@ -92,7 +102,25 @@ export class StatusTray {
         label: this.state.overlayVisible ? 'Hide Draft Overlay' : 'Show Draft Overlay',
         click: () => this.actions.toggleOverlay()
       },
+      {
+        label: 'Glue Overlay to Arena',
+        type: 'checkbox',
+        checked: this.state.followArena,
+        click: () => this.actions.toggleFollowArena()
+      },
+      {
+        label: 'Show Card Badges',
+        type: 'checkbox',
+        checked: this.state.badgesEnabled,
+        click: () => this.actions.toggleBadges()
+      },
       { label: 'Calibrate Card Badges', click: () => this.actions.calibrateBadges() },
+      this.state.layerDetection
+        ? { label: 'Arena Layer Detection: on', enabled: false }
+        : {
+            label: 'Arena Layer Detection: needs Screen Recording…',
+            click: () => this.actions.grantScreenRecording()
+          },
       { type: 'separator' },
       { label: 'Quit MTGA Draft Assistant', click: () => app.quit() }
     ])

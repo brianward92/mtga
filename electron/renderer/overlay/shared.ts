@@ -3,6 +3,17 @@
  */
 
 /**
+ * Effective CSS zoom of the page (1 when the panel isn't glued to Arena).
+ * getBoundingClientRect returns ZOOMED viewport px while style lengths render
+ * multiplied by the zoom — any math mixing the two must divide rect-derived
+ * distances by this (Chromium 128+ exposes it as Element.currentCSSZoom).
+ */
+export function effectiveZoom(): number {
+  const zoom = (document.documentElement as unknown as { currentCSSZoom?: number }).currentCSSZoom
+  return typeof zoom === 'number' && zoom > 0 ? zoom : 1
+}
+
+/**
  * Escape HTML to prevent XSS
  */
 export function escapeHtml(text: string): string {

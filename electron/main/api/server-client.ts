@@ -186,7 +186,7 @@ export class ServerClient extends EventEmitter {
    * Score a pack. Short timeout — the pack UI renders from cached stats
    * first and re-sorts when this resolves; a miss just leaves the amber path.
    */
-  async score(req: ScoreRequest): Promise<ScoreResult | null> {
+  async score(req: ScoreRequest, timeoutMs: number = this.config.requestTimeoutMs): Promise<ScoreResult | null> {
     const body: Record<string, unknown> = {
       format: req.format,
       pack: req.pack,
@@ -204,7 +204,7 @@ export class ServerClient extends EventEmitter {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body)
         },
-        this.config.requestTimeoutMs
+        timeoutMs
       ) as Record<string, unknown>
 
       this.setStatus('green')
