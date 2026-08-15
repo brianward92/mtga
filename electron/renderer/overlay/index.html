@@ -3,213 +3,170 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MTGA Draft Assistant Overlay</title>
+  <title>MTGA Draft Assistant</title>
   <link rel="stylesheet" href="./overlay.css">
 </head>
 <body>
-  <div id="overlay" class="overlay">
-    <!-- Match grip bar (draggable; hosts status + minimize + hide) -->
-    <header class="overlay-header grip" id="matchGrip" data-grip>
-      <div class="match-info" id="matchInfo">
-        <span class="status" id="matchStatus">Waiting for match...</span>
-        <span class="turn-counter" id="turnCounter"></span>
-        <span class="win-rate-badge" id="winRateBadge" style="display: none;">
-          <span id="winRateValue">0%</span>
-        </span>
-      </div>
-      <button class="grip-btn minimize-btn" id="minimizeBtn" title="Minimize">−</button>
-      <button class="grip-btn hide-btn" title="Hide overlay (reopen from the Dock or menu bar)">✕</button>
-    </header>
+  <div id="app" class="app" data-testid="overlay-root">
+  <!-- 1. Badge layer: frames + chips on Arena's pack grid. Never interactive. -->
+  <div id="badges" class="badges" aria-hidden="true"></div>
 
-    <!-- Detailed-logs warning banner -->
-    <div class="log-warning" id="logWarning" style="display: none;">
-      Detailed Logs are disabled in MTGA — enable "Detailed Logs (Plugin Support)" in
-      Options &gt; Account and restart Arena.
+  <!-- 4. Calibration ghosts (dashed cells + numbers). Never interactive. -->
+  <div id="ghosts" class="ghosts" aria-hidden="true"></div>
+
+  <!-- 2. Context HUD (corner glass card). Interactive: buttons + hover. -->
+  <aside id="hud" class="hud interactive hud-tr" role="complementary" aria-label="Draft assistant" data-testid="hud">
+    <div class="hud-idle" id="hudIdle">
+      <span class="hud-glyph" aria-hidden="true">◇</span>
+      <span class="hud-idle-text">DraftFM · waiting for a draft</span>
     </div>
 
-    <!-- Draft view (shown between draft-start and draft-end) -->
-    <section class="draft-view" id="draftView" style="display: none;">
-      <!-- Draft grip bar: drag anywhere that isn't a button -->
-      <div class="draft-grip grip" id="draftGrip" data-grip>
-        <span class="grip-dots" aria-hidden="true"></span>
-        <span class="grip-chip" id="draftEventChip">—</span>
-        <span class="grip-pickpos" id="draftPickPos"></span>
-        <span class="server-dot red" id="serverDot" title="Server offline"></span>
-        <button class="grip-btn" id="densityBtn" title="Cycle view">
-          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-            <path d="M4 7h16M4 12h10M4 17h5"/>
-          </svg>
-        </button>
-        <button class="grip-btn hide-btn" title="Hide overlay (reopen from the Dock or menu bar)">✕</button>
-      </div>
+    <div class="hud-warning" id="hudWarning" hidden></div>
 
-      <div class="draft-note" id="draftNote" style="display: none;"></div>
+    <div class="hud-main" id="hudMain">
+      <header class="hud-head">
+        <span class="hud-title" id="hudTitle"></span>
+        <span class="hud-pos" id="hudPos"></span>
+        <span class="hud-dots" id="hudDots" aria-hidden="true"></span>
+        <span class="hud-model" id="hudModel" title="">DraftFM</span>
+      </header>
+      <div class="hud-model-msg" id="hudModelMsg" hidden></div>
 
-      <!-- Verdict: THE PICK (shown in verdict + full densities) -->
-      <div class="verdict" id="verdictView">
-        <div class="draft-empty">waiting for pack…</div>
-      </div>
-
-      <!-- Mini: one line, top pick name only -->
-      <div class="mini-line" id="miniLine"></div>
-
-      <!-- Full density: ranked pack table, pool curve, pick history -->
-      <div class="draft-body" id="draftBody">
-        <div class="pack-table" id="packTable">
-          <div class="draft-empty">waiting for pack…</div>
+      <!-- Recommendation / hover detail -->
+      <section class="hud-rec" id="hudRec" data-testid="hud-pick">
+        <div class="hud-rec-grade" id="recGrade">—</div>
+        <div class="hud-rec-body">
+          <div class="hud-rec-top">
+            <span class="hud-rec-name" id="recName">waiting for pack…</span>
+            <span class="hud-hovering" id="recHovering" hidden>hovering</span>
+          </div>
+          <div class="hud-rec-conv" id="recConv">
+            <span class="hud-flames" id="recFlames"></span>
+            <span class="hud-band" id="recBand"></span>
+            <span class="hud-rank" id="recRank"></span>
+          </div>
+          <div class="hud-rec-why" id="recWhy"></div>
         </div>
-        <div class="pool-strip" id="poolStrip"></div>
-        <div class="pick-history">
-          <button class="history-toggle" id="historyToggle" aria-expanded="false">
-            <span>Pick history</span>
-            <span class="history-count" id="historyCount">0</span>
-          </button>
-          <div class="history-list" id="historyList" style="display: none;"></div>
-        </div>
-      </div>
+      </section>
 
-      <!-- 17Lands attribution: must remain visible (license requirement) -->
-      <footer class="draft-footer">
-        <span class="footer-model" id="footerModel"></span>
-        <span class="footer-attr">17Lands.com</span>
+      <ul class="hud-runners" id="hudRunners">
+        <li class="hud-runner"><span class="hud-runner-rank">#2</span><span class="hud-runner-name"></span><span class="hud-runner-grade"></span></li>
+        <li class="hud-runner"><span class="hud-runner-rank">#3</span><span class="hud-runner-name"></span><span class="hud-runner-grade"></span></li>
+      </ul>
+
+      <section class="hud-pool" id="hudPool">
+        <div class="hud-pool-bar" id="poolBar" role="img" aria-label="Pool colours">
+          <span class="seg W"></span><span class="seg U"></span><span class="seg B"></span>
+          <span class="seg R"></span><span class="seg G"></span><span class="seg C"></span>
+        </div>
+        <div class="hud-pool-counts" id="poolCounts">
+          <span class="pc W"><i></i><b>0</b></span><span class="pc U"><i></i><b>0</b></span>
+          <span class="pc B"><i></i><b>0</b></span><span class="pc R"><i></i><b>0</b></span>
+          <span class="pc G"><i></i><b>0</b></span><span class="pc C"><i></i><b>0</b></span>
+          <span class="hud-pool-total" id="poolTotal"></span>
+        </div>
+        <div class="hud-lane" id="hudLane" hidden></div>
+      </section>
+
+      <!-- Complete summary -->
+      <section class="hud-done" id="hudDone" hidden>
+        <div class="hud-done-title">Draft complete</div>
+        <div class="hud-done-line" id="doneAgree"></div>
+        <div class="hud-done-line" id="doneBest"></div>
+        <button class="hud-btn hud-dismiss" id="btnDismiss" type="button">Dismiss</button>
+      </section>
+
+      <footer class="hud-foot">
+        <button class="hud-icon" id="btnSheet" type="button" data-testid="hud-btn-sheet" title="Pool &amp; picks (⌘⇧D)" aria-label="Pool and picks">▤</button>
+        <button class="hud-icon" id="btnBadges" type="button" title="Toggle card badges (⌘⇧B)" aria-label="Toggle badges">◧</button>
+        <button class="hud-icon" id="btnCorner" type="button" title="Move HUD" aria-label="Move HUD to the next corner">⤢</button>
+        <button class="hud-icon" id="btnCalibrate" type="button" data-testid="hud-btn-calibrate" title="Calibrate the pack grid" aria-label="Calibrate">⌖</button>
+        <span class="hud-attrib" id="hudAttrib" hidden>Data from 17Lands.com</span>
       </footer>
-    </section>
+    </div>
+  </aside>
 
-    <!-- Deck tracker content -->
-    <main class="overlay-content" id="overlayContent">
-      <!-- Deck name -->
-      <div class="deck-header" id="deckHeader">
-        <span class="deck-name" id="deckName">No deck loaded</span>
-        <span class="deck-count" id="deckCount">0 cards</span>
-      </div>
+  <!-- 3. Pool / pick-history sheet. Interactive. -->
+  <aside id="sheet" class="sheet interactive side-right" aria-label="Pool and picks" aria-hidden="true">
+    <header class="sheet-head">
+      <span class="sheet-title" id="sheetTitle">Pool</span>
+      <span class="sheet-agree" id="sheetAgree"></span>
+      <button class="hud-icon sheet-close" id="btnSheetClose" type="button" title="Close" aria-label="Close">✕</button>
+    </header>
+    <div class="sheet-body">
+      <section class="sheet-pool" id="sheetPool"></section>
+      <section class="sheet-picks">
+        <h3 class="sheet-h">Picks</h3>
+        <ol class="sheet-picklist" id="sheetPicks"></ol>
+      </section>
+    </div>
+  </aside>
 
-      <!-- Card list grouped by type -->
-      <div class="card-groups" id="cardGroups">
-        <div class="empty-state">
-          <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <rect x="3" y="3" width="18" height="18" rx="2" />
-            <path d="M12 8v8M8 12h8" />
-          </svg>
-          <p>Start a match to see your deck</p>
-        </div>
-      </div>
+  <!-- 4. Calibration helper panel (right rail). Interactive. -->
+  <div id="calPanel" class="cal-panel interactive" hidden>
+    <div class="cal-title">Grid calibration</div>
+    <div class="cal-status" id="calStatus">Looking for the Arena window…</div>
 
-      <!-- Sideboard section -->
-      <div class="sideboard-section" id="sideboardSection">
-        <button class="sideboard-toggle" id="sideboardToggle" aria-expanded="false">
-          <span class="sideboard-label">Sideboard</span>
-          <svg class="sideboard-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="6 9 12 15 18 9"></polyline>
-          </svg>
-        </button>
-        <div class="sideboard-cards" id="sideboardCards"></div>
+    <div class="cal-row">
+      <span class="cal-label">Cards</span>
+      <div class="cal-btns" id="calCounts">
+        <button class="cal-btn" type="button" data-count="13">13</button>
+        <button class="cal-btn active" type="button" data-count="14">14</button>
+        <button class="cal-btn" type="button" data-count="15">15</button>
       </div>
-    </main>
+    </div>
+    <div class="cal-row">
+      <span class="cal-label">Position</span>
+      <div class="cal-btns">
+        <button class="cal-btn" type="button" data-op='{"type":"nudge","dx":-1,"dy":0}' title="Nudge left">←</button>
+        <button class="cal-btn" type="button" data-op='{"type":"nudge","dx":1,"dy":0}' title="Nudge right">→</button>
+        <button class="cal-btn" type="button" data-op='{"type":"nudge","dx":0,"dy":-1}' title="Nudge up">↑</button>
+        <button class="cal-btn" type="button" data-op='{"type":"nudge","dx":0,"dy":1}' title="Nudge down">↓</button>
+      </div>
+    </div>
+    <div class="cal-row">
+      <span class="cal-label">Scale</span>
+      <div class="cal-btns">
+        <button class="cal-btn" type="button" data-op='{"type":"scale","dir":-1}' title="Shrink the grid">−</button>
+        <button class="cal-btn" type="button" data-op='{"type":"scale","dir":1}' title="Grow the grid">+</button>
+      </div>
+      <span class="cal-label">Cols</span>
+      <div class="cal-btns">
+        <button class="cal-btn" type="button" data-op='{"type":"cols","dir":-1}'>−</button>
+        <button class="cal-btn" type="button" data-op='{"type":"cols","dir":1}'>+</button>
+      </div>
+    </div>
+    <div class="cal-row">
+      <span class="cal-label">Width</span>
+      <div class="cal-btns">
+        <button class="cal-btn" type="button" data-op='{"type":"scale-width","dir":-1}'>−</button>
+        <button class="cal-btn" type="button" data-op='{"type":"scale-width","dir":1}'>+</button>
+      </div>
+      <span class="cal-label">Height</span>
+      <div class="cal-btns">
+        <button class="cal-btn" type="button" data-op='{"type":"scale-height","dir":-1}'>−</button>
+        <button class="cal-btn" type="button" data-op='{"type":"scale-height","dir":1}'>+</button>
+      </div>
+    </div>
+    <div class="cal-row">
+      <span class="cal-label">Badge ↕</span>
+      <div class="cal-btns">
+        <button class="cal-btn" type="button" data-op='{"type":"badge-y","dir":-1}'>−</button>
+        <button class="cal-btn" type="button" data-op='{"type":"badge-y","dir":1}'>+</button>
+      </div>
+    </div>
 
-    <!-- Quick stats footer -->
-    <footer class="overlay-footer">
-      <div class="stat">
-        <span class="stat-label">Life</span>
-        <span class="stat-value" id="playerLife">20</span>
-        <span class="stat-separator">:</span>
-        <span class="stat-value opp" id="opponentLife">20</span>
-      </div>
-      <div class="stat">
-        <span class="stat-label">Library</span>
-        <span class="stat-value" id="libraryCount">-</span>
-      </div>
-      <div class="stat">
-        <span class="stat-label">Hand</span>
-        <span class="stat-value" id="handCount">-</span>
-      </div>
-      <div class="stat">
-        <span class="stat-label">Graveyard</span>
-        <span class="stat-value" id="graveyardCount">-</span>
-      </div>
-    </footer>
-
-    <!-- Manual resize grip (bottom-right; match mode + draft full density) -->
-    <div class="resize-handle" id="resizeHandle" title="Resize"></div>
-
-    <!-- Badge calibration helper: the always-interactive control surface for
-         the (always click-through) badge window. Ghosts render over Arena;
-         these buttons nudge/scale the grid live. -->
-    <div class="calibrate-panel" id="calibratePanel" style="display: none;">
-      <div class="cal-title" data-grip>Badge calibration</div>
-      <div class="cal-status" id="calStatus">Looking for the Arena window…</div>
-
-      <div class="cal-row">
-        <span class="cal-label">Cards</span>
-        <div class="cal-btns" id="calCounts">
-          <button class="cal-btn" data-count="13">13</button>
-          <button class="cal-btn active" data-count="14">14</button>
-          <button class="cal-btn" data-count="15">15</button>
-        </div>
-      </div>
-      <div class="cal-row">
-        <span class="cal-label">Position</span>
-        <div class="cal-btns">
-          <button class="cal-btn" data-op='{"type":"nudge","dx":-1,"dy":0}' title="Nudge left">←</button>
-          <button class="cal-btn" data-op='{"type":"nudge","dx":1,"dy":0}' title="Nudge right">→</button>
-          <button class="cal-btn" data-op='{"type":"nudge","dx":0,"dy":-1}' title="Nudge up">↑</button>
-          <button class="cal-btn" data-op='{"type":"nudge","dx":0,"dy":1}' title="Nudge down">↓</button>
-        </div>
-      </div>
-      <div class="cal-row">
-        <span class="cal-label">Scale</span>
-        <div class="cal-btns">
-          <button class="cal-btn" data-op='{"type":"scale","dir":-1}' title="Shrink the grid">−</button>
-          <button class="cal-btn" data-op='{"type":"scale","dir":1}' title="Grow the grid">+</button>
-        </div>
-      </div>
-      <div class="cal-row">
-        <span class="cal-label">Width</span>
-        <div class="cal-btns">
-          <button class="cal-btn" data-op='{"type":"scale-width","dir":-1}'>−</button>
-          <button class="cal-btn" data-op='{"type":"scale-width","dir":1}'>+</button>
-        </div>
-        <span class="cal-label">Height</span>
-        <div class="cal-btns">
-          <button class="cal-btn" data-op='{"type":"scale-height","dir":-1}'>−</button>
-          <button class="cal-btn" data-op='{"type":"scale-height","dir":1}'>+</button>
-        </div>
-      </div>
-      <div class="cal-row">
-        <span class="cal-label">Columns</span>
-        <div class="cal-btns">
-          <button class="cal-btn" data-op='{"type":"cols","dir":-1}'>−</button>
-          <button class="cal-btn" data-op='{"type":"cols","dir":1}'>+</button>
-        </div>
-        <span class="cal-label">Badge ↕</span>
-        <div class="cal-btns">
-          <button class="cal-btn" data-op='{"type":"badge-y","dir":-1}'>−</button>
-          <button class="cal-btn" data-op='{"type":"badge-y","dir":1}'>+</button>
-        </div>
-      </div>
-
-      <div class="cal-actions">
-        <button class="cal-btn" data-op='{"type":"reset"}' title="Back to defaults">Reset</button>
-        <button class="cal-btn" id="calCancel">Cancel</button>
-        <button class="cal-btn cal-save" id="calSave">Save</button>
-      </div>
-      <div class="cal-hint">
-        Line the numbered ghosts up with the pack cards (1 = top-left, counting
-        left→right). If the numbers don't match the pack order in the overlay
-        panel, note it — the grid order may need flipping.
-      </div>
+    <div class="cal-actions">
+      <button class="cal-btn" type="button" data-op='{"type":"reset"}' title="Back to defaults">Reset</button>
+      <button class="cal-btn" type="button" id="calCancel" data-testid="calibrate-cancel">Cancel</button>
+      <button class="cal-btn cal-save" type="button" id="calSave">Save</button>
+    </div>
+    <div class="cal-hint">
+      Line the numbered ghosts up with the pack cards (1 = top-left, counting
+      left→right, row by row).
     </div>
   </div>
 
-  <!-- Match result overlay -->
-  <div class="match-result-overlay" id="matchResultOverlay">
-    <span class="match-result-text" id="matchResultText"></span>
-  </div>
-
-  <!-- Card tooltip -->
-  <div class="tooltip" id="cardTooltip">
-    <div class="tooltip-name" id="tooltipName"></div>
-    <div class="tooltip-type" id="tooltipType"></div>
-    <div class="tooltip-cost" id="tooltipCost"></div>
   </div>
 
   <script type="module" src="./overlay.ts"></script>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { arenaDisplayOrder } from '../renderer/badges/display-order'
+import { arenaDisplayOrder } from '../shared/display-order'
 
 // Real DSK Quick Draft P1P1, in log (DraftPack) order, vs. what Arena drew on
 // screen (5-column grid, row-major).

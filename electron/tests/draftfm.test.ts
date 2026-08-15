@@ -6,7 +6,7 @@ import { parseNpz } from '../main/model/npz'
 
 const ROOT = join(__dirname, '..', 'resources', 'draftfm')
 const MODEL = join(ROOT, 'model', 'v20260809_final_d256')
-const DSK = join(ROOT, 'sets', 'DSK.npz')
+const DSK = join(ROOT, 'sets', 'DSK', 'assets.npz')
 const FIX = join(__dirname, 'fixtures', 'draftfm-reference-DSK.json')
 const have = existsSync(MODEL) && existsSync(DSK) && existsSync(FIX)
 
@@ -53,7 +53,7 @@ describe('DraftFM (bundled v1.0 + DSK assets)', () => {
         expect(got[i].prob!).toBeCloseTo(ref.prob!, 4)
       })
     }
-    const curve = await model.p1p1Curve()
+    const curve = Array.from(await model.p1p1Logits()).sort((a, b) => a - b)
     expect(curve.length).toBeGreaterThan(300)
     for (let i = 1; i < curve.length; i++) expect(curve[i]).toBeGreaterThanOrEqual(curve[i - 1])
     await model.release()

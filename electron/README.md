@@ -1,193 +1,100 @@
 # MTGA Draft Assistant
 
-A lightweight deck tracker and overlay for Magic: The Gathering Arena on macOS.
+A macOS menu-bar app that overlays MTG Arena during a draft and recommends
+picks with **DraftFM** — the day-zero draft model from
+[the paper](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=7257098) —
+running **locally**, weights bundled, no server.
 
-This is separate from MTG Registry, the live web card database and physical
-inventory tracker served from `app/` on port `8000`. The Electron app is not the
-prod web service.
+## What it does
 
-## Features
-
-- **Deck Tracker Overlay**: See remaining cards in your deck during matches
-- **Arena Glue**: The panel snaps magnetically to screen and Arena edges,
-  follows the Arena window when it moves, and rescales with it when it
-  resizes (Untapped-style). Toggle via the menu-bar item ("Glue Overlay to
-  Arena"); when Arena isn't running the panel free-floats where you left it.
-- **Card Badges**: Per-card overlays drawn on Arena's pack grid — a frame
-  around each card tinted by strength, a chip with the model grade, flame
-  rating and head-to-head %, #1/#2/#3 rank tags and the LEAN/SLAM label on the
-  top pick. Toggle via the menu-bar item ("Show Card Badges"); they only draw
-  while Arena (or the assistant) is the front app. Cards are matched to screen
-  cells using Arena's display order (rarity, then colour, then name), not the
-  log order. If the grid doesn't line up for your window size, run "Calibrate
-  Card Badges" once.
-- **Arena Layer Detection**: Arena's hover preview and modals (Options…) are
-  drawn inside Arena's own window, so no overlay can sit between them and the
-  pack. Instead the app captures Arena's window (our overlays are excluded),
-  keeps a "clear" baseline of the pack and per-cell diffs each frame: badges
-  under a preview of any shape lift, the whole set lifts under a modal scrim
-  or when the pack isn't on screen (Home, deck list), and the panel steps
-  aside when covered. Needs macOS **Screen Recording** for the app (menu bar
-  → "Arena Layer Detection: needs Screen Recording…" opens the pane; relaunch
-  after granting). Without it, a geometric prediction of the hover preview is
-  used instead.
-- **Smooth Arena following**: a bundled native helper
-  (`native/arena-window-watch.swift`, built by `npm run build`) streams the
-  Arena window frame at ~30 Hz via CGWindowList, so the panel and badges ride
-  along with a live drag/resize instead of snapping afterwards. AppleScript
-  polling remains as the fallback (and needs Accessibility).
-- **Win/Loss Tracking**: Automatic match history with statistics
-- **Collection Tracking**: Syncs your MTGA collection from game logs
-- **Inventory Tracking**: Gems, gold, wildcards, vault progress
+- One transparent overlay glued to the Arena window (follows moves/resizes at
+  30 Hz). Click-through: Arena keeps focus and gets every click.
+- **Card badges** on the pack grid: a frame per card tinted by tier, a chip
+  with the set-relative grade (the paper's 13-level ladder), a 5-flame
+  conviction rating and the head-to-head % vs the next card, `#1 #2 #3` tags
+  and a LEAN/SLAM label on the model's pick.
+- **Context HUD** in a corner: set·format, P{pack}P{pick}, the recommendation
+  with a one-line "why" (EV gap, 17Lands GIH WR / ALSA when bundled),
+  runner-ups, your pool by colour and lane lean. Hover a card in the pack and
+  the HUD shows that card's detail. `⌘⇧D` opens the pool & pick-history sheet.
+- **Layer awareness**: Arena draws its card previews and menus inside its own
+  window, so no overlay can sit between them and the pack. Instead the native
+  helper takes one-shot screenshots of the Arena window (only that window;
+  never stored; no macOS recording indicator) and per-cell diffs them against
+  a clear baseline — badges under a preview or a modal lift, and come back.
+  Needs the Screen Recording permission; without it a cursor-based prediction
+  is used.
+- Nothing leaves the machine. Card art thumbnails are the only URLs in the
+  bundle (Scryfall) and are optional.
 
 ## Requirements
 
-- macOS (tested on 10.15+)
-- MTG Arena installed
-- "Detailed Logs (Plugin Support)" enabled in MTGA settings
+- macOS 14+ (Apple silicon build), MTG Arena with **Detailed Logs** enabled
+  (Options → Account → Detailed Logs (Plugin Support)).
+- Optional: Screen Recording permission for the app (layer awareness).
 
-## Setup
-
-### 1. Enable Detailed Logs in MTGA
-
-Open MTGA and go to: **Options > Account > Detailed Logs (Plugin Support)** and toggle it **ON**.
-
-### 2. Install Dependencies
+## Install / run
 
 ```bash
 cd electron
 npm install
+npm run install:local -- --launch   # typecheck, tests, build, package, copy to /Applications
 ```
 
-### 3. Card Data
+`npm run dev` runs from source. The app lives in the menu bar (card icon):
+toggles for badges / HUD / layer awareness, grid calibration, quit.
 
-Card data is read directly from Arena's own card database
-(`~/Library/Application Support/com.wizards.mtga/Downloads/Raw/Raw_CardDatabase_*.mtga`)
-at startup and snapshotted to the app cache — no build step required.
-`scripts/build_arena_mapping.py` remains available as an optional offline seed.
+## The model bundle
 
-### 4. Run in Development Mode
+`resources/draftfm/` ships with the app (`Resources/draftfm` in the bundle):
+
+```
+model/<tag>/{card_encoder.onnx,card_encoder.onnx.data,scorer.onnx,scorer.onnx.data,constants.npz,meta.json}
+sets/index.json
+sets/<SET>/assets.npz    # per-set model assets (fp16 features, names, grpId aliases)
+sets/<SET>/cards.json    # card identity per grpId (name, rarity, colours, cost, type, art URLs)
+sets/<SET>/ratings.json  # 17Lands stats snapshot for display ("Data from 17Lands.com")
+```
+
+Inference is `main/model/draftfm.ts` (onnxruntime-node), a bit-for-bit port
+of `mtga/models/draftfm.py` (`tests/draftfm.test.ts` checks against Python
+reference fixtures). Set-relative grades come from scoring the whole set at
+P1P1 with an empty pool once per set (cached under the app's userData).
+
+**Supporting a new set** = shipping a new `sets/<SET>/` (an app update):
 
 ```bash
-cd electron
-npm run dev
+# from the repo root, with the DraftFM data root available
+MTGA_DATA_ROOT=/path/to/data .venv/bin/python scripts/build_app_bundle.py --set HOB
 ```
 
-### 5. Build for Production
+The weights only change when a new model is exported.
 
-```bash
-npm run build
-npm run package
-```
-
-The packaged app will be in `electron/release/`.
-
-## Usage
-
-1. Start MTGA Draft Assistant before or during a MTGA session
-2. The overlay opens as the app's only window
-3. Drag its top grip to position it over Arena
-4. Start a match in MTGA - the deck tracker will populate automatically
-5. Cards drawn will be marked and counts updated in real-time
-
-The menu-bar item shows the draft server, active model, and current draft
-position. The Dock icon and menu-bar item reopen a hidden overlay; badge
-calibration and Quit remain available from the menu bar.
-
-### Overlay Controls
-
-- **Cmd+W**: Hide the overlay while the tracker keeps running
-- **Cmd+M**: Minimize the overlay normally
-- **Cmd+Q**: Quit the app and stop the tracker cleanly
-- **Cmd+Shift+D**: Cycle Verdict, Full, and Mini draft views
-- **Three-line button**: Cycle the same draft views without a shortcut
-- **Drag header**: Reposition the overlay — it snaps to screen edges, and to
-  the Arena window's edges (inside corners or docked flush outside) while
-  Arena is tracked. Wherever you drop it becomes its anchor: the panel then
-  rides along with Arena moves/resizes until you toggle "Glue Overlay to
-  Arena" off in the menu bar. Locating the Arena window needs the
-  **Accessibility** permission (System Settings > Privacy & Security >
-  Accessibility), same as badge calibration.
-
-Automatic draft updates use `showInactive()` and do not take focus from Arena.
-An intentional launch, Dock click, menu-bar click, or overlay click focuses the
-assistant so its standard Mac shortcuts work.
-
-### Deploy to the MacBook
-
-Use the checked deployment path from `electron/`:
-
-```bash
-npm run deploy:mbp
-```
-
-The command refuses to update a running app, runs typecheck/tests/build, stages
-and verifies the arm64 `better-sqlite3` binary, updates the existing
-`/Applications/MTGA Draft Assistant.app` bundle in place, and preserves its
-Dock identity. It leaves the app closed by default. For an intentional
-interactive smoke test only:
-
-```bash
-npm run deploy:mbp -- --launch
-```
-
-Do not deploy only `app.asar`: the packaged native SQLite binary must be
-updated and architecture-checked with it. The bundle PNG and ICNS are deployed
-together; packaged builds never replace the Dock icon at runtime.
-
-## Data Storage
-
-- **Database**: `~/Library/Application Support/mtga-tracker/data/mtga-tracker.db`
-- **Card Data**: Arena's `Raw_CardDatabase_*.mtga` (snapshot cached under the app's `cache/` dir)
-- **Config**: `~/.mtga-tracker/config.json` (draft server URLs, timeouts)
-
-## Log File Location
-
-MTGA logs are read from the canonical detailed log:
-```
-~/Library/Logs/Wizards Of The Coast/MTGA/Player.log   (+ Player-prev.log at startup)
-```
-Set the `MTGA_LOG_PATH` env var to point at a different file for replay testing.
-The legacy `~/Library/Application Support/com.wizards.mtga/Logs/Logs/UTC_Log - *.log`
-directory is still tailed as a secondary source (config: `watchLegacyLogs`).
-
-For testing without a running Arena, `MTGA_FAKE_ARENA_FILE` can point at a
-JSON file (`{"x":0,"y":33,"width":1512,"height":949}`); geometry probes read
-it instead of System Events, and rewriting the file "moves" the window.
-
-### Native module ABIs (better-sqlite3)
-
-The canonical `node_modules/better-sqlite3` binary is compiled for
-**Electron's** ABI (a `postinstall` electron-rebuild keeps it that way), so
-`npm run dev` works after any install. Vitest runs under system Node, so
-`vitest.config.ts` aliases `better-sqlite3` to `better-sqlite3-node` — a
-second npm-alias install of the same package at the system-Node ABI. Both
-`npm test` and `npm run dev` therefore work back-to-back with no rebuild
-dance; `deploy:mbp` stages from (and restores) the Electron-ABI binary.
-
-## Architecture
+## Layout
 
 ```
-electron/
-├── main/           # Main process (Node.js)
-│   ├── parser/     # Log parsing logic
-│   ├── data/       # Database & card registry
-│   └── windows/    # Window management
-└── renderer/       # Renderer process (UI)
-    └── overlay/    # Deck tracker overlay
+main/            Electron main process
+  index.ts       wiring: log → parser → coordinator → overlay; tray, shortcuts
+  draft/         DraftCoordinator: draft state machine + scoring + history
+  model/         DraftFM (onnxruntime), ModelManager (bundle, P1P1 curve), npz reader
+  data/          set bundle loader, JSONL draft history
+  overlay/       overlay window, layer detector, occlusion math, calibration
+  parser/        Player.log watcher + draft parser
+  arena-geometry.ts  native helper client (window rect, frontmost, frames)
+renderer/overlay/  the single overlay page (badges, HUD, sheet, calibration)
+shared/          pure logic used by both sides (state contract, grid layout, ladder…)
+native/          arena-window-watch.swift (CGWindowList + one-shot SCK captures)
+resources/draftfm/  bundled model + set bundles
 ```
 
-## Troubleshooting
+## Data & files on your machine
 
-### Overlay not appearing over MTGA
-- Grant Screen Recording permission: **System Preferences > Security & Privacy > Privacy > Screen Recording**
-- Add the MTGA Draft Assistant app to the allowed list
+- `~/.mtga-tracker/prefs.json` — toggles + grid calibrations
+- `~/Library/Application Support/mtga-tracker/draft-history.jsonl` — your picks
+  and what the model recommended
+- `~/Library/Application Support/mtga-tracker/model-cache/` — P1P1 curves
 
-### No match data showing
-- Verify "Detailed Logs" is enabled in MTGA settings
-- Restart MTGA after enabling logs
-- Check that log files exist in the log directory
+Set `MTGA_LOG_PATH` to replay a different log; `MTGA_FAKE_ARENA_FILE` (JSON
+rect) fakes the Arena window; `MTGA_BUNDLE_DIR` points at another bundle.
 
-### Card names showing as "Unknown Card #12345"
-- Run `python3 scripts/build_arena_mapping.py` to update card data
-- New sets may require updating the card mapping
+Card statistics shown in the HUD/sheet come from 17Lands.com (CC BY 4.0).

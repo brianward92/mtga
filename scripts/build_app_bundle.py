@@ -223,16 +223,17 @@ def _scryfall_by_name(names, set_code):
         _digital=scry["digital"].fillna(False).astype(bool).astype(int),
     ).sort_values(["_norm", "_in_set", "_digital"])
     result = {}
-    for row in scry.drop_duplicates("_norm").itertuples():
-        result[wanted[row._norm]] = {
-            "rarity": _str(row.rarity),
-            "colors": _colors(row.color_identity),
-            "manaCost": _str(row.mana_cost),
-            "manaValue": _mana_value(row.cmc),
-            "type": _str(row.type_line),
-            "setCode": _str(row.set).upper(),
-            "imageSmall": _str(row.image_small_url) or None,
-            "imageNormal": _str(row.image_normal_url) or None,
+    # itertuples() renames underscore-prefixed columns; iterate dicts instead.
+    for row in scry.drop_duplicates("_norm").to_dict("records"):
+        result[wanted[row["_norm"]]] = {
+            "rarity": _str(row["rarity"]),
+            "colors": _colors(row["color_identity"]),
+            "manaCost": _str(row["mana_cost"]),
+            "manaValue": _mana_value(row["cmc"]),
+            "type": _str(row["type_line"]),
+            "setCode": _str(row["set"]).upper(),
+            "imageSmall": _str(row["image_small_url"]) or None,
+            "imageNormal": _str(row["image_normal_url"]) or None,
         }
     return result
 

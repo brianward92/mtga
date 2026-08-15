@@ -245,6 +245,23 @@ export class DraftFM {
     }
   }
 
+  private feedsFor(pool: { emb: Float32Array; counts: BigInt64Array; p: number }, packRows: number[], position: Float32Array): Record<string, ort.Tensor> {
+    const feeds: Record<string, ort.Tensor> = {
+      pool_emb: new ort.Tensor('float32', pool.emb, [1, pool.p, this.d]),
+      pool_counts: new ort.Tensor('int64', pool.counts, [1, pool.p]),
+      pool_mask: new ort.Tensor('bool', new Uint8Array(pool.p), [1, pool.p]),
+      pack_emb: new ort.Tensor('float32', this.gather(packRows), [1, packRows.length, this.d]),
+      pack_mask: new ort.Tensor('bool', new Uint8Array(packRows.length), [1, packRows.length]),
+      wr_id: new ort.Tensor('int64', BigInt64Array.from([BigInt(this.wrId)]), [1]),
+      games_id: new ort.Tensor('int64', BigInt64Array.from([BigInt(this.gamesId)]), [1]),
+      format_id: new ort.Tensor('int64', BigInt64Array.from([BigInt(this.formatId)]), [1]),
+      position: new ort.Tensor('float32', position, [1, 7]),
+      set_scalars: new ort.Tensor('float32', this.setScalars, [1, 4])
+    }
+    if (this.setSummary) feeds.set_summary = new ort.Tensor('float32', this.setSummary, [this.setSummary.length])
+    return feeds
+  }
+
   async scorePack(packGrpIds: number[], poolGrpIds: number[], packNumber?: number, pickNumber?: number): Promise<CardScore[]> {
     const rows = packGrpIds.map(g => this.grpToRow.get(g) ?? null)
     const known = [...new Set(rows.filter((r): r is number => r !== null))].sort((x, y) => x - y)
@@ -256,20 +273,7 @@ export class DraftFM {
       packNumber = Math.floor(poolSize / this.picksPerPack)
       pickNumber = poolSize % this.picksPerPack
     }
-    const feeds: Record<string, ort.Tensor> = {
-      pool_emb: new ort.Tensor('float32', pool.emb, [1, pool.p, this.d]),
-      pool_counts: new ort.Tensor('int64', pool.counts, [1, pool.p]),
-      pool_mask: new ort.Tensor('bool', new Uint8Array(pool.p), [1, pool.p]),
-      pack_emb: new ort.Tensor('float32', this.gather(known), [1, known.length, this.d]),
-      pack_mask: new ort.Tensor('bool', new Uint8Array(known.length), [1, known.length]),
-      wr_id: new ort.Tensor('int64', BigInt64Array.from([BigInt(this.wrId)]), [1]),
-      games_id: new ort.Tensor('int64', BigInt64Array.from([BigInt(this.gamesId)]), [1]),
-      format_id: new ort.Tensor('int64', BigInt64Array.from([BigInt(this.formatId)]), [1]),
-      position: new ort.Tensor('float32', positionFeatures(packNumber, pickNumber, this.picksPerPack), [1, 7]),
-      set_scalars: new ort.Tensor('float32', this.setScalars, [1, 4])
-    }
-    if (this.setSummary) feeds.set_summary = new ort.Tensor('float32', this.setSummary, [this.setSummary.length])
-    const out = await this.scorer.run(feeds)
+    const out = await this.scorer.run(this.feedsFor(pool, known, positionFeatures(packNumber, pickNumber, this.picksPerPack)))
     const logits = out.logits.data as Float32Array
     const byRow = new Map<number, number>()
     known.forEach((r, i) => byRow.set(r, logits[i]))
@@ -280,28 +284,19 @@ export class DraftFM {
    * Set-relative P1P1 curve: every card's logit at pack 1 pick 1 with an empty
    * pool, sorted ascending — powers percentile grades without any server.
    */
-  async p1p1Curve(): Promise<Float32Array> {
+  /** Unsorted P1P1 logits, one per asset row (row order = assets.names). */
+  async p1p1Logits(): Promise<Float32Array> {
     const n = this.assets.n
     const rows = Array.from({ length: n }, (_, i) => i)
-    const feeds: Record<string, ort.Tensor> = {
-      pool_emb: new ort.Tensor('float32', this.poolNull, [1, 1, this.d]),
-      pool_counts: new ort.Tensor('int64', BigInt64Array.from([0n]), [1, 1]),
-      pool_mask: new ort.Tensor('bool', new Uint8Array(1), [1, 1]),
-      pack_emb: new ort.Tensor('float32', this.gather(rows), [1, n, this.d]),
-      pack_mask: new ort.Tensor('bool', new Uint8Array(n), [1, n]),
-      wr_id: new ort.Tensor('int64', BigInt64Array.from([BigInt(this.wrId)]), [1]),
-      games_id: new ort.Tensor('int64', BigInt64Array.from([BigInt(this.gamesId)]), [1]),
-      format_id: new ort.Tensor('int64', BigInt64Array.from([BigInt(this.formatId)]), [1]),
-      position: new ort.Tensor('float32', positionFeatures(0, 0, this.picksPerPack), [1, 7]),
-      set_scalars: new ort.Tensor('float32', this.setScalars, [1, 4])
-    }
-    if (this.setSummary) feeds.set_summary = new ort.Tensor('float32', this.setSummary, [this.setSummary.length])
-    const res = await this.scorer.run(feeds)
-    return new Float32Array(res.logits.data as Float32Array).sort()
+    const res = await this.scorer.run(this.feedsFor(this.poolInputs([]), rows, positionFeatures(0, 0, this.picksPerPack)))
+    return new Float32Array(res.logits.data as Float32Array)
   }
 
-  /** P1P1 logit of one known grpId within the whole-set curve context. */
-  rowOf(grpId: number): number | undefined { return this.grpToRow.get(grpId) }
+  /** Number of asset rows (unique card names). */
+  get setSize(): number { return this.assets.n }
+
+  /** grpId -> asset row, for every alias the set knows. */
+  grpRows(): IterableIterator<[number, number]> { return this.grpToRow.entries() }
 
   async release(): Promise<void> {
     await this.scorer.release()

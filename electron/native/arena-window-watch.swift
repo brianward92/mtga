@@ -1,26 +1,39 @@
 // arena-window-watch — Arena window geometry + (optionally) a low-res
-// luminance stream of the Arena window for the badge overlay's layer detection.
+// luminance feed of the Arena window for the badge overlay's layer detection.
 //
-// Output lines (stdout, only on change for geometry):
-//   G x,y,width,height,frontmost   window frame in points (top-left origin)
+// Output lines (stdout):
+//   G x,y,width,height,frontmost   window frame in points (top-left origin);
+//                                  printed on change + a 1 Hz heartbeat
 //   G NOWIN                        Arena not running / no on-screen window
-//   F w,h,<base64 gray bytes>      one downscaled luminance frame (≤ 12 fps)
-//   C on|off                       capture available (Screen Recording granted)
-// Args: --capture   enable the frame stream (needs Screen Recording).
-// Geometry uses CGWindowList (no Accessibility needed); frames use
-// ScreenCaptureKit filtered to the Arena window only, so our own overlays are
-// never in the image and no other window is ever captured.
+//   F w,h,<base64 gray bytes>      one downscaled luminance frame (160 px wide,
+//                                  aspect-correct height); only when the image
+//                                  changed vs the previously emitted frame
+//   C on|off                       frames flowing (capture enabled AND Screen
+//                                  Recording granted) / not
+// Args:  --capture   start with capture enabled (default: off).
+// Stdin control channel (one command per line):
+//   capture on | capture off       enable / disable the frame feed
+//   rate <hz>                      base capture rate (default 4; 0 pauses)
+// The helper exits when stdin closes or a stdout write fails.
+//
+// Geometry uses CGWindowList (no Accessibility needed). Frames are one-shot
+// SCScreenshotManager captures filtered to the Arena window only, so our own
+// overlays are never in the image and no other window is ever captured — and,
+// unlike an SCStream, one-shot captures do not light macOS's purple
+// "screen recording" menu-bar indicator. Rate is adaptive: base (4 Hz),
+// 2× base for 1.5 s after the cursor moved or the window rect changed,
+// 1 Hz when neither Arena nor we are frontmost, 0 when capture is off.
 import Foundation
 import AppKit
 import ScreenCaptureKit
-import CoreMedia
-import CoreVideo
+import CoreGraphics
 
 let arenaBundleIds: Set<String> = ["com.wizards.mtga"]
 let arenaNames: Set<String> = ["MTGA", "MTG Arena", "Magic: The Gathering Arena"]
 let selfBundleIds: Set<String> = ["com.mtga.tracker", "com.github.Electron"]
-let wantCapture = CommandLine.arguments.contains("--capture")
 let FRAME_W = 160
+let DEFAULT_RATE_HZ = 4.0
+let BURST_WINDOW_S = 1.5
 let out = FileHandle.standardOutput
 let outLock = NSLock()
 
@@ -82,123 +95,198 @@ func arenaWindow(pids: Set<pid_t>) -> ArenaWin? {
 }
 
 // ---------------------------------------------------------------------------
-// Frame stream (ScreenCaptureKit)
+// Shared state between the geometry loop, the stdin reader and the capture loop
 // ---------------------------------------------------------------------------
-final class FrameSink: NSObject, SCStreamOutput, SCStreamDelegate {
-  var lastEmit = Date.distantPast
-  func stream(_ stream: SCStream, didOutputSampleBuffer sb: CMSampleBuffer, of type: SCStreamOutputType) {
-    guard type == .screen, let pb = CMSampleBufferGetImageBuffer(sb) else { return }
-    // SCK delivers frames only when content changes; still cap the rate.
-    let now = Date()
-    if now.timeIntervalSince(lastEmit) < (1.0 / 12.0) { return }
-    lastEmit = now
-    CVPixelBufferLockBaseAddress(pb, .readOnly)
-    defer { CVPixelBufferUnlockBaseAddress(pb, .readOnly) }
-    let w = CVPixelBufferGetWidth(pb), h = CVPixelBufferGetHeight(pb)
-    guard let base = CVPixelBufferGetBaseAddress(pb) else { return }
-    let stride = CVPixelBufferGetBytesPerRow(pb)
-    var gray = [UInt8](repeating: 0, count: w * h)
-    let p = base.assumingMemoryBound(to: UInt8.self)
-    for y in 0..<h {
-      let row = p + y * stride
-      for x in 0..<w {
-        let b = Int(row[x * 4]), g = Int(row[x * 4 + 1]), r = Int(row[x * 4 + 2])
-        gray[y * w + x] = UInt8((299 * r + 587 * g + 114 * b) / 1000)
-      }
-    }
-    emit("F \(w),\(h),\(Data(gray).base64EncodedString())")
+final class Shared {
+  private let lock = NSLock()
+  private var _win: ArenaWin? = nil
+  private var _frontmost = false
+  private var _captureEnabled = CommandLine.arguments.contains("--capture")
+  private var _rateHz = DEFAULT_RATE_HZ
+  /// Last time the cursor moved or the Arena rect changed (drives the burst rate).
+  private var _lastActivity = Date.distantPast
+
+  func setWindow(_ win: ArenaWin?, frontmost: Bool) {
+    lock.lock(); defer { lock.unlock() }
+    if let a = _win, let b = win, a.frame != b.frame { _lastActivity = Date() }
+    else if (_win == nil) != (win == nil) { _lastActivity = Date() }
+    _win = win
+    _frontmost = frontmost
   }
-  func stream(_ stream: SCStream, didStopWithError error: Error) {
-    capture.streamStopped()
+  func noteActivity() { lock.lock(); _lastActivity = Date(); lock.unlock() }
+  func setCapture(_ on: Bool) { lock.lock(); _captureEnabled = on; lock.unlock() }
+  func setRate(_ hz: Double) { lock.lock(); _rateHz = max(0, hz); lock.unlock() }
+
+  struct Snapshot { let win: ArenaWin?; let frontmost: Bool; let enabled: Bool; let rateHz: Double; let lastActivity: Date }
+  func snapshot() -> Snapshot {
+    lock.lock(); defer { lock.unlock() }
+    return Snapshot(win: _win, frontmost: _frontmost, enabled: _captureEnabled, rateHz: _rateHz, lastActivity: _lastActivity)
   }
 }
+let shared = Shared()
 
+// ---------------------------------------------------------------------------
+// Stdin control channel
+// ---------------------------------------------------------------------------
+DispatchQueue.global(qos: .utility).async {
+  while let line = readLine(strippingNewline: true) {
+    let parts = line.trimmingCharacters(in: .whitespaces).lowercased().split(separator: " ").map(String.init)
+    guard parts.count >= 2 else { continue }
+    switch parts[0] {
+    case "capture": shared.setCapture(parts[1] == "on")
+    case "rate": if let hz = Double(parts[1]) { shared.setRate(hz) }
+    default: break
+    }
+  }
+  exit(0) // stdin closed: parent gone
+}
+
+// ---------------------------------------------------------------------------
+// One-shot capture loop (ScreenCaptureKit screenshots — no recording indicator)
+// ---------------------------------------------------------------------------
 final class Capture {
-  var stream: SCStream? = nil
-  var streamWindowId: CGWindowID = 0
-  var streamAspect: CGFloat = 0
-  let sink = FrameSink()
-  let queue = DispatchQueue(label: "arena.frames")
-  var starting = false
+  var filter: SCContentFilter? = nil
+  var filterWindowId: CGWindowID = 0
+  var lastLookup = Date.distantPast
   var announced: Bool? = nil
+  var lastGray: [UInt8] = []
+  var lastW = 0, lastH = 0
 
   func announce(_ ok: Bool) {
     if announced != ok { announced = ok; emit("C \(ok ? "on" : "off")") }
   }
 
-  func streamStopped() {
-    stream = nil
-    streamWindowId = 0
+  /// Content filter for the Arena window; refreshed when the CGWindowID changes.
+  func filterFor(_ win: ArenaWin) async -> SCContentFilter? {
+    if let f = filter, filterWindowId == win.id { return f }
+    // Don't hammer the window server if the id isn't shareable (yet).
+    if Date().timeIntervalSince(lastLookup) < 1.0 { return nil }
+    lastLookup = Date()
+    do {
+      let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+      guard let scw = content.windows.first(where: { $0.windowID == win.id }) else { return nil }
+      filter = SCContentFilter(desktopIndependentWindow: scw)
+      filterWindowId = win.id
+      return filter
+    } catch {
+      announce(false)
+      return nil
+    }
   }
 
-  /// Ensure a stream exists for the current Arena window (restart on window id
-  /// / aspect change). Called from the geometry loop.
-  func ensure(win: ArenaWin?) {
-    guard wantCapture else { return }
-    guard let win = win else {
-      if let s = stream { s.stopCapture { _ in }; streamStopped() }
-      return
+  /// Downscale a CGImage to FRAME_W×h 8-bit gray via CoreGraphics.
+  func gray(of img: CGImage, aspect: CGFloat) -> (Int, Int, [UInt8])? {
+    let w = FRAME_W
+    let h = max(1, Int((CGFloat(w) / max(0.05, aspect)).rounded()))
+    var buf = [UInt8](repeating: 0, count: w * h)
+    let ok = buf.withUnsafeMutableBytes { raw -> Bool in
+      guard let ctx = CGContext(data: raw.baseAddress, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w,
+                                space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue)
+      else { return false }
+      ctx.interpolationQuality = .low
+      ctx.draw(img, in: CGRect(x: 0, y: 0, width: w, height: h))
+      return true
     }
+    return ok ? (w, h, buf) : nil
+  }
+
+  /// Sum-of-absolute-differences change gate; also true on size change / first frame.
+  func changed(_ w: Int, _ h: Int, _ g: [UInt8]) -> Bool {
+    if w != lastW || h != lastH || lastGray.count != g.count { return true }
+    var sad = 0
+    for i in 0..<g.count { sad += abs(Int(g[i]) - Int(lastGray[i])) }
+    // Mean per-pixel difference above half a gray level: rendered content, so
+    // there is no sensor noise — anything larger is a real change.
+    return sad * 2 > g.count
+  }
+
+  func captureOnce(win: ArenaWin) async {
+    guard let filter = await filterFor(win) else { return }
     let aspect = win.frame.width / max(1, win.frame.height)
-    if let _ = stream, streamWindowId == win.id, abs(aspect - streamAspect) < 0.02 { return }
-    if starting { return }
-    starting = true
-    Task {
-      defer { starting = false }
-      if let s = stream { try? await s.stopCapture(); streamStopped() }
-      do {
-        let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
-        guard let scw = content.windows.first(where: { $0.windowID == win.id }) else { return }
-        let filter = SCContentFilter(desktopIndependentWindow: scw)
-        let cfg = SCStreamConfiguration()
-        cfg.width = FRAME_W
-        cfg.height = max(1, Int((CGFloat(FRAME_W) / aspect).rounded()))
-        cfg.pixelFormat = kCVPixelFormatType_32BGRA
-        cfg.minimumFrameInterval = CMTime(value: 1, timescale: 15)
-        cfg.showsCursor = false
-        cfg.queueDepth = 3
-        let s = SCStream(filter: filter, configuration: cfg, delegate: sink)
-        try s.addStreamOutput(sink, type: .screen, sampleHandlerQueue: queue)
-        try await s.startCapture()
-        stream = s
-        streamWindowId = win.id
-        streamAspect = aspect
-        announce(true)
-      } catch {
-        announce(false)
+    let cfg = SCStreamConfiguration()
+    cfg.width = FRAME_W
+    cfg.height = max(1, Int((CGFloat(FRAME_W) / max(0.05, aspect)).rounded()))
+    cfg.showsCursor = false
+    cfg.pixelFormat = kCVPixelFormatType_32BGRA
+    do {
+      let img = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: cfg)
+      guard let (w, h, g) = gray(of: img, aspect: aspect) else { return }
+      announce(true)
+      if changed(w, h, g) {
+        lastW = w; lastH = h; lastGray = g
+        emit("F \(w),\(h),\(Data(g).base64EncodedString())")
       }
+    } catch {
+      // Window vanished mid-capture (retry next tick with a fresh filter) or
+      // Screen Recording denied.
+      filter_reset()
+      announce(false)
+    }
+  }
+
+  func filter_reset() { filter = nil; filterWindowId = 0 }
+
+  func run() async {
+    while true {
+      let s = shared.snapshot()
+      guard s.enabled, s.rateHz > 0 else {
+        if announced == true { announce(false) }
+        filter_reset()
+        lastGray = []; lastW = 0; lastH = 0 // force a full frame when re-enabled
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        continue
+      }
+      guard let win = s.win else {
+        filter_reset()
+        try? await Task.sleep(nanoseconds: 250_000_000)
+        continue
+      }
+      let burst = Date().timeIntervalSince(s.lastActivity) < BURST_WINDOW_S
+      let hz: Double = !s.frontmost ? min(s.rateHz, 1.0) : (burst ? s.rateHz * 2 : s.rateHz)
+      let started = Date()
+      await captureOnce(win: win)
+      let elapsed = Date().timeIntervalSince(started)
+      let wait = max(0.005, 1.0 / hz - elapsed)
+      try? await Task.sleep(nanoseconds: UInt64(wait * 1e9))
     }
   }
 }
-
 let capture = Capture()
+Task { await capture.run() }
 
 // ---------------------------------------------------------------------------
-// Geometry loop (~30Hz, prints on change)
+// Geometry loop (~30Hz, prints on change + 1Hz heartbeat); also polls the
+// cursor so the capture loop can burst while the user is interacting.
 // ---------------------------------------------------------------------------
 DispatchQueue.global(qos: .userInteractive).async {
   var last = ""
   var pids = arenaPids()
   var tick = 0
-  var lastEnsure = Date.distantPast
+  var lastCursor = CGPoint(x: -1, y: -1)
   while true {
     tick += 1
     if tick % 30 == 0 { pids = arenaPids() }
     let win = arenaWindow(pids: pids)
     var line = "G NOWIN"
+    var fm = false
     if let w = win {
       let r = w.frame
-      line = "G \(Int(r.origin.x.rounded())),\(Int(r.origin.y.rounded())),\(Int(r.width.rounded())),\(Int(r.height.rounded())),\(frontmostOk() ? 1 : 0)"
+      fm = frontmostOk()
+      line = "G \(Int(r.origin.x.rounded())),\(Int(r.origin.y.rounded())),\(Int(r.width.rounded())),\(Int(r.height.rounded())),\(fm ? 1 : 0)"
     } else if pids.isEmpty {
       pids = arenaPids()
+    }
+    shared.setWindow(win, frontmost: fm)
+    if let ev = CGEvent(source: nil) {
+      let p = ev.location
+      if abs(p.x - lastCursor.x) >= 1 || abs(p.y - lastCursor.y) >= 1 {
+        if lastCursor.x >= 0 { shared.noteActivity() }
+        lastCursor = p
+      }
     }
     // Print on change, plus a 1Hz heartbeat so a consumer that missed the
     // last line (or had it overwritten) converges.
     if line != last || tick % 30 == 0 { last = line; emit(line) }
-    if Date().timeIntervalSince(lastEnsure) > 1.0 {
-      lastEnsure = Date()
-      capture.ensure(win: win)
-    }
     usleep(33_000)
   }
 }

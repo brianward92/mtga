@@ -155,9 +155,13 @@ export function probeArenaWindow(): Promise<ArenaProbe> {
 
 /**
  * Native window-watch helper (native/arena-window-watch.swift): streams
- * "x,y,w,h,frontmost" at ~30Hz on change via CGWindowList — no Accessibility
- * needed, and smooth enough to ride along with a live drag. Resolved from the
- * packaged resources or the dev build dir; null when absent (osascript only).
+ * "G x,y,w,h,frontmost" at ~30Hz on change via CGWindowList — no Accessibility
+ * needed, and smooth enough to ride along with a live drag — plus, when
+ * capture is on, one-shot ScreenCaptureKit luminance frames ("F w,h,b64", only
+ * on change; no purple recording indicator) and "C on|off". Its stdin is a
+ * control channel ("capture on|off", "rate <hz>"); it exits when stdin closes.
+ * Resolved from the packaged resources or the dev build dir; null when absent
+ * (osascript only).
  */
 export function findWindowWatchHelper(): string | null {
   if (process.platform !== 'darwin' || FAKE_ARENA_FILE) return null
@@ -226,8 +230,11 @@ export class ArenaGeometryPoller extends EventEmitter {
   private helperAlive = false
   /** Whether the helper's window-capture stream is running (Screen Recording granted). */
   captureOn = false
-  /** Ask the helper for the frame stream (needs Screen Recording). */
-  wantCapture = true
+  /**
+   * Ask the helper for the frame feed (needs Screen Recording). Applied at
+   * spawn (--capture) and live via setCapture().
+   */
+  wantCapture = false
   private probing = false
   private baseIntervalMs = POLL_INTERVAL_MS
   private currentIntervalMs = POLL_INTERVAL_MS
@@ -265,11 +272,14 @@ export class ArenaGeometryPoller extends EventEmitter {
     if (!path) return
     let child: ChildProcess
     try {
-      child = spawn(path, this.wantCapture ? ['--capture'] : [], { stdio: ['ignore', 'pipe', 'ignore'] })
+      child = spawn(path, this.wantCapture ? ['--capture'] : [], { stdio: ['pipe', 'pipe', 'ignore'] })
     } catch {
       return
     }
     this.helper = child
+    // stdin is the control channel; the helper exits when it closes. An EPIPE
+    // on a dying helper must never surface as an unhandled error.
+    child.stdin?.on('error', () => { /* helper gone; 'exit' handles it */ })
     const rl = createInterface({ input: child.stdout! })
     rl.on('line', line => {
       if (line.startsWith('F ')) {
@@ -298,11 +308,34 @@ export class ArenaGeometryPoller extends EventEmitter {
     child.on('error', done)
   }
 
+  /**
+   * Turn the helper's frame feed on/off at runtime ("capture on|off" over its
+   * stdin control channel). Also remembered for the next spawn.
+   */
+  setCapture(on: boolean): void {
+    this.wantCapture = on
+    this.helperWrite(`capture ${on ? 'on' : 'off'}`)
+  }
+
+  /** Set the helper's base capture rate in Hz (0 pauses; default 4). */
+  setCaptureRate(hz: number): void {
+    if (!Number.isFinite(hz) || hz < 0) return
+    this.helperWrite(`rate ${hz}`)
+  }
+
+  private helperWrite(cmd: string): void {
+    const stdin = this.helper?.stdin
+    if (!stdin || stdin.destroyed || !stdin.writable) return
+    try { stdin.write(cmd + '\n') } catch { /* helper gone; 'exit' handles it */ }
+  }
+
   private stopHelper(): void {
     const h = this.helper
     this.helper = null
     this.helperAlive = false
     if (h && !h.killed) {
+      // Closing stdin asks the helper to exit on its own; kill covers a hung one.
+      try { h.stdin?.end() } catch { /* ignore */ }
       try { h.kill() } catch { /* ignore */ }
     }
   }

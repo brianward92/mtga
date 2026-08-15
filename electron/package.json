@@ -1,42 +1,44 @@
 {
   "name": "mtga-tracker",
   "version": "0.1.0",
-  "description": "MTGA draft assistant, log parser, and overlay",
+  "description": "MTGA Draft Assistant \u2014 a draft overlay for MTG Arena with local DraftFM recommendations",
   "main": "dist/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
     "build": "npm run build:native && electron-vite build",
-    "preview": "electron-vite preview",
-    "package": "electron-builder",
-    "deploy:mbp": "bash scripts/deploy-mbp.sh",
-    "typecheck": "tsc --noEmit",
     "build:native": "bash scripts/build-native.sh",
+    "package": "npm run build && electron-builder --mac --arm64",
+    "package:dir": "npm run build && electron-builder --mac --arm64 --dir",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "e2e": "node tests/e2e/drive.mjs",
-    "postinstall": "electron-rebuild -f -w better-sqlite3 || echo '[postinstall] electron-rebuild skipped (dev deps absent or offline); npm run dev needs it, prod installs do not'"
+    "bundle:sets": "cd .. && .venv/bin/python scripts/build_app_bundle.py --all-curated",
+    "install:local": "bash scripts/install-local.sh"
   },
   "dependencies": {
-    "better-sqlite3": "^11.6.0",
     "chokidar": "^4.0.3",
-    "onnxruntime-node": "^1.27.0"
+    "onnxruntime-node": "^1.20.0"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.10.2",
-    "better-sqlite3-node": "npm:better-sqlite3@^11.6.0",
     "electron": "^33.2.1",
     "electron-builder": "^25.1.8",
-    "electron-rebuild": "^3.2.9",
     "electron-vite": "^2.3.0",
     "puppeteer-core": "^25.3.0",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
   },
   "build": {
-    "appId": "com.mtga.tracker",
+    "appId": "com.mtga.draft-assistant",
     "productName": "MTGA Draft Assistant",
     "files": [
-      "dist/**/*"
+      "dist/**/*",
+      "!node_modules/onnxruntime-node/bin/napi-v6/linux/**",
+      "!node_modules/onnxruntime-node/bin/napi-v6/win32/**",
+      "!node_modules/onnxruntime-node/bin/napi-v6/darwin/x64/**"
+    ],
+    "asarUnpack": [
+      "node_modules/onnxruntime-node/**/*"
     ],
     "extraResources": [
       {
@@ -46,6 +48,18 @@
       {
         "from": "build/native",
         "to": "native"
+      },
+      {
+        "from": "resources/draftfm",
+        "to": "draftfm"
+      },
+      {
+        "from": "build/trayTemplate.png",
+        "to": "trayTemplate.png"
+      },
+      {
+        "from": "build/trayTemplate@2x.png",
+        "to": "trayTemplate@2x.png"
       }
     ],
     "mac": {
@@ -54,7 +68,11 @@
       "target": [
         "dmg",
         "zip"
-      ]
+      ],
+      "extendInfo": {
+        "LSUIElement": true,
+        "NSScreenCaptureUsageDescription": "Used only to lift card badges from under Arena's own card previews and menus. Only the Arena window is captured; nothing is recorded or stored."
+      }
     },
     "directories": {
       "output": "release"

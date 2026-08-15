@@ -1,42 +1,58 @@
-# MTGA Draft Assistant v2 — draft-only, single overlay, local DraftFM
+# MTGA Draft Assistant v2 — architecture
 
-Status: DRAFT (2026-08-15). Being reconciled against the code audit.
+Draft-only. One overlay window. Local DraftFM. (Built 2026-08-15; see
+AUDIT-2026-08-15.md for what was cut and why.)
 
-## Product
-One menu-bar app. One transparent, click-through overlay window that covers the
-Arena window (glued at ~30 Hz via the native helper). No separate panel.
+## Processes & modules
 
-Overlay contents
-- Context HUD (corner, small, always subtle): model + set/format, pack·pick,
-  pool colour bars / lane lean, and a one-line hint. Hidden outside drafts
-  except a tiny status glyph.
-- Draft mode ("goes nuts"): per-card frames + chips on the pack grid (grade,
-  flames, head-to-head %, #1–#3, LEAN/SLAM), layer-aware (previews/modals lift
-  what they cover), hover-to-detail: cursor over a card puts that card's detail
-  (why: EV, GIH WR, ALSA, model prob) into the HUD — no click needed.
-- Keyboard: global shortcut toggles an expanded pool/pick-history sheet inside
-  the same overlay; menu bar for the rest (calibrate, toggle, quit).
+```
+main/index.ts               bootstrap + wiring; overlay visibility policy; tray; global shortcuts; IPC
+main/parser/                LogWatcher (Player-prev.log replay + Player.log tail) → LogParser → DraftParser
+main/draft/coordinator.ts   DraftState machine: start/pack/pick/end/idle; scoring (0-based pack/pick);
+                            grades; pool/picks; JSONL history; replay-safe
+main/model/draftfm.ts       OnnxDraftFMModel port (onnxruntime-node); bit-for-bit vs Python fixtures
+main/model/manager.ts       bundle discovery, per-set load, P1P1 curve cache, status
+main/data/bundle.ts         sets/<SET>/{assets.npz,cards.json,ratings.json} + index.json loader
+main/data/history.ts        append-only JSONL
+main/overlay/window.ts      the transparent click-through window (mouse forwarding; setInteractive)
+main/overlay/layer.ts       LayerDetector: frame diff vs baseline / cursor prediction → LayerState
+main/overlay/occlusion.ts   pure pixel math (cardness, per-cell diff)
+main/overlay/calibration.ts grid calibration state + persistence (prefs.json)
+main/arena-geometry.ts      native helper client: G (rect+frontmost) / F (frames) / C lines; stdin control
+main/prefs.ts               ~/.mtga-tracker/prefs.json
+main/status-tray.ts         menu-bar item
+shared/                     state contract (DraftState…), layout (grid), display-order, hover, grades ladder
+renderer/overlay/           single page: badges layer, HUD, sheet, calibration (see renderer files)
+native/arena-window-watch.swift  CGWindowList geometry @30Hz + one-shot SCK captures (no recording indicator)
+```
 
-## Inference (local, bundled)
-- DraftFM foundation model (paper: SSRN 7257098) as ONNX: card_encoder.onnx,
-  scorer.onnx, constants, meta — ~6.5 MB. Runs in-process via onnxruntime-node.
-- Per-set asset bundle (~0.6 MB each): feature matrix (fp16 775 dims), rarity
-  ids, names, grpId aliases; plus a 17Lands ratings snapshot for display
-  (attribution required). New set ⇒ app update ships a new bundle; weights
-  optional.
-- Set-relative grades computed locally: score every card in the set at P1P1
-  with an empty pool once per set ⇒ percentile table.
-- No network at draft time. Remote API kept only as dev tooling.
+## Data flow
 
-## Layer awareness (no recording indicator)
-- Native helper: CGWindowList geometry stream (30 Hz on change + 1 Hz
-  heartbeat) and one-shot SCScreenshotManager captures of the Arena window
-  (adaptive 2–8 Hz; only while overlay is live). One-shot captures do NOT
-  trigger macOS's recording indicator (verified 2026-08-15).
-- Main: per-cell frame diff vs. a "clear" baseline; cardness gate; frontmost
-  from window order.
+Player.log line → DraftParser event → DraftCoordinator (state) → `overlay:state`
+push (full snapshot with `seq`) → renderer renders. Scoring is async: the pack
+renders immediately from bundle identity; scores/grades land ~1 ms later.
+Helper frames → LayerDetector → `overlay:layer` (covered cells / regions /
+covered / hudCovered) → renderer lifts what Arena is drawing over.
 
-## Removed (draft-only)
-match/deck tracker, collection sync, inventory, win/loss stats, dashboard,
-tier-list mode, sqlite except a small draft-history store (or JSON), remote
-score/ratings calls, legacy UTC log tailing (verify), the panel window.
+## Visibility policy (main/index.ts)
+
+Overlay shown iff Arena window found AND Arena (or we) frontmost AND
+(calibrating OR draft active/complete with badges|hud OR idle with hud).
+Window capture only while badges are live and layer detection is enabled.
+
+## Contracts
+
+- Parser snapshot pack/pick are 1-based; the model takes 0-based (coordinator
+  subtracts at the boundary — the old app got this wrong).
+- Grades: the paper's 13-level ladder over the set's P1P1 curve (whole set
+  scored as one pack, empty pool, serving condition 33/6).
+- Bundle: manifest_hash in sets/index.json must equal the model's; DraftFM.load
+  refuses mismatches.
+- Renderer test hooks: data-testid overlay-root / badge-cell[data-scored] /
+  hud / hud-pick / hud-btn-sheet / hud-btn-calibrate / sheet /
+  calibrate-panel / calibrate-cancel (used by tests/e2e/drive.mjs).
+
+## Adding a set
+
+`MTGA_DATA_ROOT=… .venv/bin/python scripts/build_app_bundle.py --set XYZ` →
+commit `electron/resources/draftfm/sets/XYZ/` → ship an app update.

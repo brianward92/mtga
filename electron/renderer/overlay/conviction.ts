@@ -1,7 +1,7 @@
 /**
  * Pick conviction (pure logic — unit tested).
  *
- * The Verdict view's headline number is head-to-head **dominance**, not the
+ * The overlay's headline number is head-to-head **dominance**, not the
  * model's within-pack softmax. Softmax understates obviousness: a dominant
  * bomb in a 14-card pack reads "66%" only because probability mass spreads
  * over 13 alternatives. Dominance asks the sharper question — what is the
@@ -64,24 +64,6 @@ export function runnerDominance(
 }
 
 /**
- * Percentile (0..1) of `value` within a sorted-ascending population:
- * the fraction of values strictly below it (binary search — the population
- * is the whole set's ev_p1p1 list, sorted once and cached at draft-start).
- * Empty population or non-finite value -> null.
- */
-export function percentileOfSortedAsc(value: number, sortedAsc: readonly number[]): number | null {
-  if (!Number.isFinite(value) || sortedAsc.length === 0) return null
-  let lo = 0
-  let hi = sortedAsc.length
-  while (lo < hi) {
-    const mid = (lo + hi) >> 1
-    if (sortedAsc[mid] < value) lo = mid + 1
-    else hi = mid
-  }
-  return lo / sortedAsc.length
-}
-
-/**
  * The display band for a scored pack.
  *
  *   dominance >= 0.97 && setPct >= 0.98 -> OBVIOUS BOMB — just take it, 5 flames, pct
@@ -126,10 +108,4 @@ export function bandConviction(
 export function formatDominancePct(dominance: number): string {
   const pct = Math.round(dominance * 100)
   return pct >= 100 ? '>99%' : `${pct}%`
-}
-
-/** Pairwise split for the close-call duo, e.g. 0.52 -> ['52', '48']. */
-export function formatSplit(dominance: number): [string, string] {
-  const a = Math.round(dominance * 100)
-  return [`${a}`, `${100 - a}`]
 }

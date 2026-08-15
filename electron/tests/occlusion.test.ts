@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 vi.mock('electron', () => ({ desktopCapturer: {}, systemPreferences: {} }))
-import { detectOcclusion, toGray, type GrayFrame, CELL_DIFF_THRESHOLD } from '../main/windows/occlusion'
+import { detectOcclusion, toGray, type GrayFrame, CELL_DIFF_THRESHOLD } from '../main/overlay/occlusion'
 
 function frame(w: number, h: number, fill: (x: number, y: number) => number): GrayFrame {
   const data = new Float32Array(w * h)
@@ -55,7 +55,7 @@ describe('detectOcclusion', () => {
   })
 })
 
-import { cardness, CARDNESS_MIN } from '../main/windows/occlusion'
+import { cardness, CARDNESS_MIN } from '../main/overlay/occlusion'
 describe('cardness', () => {
   const pack = { x: 0, y: 0, width: 40, height: 20 }
   const cells = [{ x: 2, y: 2, width: 16, height: 16 }, { x: 22, y: 2, width: 16, height: 16 }]

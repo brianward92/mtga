@@ -18,7 +18,7 @@ import {
   aspectOfBucket,
   nearestCalibrationBucket,
   CalibrationConfig
-} from '../renderer/badges/layout'
+} from '../shared/layout'
 
 const VIEWS = [
   { width: 1600, height: 900 },   // 16:9

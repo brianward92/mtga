@@ -1,25 +1,16 @@
 /**
- * Shared renderer helpers (used by the match overlay and the draft view).
+ * Small pure rendering helpers shared by the overlay's layers (unit tested).
  */
 
-/**
- * Effective CSS zoom of the page (1 when the panel isn't glued to Arena).
- * getBoundingClientRect returns ZOOMED viewport px while style lengths render
- * multiplied by the zoom — any math mixing the two must divide rect-derived
- * distances by this (Chromium 128+ exposes it as Element.currentCSSZoom).
- */
-export function effectiveZoom(): number {
-  const zoom = (document.documentElement as unknown as { currentCSSZoom?: number }).currentCSSZoom
-  return typeof zoom === 'number' && zoom > 0 ? zoom : 1
-}
-
-/**
- * Escape HTML to prevent XSS
- */
+/** Escape text for insertion into an HTML string (no DOM needed). */
 export function escapeHtml(text: string): string {
-  const div = document.createElement('div')
-  div.textContent = text
-  return div.innerHTML
+  return String(text).replace(/[&<>"']/g, char => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  })[char]!)
 }
 
 /**
@@ -35,20 +26,10 @@ const MANA_SYMBOL_NAMES: Readonly<Record<string, string>> = {
   C: 'Colorless'
 }
 
-function escapeManaText(text: string): string {
-  return text.replace(/[&<>"']/g, char => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;'
-  })[char]!)
-}
-
 /** A compact, text-precise mana pip that remains meaningful without color. */
 export function renderManaSymbol(symbol: string, options: { decorative?: boolean } = {}): string {
   const upper = symbol.toUpperCase()
-  const safe = escapeManaText(upper)
+  const safe = escapeHtml(upper)
   const colorName = MANA_SYMBOL_NAMES[upper]
   const generic = !colorName
   const label = colorName
@@ -58,7 +39,7 @@ export function renderManaSymbol(symbol: string, options: { decorative?: boolean
       : `${upper} mana`
   const accessibility = options.decorative
     ? ' aria-hidden="true"'
-    : ` role="img" aria-label="${escapeManaText(label)}" title="${escapeManaText(label)}"`
+    : ` role="img" aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}"`
 
   return `<span class="mana-symbol ${generic ? 'generic' : upper}"${accessibility}>${safe}</span>`
 }
@@ -84,19 +65,4 @@ export function formatWinRate(value: number | null | undefined): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return '—'
   const pct = value <= 1 ? value * 100 : value
   return `${pct.toFixed(1)}%`
-}
-
-/**
- * Coarse relative age of an ISO timestamp ("3m ago" / "5h ago" / "2d ago").
- * Unparseable, missing, or future timestamps return ''.
- */
-export function formatRelativeAge(iso: string | null | undefined): string {
-  if (!iso) return ''
-  const ms = Date.now() - Date.parse(iso)
-  if (!Number.isFinite(ms) || ms < 0) return ''
-  const minutes = Math.floor(ms / 60_000)
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 48) return `${hours}h ago`
-  return `${Math.floor(hours / 24)}d ago`
 }

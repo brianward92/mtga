@@ -1,11 +1,11 @@
 /**
  * Flame ratings (pure logic — unit tested).
  *
- * The Verdict view speaks heat, not numbers: model conviction becomes a
- * 1-5 flame rating. Live scored packs use head-to-head dominance bands
- * (see conviction.ts); this module covers the percentile-based ratings:
- *   - P1P1 tier list: the card's ev_p1p1 percentile within the set
- *   - scored packs with <2 EVs: set-percentile fallback for the top card
+ * The overlay speaks heat, not numbers: model conviction becomes a 1-5
+ * flame rating. The top pick of a scored pack uses head-to-head dominance
+ * bands (see conviction.ts); this module covers the percentile-based
+ * ratings — a card's set-relative P1P1 percentile (chips for runner-ups,
+ * hover detail, and the top card while fewer than 2 EVs are known).
  */
 
 export interface FlameRating {
@@ -13,17 +13,6 @@ export interface FlameRating {
   flames: number
   /** Band label ('OBVIOUS BOMB' / 'SLAM' at the top), otherwise null */
   label: string | null
-}
-
-/**
- * Percentile (0..100) of `value` within `population` (fraction of values
- * strictly below it). Empty population -> null.
- */
-export function percentileOf(value: number, population: readonly number[]): number | null {
-  const finite = population.filter(v => Number.isFinite(v))
-  if (finite.length === 0) return null
-  const below = finite.filter(v => v < value).length
-  return (below / finite.length) * 100
 }
 
 /**

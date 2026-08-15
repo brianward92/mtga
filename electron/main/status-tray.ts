@@ -1,126 +1,95 @@
-/** Persistent macOS menu-bar status and controls. */
+/**
+ * Menu-bar item: the app's only persistent surface. Shows model/draft status
+ * and the few toggles a drafter needs.
+ */
+import { app, Menu, Tray, nativeImage } from 'electron'
+import { existsSync } from 'fs'
+import { join } from 'path'
+import type { DraftState } from '../shared/state'
+import type { Prefs } from './prefs'
 
-import { app, Menu, nativeImage, Tray } from 'electron'
-
-export interface StatusTrayState {
-  serverStatus: 'green' | 'amber' | 'red'
-  model: string | null
-  draft: {
-    set: string | null
-    format: string | null
-    pack: number | null
-    pick: number | null
-  } | null
+export interface TrayState {
+  draft: DraftState
+  prefs: Prefs
+  layerDetectionAvailable: boolean
   overlayVisible: boolean
-  followArena: boolean
-  badgesEnabled: boolean
-  /** Screen Recording granted → Arena modal detection for badges works. */
-  layerDetection: boolean
 }
 
-export interface StatusTrayActions {
-  showOverlay: () => void
-  toggleOverlay: () => void
-  calibrateBadges: () => void
+export interface TrayActions {
   toggleBadges: () => void
-  grantScreenRecording: () => void
-  toggleFollowArena: () => void
+  toggleHud: () => void
+  toggleLayerDetection: () => void
+  calibrate: () => void
+  toggleSheet: () => void
+  openScreenRecordingSettings: () => void
 }
 
-// Monochrome stacked-card mark. macOS recolors template images for the
-// current menu-bar appearance, including high-contrast and dark modes.
-const ICON_SVG = `
-<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
-  <path fill="#000" d="M4 2h9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm1 2a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1H5Zm1 2h5v1H6V6Zm0 3h5v1H6V9Zm0 3h3v1H6v-1Z"/>
-</svg>`.trim()
-
-function menuIcon() {
-  const data = Buffer.from(ICON_SVG).toString('base64')
-  const image = nativeImage.createFromDataURL(`data:image/svg+xml;base64,${data}`)
-  image.setTemplateImage(true)
-  return image
+// Monochrome stacked-card mark as a template PNG (macOS recolors template
+// images; nativeImage cannot rasterize SVG, so we ship 1x/2x PNGs).
+function menuIcon(): Electron.NativeImage {
+  const candidates = [
+    join(process.resourcesPath ?? '', 'trayTemplate.png'),
+    join(__dirname, '..', '..', 'build', 'trayTemplate.png'),
+    join(process.cwd(), 'build', 'trayTemplate.png')
+  ]
+  for (const p of candidates) {
+    if (existsSync(p)) {
+      const img = nativeImage.createFromPath(p)
+      if (!img.isEmpty()) { img.setTemplateImage(true); return img }
+    }
+  }
+  return nativeImage.createEmpty()
 }
 
-function modelLabel(model: string | null): string {
-  if (!model) return 'none'
-  const parts = model.split('/').filter(Boolean)
-  return parts.at(-1) || model
+function modelLabel(d: DraftState): string {
+  const m = d.model
+  if (m.state === 'ready' && m.modelId) return `Model: ${m.modelId.replace(/^_foundation\//, 'DraftFM ')}`
+  if (m.state === 'no-bundle') return 'Model: bundle missing'
+  if (m.state === 'no-set') return `Model: ${d.set ?? 'set'} not bundled`
+  if (m.state === 'error') return `Model: error — ${m.message ?? ''}`
+  return 'Model: DraftFM (loading…)'
 }
 
-function draftLabel(draft: StatusTrayState['draft']): string {
-  if (!draft) return 'Draft: idle'
-  const set = draft.set || 'unknown set'
-  const format = draft.format || 'draft'
-  const position = draft.pack !== null && draft.pick !== null
-    ? ` P${draft.pack}P${draft.pick}`
-    : ''
-  return `Draft: ${set} ${format}${position}`
+function draftLabel(d: DraftState): string {
+  if (d.phase === 'idle') return 'No draft in progress'
+  const where = d.pack && d.pick ? ` P${d.pack}P${d.pick}` : ''
+  return `${d.set ?? '?'} ${d.format ?? ''}${where}${d.phase === 'complete' ? ' — complete' : ''}`
 }
 
 export class StatusTray {
-  private readonly tray: Tray
-  private state: StatusTrayState
+  private tray: Tray
+  private state: TrayState | null = null
 
-  constructor(private readonly actions: StatusTrayActions) {
-    this.state = {
-      serverStatus: 'red',
-      model: null,
-      draft: null,
-      overlayVisible: false,
-      followArena: true,
-      badgesEnabled: false,
-      layerDetection: false
-    }
-    this.tray = new Tray(menuIcon())
-    if (process.platform === 'darwin') {
-      // Text is an intentional fallback: a malformed/unsupported template
-      // image must never leave the status item present but invisible.
-      this.tray.setTitle('MTGA')
-    }
+  constructor(private actions: TrayActions) {
+    const icon = menuIcon()
+    this.tray = new Tray(icon)
+    // Text fallback so the item is never invisible.
+    if (process.platform === 'darwin' && icon.isEmpty()) this.tray.setTitle('Draft')
     this.tray.setToolTip('MTGA Draft Assistant')
-    this.tray.on('click', () => this.actions.showOverlay())
-    this.rebuildMenu()
   }
 
-  update(state: StatusTrayState): void {
+  update(state: TrayState): void {
     this.state = state
-    this.rebuildMenu()
+    this.rebuild()
   }
 
-  destroy(): void {
-    this.tray.destroy()
-  }
+  destroy(): void { this.tray.destroy() }
 
-  private rebuildMenu(): void {
-    const status = this.state.serverStatus.toUpperCase()
+  private rebuild(): void {
+    const s = this.state
+    if (!s) return
     const menu = Menu.buildFromTemplate([
-      { label: `Server: ${status}`, enabled: false },
-      { label: `Model: ${modelLabel(this.state.model)}`, enabled: false },
-      { label: draftLabel(this.state.draft), enabled: false },
+      { label: modelLabel(s.draft), enabled: false },
+      { label: draftLabel(s.draft), enabled: false },
       { type: 'separator' },
-      {
-        label: this.state.overlayVisible ? 'Hide Draft Overlay' : 'Show Draft Overlay',
-        click: () => this.actions.toggleOverlay()
-      },
-      {
-        label: 'Glue Overlay to Arena',
-        type: 'checkbox',
-        checked: this.state.followArena,
-        click: () => this.actions.toggleFollowArena()
-      },
-      {
-        label: 'Show Card Badges',
-        type: 'checkbox',
-        checked: this.state.badgesEnabled,
-        click: () => this.actions.toggleBadges()
-      },
-      { label: 'Calibrate Card Badges', click: () => this.actions.calibrateBadges() },
-      this.state.layerDetection
-        ? { label: 'Arena Layer Detection: on', enabled: false }
-        : {
-            label: 'Arena Layer Detection: needs Screen Recording…',
-            click: () => this.actions.grantScreenRecording()
-          },
+      { label: 'Card Badges', type: 'checkbox', checked: s.prefs.badges, click: () => this.actions.toggleBadges() },
+      { label: 'Context HUD', type: 'checkbox', checked: s.prefs.hud, click: () => this.actions.toggleHud() },
+      { label: 'Pool & Picks Sheet   ⌘⇧D', click: () => this.actions.toggleSheet() },
+      { type: 'separator' },
+      s.layerDetectionAvailable
+        ? { label: 'Lift badges under Arena previews', type: 'checkbox', checked: s.prefs.layerDetection, click: () => this.actions.toggleLayerDetection() }
+        : { label: 'Lift badges under previews: needs Screen Recording…', click: () => this.actions.openScreenRecordingSettings() },
+      { label: 'Calibrate Card Grid…', click: () => this.actions.calibrate() },
       { type: 'separator' },
       { label: 'Quit MTGA Draft Assistant', click: () => app.quit() }
     ])

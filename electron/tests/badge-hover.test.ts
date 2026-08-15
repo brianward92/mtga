@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { hoveredCardIndex, intersects, predictPopout } from '../renderer/badges/hover'
+import { hoveredCardIndex, intersects, predictPopout } from '../shared/hover'
 
 const view = { width: 1512, height: 949 }
 const card = { x: 843, y: 447, width: 148, height: 212 } // Impossible Inferno cell (pts)
