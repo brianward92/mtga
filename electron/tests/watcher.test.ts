@@ -46,7 +46,7 @@ describe('LogWatcher', () => {
     events: string[]
   }> {
     process.env.MTGA_LOG_PATH = logPath
-    watcher = new LogWatcher({ watchLegacyLogs: false })
+    watcher = new LogWatcher()
 
     const lines: CapturedLine[] = []
     const events: string[] = []

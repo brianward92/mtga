@@ -1,0 +1,32 @@
+[UnityCrossThreadLogger]==> EventJoin {"id":"4cccac5b-1262-4a6b-aea1-28679bb65c16","request":"{\"EventName\":\"QuickDraft_DSK_20260811\",\"EntryCurrencyType\":\"Gem\",\"EntryCurrencyPaid\":750,\"CustomTokenId\":null,\"EventChoice\":\"\",\"DebugIgnoreEntryLimits\":false}"}
+FrontDoorConnectionAWS:LogOutgoingMessage(IFDPromiseWriter)
+FrontDoorConnectionAWS:SendOnWire(IFDPromiseWriter)
+
+[UnityCrossThreadLogger]8/15/2026 9:32:28 AM
+<== EventJoin(4cccac5b-1262-4a6b-aea1-28679bb65c16)
+{"Course":{"CourseId":"c30300d0-15e9-4860-88c7-7d3d8f5305b6","InternalEventName":"QuickDraft_DSK_20260811","CurrentModule":"BotDraft","ModulePayload":"","CourseDeckSummary":{"Attributes":[],"PreferredCosmetics":{"Avatar":"","Sleeve":"","Pet":"","Title":"","Emotes":[]}},"CardPool":[],"CardStyles":[]}
+FrontDoorConnectionAWS:LogIncomingMessage(CmdType, Guid, IFDPromiseWriter)
+FrontDoorConnectionAWS:HandleTcpEvent(ITcpEvent)
+[UnityCrossThreadLogger]==> BotDraftDraftStatus {"id":"006528f2-67ab-4da5-b04a-88d36b803911","request":"{\"EventName\":\"QuickDraft_DSK_20260811\"}"}
+FrontDoorConnectionAWS:LogOutgoingMessage(IFDPromiseWriter)
+Wotc.Mtga.Network.ServiceWrappers.AwsEventServiceWrapper:GetBotDraftStatus(String)
+
+[UnityCrossThreadLogger]8/15/2026 9:32:30 AM
+<== BotDraftDraftStatus(006528f2-67ab-4da5-b04a-88d36b803911)
+{"CurrentModule":"BotDraft","Payload":"{\"Result\":\"Success\",\"EventName\":\"QuickDraft_DSK_20260811\",\"DraftStatus\":\"PickNext\",\"PackNumber\":0,\"PickNumber\":0,\"NumCardsToPick\":1,\"DraftPack\":[\"92188\",\"92154\",\"92073\",\"92248\",\"92224\",\"92346\",\"92290\",\"92076\",\"92231\",\"92161\",\"92082\",\"92310\",\"92176\",\"92380\"],\"PackStyles\":[],\"PickedCards\":[],\"PickedStyles\":[]}"}
+FrontDoorConnectionAWS:LogIncomingMessage(CmdType, Guid, IFDPromiseWriter)
+FrontDoorConnectionAWS:HandleTcpEvent(ITcpEvent)
+PAPA:Update()
+[UnityCrossThreadLogger]==> BotDraftDraftPick {"id":"7d1f0a3c-0001-4c2a-9b3d-aaaaaaaaaaaa","request":"{\"EventName\":\"QuickDraft_DSK_20260811\",\"PickInfo\":{\"EventName\":\"QuickDraft_DSK_20260811\",\"CardIds\":[\"92188\"],\"PackNumber\":0,\"PickNumber\":0}}"}
+FrontDoorConnectionAWS:LogOutgoingMessage(IFDPromiseWriter)
+
+[UnityCrossThreadLogger]8/15/2026 9:32:44 AM
+<== BotDraftDraftPick(7d1f0a3c-0001-4c2a-9b3d-aaaaaaaaaaaa)
+{"CurrentModule":"BotDraft","Payload":"{\"Result\":\"Success\",\"EventName\":\"QuickDraft_DSK_20260811\",\"DraftStatus\":\"PickNext\",\"PackNumber\":0,\"PickNumber\":1,\"NumCardsToPick\":1,\"DraftPack\":[\"92301\",\"92112\",\"92255\",\"92060\",\"92199\",\"92333\",\"92140\",\"92277\",\"92088\",\"92210\",\"92365\",\"92121\",\"92244\"],\"PackStyles\":[],\"PickedCards\":[\"92188\"],\"PickedStyles\":[]}"}
+FrontDoorConnectionAWS:LogIncomingMessage(CmdType, Guid, IFDPromiseWriter)
+[UnityCrossThreadLogger]==> BotDraftDraftPick {"id":"7d1f0a3c-0002-4c2a-9b3d-aaaaaaaaaaaa","request":"{\"EventName\":\"QuickDraft_DSK_20260811\",\"PickInfo\":{\"EventName\":\"QuickDraft_DSK_20260811\",\"CardIds\":[\"92301\"],\"PackNumber\":0,\"PickNumber\":1}}"}
+
+[UnityCrossThreadLogger]8/15/2026 9:32:59 AM
+<== BotDraftDraftPick(7d1f0a3c-0002-4c2a-9b3d-aaaaaaaaaaaa)
+{"CurrentModule":"BotDraft","Payload":"{\"Result\":\"Success\",\"EventName\":\"QuickDraft_DSK_20260811\",\"DraftStatus\":\"Completed\",\"PackNumber\":0,\"PickNumber\":2,\"NumCardsToPick\":0,\"DraftPack\":[],\"PackStyles\":[],\"PickedCards\":[\"92188\",\"92301\"],\"PickedStyles\":[]}"}
+FrontDoorConnectionAWS:LogIncomingMessage(CmdType, Guid, IFDPromiseWriter)

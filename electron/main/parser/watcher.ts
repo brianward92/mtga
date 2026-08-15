@@ -20,15 +20,15 @@
  * MTGA_LOG_PATH env var overrides the target file (its directory is watched)
  * for replay testing.
  *
- * The legacy UTC_Log directory watch is kept as an optional secondary source
- * (config flag, default on) so existing match tracking keeps working while
- * the Player.log switch is verified.
+ * Only Player.log is tailed. The legacy UTC_Log directory carries the same
+ * draft messages (EventJoin, BotDraftDraftStatus, ...) and was a double-feed
+ * risk, so it is no longer watched.
  */
 
 import { EventEmitter } from 'events'
 import { watch, FSWatcher } from 'chokidar'
 import { stat } from 'fs/promises'
-import { createReadStream, existsSync, readdirSync, statSync } from 'fs'
+import { createReadStream, existsSync } from 'fs'
 import { join, dirname } from 'path'
 import { homedir } from 'os'
 import { LineSplitter } from './line-splitter'
@@ -40,11 +40,6 @@ export interface LogWatcherEvents {
   rotated: (newPath: string) => void
   'replay-start': () => void
   'replay-complete': () => void
-}
-
-export interface LogWatcherOptions {
-  /** Also tail the legacy UTC_Log directory (default true). */
-  watchLegacyLogs?: boolean
 }
 
 // Polling backstop (one stat/s when idle): fsevents can miss writes that land
@@ -73,12 +68,6 @@ class FileTail {
 
   reset(): void {
     this.offset = 0
-    this.splitter.reset()
-    this.lastIno = null
-  }
-
-  seekToEnd(size: number): void {
-    this.offset = size
     this.splitter.reset()
     this.lastIno = null
   }
@@ -161,7 +150,6 @@ class FileTail {
 export class LogWatcher extends EventEmitter {
   private readonly logPath: string
   private readonly logDirectory: string
-  private readonly watchLegacy: boolean
   private readonly usingOverride: boolean
 
   private playerTail: FileTail
@@ -169,21 +157,13 @@ export class LogWatcher extends EventEmitter {
   private pollTimer: NodeJS.Timeout | null = null
   private stopped = false
 
-  // Legacy UTC_Log secondary watch
-  private readonly legacyDirectory: string
-  private legacyWatcher: FSWatcher | null = null
-  private legacyTail: FileTail | null = null
-
-  constructor(options: LogWatcherOptions = {}) {
+  constructor() {
     super()
-    this.watchLegacy = options.watchLegacyLogs ?? true
 
     const override = process.env.MTGA_LOG_PATH
     this.usingOverride = !!override
     this.logPath = override || join(homedir(), 'Library/Logs/Wizards Of The Coast/MTGA/Player.log')
     this.logDirectory = dirname(this.logPath)
-
-    this.legacyDirectory = join(homedir(), 'Library/Application Support/com.wizards.mtga/Logs/Logs')
 
     this.playerTail = new FileTail(
       this.logPath,
@@ -246,105 +226,12 @@ export class LogWatcher extends EventEmitter {
     this.pollTimer = setInterval(() => {
       void this.playerTail.poll(false)
     }, POLL_INTERVAL_MS)
-
-    // ---- Optional legacy UTC_Log secondary watch
-    if (this.watchLegacy) {
-      this.startLegacyWatch()
-    }
-  }
-
-  // ==========================================================================
-  // Legacy UTC_Log directory (secondary source for match tracking)
-  // ==========================================================================
-
-  private startLegacyWatch(): void {
-    if (!existsSync(this.legacyDirectory)) return
-
-    const latest = this.findLatestLegacyLog()
-    if (latest) {
-      this.attachLegacyTail(latest, true)
-    }
-
-    this.legacyWatcher = watch(this.legacyDirectory, {
-      persistent: true,
-      ignoreInitial: true,
-      depth: 0
-    })
-
-    this.legacyWatcher.on('change', (path) => {
-      if (this.legacyTail && path === this.legacyTail.filePath) {
-        void this.legacyTail.poll(false)
-      }
-    })
-
-    this.legacyWatcher.on('add', (path) => {
-      if (path.includes('UTC_Log') && path.endsWith('.log')) {
-        const newest = this.findLatestLegacyLog()
-        if (newest && newest !== this.legacyTail?.filePath) {
-          this.attachLegacyTail(newest, false)
-          void this.legacyTail?.poll(false)
-        }
-      }
-    })
-
-    this.legacyWatcher.on('error', (error) => this.emit('error', error as Error))
-  }
-
-  private attachLegacyTail(path: string, seekToEnd: boolean): void {
-    this.legacyTail = new FileTail(
-      path,
-      (line, replay) => this.emit('line', line, replay),
-      (error) => this.emit('error', error)
-    )
-    if (seekToEnd) {
-      try {
-        this.legacyTail.seekToEnd(statSync(path).size)
-      } catch {
-        // start from 0 if stat fails
-      }
-    }
-    this.emit('watching', path)
-  }
-
-  private findLatestLegacyLog(): string | null {
-    if (!existsSync(this.legacyDirectory)) return null
-
-    const files = readdirSync(this.legacyDirectory)
-      .filter(f => f.startsWith('UTC_Log') && f.endsWith('.log'))
-      .map(f => ({
-        path: join(this.legacyDirectory, f),
-        time: this.parseLegacyFilename(f)
-      }))
-      .filter(f => f.time !== null)
-      .sort((a, b) => (b.time?.getTime() ?? 0) - (a.time?.getTime() ?? 0))
-
-    return files[0]?.path ?? null
-  }
-
-  private parseLegacyFilename(filename: string): Date | null {
-    // Format: "UTC_Log - MM-DD-YYYY HH.MM.SS.log"
-    const match = filename.match(
-      /UTC_Log - (\d{2})-(\d{2})-(\d{4}) (\d{2})\.(\d{2})\.(\d{2})\.log/
-    )
-    if (!match) return null
-
-    const [, month, day, year, hour, minute, second] = match
-    return new Date(
-      parseInt(year),
-      parseInt(month) - 1,
-      parseInt(day),
-      parseInt(hour),
-      parseInt(minute),
-      parseInt(second)
-    )
   }
 
   stop(): void {
     this.stopped = true
     this.watcher?.close()
     this.watcher = null
-    this.legacyWatcher?.close()
-    this.legacyWatcher = null
     if (this.pollTimer) {
       clearInterval(this.pollTimer)
       this.pollTimer = null

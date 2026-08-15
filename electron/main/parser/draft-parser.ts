@@ -2,9 +2,16 @@
  * Draft event parser for MTGA Player.log lines.
  *
  * Self-contained state machine fed raw log lines (it needs the message name
- * that precedes the JSON, which the generic JSON extractor throws away).
+ * that precedes the JSON). Every line gets a cheap substring pre-filter; only
+ * the handful of draft lines are JSON.parsed. This is the ONLY parsing the
+ * app does on Player.log — there is no generic JSON extraction anywhere.
  *
  * Log format quirks handled here (verified against 2026 clients):
+ * - Responses are TWO lines: a bare "<== Name(id)" marker line followed by
+ *   the JSON body on the next line (requests "==> Name {json}" stay on one
+ *   line). handleLine remembers the marker and stitches the body onto it so
+ *   every handler below sees the same-line "<== Name {json}" shape. Older
+ *   logs/fixtures that already put both on one line still work.
  * - The April 2025 client removed underscores from request names
  *   (Event_PlayerDraftMakePick -> EventPlayerDraftMakePick, etc.); every key
  *   is matched both with and without underscores.
@@ -25,13 +32,35 @@
 import { EventEmitter } from 'events'
 import { parseDraftEventName } from '../utils/format-utils'
 
+/**
+ * One recorded pick. `pack`/`pick` are 1-based (P1P1 is pack 1, pick 1) —
+ * see DraftSessionSnapshot.
+ */
 export interface DraftPickRecord {
+  /** 1-based pack number (1..3). */
   pack: number
+  /** 1-based pick number within the pack (1..picksPerPack). */
   pick: number
+  /** Cards taken with this pick (length > 1 in Pick-Two drafts). */
   grpIds: number[]
+  /** Contents of the pack when the pick was made ([] if never observed). */
   packGrpIds: number[]
 }
 
+/**
+ * Point-in-time view of the current draft.
+ *
+ * INDEXING CONTRACT: every pack/pick number in a snapshot (`currentPack`,
+ * `picks[]`) is 1-BASED, i.e. exactly what a human calls it: P1P1 is
+ * `{ pack: 1, pick: 1 }`. The parser normalizes the raw log's mixed
+ * conventions to this:
+ *   - human events (Draft.Notify SelfPack/SelfPick, EventPlayerDraftMakePick
+ *     Pack/Pick) are already 1-based and are passed through;
+ *   - bot-draft payloads (BotDraftDraftStatus/BotDraftDraftPick
+ *     PackNumber/PickNumber) are 0-based in the log and are shifted by +1.
+ * Consumers that feed a 0-based model (DraftFM scores by pack index / pick
+ * index) must subtract 1 from both at the model boundary.
+ */
 export interface DraftSessionSnapshot {
   draftId: string | null
   eventName: string | null
@@ -39,7 +68,9 @@ export interface DraftSessionSnapshot {
   format: string | null
   state: 'active' | 'complete'
   isBotDraft: boolean
+  /** The pack currently on screen; 1-based pack/pick (see above). */
   currentPack: { pack: number; pick: number; grpIds: number[] } | null
+  /** Picks so far, sorted by (pack, pick); 1-based. */
   picks: DraftPickRecord[]
   pool: number[]
 }
@@ -57,6 +88,13 @@ const KEY_MAKE_PICK = 'Event_PlayerDraftMakePick'
 const KEY_BOT_PICK = 'BotDraft_DraftPick'
 const KEY_COMPLETE = 'Draft_CompleteDraft'
 const KEY_EVENT_JOIN = 'Event_Join'
+
+/**
+ * Bare response marker line: "[UnityCrossThreadLogger]<== BotDraftDraftStatus(guid)"
+ * (the JSON body follows on the next line). Only matches when there is NO
+ * body on the same line, so one-line "<== Name {json}" shapes fall through.
+ */
+const RESPONSE_MARKER_RE = /^(?:\[UnityCrossThreadLogger\])?\s*<==\s*([A-Za-z0-9_.]+)\([^)]*\)\s*$/
 
 /** Match a log key both with and without underscores (April 2025 client change). */
 function hasKey(line: string, key: string): boolean {
@@ -259,6 +297,11 @@ export class DraftParser extends EventEmitter {
   private session: DraftSession | null = null
   /** EventName from the last draft Event_Join — human packs carry no name. */
   private pendingEventName: string | null = null
+  /**
+   * Message name from a bare "<== Name(id)" marker line whose JSON body is
+   * expected on the very next line (two-line response shape).
+   */
+  private pendingResponseName: string | null = null
 
   getSnapshot(): DraftSessionSnapshot | null {
     return this.session?.snapshot() ?? null
@@ -267,10 +310,29 @@ export class DraftParser extends EventEmitter {
   reset(): void {
     this.session = null
     this.pendingEventName = null
+    this.pendingResponseName = null
   }
 
   handleLine(line: string): void {
     if (!line) return
+
+    // Two-line response shape: remember the marker, stitch the body onto it.
+    if (this.pendingResponseName) {
+      const name = this.pendingResponseName
+      this.pendingResponseName = null
+      const trimmed = line.trimStart()
+      if (trimmed.startsWith('{')) {
+        line = `<== ${name} ${trimmed}`
+      }
+      // else: no body followed (or it was not JSON) — treat the line normally.
+    }
+    if (line.includes('<==')) {
+      const marker = RESPONSE_MARKER_RE.exec(line)
+      if (marker) {
+        this.pendingResponseName = marker[1]
+        return
+      }
+    }
 
     // Player.log announces the Detailed Logs toggle state in its first lines.
     if (line.includes('DETAILED LOGS: DISABLED')) {

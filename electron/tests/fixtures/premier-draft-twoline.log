@@ -1,0 +1,28 @@
+[UnityCrossThreadLogger]==> EventJoin {"id":"e1e1e1e1-0000-4000-8000-000000000001","request":"{\"EventName\":\"PremierDraft_SOS_20260421\",\"EntryCurrencyType\":\"Gem\",\"EntryCurrencyPaid\":1500,\"CustomTokenId\":null,\"EventChoice\":\"\",\"DebugIgnoreEntryLimits\":false}"}
+FrontDoorConnectionAWS:LogOutgoingMessage(IFDPromiseWriter)
+
+[UnityCrossThreadLogger]8/15/2026 11:02:10 AM
+<== EventJoin(e1e1e1e1-0000-4000-8000-000000000001)
+{"Course":{"CourseId":"course-0001","InternalEventName":"PremierDraft_SOS_20260421","CurrentModule":"HumanDraft","ModulePayload":"","CourseDeckSummary":{"Attributes":[],"PreferredCosmetics":{"Avatar":"","Sleeve":"","Pet":"","Title":"","Emotes":[]}},"CardPool":[],"CardStyles":[]}
+FrontDoorConnectionAWS:LogIncomingMessage(CmdType, Guid, IFDPromiseWriter)
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"e1e1e1e1-0000-4000-8000-000000000002","request":"{\"DraftId\":\"c7d1a9e0-1111-2222-3333-444455556666\",\"GrpIds\":[90210],\"Pack\":1,\"Pick\":1}"}
+FrontDoorConnectionAWS:LogOutgoingMessage(IFDPromiseWriter)
+
+[UnityCrossThreadLogger]8/15/2026 11:02:31 AM
+<== EventPlayerDraftMakePick(e1e1e1e1-0000-4000-8000-000000000002)
+{"Result":"Success","DraftId":"c7d1a9e0-1111-2222-3333-444455556666"}
+FrontDoorConnectionAWS:LogIncomingMessage(CmdType, Guid, IFDPromiseWriter)
+[UnityCrossThreadLogger]==> LogBusinessEvents {"id":"e1e1e1e1-0000-4000-8000-000000000003","request":"{\"PageName\":\"Draft\",\"Payload\":\"{\\\"DraftId\\\":\\\"c7d1a9e0-1111-2222-3333-444455556666\\\",\\\"EventId\\\":\\\"PremierDraft_SOS_20260421\\\",\\\"PackNumber\\\":1,\\\"PickNumber\\\":1,\\\"CardsInPack\\\":[90210,90355,90114],\\\"PickGrpId\\\":90210,\\\"AutoPick\\\":false,\\\"TimeRemainingOnPick\\\":31.2}\"}"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"c7d1a9e0-1111-2222-3333-444455556666","SelfPick":2,"SelfPack":1,"PackCards":"90355,90114,90500"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"e1e1e1e1-0000-4000-8000-000000000004","request":"{\"DraftId\":\"c7d1a9e0-1111-2222-3333-444455556666\",\"GrpIds\":[90355],\"Pack\":1,\"Pick\":2}"}
+
+[UnityCrossThreadLogger]8/15/2026 11:02:55 AM
+<== EventPlayerDraftMakePick(e1e1e1e1-0000-4000-8000-000000000004)
+{"Result":"Success","DraftId":"c7d1a9e0-1111-2222-3333-444455556666"}
+[UnityCrossThreadLogger]==> DraftCompleteDraft {"id":"e1e1e1e1-0000-4000-8000-000000000005","request":"{\"DraftId\":\"c7d1a9e0-1111-2222-3333-444455556666\"}"}
+FrontDoorConnectionAWS:LogOutgoingMessage(IFDPromiseWriter)
+
+[UnityCrossThreadLogger]8/15/2026 11:03:01 AM
+<== DraftCompleteDraft(e1e1e1e1-0000-4000-8000-000000000005)
+{"CourseId":"course-0001","InternalEventName":"PremierDraft_SOS_20260421","CardPool":[90210,90355],"DraftId":"c7d1a9e0-1111-2222-3333-444455556666"}
+FrontDoorConnectionAWS:LogIncomingMessage(CmdType, Guid, IFDPromiseWriter)

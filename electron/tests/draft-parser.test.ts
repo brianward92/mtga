@@ -171,6 +171,195 @@ describe('DraftParser — Quick (bot) draft', () => {
   })
 })
 
+describe('DraftParser — real two-line response shape ("<== Name(id)" then body)', () => {
+  // Real 2026 Player.log puts a bare "<== BotDraftDraftStatus(guid)" marker on
+  // one line and the JSON body on the NEXT line (verified against
+  // Player-prev.log 2026-08-15, QuickDraft_DSK_20260811). Requests stay on
+  // one line. The older one-line "<== Name {json}" fixtures above still pass.
+
+  it('parses a real QuickDraft_DSK two-line status/pick sequence with noise lines', () => {
+    const parser = new DraftParser()
+    const events = capture(parser)
+    feed(parser, fixtureLines('quick-draft-twoline.log'))
+
+    expect(events.starts.length).toBe(1)
+    expect(events.starts[0].set).toBe('DSK')
+    expect(events.starts[0].format).toBe('QuickDraft')
+    expect(events.starts[0].isBotDraft).toBe(true)
+
+    // <== BotDraftDraftStatus(id) + body: P1P1 pack, real 14-card DSK pack
+    expect(events.packs[0].currentPack).toMatchObject({ pack: 1, pick: 1 })
+    expect(events.packs[0].currentPack!.grpIds).toEqual([
+      92188, 92154, 92073, 92248, 92224, 92346, 92290, 92076, 92231, 92161, 92082, 92310, 92176, 92380
+    ])
+
+    // <== BotDraftDraftPick(id) + body: next pack, PickedCards resync
+    expect(events.packs[1].currentPack).toMatchObject({ pack: 1, pick: 2 })
+    expect(events.packs[1].currentPack!.grpIds.length).toBe(13)
+    expect(events.packs[1].pool).toEqual([92188])
+
+    const final = parser.getSnapshot()!
+    expect(final.state).toBe('complete')
+    expect(final.eventName).toBe('QuickDraft_DSK_20260811')
+    expect(final.picks.map(p => ({ pack: p.pack, pick: p.pick, grpIds: p.grpIds }))).toEqual([
+      { pack: 1, pick: 1, grpIds: [92188] },
+      { pack: 1, pick: 2, grpIds: [92301] }
+    ])
+    expect(final.pool).toEqual([92188, 92301])
+    expect(events.ends.length).toBe(1)
+  })
+
+  it('two-line human draft: MakePick response bodies are harmless, DraftCompleteDraft CardPool is picked up', () => {
+    const parser = new DraftParser()
+    const events = capture(parser)
+    feed(parser, fixtureLines('premier-draft-twoline.log'))
+
+    expect(events.starts.length).toBe(1)
+    expect(events.starts[0].set).toBe('SOS')
+
+    const final = parser.getSnapshot()!
+    expect(final.state).toBe('complete')
+    expect(final.draftId).toBe('c7d1a9e0-1111-2222-3333-444455556666')
+    expect(final.picks.length).toBe(2)
+    expect(final.picks[0]).toMatchObject({ pack: 1, pick: 1, grpIds: [90210] })
+    expect(final.picks[0].packGrpIds).toEqual([90210, 90355, 90114])
+    expect(final.picks[1]).toMatchObject({ pack: 1, pick: 2, grpIds: [90355] })
+    expect(final.pool).toEqual([90210, 90355])
+    // Completion via request line then response body — exactly one end
+    expect(events.ends.length).toBe(1)
+  })
+
+  it('a two-line completion response whose body carries a LARGER CardPool is authoritative', () => {
+    // Only reachable with two-line stitching: the body alone contains no
+    // "CompleteDraft" substring.
+    const parser = new DraftParser()
+    parser.handleLine(
+      '[UnityCrossThreadLogger]==> EventPlayerDraftMakePick ' +
+        JSON.stringify({
+          id: 'm1',
+          request: JSON.stringify({ DraftId: 'two-line-pool', GrpIds: [105101], Pack: 1, Pick: 1 })
+        })
+    )
+    parser.handleLine('[UnityCrossThreadLogger]8/15/2026 11:03:01 AM')
+    parser.handleLine('<== DraftCompleteDraft(e1e1e1e1-0000-4000-8000-000000000009)')
+    parser.handleLine(
+      JSON.stringify({
+        CourseId: 'c1',
+        InternalEventName: 'PremierDraft_MSH_20260623',
+        CardPool: [105101, 105102, 105103],
+        DraftId: 'two-line-pool'
+      })
+    )
+
+    const final = parser.getSnapshot()!
+    expect(final.state).toBe('complete')
+    expect(final.pool).toEqual([105101, 105102, 105103])
+  })
+
+  it('a marker line not followed by a JSON body does not swallow the next line', () => {
+    const parser = new DraftParser()
+    const events = capture(parser)
+    parser.handleLine('<== SomeOtherResponse(abc)')
+    // Next line is a normal one-line request, not a body: must still be handled
+    parser.handleLine(
+      '[UnityCrossThreadLogger]==> BotDraftDraftPick ' +
+        JSON.stringify({
+          id: 'b1',
+          request: JSON.stringify({
+            EventName: 'QuickDraft_DSK_20260811',
+            PickInfo: { EventName: 'QuickDraft_DSK_20260811', CardIds: ['92188'], PackNumber: 0, PickNumber: 0 }
+          })
+        })
+    )
+    expect(events.picks.length).toBe(1)
+    expect(events.picks[0].pick).toMatchObject({ pack: 1, pick: 1, grpIds: [92188] })
+  })
+
+  it('mid-draft attach (no EventJoin seen) still starts a session from the first two-line status', () => {
+    const parser = new DraftParser()
+    const events = capture(parser)
+    const lines = fixtureLines('quick-draft-twoline.log')
+    // Skip everything before the "<== BotDraftDraftStatus(id)" marker
+    const markerIdx = lines.findIndex(l => l.startsWith('<== BotDraftDraftStatus('))
+    expect(markerIdx).toBeGreaterThan(0)
+    feed(parser, lines.slice(markerIdx))
+
+    expect(events.starts.length).toBe(1)
+    expect(events.starts[0].set).toBe('DSK')
+    expect(events.packs[0].currentPack).toMatchObject({ pack: 1, pick: 1 })
+    expect(parser.getSnapshot()!.state).toBe('complete')
+  })
+
+  it('replaying the two-line log twice converges', () => {
+    const once = new DraftParser()
+    feed(once, fixtureLines('quick-draft-twoline.log'))
+    const twice = new DraftParser()
+    feed(twice, fixtureLines('quick-draft-twoline.log'))
+    feed(twice, fixtureLines('quick-draft-twoline.log'))
+    expect(twice.getSnapshot()).toEqual(once.getSnapshot())
+  })
+})
+
+describe('DraftParser — snapshot pack/pick indexing contract', () => {
+  function botStatusBody(packNumber: number, pickNumber: number, draftPack: string[], picked: string[]): string {
+    return JSON.stringify({
+      CurrentModule: 'BotDraft',
+      Payload: JSON.stringify({
+        Result: 'Success',
+        EventName: 'QuickDraft_DSK_20260811',
+        DraftStatus: 'PickNext',
+        PackNumber: packNumber,
+        PickNumber: pickNumber,
+        NumCardsToPick: 1,
+        DraftPack: draftPack,
+        PackStyles: [],
+        PickedCards: picked,
+        PickedStyles: []
+      })
+    })
+  }
+
+  it('snapshot pack/pick are 1-based: raw bot PackNumber/PickNumber 0/0 becomes {pack:1,pick:1}', () => {
+    const parser = new DraftParser()
+    const events = capture(parser)
+    parser.handleLine('<== BotDraftDraftStatus(006528f2-67ab-4da5-b04a-88d36b803911)')
+    parser.handleLine(botStatusBody(0, 0, ['92188', '92154'], []))
+    expect(events.packs[0].currentPack).toEqual({ pack: 1, pick: 1, grpIds: [92188, 92154] })
+
+    // Second pack of the draft, third pick: raw 1/2 -> 2/3
+    parser.handleLine('<== BotDraftDraftStatus(006528f2-67ab-4da5-b04a-88d36b803912)')
+    parser.handleLine(botStatusBody(1, 2, ['92301'], ['92188', '92154']))
+    expect(events.packs[1].currentPack).toMatchObject({ pack: 2, pick: 3 })
+
+    // Bot pick with raw PackNumber/PickNumber 1/2 lands on the same 1-based key
+    parser.handleLine(
+      '[UnityCrossThreadLogger]==> BotDraftDraftPick ' +
+        JSON.stringify({
+          id: 'b1',
+          request: JSON.stringify({
+            EventName: 'QuickDraft_DSK_20260811',
+            PickInfo: { EventName: 'QuickDraft_DSK_20260811', CardIds: ['92301'], PackNumber: 1, PickNumber: 2 }
+          })
+        })
+    )
+    const final = parser.getSnapshot()!
+    expect(final.picks.at(-1)).toMatchObject({ pack: 2, pick: 3, grpIds: [92301], packGrpIds: [92301] })
+    // Nothing in a snapshot is ever 0-based
+    for (const p of final.picks) {
+      expect(p.pack).toBeGreaterThanOrEqual(1)
+      expect(p.pick).toBeGreaterThanOrEqual(1)
+    }
+  })
+
+  it('human events (already 1-based) pass through unchanged', () => {
+    const parser = new DraftParser()
+    parser.handleLine(
+      '[UnityCrossThreadLogger]Draft.Notify {"draftId":"d1","SelfPick":1,"SelfPack":2,"PackCards":"1,2,3"}'
+    )
+    expect(parser.getSnapshot()!.currentPack).toMatchObject({ pack: 2, pick: 1 })
+  })
+})
+
 describe('DraftParser — legacy event names (with underscores)', () => {
   it('handles Event_Join / Event_PlayerDraftMakePick / Draft_CompleteDraft', () => {
     const parser = new DraftParser()
