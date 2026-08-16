@@ -33,9 +33,6 @@ export interface CardRow {
   /** Raw set rating: empty-pool P1P1 percentile/letter (the paper's scale). */
   setPercentile: number | null
   setGrade: Grade | null
-  /** 17Lands display stats (may be absent). */
-  gihWr: number | null
-  alsa: number | null
 }
 
 export interface PickRecord {
@@ -74,7 +71,8 @@ export interface DraftState {
   pool: CardRow[]
   picks: PickRecord[]
   model: ModelInfo
-  attribution: string | null
+  /** Provenance of what's on screen: Scryfall snapshot date + model tag. */
+  snapshot: { scryfall: string | null; model: string | null }
   /** Setup problem to surface (e.g. Arena detailed logs disabled). */
   warning: string | null
   /** Monotonic; renderer can skip stale pushes. */
@@ -84,7 +82,8 @@ export interface DraftState {
 export const EMPTY_STATE: DraftState = {
   phase: 'idle', set: null, format: null, eventName: null, isBotDraft: false,
   pack: null, pick: null, picksPerPack: 14, totalPicks: 42, cards: [], scoring: false,
-  pool: [], picks: [], model: { state: 'loading', modelId: null, message: null }, attribution: null, warning: null, seq: 0
+  pool: [], picks: [], model: { state: 'loading', modelId: null, message: null },
+  snapshot: { scryfall: null, model: null }, warning: null, seq: 0
 }
 
 // ---------------------------------------------------------------------------

@@ -55,6 +55,7 @@ export class ModelManager {
   }
 
   get available(): boolean { return !!this.index }
+  get modelTag(): string | null { return this.index?.modelTag ?? null }
   get sets(): string[] { return this.index ? Object.keys(this.index.sets).sort() : [] }
   hasSet(set: string): boolean { return !!this.index && !!this.index.sets[set] && !!this.root && existsSync(join(this.root, 'sets', set, 'assets.npz')) }
   bundleFor(set: string): SetBundle | null { return this.root ? loadSetBundle(this.root, set) : null }

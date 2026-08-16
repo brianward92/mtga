@@ -43,6 +43,8 @@ export interface SetBundle {
   /** format -> (grpId -> rating) */
   ratings: Map<string, Map<number, CardRating>>
   attribution: string | null
+  /** Scryfall bulk snapshot date the bundle was built from (cards.json). */
+  scryfallUpdatedAt: string | null
 }
 
 export interface BundleIndex {
@@ -93,9 +95,18 @@ export function loadSetBundle(root: string, set: string): SetBundle | null {
   const assetsPath = join(dir, 'assets.npz')
   if (!existsSync(assetsPath)) { cache.set(key, null); return null }
   const cards = new Map<number, CardInfo>()
+  let scryfallUpdatedAt: string | null = null
   const cardsPath = join(dir, 'cards.json')
   if (existsSync(cardsPath)) {
-    for (const raw of JSON.parse(readFileSync(cardsPath, 'utf8')) as Array<Record<string, unknown>>) {
+    const parsed = JSON.parse(readFileSync(cardsPath, 'utf8')) as unknown
+    // Legacy shape: an array of per-grpId rows. (The Scryfall-only bundle is
+    // name-keyed with a snapshot date — handled by the newer loader.)
+    const rows: Array<Record<string, unknown>> = Array.isArray(parsed) ? parsed as Array<Record<string, unknown>> : []
+    if (!Array.isArray(parsed) && parsed && typeof parsed === 'object') {
+      const obj = parsed as Record<string, unknown>
+      if (typeof obj.scryfall_updated_at === 'string') scryfallUpdatedAt = obj.scryfall_updated_at
+    }
+    for (const raw of rows) {
       const grpId = Number(raw.grpId)
       if (!Number.isFinite(grpId)) continue
       cards.set(grpId, {
@@ -146,7 +157,7 @@ export function loadSetBundle(root: string, set: string): SetBundle | null {
       if (entry?.manifest_hash) manifestHash = entry.manifest_hash
     } catch { /* ignore */ }
   }
-  const bundle: SetBundle = { set, dir, assetsPath, picksPerPack, manifestHash, cards, ratings, attribution }
+  const bundle: SetBundle = { set, dir, assetsPath, picksPerPack, manifestHash, cards, ratings, attribution, scryfallUpdatedAt }
   cache.set(key, bundle)
   return bundle
 }

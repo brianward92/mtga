@@ -101,8 +101,7 @@ export function whyLine(top: CardRow, runnerUp: CardRow | null, conviction: Conv
   if (conviction && runnerUp) {
     parts.push(`${formatDominancePct(conviction.dominance)} over #2`)
   }
-  if (top.gihWr !== null && Number.isFinite(top.gihWr)) parts.push(`GIH ${formatWinRate(top.gihWr)}`)
-  if (top.alsa !== null && Number.isFinite(top.alsa)) parts.push(`ALSA ${top.alsa.toFixed(1)}`)
+  if (top.setGrade && top.grade && top.setGrade !== top.grade) parts.push(`set ${top.setGrade}`)
   return parts.join(' · ')
 }
 
@@ -113,8 +112,6 @@ export function detailLine(card: CardRow): string {
   if (card.setGrade && card.grade && card.setGrade !== card.grade) parts.push(`set ${card.setGrade}`)
   if (card.prob !== null && Number.isFinite(card.prob)) parts.push(`p ${Math.round(card.prob * 100)}%`)
   if (card.ev !== null && Number.isFinite(card.ev)) parts.push(`ev ${card.ev >= 0 ? '+' : ''}${card.ev.toFixed(2)}`)
-  if (card.gihWr !== null && Number.isFinite(card.gihWr)) parts.push(`GIH ${formatWinRate(card.gihWr)}`)
-  if (card.alsa !== null && Number.isFinite(card.alsa)) parts.push(`ALSA ${card.alsa.toFixed(1)}`)
   return parts.join(' · ')
 }
 

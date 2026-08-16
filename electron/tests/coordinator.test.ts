@@ -11,14 +11,16 @@ function stubModels() {
       [1, { grpId: 1, name: 'Murder', rarity: 'common', colors: 'B', manaCost: '{1}{B}{B}', manaValue: 3, type: 'Instant', setCode: 'DSK', imageSmall: null, imageNormal: null }],
       [2, { grpId: 2, name: 'Funeral Room', rarity: 'mythic', colors: 'WB', manaCost: '{2}{B}', manaValue: 3, type: 'Enchantment — Room', setCode: 'DSK', imageSmall: null, imageNormal: null }]
     ]),
-    ratings: new Map([['PremierDraft', new Map([[1, { gih_wr: 0.55, alsa: 4.2 }]])]]),
-    attribution: 'Data from 17Lands.com (CC BY 4.0)'
+    ratings: new Map(),
+    attribution: null,
+    scryfallUpdatedAt: '2026-08-15'
   }
   const calls: unknown[] = []
   return {
     calls,
     bundleFor: () => bundle,
     ensure: vi.fn(async () => ({})),
+    modelTag: 'v',
     status: () => ({ state: 'ready' as const, modelId: '_foundation/v', modelTag: 'v', set: 'DSK', format: 'QuickDraft', message: null, sets: ['DSK'] }),
     intrinsic: (g: number) => (g === 2 ? { percentile: 0.97, grade: 'A' as const } : g === 1 ? { percentile: 0.4, grade: 'C' as const } : null),
     score: vi.fn(async (set: string, format: string, pack: number[], pool: number[], pack0: number, pick0: number) => {
@@ -46,12 +48,11 @@ describe('DraftCoordinator', () => {
     c.onDraftStart(snap({}))
     expect(c.current.phase).toBe('active')
     expect(c.current.picksPerPack).toBe(14)
-    expect(c.current.attribution).toContain('17Lands')
+    expect(c.current.snapshot.model).toBe('v')
 
     c.onDraftPack(snap({ currentPack: { pack: 1, pick: 1, grpIds: [1, 2, 999] } }))
     expect(c.current.scoring).toBe(true)
     expect(c.current.cards.map(r => r.name)).toEqual(['Murder', 'Funeral Room', 'Card #999'])
-    expect(c.current.cards[0].gihWr).toBe(0.55)
     await flush(); await flush()
     expect(models.calls[0]).toMatchObject({ pack0: 0, pick0: 0, pool: [] })
     expect(c.current.scoring).toBe(false)

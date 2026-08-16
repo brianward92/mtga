@@ -14,7 +14,7 @@ import { sigmoid, formatDominancePct } from '../renderer/overlay/conviction'
 function card(over: Partial<CardRow> & { grpId: number }): CardRow {
   return {
     name: `Card ${over.grpId}`, rarity: 'common', colors: '', manaCost: '', manaValue: null, type: 'Creature',
-    imageUrl: null, ev: null, prob: null, rank: null, percentile: null, grade: null, gihWr: null, alsa: null,
+    imageUrl: null, ev: null, prob: null, rank: null, percentile: null, grade: null,
     ...over
   }
 }
@@ -76,8 +76,8 @@ describe('laneLean', () => {
 
 describe('rankedCards / packConviction / whyLine / detailLine', () => {
   const cards = [
-    card({ grpId: 2, ev: 1, rank: 2, grade: 'B', percentile: 0.8, gihWr: 0.55 }),
-    card({ grpId: 1, ev: 3, rank: 1, grade: 'A', percentile: 0.97, gihWr: 0.612, alsa: 2.34 }),
+    card({ grpId: 2, ev: 1, rank: 2, grade: 'B', percentile: 0.8}),
+    card({ grpId: 1, ev: 3, rank: 1, grade: 'A', percentile: 0.97}),
     card({ grpId: 3 })
   ]
 
@@ -92,17 +92,17 @@ describe('rankedCards / packConviction / whyLine / detailLine', () => {
     expect(packConviction(cards.map(c => ({ ...c, ev: null, rank: null })))).toBeNull()
   })
 
-  it('formats the why line from dominance, GIH and ALSA', () => {
+  it('formats the why line from dominance and the set grade when it differs', () => {
     const ranked = rankedCards(cards)
     const line = whyLine(ranked[0], ranked[1], packConviction(cards))
-    expect(line).toBe(`${formatDominancePct(sigmoid(2))} over #2 · GIH 61.2% · ALSA 2.3`)
-    expect(whyLine(ranked[0], null, null)).toBe('GIH 61.2% · ALSA 2.3')
+    expect(line).toBe(`${formatDominancePct(sigmoid(2))} over #2`)
+    expect(whyLine(card({ grpId: 9, grade: 'B', setGrade: 'C+' }), null, null)).toBe('set C+')
     expect(whyLine(card({ grpId: 9 }), null, null)).toBe('')
   })
 
   it('formats the hover detail line', () => {
-    expect(detailLine(card({ grpId: 1, rank: 2, prob: 0.234, ev: -0.5, gihWr: 55, alsa: 4 })))
-      .toBe('#2 · p 23% · ev -0.50 · GIH 55.0% · ALSA 4.0')
+    expect(detailLine(card({ grpId: 1, rank: 2, prob: 0.234, ev: -0.5})))
+      .toBe('#2 · p 23% · ev -0.50')
     expect(detailLine(card({ grpId: 1, ev: 1.234 }))).toBe('ev +1.23')
     expect(detailLine(card({ grpId: 1 }))).toBe('')
   })

@@ -10,7 +10,7 @@
 import { EventEmitter } from 'events'
 import type { DraftSessionSnapshot, DraftPickRecord } from '../parser/draft-parser'
 import { ModelManager, type ScoredCard } from '../model/manager'
-import { ratingsFor, type SetBundle, type CardInfo } from '../data/bundle'
+import { type SetBundle, type CardInfo } from '../data/bundle'
 import { DraftHistory } from '../data/history'
 import { EMPTY_STATE, type CardRow, type DraftState, type PickRecord } from '../../shared/state'
 
@@ -56,7 +56,7 @@ export class DraftCoordinator extends EventEmitter {
       pool: this.rows(snap.pool),
       picks: [],
       model: this.modelInfo(snap),
-      attribution: this.bundle?.attribution ?? null,
+      snapshot: { scryfall: this.bundle?.scryfallUpdatedAt ?? null, model: this.models.modelTag },
       seq: this.state.seq + 1
     }
     if (!this.replaying) this.history.append({ at: new Date().toISOString(), type: 'draft-start', draftId: snap.draftId, eventName: snap.eventName, set: snap.set, format: snap.format })
@@ -191,10 +191,8 @@ export class DraftCoordinator extends EventEmitter {
   private card(grpId: number): CardInfo | undefined { return this.bundle?.cards.get(grpId) }
 
   private rows(grpIds: number[]): CardRow[] {
-    const ratings = this.bundle ? ratingsFor(this.bundle, this.snapshot?.format ?? null) : null
     return grpIds.map(grpId => {
       const c = this.card(grpId)
-      const r = ratings?.get(grpId)
       const intrinsic = this.models.intrinsic(grpId)
       return {
         grpId,
@@ -209,9 +207,7 @@ export class DraftCoordinator extends EventEmitter {
         percentile: intrinsic?.percentile ?? null,
         grade: intrinsic?.grade ?? null,
         setPercentile: intrinsic?.percentile ?? null,
-        setGrade: intrinsic?.grade ?? null,
-        gihWr: typeof r?.gih_wr === 'number' ? r.gih_wr : null,
-        alsa: typeof r?.alsa === 'number' ? r.alsa : null
+        setGrade: intrinsic?.grade ?? null
       }
     })
   }
