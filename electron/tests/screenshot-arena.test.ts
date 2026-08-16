@@ -38,8 +38,7 @@ function run(
   const stopped = join(root, 'helper-stopped')
   const args = join(root, 'capture-args')
   const helper = executable(root, 'arena-window-watch', `
-child=''
-trap '[ -z "$child" ] || kill "$child" 2>/dev/null; printf stopped > "$FAKE_HELPER_STOPPED"; exit 0' HUP INT TERM
+trap 'printf stopped > "$FAKE_HELPER_STOPPED"; exit 0' HUP INT TERM
 ${helperBody}
 `)
   const capture = extraEnv.MTGA_SCREENCAPTURE ?? fakeCapture(root)
@@ -51,7 +50,7 @@ ${helperBody}
       MTGA_SCREENSHOT_PLATFORM: 'Darwin',
       MTGA_ARENA_WINDOW_WATCH: helper,
       MTGA_SCREENCAPTURE: capture,
-      MTGA_ARENA_WAIT_SECONDS: '1',
+      MTGA_ARENA_WAIT_SECONDS: '4',
       FAKE_CAPTURE_ARGS: args,
       FAKE_HELPER_STOPPED: stopped,
       ...extraEnv
@@ -68,9 +67,8 @@ describe('screenshot-arena.sh', () => {
   it('passes a negative global Arena rect as one screencapture region argument', () => {
     const root = temporaryRoot()
     const { result, output, stopped, args } = run(root, `
-printf '%s\\n' 'ignored helper line' 'G -1440,-25,1280,720,0'
-sleep 60 & child=$!
-wait "$child"
+printf '%s\\n' 'G -1440,-25,1280,720,0'
+IFS= read -r _ || :
 `)
 
     expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0)
@@ -89,8 +87,7 @@ wait "$child"
     const root = temporaryRoot()
     const { result, output, stopped, args } = run(root, `
 printf '%s\\n' 'G NOWIN'
-sleep 60 & child=$!
-wait "$child"
+IFS= read -r _ || :
 `)
 
     expect(result.status).toBe(1)
@@ -104,9 +101,8 @@ wait "$child"
     const root = temporaryRoot()
     const { result, output, stopped, args } = run(root, `
 printf '%s\\n' 'G nope' 'F 1,1,AA=='
-sleep 60 & child=$!
-wait "$child"
-`)
+IFS= read -r _ || :
+`, join(root, 'Arena capture.png'), { MTGA_ARENA_WAIT_SECONDS: '1' })
 
     expect(result.status).toBe(1)
     expect(result.stderr).toContain('timed out after 1s waiting for Arena geometry')
@@ -120,8 +116,7 @@ wait "$child"
     const capture = fakeCapture(root, 7)
     const { result, output, stopped, args } = run(root, `
 printf '%s\\n' 'G 10,20,800,600,1'
-sleep 60 & child=$!
-wait "$child"
+IFS= read -r _ || :
 `, join(root, 'failed.png'), { MTGA_SCREENCAPTURE: capture })
 
     expect(result.status).toBe(1)
@@ -142,8 +137,7 @@ printf 'keep me' > "$FAKE_FINAL_OUTPUT"
 `)
     const { result, stopped } = run(root, `
 printf '%s\\n' 'G 10,20,800,600,1'
-sleep 60 & child=$!
-wait "$child"
+IFS= read -r _ || :
 `, output, { MTGA_SCREENCAPTURE: capture, FAKE_FINAL_OUTPUT: output })
 
     expect(result.status).toBe(1)

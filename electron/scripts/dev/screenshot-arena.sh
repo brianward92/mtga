@@ -140,7 +140,10 @@ geometry_fd_open=1
 
 x=""; y=""; width=""; height=""; frontmost=""
 saw_no_window=0
-deadline=$((SECONDS + wait_seconds))
+# Reset Bash's special clock so the deadline is a full interval from this
+# point, rather than the next coarse tick since process startup.
+SECONDS=0
+deadline=$wait_seconds
 while [ "$SECONDS" -lt "$deadline" ]; do
   remaining=$((deadline - SECONDS))
   if ! IFS= read -r -t "$remaining" line <&8; then
