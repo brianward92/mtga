@@ -1,36 +1,31 @@
 /**
  * The offline set bundle shipped with the app (electron/resources/draftfm):
- *   model/<tag>/…                       DraftFM ONNX export
- *   sets/index.json                      {sets:{SET:{picks_per_pack, manifest_hash, …}}}
- *   sets/<SET>/assets.npz                per-set model assets (scripts/build_set_assets.py)
- *   sets/<SET>/cards.json                card identity per grpId (name, rarity, colours, cost, type, art)
- *   sets/<SET>/ratings.json              17Lands stats snapshot per format (display only; attribution required)
- * Produced by scripts/build_app_bundle.py. Everything here is read-only.
+ *   model/<tag>/…                DraftFM ONNX export (+ featurizer_manifest.json)
+ *   sets/index.json              {model_id, model_manifest_hash, scryfall_updated_at,
+ *                                 built_at, sets:{SET:{picks_per_pack, manifest_hash, …}}}
+ *   sets/<SET>/assets.npz        per-set model assets: features, names, grp_ids (name → grpIds)
+ *   sets/<SET>/cards.json        {set, scryfall_updated_at, built_at,
+ *                                 cards:{name:{rarity, colors, colorIdentity,
+ *                                              manaCost, manaValue, type}}}
+ * Produced by scripts/build_app_bundle.py from a dated raw Scryfall snapshot.
+ * Card identity is keyed by name; grpId → name comes from the assets' grp_ids
+ * map, so every Arena printing for a model name resolves. Everything is read-only.
  */
 import { existsSync, readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
+import { parseNpz } from '../model/npz'
 
 export interface CardInfo {
   grpId: number
   name: string
   rarity: string
+  /** Printed WUBRG colours ('' for colourless cards and lands). */
   colors: string
+  /** WUBRG colour identity (not yet part of the renderer contract). */
+  colorIdentity: string
   manaCost: string
   manaValue: number | null
   type: string
-  setCode: string
-  imageSmall: string | null
-  imageNormal: string | null
-}
-
-export interface CardRating {
-  gih_wr?: number | null
-  oh_wr?: number | null
-  gd_wr?: number | null
-  alsa?: number | null
-  ata?: number | null
-  games?: number | null
-  [k: string]: unknown
 }
 
 export interface SetBundle {
@@ -39,18 +34,57 @@ export interface SetBundle {
   assetsPath: string
   picksPerPack: number
   manifestHash: string | null
-  cards: Map<number, CardInfo>
-  /** format -> (grpId -> rating) */
-  ratings: Map<string, Map<number, CardRating>>
-  attribution: string | null
-  /** Scryfall bulk snapshot date the bundle was built from (cards.json). */
+  /** Scryfall bulk-data `updated_at` the set was built from (null if unknown). */
   scryfallUpdatedAt: string | null
+  /** grpId → identity, fanned out from name-keyed cards.json via assets grp_ids. */
+  cards: Map<number, CardInfo>
+  /** Names in assets row order. */
+  names: string[]
+}
+
+export interface BundleSetEntry {
+  picks_per_pack?: number
+  manifest_hash?: string
+  cards?: number
+  grp_ids?: number
+  text_missing?: number
+  built_at?: string
+  scryfall_updated_at?: string
 }
 
 export interface BundleIndex {
   modelDir: string
   modelTag: string
-  sets: Record<string, { picks_per_pack?: number; manifest_hash?: string; cards?: number; built_at?: string; formats_with_ratings?: string[] }>
+  /** Exported model id (index.json's model_id, else the model dir's meta.json). */
+  modelId: string | null
+  modelManifestHash: string | null
+  scryfallUpdatedAt: string | null
+  builtAt: string | null
+  sets: Record<string, BundleSetEntry>
+}
+
+interface IndexFile {
+  model_id?: string
+  model_manifest_hash?: string
+  scryfall_updated_at?: string
+  built_at?: string
+  sets?: Record<string, BundleSetEntry>
+}
+
+interface CardFields {
+  rarity?: string
+  colors?: string
+  colorIdentity?: string
+  manaCost?: string
+  manaValue?: number | null
+  type?: string
+}
+
+interface CardsFile {
+  set?: string
+  scryfall_updated_at?: string
+  built_at?: string
+  cards?: Record<string, CardFields>
 }
 
 /** Locate the bundle root: packaged Resources/draftfm, else the repo's electron/resources/draftfm. */
@@ -64,17 +98,20 @@ export function findBundleRoot(): string | null {
   return null
 }
 
+function readJson<T>(path: string): T | null {
+  if (!existsSync(path)) return null
+  try { return JSON.parse(readFileSync(path, 'utf8')) as T } catch { return null }
+}
+
 export function readBundleIndex(root: string): BundleIndex | null {
   const modelParent = join(root, 'model')
   if (!existsSync(modelParent)) return null
   const tags = readdirSync(modelParent).filter(t => existsSync(join(modelParent, t, 'scorer.onnx'))).sort()
   if (!tags.length) return null
   const modelTag = tags[tags.length - 1]
-  let sets: BundleIndex['sets'] = {}
-  const idx = join(root, 'sets', 'index.json')
-  if (existsSync(idx)) {
-    try { sets = (JSON.parse(readFileSync(idx, 'utf8')) as { sets?: BundleIndex['sets'] }).sets ?? {} } catch { sets = {} }
-  }
+  const modelDir = join(modelParent, modelTag)
+  const idx = readJson<IndexFile>(join(root, 'sets', 'index.json'))
+  const sets: BundleIndex['sets'] = { ...(idx?.sets ?? {}) }
   // Tolerate a bundle without index.json: discover set dirs.
   const setsDir = join(root, 'sets')
   if (existsSync(setsDir)) {
@@ -82,7 +119,33 @@ export function readBundleIndex(root: string): BundleIndex | null {
       if (existsSync(join(setsDir, d, 'assets.npz')) && !sets[d]) sets[d] = {}
     }
   }
-  return { modelDir: join(modelParent, modelTag), modelTag, sets }
+  const meta = readJson<{ model_id?: string; manifest_hash?: string }>(join(modelDir, 'meta.json'))
+  return {
+    modelDir,
+    modelTag,
+    modelId: idx?.model_id ?? meta?.model_id ?? null,
+    modelManifestHash: idx?.model_manifest_hash ?? meta?.manifest_hash ?? null,
+    scryfallUpdatedAt: idx?.scryfall_updated_at ?? null,
+    builtAt: idx?.built_at ?? null,
+    sets
+  }
+}
+
+/** Read names + grp_ids from assets.npz without decoding the feature matrix. */
+export function readAssetsIdentity(assetsPath: string): { names: string[]; grpIds: Record<string, number[]> } {
+  const archive = parseNpz(readFileSync(assetsPath))
+  const names = archive.names?.kind === 'str' ? archive.names.data : []
+  const rawGrpIds = archive.grp_ids?.kind === 'str' ? archive.grp_ids.data[0] ?? '{}' : '{}'
+  let parsed: unknown = {}
+  try { parsed = JSON.parse(rawGrpIds) } catch { parsed = {} }
+  const grpIds: Record<string, number[]> = {}
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+    for (const [name, values] of Object.entries(parsed)) {
+      if (!Array.isArray(values)) continue
+      grpIds[name] = values.map(Number).filter(Number.isFinite)
+    }
+  }
+  return { names, grpIds }
 }
 
 const cache = new Map<string, SetBundle | null>()
@@ -94,78 +157,47 @@ export function loadSetBundle(root: string, set: string): SetBundle | null {
   const dir = join(root, 'sets', set)
   const assetsPath = join(dir, 'assets.npz')
   if (!existsSync(assetsPath)) { cache.set(key, null); return null }
+
+  let names: string[] = []
+  let grpIds: Record<string, number[]> = {}
+  try { ({ names, grpIds } = readAssetsIdentity(assetsPath)) } catch { /* identity is best-effort */ }
+
+  const cardsFile = readJson<CardsFile>(join(dir, 'cards.json'))
+  const byName = cardsFile?.cards ?? {}
   const cards = new Map<number, CardInfo>()
-  let scryfallUpdatedAt: string | null = null
-  const cardsPath = join(dir, 'cards.json')
-  if (existsSync(cardsPath)) {
-    const parsed = JSON.parse(readFileSync(cardsPath, 'utf8')) as unknown
-    // Legacy shape: an array of per-grpId rows. (The Scryfall-only bundle is
-    // name-keyed with a snapshot date — handled by the newer loader.)
-    const rows: Array<Record<string, unknown>> = Array.isArray(parsed) ? parsed as Array<Record<string, unknown>> : []
-    if (!Array.isArray(parsed) && parsed && typeof parsed === 'object') {
-      const obj = parsed as Record<string, unknown>
-      if (typeof obj.scryfall_updated_at === 'string') scryfallUpdatedAt = obj.scryfall_updated_at
-    }
-    for (const raw of rows) {
-      const grpId = Number(raw.grpId)
-      if (!Number.isFinite(grpId)) continue
+  for (const [name, ids] of Object.entries(grpIds)) {
+    const raw = byName[name] ?? {}
+    for (const value of ids) {
+      const grpId = Number(value)
+      if (!Number.isFinite(grpId) || cards.has(grpId)) continue
+      const manaValue = raw.manaValue === null || raw.manaValue === undefined ? null : Number(raw.manaValue)
       cards.set(grpId, {
         grpId,
-        name: String(raw.name ?? ''),
-        rarity: String(raw.rarity ?? 'common'),
+        name,
+        rarity: String(raw.rarity || 'common'),
         colors: String(raw.colors ?? ''),
+        colorIdentity: String(raw.colorIdentity ?? ''),
         manaCost: String(raw.manaCost ?? ''),
-        manaValue: raw.manaValue === null || raw.manaValue === undefined ? null : Number(raw.manaValue),
-        type: String(raw.type ?? ''),
-        setCode: String(raw.setCode ?? set),
-        imageSmall: raw.imageSmall ? String(raw.imageSmall) : null,
-        imageNormal: raw.imageNormal ? String(raw.imageNormal) : null
+        manaValue: Number.isFinite(manaValue) ? manaValue : null,
+        type: String(raw.type ?? '')
       })
     }
   }
-  const ratings = new Map<string, Map<number, CardRating>>()
-  let attribution: string | null = null
-  const ratingsPath = join(dir, 'ratings.json')
-  if (existsSync(ratingsPath)) {
-    try {
-      const raw = JSON.parse(readFileSync(ratingsPath, 'utf8')) as Record<string, unknown>
-      attribution = typeof raw.attribution === 'string' ? raw.attribution : null
-      const formats = (raw.formats ?? raw) as Record<string, Record<string, CardRating>>
-      for (const [fmt, byKey] of Object.entries(formats)) {
-        if (fmt === 'attribution' || typeof byKey !== 'object' || !byKey) continue
-        const m = new Map<number, CardRating>()
-        for (const [k, v] of Object.entries(byKey)) {
-          const g = Number(k)
-          if (Number.isFinite(g)) m.set(g, v)
-        }
-        // Name-keyed ratings: fan out to every grpId with that name.
-        for (const [k, v] of Object.entries(byKey)) {
-          if (Number.isFinite(Number(k))) continue
-          for (const c of cards.values()) if (c.name === k && !m.has(c.grpId)) m.set(c.grpId, v)
-        }
-        ratings.set(fmt, m)
-      }
-    } catch { /* ratings are optional */ }
-  }
+
   let picksPerPack = 14
   let manifestHash: string | null = null
-  const idx = join(root, 'sets', 'index.json')
-  if (existsSync(idx)) {
-    try {
-      const entry = (JSON.parse(readFileSync(idx, 'utf8')) as { sets?: Record<string, { picks_per_pack?: number; manifest_hash?: string }> }).sets?.[set]
-      if (entry?.picks_per_pack) picksPerPack = entry.picks_per_pack
-      if (entry?.manifest_hash) manifestHash = entry.manifest_hash
-    } catch { /* ignore */ }
+  const index = readJson<IndexFile>(join(root, 'sets', 'index.json'))
+  const entry = index?.sets?.[set]
+  if (entry?.picks_per_pack) picksPerPack = entry.picks_per_pack
+  if (entry?.manifest_hash) manifestHash = entry.manifest_hash
+  const scryfallUpdatedAt = cardsFile?.scryfall_updated_at
+    ?? entry?.scryfall_updated_at
+    ?? index?.scryfall_updated_at
+    ?? null
+
+  const bundle: SetBundle = {
+    set, dir, assetsPath, picksPerPack, manifestHash, scryfallUpdatedAt, cards, names
   }
-  const bundle: SetBundle = { set, dir, assetsPath, picksPerPack, manifestHash, cards, ratings, attribution, scryfallUpdatedAt }
   cache.set(key, bundle)
   return bundle
-}
-
-/** Ratings for a format with the usual fallbacks (QuickDraft → PremierDraft, etc.). */
-export function ratingsFor(bundle: SetBundle, format: string | null): Map<number, CardRating> | null {
-  const order = [format, 'PremierDraft', 'TradDraft', 'QuickDraft'].filter((f): f is string => !!f)
-  for (const f of order) { const m = bundle.ratings.get(f); if (m && m.size) return m }
-  const first = bundle.ratings.values().next()
-  return first.done ? null : first.value
 }

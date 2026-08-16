@@ -1,32 +1,87 @@
 import { describe, expect, it } from 'vitest'
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { existsSync } from 'fs'
-import { readBundleIndex, loadSetBundle, ratingsFor } from '../main/data/bundle'
-import { ModelManager } from '../main/model/manager'
-import { mkdtempSync } from 'fs'
 import { tmpdir } from 'os'
+import { loadSetBundle, readAssetsIdentity, readBundleIndex } from '../main/data/bundle'
+import { ModelManager } from '../main/model/manager'
 
 const ROOT = join(__dirname, '..', 'resources', 'draftfm')
-const have = existsSync(join(ROOT, 'sets', 'DSK', 'assets.npz'))
+const DSK_ASSETS = join(ROOT, 'sets', 'DSK', 'assets.npz')
+const have = existsSync(DSK_ASSETS)
+
+function writeJson(path: string, value: unknown): void {
+  writeFileSync(path, JSON.stringify(value))
+}
 
 describe('set bundle', () => {
-  it.skipIf(!have)('index lists the shipped sets and the model dir', () => {
-    const idx = readBundleIndex(ROOT)!
-    expect(idx.modelTag).toBe('v20260809_final_d256')
-    expect(Object.keys(idx.sets)).toEqual(expect.arrayContaining(['DSK', 'HOB']))
+  it.skipIf(!have)('reads name order and grpId aliases from assets.npz', () => {
+    const identity = readAssetsIdentity(DSK_ASSETS)
+    expect(identity.names).toContain('Murder')
+    expect(identity.grpIds.Murder).toEqual(expect.arrayContaining([92188, 67900]))
+    expect(identity.grpIds['Funeral Room // Awakening Hall']).toEqual(expect.arrayContaining([92176, 94732]))
   })
-  it.skipIf(!have)('loads DSK identity + ratings', () => {
-    const b = loadSetBundle(ROOT, 'DSK')!
-    expect(b.picksPerPack).toBe(14)
-    const funeral = b.cards.get(92176)!
-    expect(funeral.name).toBe('Funeral Room // Awakening Hall')
-    expect(funeral.rarity).toBe('mythic')
-    expect(funeral.imageSmall).toMatch(/^https:\/\/cards\.scryfall\.io/)
-    const r = ratingsFor(b, 'QuickDraft')!
-    expect(r.size).toBeGreaterThan(200)
-    expect(r.get(92188)).toBeDefined() // Murder
-    expect(b.attribution).toContain('17Lands')
+
+  it.skipIf(!have)('fans name-keyed Scryfall identity across grpIds without ratings or art', () => {
+    const root = mkdtempSync(join(tmpdir(), 'draftfm-bundle-'))
+    const modelDir = join(root, 'model', 'v-test')
+    const setDir = join(root, 'sets', 'DSK')
+    mkdirSync(modelDir, { recursive: true })
+    mkdirSync(setDir, { recursive: true })
+    writeFileSync(join(modelDir, 'scorer.onnx'), '')
+    writeJson(join(modelDir, 'meta.json'), { model_id: '_foundation/from-meta', manifest_hash: 'meta-hash' })
+    copyFileSync(DSK_ASSETS, join(setDir, 'assets.npz'))
+    writeJson(join(setDir, 'cards.json'), {
+      set: 'DSK',
+      scryfall_updated_at: '2026-08-15T12:34:56Z',
+      built_at: '2026-08-15T13:00:00Z',
+      cards: {
+        Murder: { rarity: 'common', colors: 'B', colorIdentity: 'B', manaCost: '{1}{B}{B}', manaValue: 3, type: 'Instant' },
+        'Funeral Room // Awakening Hall': { rarity: 'mythic', colors: 'B', colorIdentity: 'WB', manaCost: '{2}{B}', manaValue: 3, type: 'Enchantment — Room' }
+      }
+    })
+    // A stale file must have no effect on the Scryfall-only bundle contract.
+    writeJson(join(setDir, 'ratings.json'), { attribution: 'stale', formats: { QuickDraft: { Murder: { gih_wr: 1 } } } })
+    writeJson(join(root, 'sets', 'index.json'), {
+      model_id: '_foundation/v-test',
+      model_manifest_hash: 'manifest-hash',
+      scryfall_updated_at: '2026-08-15T12:34:56Z',
+      built_at: '2026-08-15T13:00:00Z',
+      sets: { DSK: { picks_per_pack: 15, manifest_hash: 'set-hash', cards: 333, grp_ids: 1566, text_missing: 0 } }
+    })
+
+    const idx = readBundleIndex(root)!
+    expect(idx).toMatchObject({
+      modelTag: 'v-test',
+      modelId: '_foundation/v-test',
+      modelManifestHash: 'manifest-hash',
+      scryfallUpdatedAt: '2026-08-15T12:34:56Z',
+      builtAt: '2026-08-15T13:00:00Z'
+    })
+    expect(idx.sets.DSK).toMatchObject({ picks_per_pack: 15, cards: 333, grp_ids: 1566 })
+
+    const bundle = loadSetBundle(root, 'DSK')!
+    expect(bundle.picksPerPack).toBe(15)
+    expect(bundle.manifestHash).toBe('set-hash')
+    expect(bundle.scryfallUpdatedAt).toBe('2026-08-15T12:34:56Z')
+    expect(bundle.names).toContain('Murder')
+    expect(bundle.cards.get(92188)).toEqual({
+      grpId: 92188,
+      name: 'Murder',
+      rarity: 'common',
+      colors: 'B',
+      colorIdentity: 'B',
+      manaCost: '{1}{B}{B}',
+      manaValue: 3,
+      type: 'Instant'
+    })
+    expect(bundle.cards.get(67900)?.name).toBe('Murder')
+    expect(bundle.cards.get(92176)).toMatchObject({ colors: 'B', colorIdentity: 'WB' })
+    expect(bundle.cards.get(92188)).not.toHaveProperty('imageSmall')
+    expect(bundle.cards.get(92188)).not.toHaveProperty('setCode')
+    expect(bundle).not.toHaveProperty('ratings')
+    expect(bundle).not.toHaveProperty('attribution')
   })
+
   it.skipIf(!have)('ModelManager scores a real pack with grades and caches the P1P1 curve', async () => {
     const cache = mkdtempSync(join(tmpdir(), 'p1p1-'))
     const m = new ModelManager(cache, ROOT)

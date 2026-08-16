@@ -8,12 +8,11 @@ function stubModels() {
   const bundle = {
     set: 'DSK', dir: '', assetsPath: '', picksPerPack: 14, manifestHash: 'x',
     cards: new Map([
-      [1, { grpId: 1, name: 'Murder', rarity: 'common', colors: 'B', manaCost: '{1}{B}{B}', manaValue: 3, type: 'Instant', setCode: 'DSK', imageSmall: null, imageNormal: null }],
-      [2, { grpId: 2, name: 'Funeral Room', rarity: 'mythic', colors: 'WB', manaCost: '{2}{B}', manaValue: 3, type: 'Enchantment — Room', setCode: 'DSK', imageSmall: null, imageNormal: null }]
+      [1, { grpId: 1, name: 'Murder', rarity: 'common', colors: 'B', colorIdentity: 'B', manaCost: '{1}{B}{B}', manaValue: 3, type: 'Instant' }],
+      [2, { grpId: 2, name: 'Funeral Room', rarity: 'mythic', colors: 'B', colorIdentity: 'WB', manaCost: '{2}{B}', manaValue: 3, type: 'Enchantment — Room' }]
     ]),
-    ratings: new Map(),
-    attribution: null,
-    scryfallUpdatedAt: '2026-08-15'
+    scryfallUpdatedAt: '2026-08-15',
+    names: ['Murder', 'Funeral Room']
   }
   const calls: unknown[] = []
   return {
@@ -49,6 +48,7 @@ describe('DraftCoordinator', () => {
     expect(c.current.phase).toBe('active')
     expect(c.current.picksPerPack).toBe(14)
     expect(c.current.snapshot.model).toBe('v')
+    expect(c.current.snapshot.scryfall).toBe('2026-08-15')
 
     c.onDraftPack(snap({ currentPack: { pack: 1, pick: 1, grpIds: [1, 2, 999] } }))
     expect(c.current.scoring).toBe(true)
@@ -58,6 +58,8 @@ describe('DraftCoordinator', () => {
     expect(c.current.scoring).toBe(false)
     const fr = c.current.cards.find(r => r.grpId === 2)!
     expect(fr.rank).toBe(1); expect(fr.grade).toBe('A'); expect(fr.ev).toBe(2.5)
+    expect(fr.colors).toBe('B')
+    expect(fr.imageUrl).toBeNull()
 
     c.onDraftPick(snap({ currentPack: { pack: 1, pick: 1, grpIds: [1, 2, 999] }, pool: [1] }), { pack: 1, pick: 1, grpIds: [1], packGrpIds: [1, 2, 999] })
     expect(c.current.picks).toHaveLength(1)
