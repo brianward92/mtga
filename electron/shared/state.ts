@@ -107,6 +107,8 @@ export interface LayerState {
   cells: number[]
   /** Predicted preview regions (window px) when no capture is available. */
   regions: Rect[]
+  /** Last pack cell whose 350 ms preview dwell completed; null after a pack change. */
+  selectedCell: number | null
   /** Whole pack covered (modal) or not on screen — lift everything. */
   covered: boolean
   /** The renderer-reported HUD rect is covered. */

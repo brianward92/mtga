@@ -52,14 +52,20 @@ describe('full right-column sidebar geometry', () => {
     const view = { width: 1512, height: 949 }
     const region = { x: 1200, y: 200, width: 200, height: 300 }
 
-    expect(sidebarPresentation('active', true, view, { regions: [], hudCovered: true }))
+    expect(sidebarPresentation('active', true, view, { regions: [], selectedCell: null, hudCovered: true }))
       .toEqual({ open: true, previewCovered: false })
-    expect(sidebarPresentation('active', true, view, { regions: [region], hudCovered: false }))
+    expect(sidebarPresentation('active', true, view, { regions: [region], selectedCell: null, hudCovered: false }))
       .toEqual({ open: true, previewCovered: true })
-    expect(sidebarPresentation('active', false, view, { regions: [region], hudCovered: false }))
+    expect(sidebarPresentation('active', false, view, { regions: [region], selectedCell: 3, hudCovered: false }))
       .toEqual({ open: false, previewCovered: false })
-    expect(sidebarPresentation('idle', true, view, { regions: [region], hudCovered: false }))
+    expect(sidebarPresentation('idle', true, view, { regions: [region], selectedCell: 3, hudCovered: false }))
       .toEqual({ open: false, previewCovered: false })
+    expect(sidebarPresentation('active', true, view, { regions: [], selectedCell: 3, hudCovered: false }))
+      .toEqual({ open: true, previewCovered: true })
+    expect(sidebarPresentation('complete', true, view, { regions: [], selectedCell: 3, hudCovered: false }))
+      .toEqual({ open: true, previewCovered: false })
+    expect(sidebarPresentation('complete', true, view, { regions: [region], selectedCell: null, hudCovered: false }))
+      .toEqual({ open: true, previewCovered: true })
   })
 })
 
@@ -101,7 +107,7 @@ function sheetHarness(sheetOpen = false) {
   const store: Store = {
     state: { ...EMPTY_STATE, phase: 'active', seq: 1 },
     prefs: { badges: true, hud: true, hudCorner: 'bl', layerDetection: false },
-    layer: { cells: [], regions: [], covered: false, hudCovered: false },
+    layer: { cells: [], regions: [], selectedCell: null, covered: false, hudCovered: false },
     calibrate: { active: false, count: 14, config: {} as never, arenaFound: true },
     sheetOpen,
     hoverCell: -1,

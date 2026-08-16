@@ -178,6 +178,37 @@ export class HoverPreviewIntent {
   }
 }
 
+/**
+ * Last pack cell whose hover completed Arena's preview dwell.
+ *
+ * Unlike predicted regions, selection is sticky: Arena can keep the enlarged
+ * card under inspection after the cursor leaves its source cell. Callers
+ * explicitly reset this state when the pack identity changes.
+ */
+export class HoverPreviewSelection {
+  private candidate = -1
+  private candidateSince = 0
+  private selected = -1
+
+  constructor(private readonly enterDwellMs = HOVER_ENTER_DWELL_MS) {}
+
+  reset(): void {
+    this.candidate = -1
+    this.candidateSince = 0
+    this.selected = -1
+  }
+
+  update(hoveredIndex: number, now: number): number {
+    const hovered = Number.isInteger(hoveredIndex) && hoveredIndex >= 0 ? hoveredIndex : -1
+    if (hovered !== this.candidate) {
+      this.candidate = hovered
+      this.candidateSince = now
+    }
+    if (hovered >= 0 && now - this.candidateSince >= this.enterDwellMs) this.selected = hovered
+    return this.selected
+  }
+}
+
 /** Regions Arena's preview is expected to cover for a hovered card. */
 export function predictPopout(
   card: Rect,

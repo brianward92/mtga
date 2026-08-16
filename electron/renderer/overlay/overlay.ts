@@ -19,7 +19,7 @@ import { draftStateAdvanced, sameCalibrateState, sameLayerState, sameViewPrefs }
 import { RailInteraction } from './rail-interaction'
 import { sidebarPresentation, sidebarShellFrame } from './sidebar'
 
-const EMPTY_LAYER: LayerState = { cells: [], regions: [], covered: false, hudCovered: false }
+const EMPTY_LAYER: LayerState = { cells: [], regions: [], selectedCell: null, covered: false, hudCovered: false }
 const EMPTY_CALIBRATE: CalibrateState = { active: false, count: 14, config: { ...DEFAULT_CALIBRATION }, arenaFound: false }
 const DEFAULT_PREFS: ViewPrefs = { badges: true, hud: true, hudCorner: 'tr', layerDetection: false }
 
@@ -160,7 +160,12 @@ function onState(raw: unknown): void {
   const packChanged = next.pack !== store.state.pack || next.pick !== store.state.pick || next.cards.length !== store.state.cards.length
   if (next.phase === 'complete' && store.state.phase !== 'complete') resetSheetScroll = true
   store.state = next
-  if (packChanged) store.hoverCell = -1
+  if (packChanged) {
+    store.hoverCell = -1
+    // Main resets the detector on the same transition; clear its old-pack
+    // prediction synchronously so a selected preview cannot hold the rail faded.
+    store.layer = EMPTY_LAYER
+  }
   schedule()
 }
 
@@ -183,6 +188,7 @@ function onLayer(raw: unknown): void {
   const next: LayerState = {
     cells: Array.isArray(l?.cells) ? l!.cells : [],
     regions: Array.isArray(l?.regions) ? l!.regions : [],
+    selectedCell: Number.isInteger(l?.selectedCell) && Number(l?.selectedCell) >= 0 ? Number(l!.selectedCell) : null,
     covered: l?.covered === true,
     hudCovered: l?.hudCovered === true
   }

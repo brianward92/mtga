@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   HoverPreviewIntent,
+  HoverPreviewSelection,
   hoveredCardIndex,
   intersectionFraction,
   intersects,
@@ -145,5 +146,20 @@ describe('hover pop-out prediction', () => {
     expect(intent.update(2, 619)).toBe(1)
     expect(intent.update(2, 620)).toBe(-1)
     expect(intent.update(2, 850)).toBe(2)
+  })
+
+  it('latches the last fully dwelled preview selection until an explicit pack reset', () => {
+    const selection = new HoverPreviewSelection()
+    expect(selection.update(1, 0)).toBe(-1)
+    expect(selection.update(1, 349)).toBe(-1)
+    expect(selection.update(1, 350)).toBe(1)
+
+    expect(selection.update(-1, 1_000)).toBe(1)
+    expect(selection.update(2, 2_000)).toBe(1)
+    expect(selection.update(2, 2_349)).toBe(1)
+    expect(selection.update(2, 2_350)).toBe(2)
+
+    selection.reset()
+    expect(selection.update(-1, 3_000)).toBe(-1)
   })
 })

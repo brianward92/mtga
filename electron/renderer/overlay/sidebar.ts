@@ -50,8 +50,15 @@ export function sidebarPresentation(
   phase: DraftState['phase'],
   enabled: boolean,
   view: ViewSize,
-  layer: Pick<LayerState, 'regions' | 'hudCovered'>
+  layer: Pick<LayerState, 'regions' | 'selectedCell' | 'hudCovered'>
 ): { open: boolean; previewCovered: boolean } {
   const open = enabled && (phase === 'active' || phase === 'complete')
-  return { open, previewCovered: open && previewIntersectsSidebar(view, layer.regions) }
+  const inspectingPackCard = layer.selectedCell !== null && layer.selectedCell >= 0
+  return {
+    open,
+    previewCovered: open && (
+      previewIntersectsSidebar(view, layer.regions) ||
+      (phase === 'active' && inspectingPackCard)
+    )
+  }
 }
