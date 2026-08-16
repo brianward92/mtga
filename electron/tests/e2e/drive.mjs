@@ -376,9 +376,11 @@ try {
     const runners = [...document.querySelectorAll(S.hudRunners)].filter(row => !row.hidden)
     const meta = document.querySelector(`${S.hudPick} .hud-rec-meta`)
     const pool = document.querySelector(`${S.hudPool} .hud-pool-bar`)
-    return rank === '#1' && runners.length === 4 &&
-      runners.map(row => row.querySelector('.hud-runner-rank')?.textContent?.trim()).join('') === '#2#3#4#5' &&
-      runners.every(row => !!row.querySelector('.hud-runner-name')?.textContent?.trim() && !!row.querySelector('.hud-runner-grade')?.textContent?.trim()) &&
+    return rank === '#1' && runners.length === 5 &&
+      runners.map(row => row.querySelector('.hud-runner-rank')?.textContent?.trim()).join('') === '#1#2#3#4#5' &&
+      runners.every(row => !!row.querySelector('.hud-runner-name')?.textContent?.trim() &&
+        !!row.querySelector('.hud-runner-grade')?.textContent?.trim() &&
+        /^\d+%$/.test(row.querySelector('.hud-runner-pct')?.textContent?.trim() ?? '')) &&
       !!meta?.textContent?.trim() && !!pool
   }, 'ranked top five, card metadata, grades, and pool bar')
   await shot(page, '02-p1p1-scored')

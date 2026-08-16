@@ -5,7 +5,7 @@
  * summary + lane lean, the recommendation "why" line, pick progress, the
  * agreement rate and the end-of-draft summary, event naming, corner cycling.
  */
-import type { CardRow, DraftState, HudCorner, PickRecord } from '../../shared/state'
+import type { CardRow, DraftState, Grade, HudCorner, PickRecord } from '../../shared/state'
 import { bandConviction, dominanceFromEvs, formatDominancePct, type Conviction } from './conviction'
 import { isFiniteNumber } from './shared'
 import { rankOrder } from './chips'
@@ -86,6 +86,44 @@ export function laneLean(summary: PoolSummary): LaneLean | null {
 /** Cards in the pack ordered by the model (state order → ranked). */
 export function rankedCards(cards: ReadonlyArray<CardRow>): CardRow[] {
   return rankOrder(cards).map(i => cards[i])
+}
+
+/** Rows in the HUD's ranked table (always exactly this many). */
+export const RANKED_ROWS = 5
+
+/** One row of the HUD's fixed-height ranked table. Blank rows keep name '' and nulls. */
+export interface RankedRow {
+  /** 1-based table position (#1..#5), independent of whether a card fills it. */
+  rank: number
+  name: string
+  /** Pool grade; null while scoring / unscored / blank. */
+  grade: Grade | null
+  /** Raw set grade, only when it differs from the pool grade (else null). */
+  setGrade: Grade | null
+  /** Math.round(prob * 100) — the same number the chips show; null while scoring / unknown. */
+  pct: number | null
+}
+
+/**
+ * Row model for the ranked table: exactly RANKED_ROWS entries so the block
+ * never changes height. Scored packs list the model's ranking; while scoring
+ * (or before scores exist) the names appear in log order with no grade/%.
+ */
+export function rankedRows(cards: ReadonlyArray<CardRow>, scoring = false): RankedRow[] {
+  const scored = !scoring && cards.some(c => c.rank !== null || isFiniteNumber(c.ev))
+  const ordered = scored ? rankedCards(cards) : [...cards]
+  return Array.from({ length: RANKED_ROWS }, (_, i) => {
+    const c = ordered[i]
+    if (!c) return { rank: i + 1, name: '', grade: null, setGrade: null, pct: null }
+    const grade = scored ? c.grade : null
+    return {
+      rank: i + 1,
+      name: c.name,
+      grade,
+      setGrade: scored && grade && c.setGrade && c.setGrade !== grade ? c.setGrade : null,
+      pct: scored && isFiniteNumber(c.prob) ? Math.round(c.prob * 100) : null
+    }
+  })
 }
 
 /** Conviction band for the pack (null before scores / with <2 scored cards). */

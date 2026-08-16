@@ -57,12 +57,16 @@
         </div>
       </section>
 
-      <ul class="hud-runners" id="hudRunners">
-        <li class="hud-runner"><span class="hud-runner-rank">#2</span><span class="hud-runner-name"></span><span class="hud-runner-grade"></span></li>
-        <li class="hud-runner"><span class="hud-runner-rank">#3</span><span class="hud-runner-name"></span><span class="hud-runner-grade"></span></li>
-        <li class="hud-runner"><span class="hud-runner-rank">#4</span><span class="hud-runner-name"></span><span class="hud-runner-grade"></span></li>
-        <li class="hud-runner"><span class="hud-runner-rank">#5</span><span class="hud-runner-name"></span><span class="hud-runner-grade"></span></li>
-      </ul>
+      <!-- Ranked table (#1–#5): fixed five rows so the top block never reflows -->
+      <table class="hud-runners" id="hudRunners" data-testid="hud-ranked" aria-label="Model ranking">
+        <tbody>
+          <tr class="hud-runner"><td class="hud-runner-rank">#1</td><td class="hud-runner-name"></td><td class="hud-runner-grade"></td><td class="hud-runner-setgrade"></td><td class="hud-runner-pct"></td></tr>
+          <tr class="hud-runner"><td class="hud-runner-rank">#2</td><td class="hud-runner-name"></td><td class="hud-runner-grade"></td><td class="hud-runner-setgrade"></td><td class="hud-runner-pct"></td></tr>
+          <tr class="hud-runner"><td class="hud-runner-rank">#3</td><td class="hud-runner-name"></td><td class="hud-runner-grade"></td><td class="hud-runner-setgrade"></td><td class="hud-runner-pct"></td></tr>
+          <tr class="hud-runner"><td class="hud-runner-rank">#4</td><td class="hud-runner-name"></td><td class="hud-runner-grade"></td><td class="hud-runner-setgrade"></td><td class="hud-runner-pct"></td></tr>
+          <tr class="hud-runner"><td class="hud-runner-rank">#5</td><td class="hud-runner-name"></td><td class="hud-runner-grade"></td><td class="hud-runner-setgrade"></td><td class="hud-runner-pct"></td></tr>
+        </tbody>
+      </table>
 
       <section class="hud-pool" id="hudPool">
         <div class="hud-pool-bar" id="poolBar" role="img" aria-label="Pool colours">

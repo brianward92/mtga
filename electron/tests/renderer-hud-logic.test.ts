@@ -6,7 +6,7 @@ import { describe, it, expect } from 'vitest'
 import type { CardRow, PickRecord } from '../shared/state'
 import {
   agreement, bestPick, detailLine, eventTitle, laneLean, nextCorner, packConviction,
-  pickPosition, poolSummary, progressDots, rankedCards, sheetSide, whyLine
+  pickPosition, poolSummary, progressDots, RANKED_ROWS, rankedCards, rankedRows, sheetSide, whyLine
 } from '../renderer/overlay/hud-logic'
 import { picksHtml, poolColorCountsHtml, poolDisplayRows, poolHtml } from '../renderer/overlay/sheet'
 import { sigmoid, formatDominancePct } from '../renderer/overlay/conviction'
@@ -105,6 +105,46 @@ describe('rankedCards / packConviction / whyLine / detailLine', () => {
       .toBe('#2 · p 23% · ev -0.50')
     expect(detailLine(card({ grpId: 1, ev: 1.234 }))).toBe('ev +1.23')
     expect(detailLine(card({ grpId: 1 }))).toBe('')
+  })
+})
+
+describe('rankedRows', () => {
+  it('always yields 5 rows (#1–#5), blank when the pack is short or empty', () => {
+    expect(rankedRows([])).toHaveLength(RANKED_ROWS)
+    expect(rankedRows([]).map(r => r.rank)).toEqual([1, 2, 3, 4, 5])
+    expect(rankedRows([])).toEqual(Array.from({ length: 5 }, (_, i) => ({ rank: i + 1, name: '', grade: null, setGrade: null, pct: null })))
+    const two = rankedRows([card({ grpId: 1, rank: 2, ev: 0.5, prob: 0.4 }), card({ grpId: 2, rank: 1, ev: 1, prob: 0.6 })])
+    expect(two).toHaveLength(5)
+    expect(two.map(r => r.name)).toEqual(['Card 2', 'Card 1', '', '', ''])
+    expect(rankedRows(Array.from({ length: 14 }, (_, i) => card({ grpId: i + 1, rank: i + 1, ev: -i })))).toHaveLength(5)
+  })
+
+  it('lists the model ranking with pool grade, set grade only when different, and chip-rounded pick %', () => {
+    const rows = rankedRows([
+      card({ grpId: 1, name: 'Second', rank: 2, ev: 1, prob: 0.2549, grade: 'B', setGrade: 'B' }),
+      card({ grpId: 2, name: 'First', rank: 1, ev: 2, prob: 0.605, grade: 'A-', setGrade: 'B+' }),
+      card({ grpId: 3, name: 'Third', rank: 3, ev: 0, prob: 0.14, grade: null, setGrade: 'C' })
+    ])
+    expect(rows[0]).toEqual({ rank: 1, name: 'First', grade: 'A-', setGrade: 'B+', pct: 61 })
+    expect(rows[1]).toEqual({ rank: 2, name: 'Second', grade: 'B', setGrade: null, pct: 25 })
+    expect(rows[2]).toEqual({ rank: 3, name: 'Third', grade: null, setGrade: null, pct: 14 })
+    expect(rows[3].name).toBe('')
+    expect(rows[4].name).toBe('')
+  })
+
+  it('shows names in log order without grade/% while scoring or before scores exist', () => {
+    const pack = [
+      card({ grpId: 1, name: 'Logged first', rank: 2, ev: 1, prob: 0.3, grade: 'B', setGrade: 'C' }),
+      card({ grpId: 2, name: 'Logged second', rank: 1, ev: 2, prob: 0.7, grade: 'A' })
+    ]
+    const scoring = rankedRows(pack, true)
+    expect(scoring.map(r => r.name)).toEqual(['Logged first', 'Logged second', '', '', ''])
+    expect(scoring.every(r => r.grade === null && r.setGrade === null && r.pct === null)).toBe(true)
+    const unscored = rankedRows([card({ grpId: 1, name: 'A', grade: 'B' }), card({ grpId: 2, name: 'B', grade: 'A' })])
+    expect(unscored.slice(0, 2)).toEqual([
+      { rank: 1, name: 'A', grade: null, setGrade: null, pct: null },
+      { rank: 2, name: 'B', grade: null, setGrade: null, pct: null }
+    ])
   })
 })
 

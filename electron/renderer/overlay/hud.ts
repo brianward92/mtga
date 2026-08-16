@@ -1,7 +1,7 @@
 /**
  * Context HUD: a compact glass card in a corner. Draft: header (set·format,
  * P#P#, progress dots, model chip), the recommendation (or the hovered
- * card's detail), runner-ups, pool colour bar + lane lean, footer buttons.
+ * card's detail), the ranked table (#1–#5), pool colour bar + lane lean, footer buttons.
  * Idle: a tiny, fixed top-right glyph. Complete: agreement summary + Dismiss.
  * Skeleton lives in index.html; this updates it in place.
  */
@@ -16,7 +16,7 @@ import { renderManaCost, escapeHtml } from './shared'
 import { hudCornerForPhase, sheetShouldRender } from './visibility'
 import {
   agreement, bestPick, detailLine, eventTitle, laneLean, packConviction,
-  pickPosition, POOL_COLORS, poolSummary, progressDots, rankedCards, whyLine
+  pickPosition, POOL_COLORS, poolSummary, progressDots, rankedCards, rankedRows, whyLine
 } from './hud-logic'
 import type { OverlayAction, Store } from './types'
 
@@ -58,7 +58,7 @@ export class Hud {
   private readonly recRank: HTMLElement
   private readonly recWhy: HTMLElement
   private readonly runners: HTMLElement
-  private readonly runnerNodes: Array<{ li: HTMLElement; name: HTMLElement; grade: HTMLElement }> = []
+  private readonly runnerNodes: Array<{ row: HTMLElement; name: HTMLElement; grade: HTMLElement; setGrade: HTMLElement; pct: HTMLElement }> = []
   private readonly pool: HTMLElement
   private readonly poolSegs: Record<string, HTMLElement> = {}
   private readonly poolCounts: Record<string, HTMLElement> = {}
@@ -112,8 +112,14 @@ export class Hud {
       this.recFlames.appendChild(s)
       this.flameNodes.push(s)
     }
-    this.runners.querySelectorAll<HTMLElement>('.hud-runner').forEach(li => {
-      this.runnerNodes.push({ li, name: li.querySelector('.hud-runner-name')!, grade: li.querySelector('.hud-runner-grade')! })
+    this.runners.querySelectorAll<HTMLElement>('.hud-runner').forEach(row => {
+      this.runnerNodes.push({
+        row,
+        name: row.querySelector('.hud-runner-name')!,
+        grade: row.querySelector('.hud-runner-grade')!,
+        setGrade: row.querySelector('.hud-runner-setgrade')!,
+        pct: row.querySelector('.hud-runner-pct')!
+      })
     })
     for (const c of [...POOL_COLORS, 'C']) {
       this.poolSegs[c] = $(root, 'poolBar').querySelector<HTMLElement>(`.seg.${c}`)!
@@ -239,7 +245,7 @@ export class Hud {
       setText(this.recRank, '')
       setText(this.recWhy, '')
       if (this.recMetaKey !== '') { this.recMetaKey = ''; this.recMeta.innerHTML = '' }
-      for (const r of this.runnerNodes) r.li.hidden = true
+      this.paintRanked(store)
       return
     }
 
@@ -263,16 +269,27 @@ export class Hud {
       setText(this.recWhy, state.scoring ? 'scoring…' : whyLine(top, ranked[1] ?? null, conviction))
     }
 
-    // Runner-ups (#2–#5) — always the model's, even while hovering.
+    this.paintRanked(store)
+  }
+
+  /**
+   * Ranked table (#1–#5) — always the model's ranking, even while hovering.
+   * All five rows stay in the DOM (blank rows keep their height) so the top
+   * block never reflows on hover swaps or score arrival.
+   */
+  private paintRanked(store: Store): void {
+    const rows = rankedRows(store.state.cards, store.state.scoring)
     this.runnerNodes.forEach((r, i) => {
-      const c = state.scoring ? undefined : ranked[i + 1]
-      const show = !!c && (c.rank !== null || c.ev !== null)
-      r.li.hidden = !show
-      if (!show || !c) return
-      setText(r.name, c.name)
-      setText(r.grade, c.grade ? (c.setGrade && c.setGrade !== c.grade ? `${c.grade} · set ${c.setGrade}` : c.grade) : '—')
-      const cls = `hud-runner-grade ${gradeClass(c.grade)}`
+      const row = rows[i]
+      const blank = row.name === ''
+      r.row.classList.toggle('blank', blank)
+      setText(r.name, row.name)
+      setText(r.grade, blank ? '' : row.grade ?? '—')
+      const cls = `hud-runner-grade ${gradeClass(row.grade)}`
       if (r.grade.className !== cls) r.grade.className = cls
+      setText(r.setGrade, row.setGrade ?? '')
+      r.setGrade.title = row.setGrade ? `set ${row.setGrade}` : ''
+      setText(r.pct, blank ? '' : row.pct !== null ? `${row.pct}%` : '—')
     })
   }
 

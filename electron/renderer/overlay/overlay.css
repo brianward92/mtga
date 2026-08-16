@@ -457,18 +457,23 @@ body.calibrating .sheet { display: none; }
   white-space: nowrap;
 }
 
-/* Runner-ups */
-.hud-runners { list-style: none; display: flex; flex-direction: column; gap: 0.15rem; }
-.hud-runner {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  min-width: 0;
+/* Ranked table (#1–#5): five rows always present so the block's height is fixed */
+.hud-runners {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  border-spacing: 0;
   font-size: 0.85rem;
+  line-height: 1.25rem;
 }
-.hud-runner-rank { flex: 0 0 auto; color: var(--text-3); font-weight: 700; font-size: 0.75rem; }
-.hud-runner-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hud-runner-grade { flex: 0 0 auto; font-weight: 800; font-size: 0.8rem; }
+.hud-runner td { padding: 0; height: 1.25rem; white-space: nowrap; vertical-align: middle; }
+.hud-runner td + td { padding-left: 0.45rem; }
+.hud-runner-rank { width: 1.6rem; color: var(--text-3); font-weight: 700; font-size: 0.75rem; }
+.hud-runner-name { overflow: hidden; text-overflow: ellipsis; }
+.hud-runner-grade { width: 2rem; text-align: right; font-weight: 800; font-size: 0.8rem; }
+.hud-runner-setgrade { width: 2.4rem; text-align: right; font-size: 0.68rem; font-weight: 700; opacity: 0.6; }
+.hud-runner-pct { width: 2.6rem; text-align: right; font-variant-numeric: tabular-nums; color: var(--text-2); font-size: 0.78rem; }
+.hud-runner.blank td { color: var(--text-3); }
 
 /* Pool */
 .hud-pool { display: flex; flex-direction: column; gap: 0.3rem; }
