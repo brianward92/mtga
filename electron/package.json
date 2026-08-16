@@ -25,6 +25,7 @@
     "electron-builder": "^25.1.8",
     "electron-vite": "^2.3.0",
     "puppeteer-core": "^25.3.0",
+    "tsx": "^4.23.12",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
   },

@@ -10,6 +10,8 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 STATE="${MTGA_STATE_FILE:?set MTGA_STATE_FILE to the mirrored state file}"
 HIST="$HOME/Library/Application Support/mtga-tracker/draft-history.jsonl"
+TSX="./node_modules/.bin/tsx"
+[ -x "$TSX" ] || { echo "tsx missing; run npm ci in electron/ first" >&2; exit 2; }
 WHAT="top"; DRY=0; ALLOW_LAND=0
 for a in "$@"; do
   case "$a" in
@@ -28,8 +30,8 @@ RECT="{\"x\":$x,\"y\":$y,\"width\":$w,\"height\":$h}"
 
 pos() { python3 scripts/dev/statecheck.py "$STATE" pos; }
 POS0=$(pos)
-npx tsx scripts/dev/pick.ts "$STATE" "$RECT" list
-P=$(npx tsx scripts/dev/pick.ts "$STATE" "$RECT" "$WHAT")
+"$TSX" scripts/dev/pick.ts "$STATE" "$RECT" list
+P=$("$TSX" scripts/dev/pick.ts "$STATE" "$RECT" "$WHAT")
 echo "target: $P  (at pack-pick $POS0)"
 read -r TX TY TGRP TNAME <<< "$P"
 is_land() { python3 scripts/dev/statecheck.py "$STATE" island "$TGRP"; }
