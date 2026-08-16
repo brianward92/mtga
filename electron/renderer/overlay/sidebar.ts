@@ -39,10 +39,31 @@ export function sidebarPanelFrame(view: ViewSize): Rect {
   }
 }
 
+/**
+ * How much of the sidebar a predicted preview must cover before we get out of
+ * its way. A sliver of overlap is not worth hiding the drafter's pool for.
+ */
+export const SIDEBAR_COVER_THRESHOLD = 0.12
+
+/** Fraction of the sidebar covered by the predicted Arena card preview. */
+export function previewCoverFraction(view: ViewSize, regions: ReadonlyArray<Rect>): number {
+  const shell = sidebarShellFrame(view)
+  const area = shell.width * shell.height
+  if (area <= 0) return 0
+  let covered = 0
+  for (const region of regions) {
+    const x = Math.max(shell.x, region.x)
+    const y = Math.max(shell.y, region.y)
+    const right = Math.min(shell.x + shell.width, region.x + region.width)
+    const bottom = Math.min(shell.y + shell.height, region.y + region.height)
+    if (right > x && bottom > y) covered = Math.max(covered, (right - x) * (bottom - y))
+  }
+  return covered / area
+}
+
 /** Only a predicted Arena card-preview region may fade the sidebar. */
 export function previewIntersectsSidebar(view: ViewSize, regions: ReadonlyArray<Rect>): boolean {
-  const shell = sidebarShellFrame(view)
-  return shell.width > 0 && shell.height > 0 && regions.some(region => intersects(shell, region))
+  return previewCoverFraction(view, regions) >= SIDEBAR_COVER_THRESHOLD
 }
 
 /** Renderer-ready sidebar state, intentionally independent of `hudCovered`. */
@@ -53,12 +74,8 @@ export function sidebarPresentation(
   layer: Pick<LayerState, 'regions' | 'selectedCell' | 'hudCovered'>
 ): { open: boolean; previewCovered: boolean } {
   const open = enabled && (phase === 'active' || phase === 'complete')
-  const inspectingPackCard = layer.selectedCell !== null && layer.selectedCell >= 0
-  return {
-    open,
-    previewCovered: open && (
-      previewIntersectsSidebar(view, layer.regions) ||
-      (phase === 'active' && inspectingPackCard)
-    )
-  }
+  // Inspecting a card only moves us aside when Arena's preview actually lands
+  // on the sidebar: the drafter's cursor lives over the pack, and blanking
+  // their pool on every hover made the sidebar feel like it kept vanishing.
+  return { open, previewCovered: open && previewIntersectsSidebar(view, layer.regions) }
 }
