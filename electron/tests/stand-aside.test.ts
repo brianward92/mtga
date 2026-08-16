@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CHROME_BAND_FRACTION, STAND_ASIDE_TIMEOUT_MS, StandAside, inChromeBand } from '../main/overlay/stand-aside'
+import { CHROME_BAND_FRACTION, CHROME_DWELL_MS, STAND_ASIDE_TIMEOUT_MS, StandAside, inChromeBand } from '../main/overlay/stand-aside'
 
 const arena = { width: 1512, height: 949 }
 
@@ -24,11 +24,17 @@ describe('inChromeBand', () => {
 })
 
 describe('StandAside', () => {
-  it('latches on chrome entry and holds while the cursor moves away', () => {
+  it('latches after a dwell in chrome and holds while the cursor moves away', () => {
     const s = new StandAside()
     expect(s.sample({ x: 756, y: 500 }, arena, 0)).toBe(false)
     expect(s.active).toBe(false)
-    expect(s.sample({ x: 1478, y: 100 }, arena, 10)).toBe(true)
+    // A sweep through the band does not latch…
+    expect(s.sample({ x: 1478, y: 100 }, arena, 10)).toBe(false)
+    expect(s.sample({ x: 756, y: 500 }, arena, 120)).toBe(false)
+    expect(s.active).toBe(false)
+    // …but resting there does.
+    expect(s.sample({ x: 1478, y: 100 }, arena, 200)).toBe(false)
+    expect(s.sample({ x: 1478, y: 100 }, arena, 200 + CHROME_DWELL_MS)).toBe(true)
     expect(s.active).toBe(true)
     // Moving into the middle of the screen (an open Options panel) keeps it.
     expect(s.sample({ x: 700, y: 500 }, arena, 2000)).toBe(false)
@@ -38,11 +44,14 @@ describe('StandAside', () => {
   it('expires after the timeout and can be released early', () => {
     const s = new StandAside()
     s.sample({ x: 1478, y: 100 }, arena, 0)
-    expect(s.sample({ x: 700, y: 500 }, arena, STAND_ASIDE_TIMEOUT_MS - 1)).toBe(false)
-    expect(s.sample({ x: 700, y: 500 }, arena, STAND_ASIDE_TIMEOUT_MS)).toBe(true)
+    s.sample({ x: 1478, y: 100 }, arena, CHROME_DWELL_MS)
+    // The countdown runs from the last in-band sample.
+    expect(s.sample({ x: 700, y: 500 }, arena, CHROME_DWELL_MS + STAND_ASIDE_TIMEOUT_MS - 1)).toBe(false)
+    expect(s.sample({ x: 700, y: 500 }, arena, CHROME_DWELL_MS + STAND_ASIDE_TIMEOUT_MS)).toBe(true)
     expect(s.active).toBe(false)
 
     s.sample({ x: 1478, y: 100 }, arena, 100)
+    s.sample({ x: 1478, y: 100 }, arena, 100 + CHROME_DWELL_MS)
     expect(s.release()).toBe(true)
     expect(s.active).toBe(false)
     expect(s.release()).toBe(false)

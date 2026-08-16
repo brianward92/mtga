@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MTGA Draft Assistant</title>
+  <script type="module" crossorigin src="../assets/overlay-DpynwF4i.js"></script>
+  <link rel="stylesheet" crossorigin href="../assets/overlay-C3PCzPcl.css">
+</head>
+<body>
+  <div id="app" class="app" data-testid="overlay-root">
+  <!-- 1. Badge layer: frames + chips on Arena's pack grid. Never interactive. -->
+  <div id="badges" class="badges hidden" aria-hidden="true"></div>
+
+  <!-- 4. Calibration ghosts (dashed cells + numbers). Never interactive. -->
+  <div id="ghosts" class="ghosts" aria-hidden="true"></div>
+
+  <!-- 2–3. One full Arena right-column owner. Its inset panel orders the
+       header/recommendations/pool summary, scrolling pool, then footer. -->
+  <div id="draftRail" class="draft-rail" aria-hidden="true" data-testid="draft-rail">
+  <div class="draft-rail-panel">
+  <aside id="hud" class="hud hud-tr idle idle-min" role="complementary" aria-label="Draft assistant" data-testid="hud">
+    <div class="hud-idle" id="hudIdle">
+      <span class="hud-glyph" aria-hidden="true">◇</span>
+      <span class="hud-idle-text">DraftFM · waiting for a draft</span>
+    </div>
+
+    <div class="hud-warning" id="hudWarning" hidden></div>
+
+    <div class="hud-main" id="hudMain" hidden>
+      <header class="hud-head">
+        <span class="hud-title" id="hudTitle"></span>
+        <span class="hud-pos" id="hudPos"></span>
+        <span class="hud-dots" id="hudDots" aria-hidden="true"></span>
+        <span class="hud-model" id="hudModel" title="">DraftFM</span>
+        <span class="sheet-rating grade-none" id="sheetRating" title="Rarity-weighted mean of the pool's set-review grades (common 1, uncommon 2, rare 4, mythic 8)"></span>
+      </header>
+      <div class="hud-model-msg" id="hudModelMsg" hidden></div>
+
+      <!-- Recommendation / hover detail -->
+      <section class="hud-rec" id="hudRec" data-testid="hud-pick">
+        <div class="hud-rec-grades">
+          <div class="hud-rec-grade" id="recGrade" title="For your pool: set-relative grade under your current pool">—</div>
+          <div class="hud-rec-setgrade" id="recSetGrade" title="Raw set rating (P1P1, empty pool)" hidden></div>
+        </div>
+        <div class="hud-rec-body">
+          <div class="hud-rec-top">
+            <span class="hud-rec-name" id="recName">waiting for pack…</span>
+            <span class="hud-hovering" id="recHovering" hidden>hovering</span>
+          </div>
+          <div class="hud-rec-meta" id="recMeta"></div>
+          <div class="hud-rec-conv" id="recConv">
+            <span class="hud-flames" id="recFlames"></span>
+            <span class="hud-band" id="recBand"></span>
+            <span class="hud-rank" id="recRank"></span>
+          </div>
+          <div class="hud-rec-why" id="recWhy"></div>
+        </div>
+      </section>
+
+      <!-- Ranked table (#1–#5): fixed five rows so the top block never reflows -->
+      <table class="hud-runners" id="hudRunners" data-testid="hud-ranked" aria-label="Model ranking">
+        <tbody>
+          <tr class="hud-runner"><td class="hud-runner-rank">#1</td><td class="hud-runner-name"></td><td class="hud-runner-grade"></td><td class="hud-runner-setgrade"></td><td class="hud-runner-pct"></td></tr>
+          <tr class="hud-runner"><td class="hud-runner-rank">#2</td><td class="hud-runner-name"></td><td class="hud-runner-grade"></td><td class="hud-runner-setgrade"></td><td class="hud-runner-pct"></td></tr>
+          <tr class="hud-runner"><td class="hud-runner-rank">#3</td><td class="hud-runner-name"></td><td class="hud-runner-grade"></td><td class="hud-runner-setgrade"></td><td class="hud-runner-pct"></td></tr>
+          <tr class="hud-runner"><td class="hud-runner-rank">#4</td><td class="hud-runner-name"></td><td class="hud-runner-grade"></td><td class="hud-runner-setgrade"></td><td class="hud-runner-pct"></td></tr>
+          <tr class="hud-runner"><td class="hud-runner-rank">#5</td><td class="hud-runner-name"></td><td class="hud-runner-grade"></td><td class="hud-runner-setgrade"></td><td class="hud-runner-pct"></td></tr>
+        </tbody>
+      </table>
+
+      <section class="hud-pool" id="hudPool">
+        <div class="hud-pool-bar" id="poolBar" role="img" aria-label="Pool colours">
+          <span class="seg W"></span><span class="seg U"></span><span class="seg B"></span>
+          <span class="seg R"></span><span class="seg G"></span><span class="seg C"></span>
+        </div>
+        <div class="hud-pool-counts" id="poolCounts">
+          <span class="pc W"><i></i><b>0</b></span><span class="pc U"><i></i><b>0</b></span>
+          <span class="pc B"><i></i><b>0</b></span><span class="pc R"><i></i><b>0</b></span>
+          <span class="pc G"><i></i><b>0</b></span><span class="pc C"><i></i><b>0</b></span>
+          <span class="hud-pool-total" id="poolTotal"></span>
+        </div>
+        <div class="hud-lane" id="hudLane" hidden></div>
+      </section>
+
+      <!-- Complete summary -->
+      <section class="hud-done" id="hudDone" hidden>
+        <div class="hud-done-title">Draft complete</div>
+        <div class="hud-done-line" id="doneAgree"></div>
+        <div class="hud-done-line" id="doneBest"></div>
+        <button class="hud-btn hud-dismiss" id="btnDismiss" type="button">Dismiss</button>
+      </section>
+
+    </div>
+  </aside>
+
+  <!-- The grouped pool list owns all remaining height and scrolls internally. -->
+  <aside id="sheet" class="sheet interactive side-right stack-below" aria-label="Pool and picks" aria-hidden="true">
+    <div class="sheet-body">
+      <section class="sheet-pool" id="sheetPool"></section>
+    </div>
+  </aside>
+
+  <footer class="hud-foot">
+    <button class="hud-icon" id="btnBadges" type="button" title="Toggle card badges (⌘⇧B)" aria-label="Toggle badges">◧</button>
+    <button class="hud-icon" id="btnCalibrate" type="button" data-testid="hud-btn-calibrate" title="Calibrate the pack grid" aria-label="Calibrate">⌖</button>
+    <span class="hud-attrib" id="hudAttrib" data-testid="hud-provenance" hidden></span>
+  </footer>
+  </div>
+  </div>
+
+  <!-- 4. Calibration helper panel (right rail). Interactive. -->
+  <div id="calPanel" class="cal-panel interactive" hidden>
+    <div class="cal-title">Grid calibration</div>
+    <div class="cal-status" id="calStatus">Looking for the Arena window…</div>
+
+    <div class="cal-row">
+      <span class="cal-label">Cards</span>
+      <div class="cal-btns" id="calCounts">
+        <button class="cal-btn" type="button" data-count="13">13</button>
+        <button class="cal-btn active" type="button" data-count="14">14</button>
+        <button class="cal-btn" type="button" data-count="15">15</button>
+      </div>
+    </div>
+    <div class="cal-row">
+      <span class="cal-label">Position</span>
+      <div class="cal-btns">
+        <button class="cal-btn" type="button" data-op='{"type":"nudge","dx":-1,"dy":0}' title="Nudge left">←</button>
+        <button class="cal-btn" type="button" data-op='{"type":"nudge","dx":1,"dy":0}' title="Nudge right">→</button>
+        <button class="cal-btn" type="button" data-op='{"type":"nudge","dx":0,"dy":-1}' title="Nudge up">↑</button>
+        <button class="cal-btn" type="button" data-op='{"type":"nudge","dx":0,"dy":1}' title="Nudge down">↓</button>
+      </div>
+    </div>
+    <div class="cal-row">
+      <span class="cal-label">Scale</span>
+      <div class="cal-btns">
+        <button class="cal-btn" type="button" data-op='{"type":"scale","dir":-1}' title="Shrink the grid">−</button>
+        <button class="cal-btn" type="button" data-op='{"type":"scale","dir":1}' title="Grow the grid">+</button>
+      </div>
+      <span class="cal-label">Cols</span>
+      <div class="cal-btns">
+        <button class="cal-btn" type="button" data-op='{"type":"cols","dir":-1}'>−</button>
+        <button class="cal-btn" type="button" data-op='{"type":"cols","dir":1}'>+</button>
+      </div>
+    </div>
+    <div class="cal-row">
+      <span class="cal-label">Width</span>
+      <div class="cal-btns">
+        <button class="cal-btn" type="button" data-op='{"type":"scale-width","dir":-1}'>−</button>
+        <button class="cal-btn" type="button" data-op='{"type":"scale-width","dir":1}'>+</button>
+      </div>
+      <span class="cal-label">Height</span>
+      <div class="cal-btns">
+        <button class="cal-btn" type="button" data-op='{"type":"scale-height","dir":-1}'>−</button>
+        <button class="cal-btn" type="button" data-op='{"type":"scale-height","dir":1}'>+</button>
+      </div>
+    </div>
+    <div class="cal-row">
+      <span class="cal-label">Badge ↕</span>
+      <div class="cal-btns">
+        <button class="cal-btn" type="button" data-op='{"type":"badge-y","dir":-1}'>−</button>
+        <button class="cal-btn" type="button" data-op='{"type":"badge-y","dir":1}'>+</button>
+      </div>
+    </div>
+
+    <div class="cal-actions">
+      <button class="cal-btn" type="button" data-op='{"type":"reset"}' title="Back to defaults">Reset</button>
+      <button class="cal-btn" type="button" id="calCancel" data-testid="calibrate-cancel">Cancel</button>
+      <button class="cal-btn cal-save" type="button" id="calSave">Save</button>
+    </div>
+    <div class="cal-hint">
+      Line the numbered ghosts up with the pack cards (1 = top-left, counting
+      left→right, row by row).
+    </div>
+  </div>
+
+  </div>
+
+</body>
+</html>
