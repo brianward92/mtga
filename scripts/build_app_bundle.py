@@ -19,7 +19,7 @@ Per set, under electron/resources/draftfm/sets/<SET>/:
                picks_per_pack, set, text_missing, built_at
   cards.json   {"set", "scryfall_updated_at", "built_at",
                 "cards": {name: {rarity, colors, colorIdentity, manaCost,
-                                   manaValue, type}}}
+                                   manaValue, type, scryfallId}}}
                — one entry per NAME (grpId -> name lives in assets.npz)
   index.json   {"model_id", "model_manifest_hash", "scryfall_updated_at",
                 "built_at", "sets": {SET: {picks_per_pack, manifest_hash,
@@ -941,6 +941,9 @@ def card_entry(row):
     mana_cost = row.get("mana_cost")
     if not mana_cost and faces:
         mana_cost = faces[0].get("mana_cost") or ""
+    scryfall_id = row.get("id")
+    if not isinstance(scryfall_id, str) or not scryfall_id:
+        raise BundleError(f"card {row.get('name')!r} has no Scryfall id")
     return {
         "rarity": _rarity(row),
         # Arena's color sort uses the printed colors, not commander color
@@ -950,6 +953,7 @@ def card_entry(row):
         "manaCost": mana_cost or "",
         "manaValue": _mana_value(row.get("cmc")),
         "type": row.get("type_line") or "",
+        "scryfallId": scryfall_id,
     }
 
 

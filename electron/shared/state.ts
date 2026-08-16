@@ -19,6 +19,8 @@ export interface CardRow {
   manaCost: string
   manaValue: number | null
   type: string
+  /** Raw Scryfall printing id carried through from the offline bundle. */
+  scryfallId: string
   imageUrl: string | null
   /** Model logit for THIS pick (pool-conditioned); null until scored / unknown. */
   ev: number | null

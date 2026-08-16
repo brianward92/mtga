@@ -6,7 +6,8 @@
  *   sets/<SET>/assets.npz        per-set model assets: features, names, grp_ids (name → grpIds)
  *   sets/<SET>/cards.json        {set, scryfall_updated_at, built_at,
  *                                 cards:{name:{rarity, colors, colorIdentity,
- *                                              manaCost, manaValue, type}}}
+ *                                              manaCost, manaValue, type,
+ *                                              scryfallId}}}
  * Produced by scripts/build_app_bundle.py from a dated raw Scryfall snapshot.
  * Card identity is keyed by name; grpId → name comes from the assets' grp_ids
  * map, so every Arena printing for a model name resolves. Everything is read-only.
@@ -27,6 +28,8 @@ export interface CardInfo {
   manaCost: string
   manaValue: number | null
   type: string
+  /** Raw Scryfall id of the printing supplying this display metadata. */
+  scryfallId: string
 }
 
 /** One shipped set's assets, card metadata, and draft constants. */
@@ -81,6 +84,7 @@ interface CardFields {
   manaCost?: string
   manaValue?: number | null
   type?: string
+  scryfallId?: string
 }
 
 interface CardsFile {
@@ -186,7 +190,8 @@ export function loadSetBundle(root: string, set: string): SetBundle | null {
         colorIdentity: String(raw.colorIdentity ?? ''),
         manaCost: String(raw.manaCost ?? ''),
         manaValue: Number.isFinite(manaValue) ? manaValue : null,
-        type: String(raw.type ?? '')
+        type: String(raw.type ?? ''),
+        scryfallId: String(raw.scryfallId ?? '')
       })
     }
   }

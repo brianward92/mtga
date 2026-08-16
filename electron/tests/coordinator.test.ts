@@ -9,8 +9,8 @@ function stubModels() {
   const bundle = {
     set: 'DSK', dir: '', assetsPath: '', picksPerPack: 14, manifestHash: 'x',
     cards: new Map([
-      [1, { grpId: 1, name: 'Murder', rarity: 'common', colors: 'B', colorIdentity: 'B', manaCost: '{1}{B}{B}', manaValue: 3, type: 'Instant' }],
-      [2, { grpId: 2, name: 'Funeral Room', rarity: 'mythic', colors: 'B', colorIdentity: 'WB', manaCost: '{2}{B}', manaValue: 3, type: 'Enchantment — Room' }]
+      [1, { grpId: 1, name: 'Murder', rarity: 'common', colors: 'B', colorIdentity: 'B', manaCost: '{1}{B}{B}', manaValue: 3, type: 'Instant', scryfallId: 'scry-murder' }],
+      [2, { grpId: 2, name: 'Funeral Room', rarity: 'mythic', colors: 'B', colorIdentity: 'WB', manaCost: '{2}{B}', manaValue: 3, type: 'Enchantment — Room', scryfallId: 'scry-funeral-room' }]
     ]),
     scryfallUpdatedAt: '2026-08-15',
     names: ['Murder', 'Funeral Room']
@@ -86,7 +86,9 @@ describe('DraftCoordinator', () => {
     expect(fr.rank).toBe(1); expect(fr.grade).toBe('A'); expect(fr.ev).toBe(2.5)
     expect(fr.colors).toBe('B')
     expect(fr.colorIdentity).toBe('WB')
+    expect(fr.scryfallId).toBe('scry-funeral-room')
     expect(fr.imageUrl).toBeNull()
+    expect(c.current.cards.find(r => r.grpId === 999)?.scryfallId).toBe('')
 
     c.onDraftPick(snap({ currentPack: { pack: 1, pick: 1, grpIds: [1, 2, 999] }, pool: [1] }), { pack: 1, pick: 1, grpIds: [1], packGrpIds: [1, 2, 999] })
     expect(c.current.picks).toHaveLength(1)

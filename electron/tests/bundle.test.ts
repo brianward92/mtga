@@ -37,8 +37,8 @@ describe('set bundle', () => {
       scryfall_updated_at: '2026-08-15T12:34:56Z',
       built_at: '2026-08-15T13:00:00Z',
       cards: {
-        Murder: { rarity: 'common', colors: 'B', colorIdentity: 'B', manaCost: '{1}{B}{B}', manaValue: 3, type: 'Instant' },
-        'Funeral Room // Awakening Hall': { rarity: 'mythic', colors: 'B', colorIdentity: 'WB', manaCost: '{2}{B}', manaValue: 3, type: 'Enchantment — Room' }
+        Murder: { rarity: 'common', colors: 'B', colorIdentity: 'B', manaCost: '{1}{B}{B}', manaValue: 3, type: 'Instant', scryfallId: 'scry-murder' },
+        'Funeral Room // Awakening Hall': { rarity: 'mythic', colors: 'B', colorIdentity: 'WB', manaCost: '{2}{B}', manaValue: 3, type: 'Enchantment — Room', scryfallId: 'scry-funeral-room' }
       }
     })
     // A stale file must have no effect on the Scryfall-only bundle contract.
@@ -74,10 +74,11 @@ describe('set bundle', () => {
       colorIdentity: 'B',
       manaCost: '{1}{B}{B}',
       manaValue: 3,
-      type: 'Instant'
+      type: 'Instant',
+      scryfallId: 'scry-murder'
     })
     expect(bundle.cards.get(67900)?.name).toBe('Murder')
-    expect(bundle.cards.get(92176)).toMatchObject({ colors: 'B', colorIdentity: 'WB' })
+    expect(bundle.cards.get(92176)).toMatchObject({ colors: 'B', colorIdentity: 'WB', scryfallId: 'scry-funeral-room' })
     expect(bundle.cards.get(92188)).not.toHaveProperty('imageSmall')
     expect(bundle.cards.get(92188)).not.toHaveProperty('setCode')
     expect(bundle).not.toHaveProperty('ratings')

@@ -297,6 +297,7 @@ def test_build_writes_assets_cards_index(world):
         "manaCost",
         "manaValue",
         "type",
+        "scryfallId",
     }
     assert cards["cards"][CARD_A] == {
         "rarity": "common",
@@ -305,6 +306,9 @@ def test_build_writes_assets_cards_index(world):
         "manaCost": "{1}",
         "manaValue": 1,
         "type": "Creature — Human",
+        # CARD_A also has an out-of-set Arena printing. Provenance follows
+        # the in-set raw Scryfall printing selected for display metadata.
+        "scryfallId": f"scry-{CARD_A.lower().replace(' ', '-')}-tst",
     }
     assert all(set(card) == expected_card_keys for card in cards["cards"].values())
     assert cards["cards"][DFC]["manaCost"] == "{1}{R}"  # front face
@@ -903,6 +907,8 @@ def test_helpers_normalize_identity_fields():
     assert bab._rarity({"type_line": "Instant", "rarity": "Mythic"}) == "mythic"
     assert bab.card_entry(
         {
+            "id": "scry-equipment",
+            "name": "Equipment",
             "type_line": "Artifact — Equipment",
             "rarity": "uncommon",
             "colors": [],
@@ -917,10 +923,13 @@ def test_helpers_normalize_identity_fields():
         "manaCost": "{2}",
         "manaValue": 2,
         "type": "Artifact — Equipment",
+        "scryfallId": "scry-equipment",
     }
     assert (
         bab.card_entry(
             {
+                "id": "scry-land",
+                "name": "Land",
                 "type_line": "Land — Forest",
                 "rarity": "rare",
                 "colors": ["G"],
@@ -931,6 +940,8 @@ def test_helpers_normalize_identity_fields():
         )["colors"]
         == ""
     )
+    with pytest.raises(bab.BundleError, match="no Scryfall id"):
+        bab.card_entry({"name": "No Identity"})
     assert bab._mana_value(3.0) == 3
     assert bab._mana_value(2.5) == 2.5
     assert bab._mana_value(None) is None
