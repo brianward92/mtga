@@ -301,6 +301,7 @@ button {
 .hud.hud-br { bottom: 2%; right: 2%; }
 .hud.hidden { display: none; }
 .hud.covered { opacity: 0; pointer-events: none; }
+.hud.yield:not(.covered) { opacity: 0.08; }
 body.calibrating .hud,
 body.calibrating .sheet { display: none; }
 
@@ -523,6 +524,7 @@ body.calibrating .sheet { display: none; }
 .sheet.side-right { right: 2%; transform: translateX(6%); }
 .sheet.side-left { left: 2%; transform: translateX(-6%); }
 .sheet.open { visibility: visible; transform: none; opacity: 1; transition: transform var(--t), opacity var(--t), visibility 0s; }
+.sheet.open.yield { opacity: 0.08; }
 
 .sheet-head {
   display: flex;

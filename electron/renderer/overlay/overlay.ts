@@ -15,6 +15,13 @@ import { BadgeLayer } from './badges'
 import { Hud } from './hud'
 import { Sheet } from './sheet'
 import { CalibrateLayer } from './calibrate'
+import {
+  EMPTY_RAIL_DWELL,
+  advanceRailDwell,
+  railDwellDelay,
+  type RailDwellState,
+  type RailPanel
+} from './rail-dwell'
 
 const EMPTY_LAYER: LayerState = { cells: [], regions: [], covered: false, hudCovered: false }
 const EMPTY_CALIBRATE: CalibrateState = { active: false, count: 14, config: { ...DEFAULT_CALIBRATION }, arenaFound: false }
@@ -31,9 +38,11 @@ const store: Store = {
 }
 
 const bridge = window.overlay
+const hudRoot = document.getElementById('hud')!
+const sheetRoot = document.getElementById('sheet')!
 const badges = new BadgeLayer(document.getElementById('badges')!)
-const hud = new Hud(document.getElementById('hud')!, action, schedule)
-const sheet = new Sheet(document.getElementById('sheet')!, action)
+const hud = new Hud(hudRoot, action, schedule)
+const sheet = new Sheet(sheetRoot, action)
 const calibrate = new CalibrateLayer(document.getElementById('ghosts')!, document.getElementById('calPanel')!, action)
 
 function action(name: string, data?: unknown): void {
@@ -90,11 +99,46 @@ function currentLayout(): PackLayout | null {
 // ---------------------------------------------------------------------------
 
 let interactive = false
+let railDwell: RailDwellState = EMPTY_RAIL_DWELL
+let railDwellTimer: number | null = null
 
 function setInteractive(on: boolean): void {
   if (on === interactive) return
   interactive = on
   bridge?.setInteractive(on)
+}
+
+function railBodyAt(el: Element | null): RailPanel | null {
+  if (!el || el.closest('button, .hud-icon, .sheet-close')) return null
+  const panel = el.closest<HTMLElement>('.hud.interactive, .sheet.interactive')
+  if (panel === hudRoot) return 'hud'
+  if (panel === sheetRoot) return 'sheet'
+  return null
+}
+
+function updateRailDwell(target: RailPanel | null, now = performance.now()): boolean {
+  const previousYield = railDwell.yielded
+  railDwell = advanceRailDwell(railDwell, target, now)
+
+  if (previousYield !== railDwell.yielded) {
+    hudRoot.classList.toggle('yield', railDwell.yielded === 'hud')
+    sheetRoot.classList.toggle('yield', railDwell.yielded === 'sheet')
+  }
+
+  if (railDwellTimer !== null) {
+    window.clearTimeout(railDwellTimer)
+    railDwellTimer = null
+  }
+  const delay = railDwellDelay(railDwell, now)
+  if (delay !== null) {
+    railDwellTimer = window.setTimeout(() => {
+      railDwellTimer = null
+      updateRailDwell(railDwell.target)
+    }, delay)
+  }
+
+  if (railDwell.yielded !== null) setInteractive(false)
+  return railDwell.yielded !== null
 }
 
 function setHoverCell(cell: number): void {
@@ -106,15 +150,16 @@ function setHoverCell(cell: number): void {
 document.addEventListener('mousemove', e => {
   const el = document.elementFromPoint(e.clientX, e.clientY)
   const hit = !!(el && el.closest('.interactive'))
-  setInteractive(hit)
+  const yielded = updateRailDwell(railBodyAt(el))
+  setInteractive(hit && !yielded)
   if (hit || store.calibrate.active) { setHoverCell(-1); return }
   const layout = currentLayout()
   if (!layout) { setHoverCell(-1); return }
   setHoverCell(hoveredCardIndex({ x: e.clientX, y: e.clientY }, layout.cards.map(s => s.card)))
 }, { passive: true })
 
-document.addEventListener('mouseleave', () => { setInteractive(false); setHoverCell(-1) })
-window.addEventListener('blur', () => { setInteractive(false) })
+document.addEventListener('mouseleave', () => { updateRailDwell(null); setInteractive(false); setHoverCell(-1) })
+window.addEventListener('blur', () => { updateRailDwell(null); setInteractive(false) })
 
 // ---------------------------------------------------------------------------
 // Bridge events
