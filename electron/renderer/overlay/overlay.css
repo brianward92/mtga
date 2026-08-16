@@ -8,7 +8,7 @@
 :root {
   --glass: rgba(14, 14, 18, 0.86);
   --glass-strong: rgba(14, 14, 18, 0.94);
-  --rail-glass: rgba(14, 14, 18, 0.97);
+  --rail-glass: rgb(14, 14, 18); /* the column is ours: fully opaque */
   --hairline: rgba(255, 255, 255, 0.12);
   --hairline-soft: rgba(255, 255, 255, 0.07);
   --hover: rgba(255, 255, 255, 0.07);
@@ -817,7 +817,7 @@ body.calibrating .sheet { display: none; }
 .draft-rail:not(.open) .sheet { display: none; }
 
 .draft-rail.open {
-  top: 14%;
+  top: 12.5%;
   right: 0;
   bottom: 0;
   left: 76%;
@@ -1006,16 +1006,50 @@ body.calibrating .draft-rail.open { display: none; }
 }
 
 
-/* ---- Rail scale: the sidebar owns the whole column, so it can breathe. ---- */
-.draft-rail.open .hud-rec { padding: 0.35rem 0 0.25rem; }
-.draft-rail.open .hud-rec-grade { font-size: 2.6rem; min-width: 3rem; }
-.draft-rail.open .hud-rec-name { font-size: 1.15rem; }
-.draft-rail.open .hud-rec-meta { font-size: 0.82rem; }
-.draft-rail.open .hud-rec-why { font-size: 0.86rem; line-height: 1.35; }
-.draft-rail.open .hud-runner { height: 1.5rem; font-size: 0.9rem; }
-.draft-rail.open .hud-runner-name { font-size: 0.9rem; }
-.draft-rail.open .s-card { padding: 0.2rem 0; font-size: 0.93rem; }
-.draft-rail.open .s-mana { font-size: 0.93rem; }
-.draft-rail.open .s-grade { font-size: 0.88rem; min-width: 1.9rem; }
-.draft-rail.open .s-pos { font-size: 0.76rem; }
-.draft-rail.open .sheet-h { font-size: 0.72rem; margin-top: 0.35rem; }
+
+/* ==========================================================================
+   Rail scale — the sidebar OWNS the right column, so it uses all of it.
+   At 1512×949 the column is ~363×830 px: header · hero (grade + name + why)
+   · ranked #1–#5 · pool bar · pool list that fills the rest · footer.
+   ========================================================================== */
+.draft-rail.open { font-size: clamp(11px, 0.95vw, 15px); }
+.draft-rail.open .hud { padding: 0.9rem 1rem 0.5rem; }
+.draft-rail.open .hud-main { gap: 0.7rem; }
+.draft-rail.open .hud-head { font-size: 0.95rem; }
+.draft-rail.open .hud-title { font-size: 0.95rem; }
+.draft-rail.open .hud-pos { font-size: 1rem; font-weight: 800; }
+.draft-rail.open .sheet-rating { font-size: 0.95rem; padding: 0.15rem 0.6rem; }
+.draft-rail.open .hud-model { font-size: 0.8rem; }
+
+/* Hero: the recommendation gets real presence. */
+.draft-rail.open .hud-rec { padding: 0.55rem 0 0.35rem; gap: 0.9rem; align-items: flex-start; }
+.draft-rail.open .hud-rec-grades { min-width: 4.2rem; }
+.draft-rail.open .hud-rec-grade { font-size: 3.4rem; line-height: 0.95; }
+.draft-rail.open .hud-rec-setgrade { font-size: 0.85rem; }
+.draft-rail.open .hud-rec-name { font-size: 1.35rem; font-weight: 700; white-space: normal; line-height: 1.15; }
+.draft-rail.open .hud-rec-meta { font-size: 0.9rem; }
+.draft-rail.open .hud-flames { font-size: 1.05rem; }
+.draft-rail.open .hud-band { font-size: 0.8rem; }
+.draft-rail.open .hud-rec-why { font-size: 0.95rem; line-height: 1.4; }
+
+/* Ranked #1–#5 as a real table. */
+.draft-rail.open .hud-runners { font-size: 1rem; }
+.draft-rail.open .hud-runner { height: 1.85rem; }
+.draft-rail.open .hud-runner-name { font-size: 1rem; }
+.draft-rail.open .hud-runner-grade { font-size: 1rem; }
+.draft-rail.open .hud-runner-pct { font-size: 1rem; }
+
+/* Pool bar + counts. */
+.draft-rail.open .hud-pool-bar { height: 0.55rem; }
+.draft-rail.open .hud-pool-counts { font-size: 0.85rem; }
+.draft-rail.open .hud-lane { font-size: 0.85rem; }
+
+/* Pool list fills the rest; rows breathe. */
+.draft-rail.open .sheet-body { padding: 0.35rem 1rem 0.6rem; }
+.draft-rail.open .sheet-h { font-size: 0.75rem; margin-top: 0.5rem; }
+.draft-rail.open .s-card { padding: 0.28rem 0; font-size: 1rem; gap: 0.55rem; }
+.draft-rail.open .s-mana { font-size: 1rem; }
+.draft-rail.open .s-grade { font-size: 0.95rem; min-width: 2.1rem; }
+.draft-rail.open .s-pos { font-size: 0.8rem; flex-basis: 4rem; }
+.draft-rail.open .s-count-chip { font-size: 0.8rem; }
+.draft-rail.open .hud-foot { font-size: 0.8rem; }

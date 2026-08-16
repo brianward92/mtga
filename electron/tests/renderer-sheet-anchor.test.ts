@@ -11,10 +11,10 @@ import type { Store } from '../renderer/overlay/types'
 
 describe('full right-column sidebar geometry', () => {
   it.each([
-    [{ width: 1024, height: 768 }, { x: 778.24, y: 107.52, width: 245.76, height: 660.48 }, { x: 784.24, y: 113.52, width: 233.76, height: 648.48 }],
-    [{ width: 1512, height: 949 }, { x: 1149.12, y: 132.86, width: 362.88, height: 816.14 }, { x: 1155.12, y: 138.86, width: 350.88, height: 804.14 }],
-    [{ width: 3440, height: 1440 }, { x: 2614.4, y: 201.6, width: 825.6, height: 1238.4 }, { x: 2620.4, y: 207.6, width: 813.6, height: 1226.4 }]
-  ] as const)('owns 76%%/14%% through the edges and insets one panel at %j', (view, shellExpected, panelExpected) => {
+    [{ width: 1024, height: 768 }, { x: 778.24, y: 96.0, width: 245.76, height: 672.0 }, { x: 784.24, y: 102.0, width: 233.76, height: 660.0 }],
+    [{ width: 1512, height: 949 }, { x: 1149.1200000000001, y: 118.625, width: 362.8799999999999, height: 830.375 }, { x: 1155.1200000000001, y: 124.625, width: 350.8799999999999, height: 818.375 }],
+    [{ width: 3440, height: 1440 }, { x: 2614.4, y: 180.0, width: 825.5999999999999, height: 1260.0 }, { x: 2620.4, y: 186.0, width: 813.5999999999999, height: 1248.0 }]
+  ] as const)('owns 76%%/12.5%% through the edges and insets one panel at %j', (view, shellExpected, panelExpected) => {
     const shell = sidebarShellFrame(view)
     const panel = sidebarPanelFrame(view)
 

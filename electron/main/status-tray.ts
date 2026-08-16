@@ -60,11 +60,14 @@ export class StatusTray {
   }
 
   /** Destroy the native tray item. */
-  destroy(): void { this.tray.destroy() }
+  destroy(): void {
+    if (!this.tray.isDestroyed()) this.tray.destroy()
+  }
 
   private rebuild(): void {
     const s = this.state
-    if (!s) return
+    // Late poller/child-process events during quit must not touch a dead tray.
+    if (!s || this.tray.isDestroyed()) return
     const menu = Menu.buildFromTemplate([
       { label: modelLabel(s.draft), enabled: false },
       { label: draftLabel(s.draft, s.arenaFound), enabled: false },

@@ -5,7 +5,7 @@ import { intersects } from '../../shared/hover'
 import { isFiniteNumber } from './shared'
 
 const SIDEBAR_LEFT_FRACTION = 0.76
-const SIDEBAR_TOP_FRACTION = 0.14
+const SIDEBAR_TOP_FRACTION = 0.125
 const SIDEBAR_INSET = 6
 
 interface ViewSize {

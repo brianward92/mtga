@@ -137,7 +137,7 @@ async function expectSheetContained(page, label, requireScroll = false) {
     if (shouldScroll) body.scrollTop = body.scrollHeight
     const scrollTop = body.scrollTop
     const rootContained = rail.left >= window.innerWidth * 0.76 - 1 && rail.right <= window.innerWidth + 1 &&
-      rail.top >= window.innerHeight * 0.14 - 1 && rail.bottom <= window.innerHeight + 1 && rail.height > 0
+      rail.top >= window.innerHeight * 0.125 - 1 && rail.bottom <= window.innerHeight + 1 && rail.height > 0
     const bodyContained = sheetRect.top >= panelRect.top - 1 && sheetRect.bottom <= footerRect.top + 1 &&
       content.top >= sheetRect.top - 1 && content.bottom <= sheetRect.bottom + 1 &&
       sheet.scrollHeight <= sheet.clientHeight + 1
@@ -184,7 +184,7 @@ async function expectLongPoolScroll(page, label) {
     const scrollTop = body.scrollTop
     const footerAfter = footer.getBoundingClientRect()
     const contained = railRect.left >= window.innerWidth * 0.76 - 1 && railRect.right <= window.innerWidth + 1 &&
-      railRect.top >= window.innerHeight * 0.14 - 1 && railRect.bottom <= window.innerHeight + 1 &&
+      railRect.top >= window.innerHeight * 0.125 - 1 && railRect.bottom <= window.innerHeight + 1 &&
       sheetRect.top >= panelRect.top - 1 && bodyRect.top >= sheetRect.top - 1 &&
       bodyRect.bottom <= sheetRect.bottom + 1 && sheetRect.bottom <= footerBefore.top + 1
     const ok = body.scrollHeight > body.clientHeight && scrollTop > 0 &&
@@ -241,11 +241,11 @@ async function expectDraftSidebarGeometry(page, label) {
     const expected = {
       left: view.width * 0.76,
       right: view.width,
-      top: view.height * 0.14,
+      top: view.height * 0.125,
       bottom: view.height,
       panelLeft: view.width * 0.76 + 6,
       panelRight: view.width - 6,
-      panelTop: view.height * 0.14 + 6,
+      panelTop: view.height * 0.125 + 6,
       panelBottom: view.height - 6
     }
     const alpha = color => {

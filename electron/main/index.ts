@@ -290,7 +290,11 @@ function cleanup(): void {
   overlayGeometrySync.dispose()
   globalShortcut.unregisterAll()
   layer?.dispose()
+  // Stop event sources BEFORE tearing down their consumers (tray) so a final
+  // helper 'exit' cannot land on a destroyed Tray.
+  poller.removeAllListeners()
   poller.stop()
   logWatcher?.stop()
   tray?.destroy()
+  tray = null
 }
