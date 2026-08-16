@@ -21,7 +21,7 @@ for a in "$@"; do
   esac
 done
 BIN=build/dev; mkdir -p "$BIN"
-for t in dblclick move-mouse; do [ -x "$BIN/$t" ] || swiftc -O -o "$BIN/$t" "scripts/dev/$t.swift"; done
+for t in dblclick move-mouse click; do [ -x "$BIN/$t" ] || swiftc -O -o "$BIN/$t" "scripts/dev/$t.swift"; done
 
 osascript -e 'tell application "MTGA" to activate' >/dev/null; sleep 0.8
 R=$(osascript -e 'tell application "System Events" to tell process "MTGA" to get {position, size} of window 1' | tr -d ' ')
@@ -38,22 +38,23 @@ is_land() { python3 scripts/dev/statecheck.py "$STATE" island "$TGRP"; }
 if [ "$ALLOW_LAND" = 0 ] && is_land; then
   echo "REFUSING to pick a basic land ($TNAME); pass --allow-land if you really mean it" >&2; exit 3
 fi
-# Arena auto-picks the last card of a pack: never click into a 1-card pack
-# (the click would land on the NEXT pack's first card).
-if python3 - "$STATE" <<'PY'
-import json,sys; sys.exit(0 if len(json.load(open(sys.argv[1]))["cards"]) <= 1 else 1)
-PY
-then echo "1-card pack: Arena auto-picks it; not clicking" >&2; exit 6; fi
 [ "$DRY" = 1 ] && exit 0
 if [ "$(pos)" != "$POS0" ]; then echo "pack advanced before clicking; aborting" >&2; exit 4; fi
 
 BEFORE=$(grep -c '"type":"pick"' "$HIST" 2>/dev/null || echo 0)
 picked() { [ "$(grep -c '"type":"pick"' "$HIST" 2>/dev/null || echo 0)" -gt "$BEFORE" ]; }
-"$BIN/dblclick" "$TX" "$TY"
+# Arena wants a real pointer: one click selects the card (Confirm Pick lights
+# up), a second click on Confirm commits it. Double-clicking the card is
+# unreliable because Arena's own card preview covers it.
+"$BIN/click" "$TX" "$TY"
+sleep 1
+read -r CX CY _ <<< "$(npx tsx scripts/dev/pick.ts "$STATE" "$RECT" confirm)"
+"$BIN/click" "$CX" "$CY"
 for i in $(seq 1 12); do sleep 0.5; picked && break; done
-if ! picked; then
-  # Not confirmed: only retry if the very same pack/pick is still showing.
-  if [ "$(pos)" = "$POS0" ]; then "$BIN/dblclick" "$TX" "$TY"; for i in $(seq 1 12); do sleep 0.5; picked && break; done; fi
+if ! picked && [ "$(pos)" = "$POS0" ]; then
+  # One retry: re-select and confirm again.
+  "$BIN/click" "$TX" "$TY"; sleep 1; "$BIN/click" "$CX" "$CY"
+  for i in $(seq 1 12); do sleep 0.5; picked && break; done
 fi
 "$BIN/move-mouse" 1300 900
 if picked; then

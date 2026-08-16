@@ -137,11 +137,17 @@ function pushState(state: DraftState): void {
   mirrorState(state)
 }
 
-/** Dev seam: MTGA_STATE_FILE=path mirrors every DraftState push to disk. */
+/**
+ * Dev seam: MTGA_STATE_FILE=path mirrors every DraftState push to disk, plus
+ * the Arena rect the overlay is using (window mode agnostic — the development
+ * picker needs the same rect we do, including full screen).
+ */
 function mirrorState(state: DraftState): void {
   const file = process.env.MTGA_STATE_FILE
   if (!file) return
-  try { writeFileSync(file, JSON.stringify(state)) } catch { /* dev only */ }
+  try {
+    writeFileSync(file, JSON.stringify({ ...state, arena: poller.lastKnown, standAside: standAside.active }))
+  } catch { /* dev only */ }
 }
 
 function pushPrefs(prefs: Prefs): void {
