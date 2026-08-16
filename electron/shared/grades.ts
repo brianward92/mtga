@@ -47,3 +47,32 @@ export function gradeTier(grade: Grade): 'a' | 'b' | 'c' | 'd' {
   const c = grade[0]
   return c === 'A' ? 'a' : c === 'B' ? 'b' : c === 'C' ? 'c' : 'd'
 }
+
+/** Ladder as an ordinal scale: F = 0 … A+ = 12. */
+export const GRADE_ORDER: Grade[] = ['F', 'D-', 'D', 'D+', 'C-', 'C', 'C+', 'B-', 'B', 'B+', 'A-', 'A', 'A+']
+
+export function gradeOrdinal(grade: Grade): number { return GRADE_ORDER.indexOf(grade) }
+
+/** Rarity weights for pool rating: exponential, common 1 → mythic 8. */
+export const RARITY_WEIGHT: Record<string, number> = { common: 1, uncommon: 2, rare: 4, mythic: 8 }
+
+/**
+ * Pool rating: rarity-weighted mean of the pool's set-review grades on the
+ * ordinal ladder, rounded back to a letter. Basic lands and ungraded cards
+ * are skipped; null when nothing is gradeable ("NaN at the beginning").
+ */
+export function poolRating(pool: ReadonlyArray<{ grade: Grade | null; rarity: string; type?: string | null }>): { grade: Grade | null; score: number | null; n: number } {
+  let num = 0, den = 0, n = 0
+  for (const c of pool) {
+    if (!c.grade) continue
+    const rarity = (c.rarity ?? '').toLowerCase()
+    const w = RARITY_WEIGHT[rarity]
+    if (!w) continue // lands / tokens
+    num += w * gradeOrdinal(c.grade)
+    den += w
+    n++
+  }
+  if (!den) return { grade: null, score: null, n: 0 }
+  const score = num / den
+  return { grade: GRADE_ORDER[Math.min(GRADE_ORDER.length - 1, Math.max(0, Math.round(score)))], score, n }
+}

@@ -34,12 +34,16 @@
 
       <!-- Recommendation / hover detail -->
       <section class="hud-rec" id="hudRec" data-testid="hud-pick">
-        <div class="hud-rec-grade" id="recGrade">—</div>
+        <div class="hud-rec-grades">
+          <div class="hud-rec-grade" id="recGrade" title="For your pool: set-relative grade under your current pool">—</div>
+          <div class="hud-rec-setgrade" id="recSetGrade" title="Raw set rating (P1P1, empty pool)" hidden></div>
+        </div>
         <div class="hud-rec-body">
           <div class="hud-rec-top">
             <span class="hud-rec-name" id="recName">waiting for pack…</span>
             <span class="hud-hovering" id="recHovering" hidden>hovering</span>
           </div>
+          <div class="hud-rec-meta" id="recMeta"></div>
           <div class="hud-rec-conv" id="recConv">
             <span class="hud-flames" id="recFlames"></span>
             <span class="hud-band" id="recBand"></span>
@@ -52,6 +56,8 @@
       <ul class="hud-runners" id="hudRunners">
         <li class="hud-runner"><span class="hud-runner-rank">#2</span><span class="hud-runner-name"></span><span class="hud-runner-grade"></span></li>
         <li class="hud-runner"><span class="hud-runner-rank">#3</span><span class="hud-runner-name"></span><span class="hud-runner-grade"></span></li>
+        <li class="hud-runner"><span class="hud-runner-rank">#4</span><span class="hud-runner-name"></span><span class="hud-runner-grade"></span></li>
+        <li class="hud-runner"><span class="hud-runner-rank">#5</span><span class="hud-runner-name"></span><span class="hud-runner-grade"></span></li>
       </ul>
 
       <section class="hud-pool" id="hudPool">
@@ -90,6 +96,7 @@
   <aside id="sheet" class="sheet interactive side-right" aria-label="Pool and picks" aria-hidden="true">
     <header class="sheet-head">
       <span class="sheet-title" id="sheetTitle">Pool</span>
+      <span class="sheet-rating grade-none" id="sheetRating" title="Rarity-weighted mean of the pool's set-review grades (common 1, uncommon 2, rare 4, mythic 8)">Pool rating —</span>
       <span class="sheet-agree" id="sheetAgree"></span>
       <button class="hud-icon sheet-close" id="btnSheetClose" type="button" title="Close" aria-label="Close">✕</button>
     </header>

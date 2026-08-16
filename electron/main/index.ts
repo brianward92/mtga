@@ -11,6 +11,7 @@
  */
 import { app, BrowserWindow, globalShortcut, ipcMain, shell } from 'electron'
 import { join } from 'path'
+import { writeFileSync } from 'fs'
 import { LogWatcher } from './parser/watcher'
 import { LogParser } from './parser/index'
 import { ArenaGeometryPoller, type ArenaRect } from './arena-geometry'
@@ -41,8 +42,8 @@ const calibration = new Calibration()
 const poller = new ArenaGeometryPoller()
 let quitCommitted = false
 let quitTimer: NodeJS.Timeout | null = null
-/** True while the overlay is deliberately hidden by the user (tray). */
-let sheetOpen = false
+/** Pool & picks section of the rail: open by default during a draft. */
+let sheetOpen = true
 
 // ---------------------------------------------------------------------------
 // Overlay visibility policy
@@ -88,6 +89,14 @@ function pushState(state: DraftState): void {
   send('overlay:state', state)
   syncOverlay()
   refreshTray()
+  mirrorState(state)
+}
+
+/** Dev seam: MTGA_STATE_FILE=path mirrors every DraftState push to disk. */
+function mirrorState(state: DraftState): void {
+  const file = process.env.MTGA_STATE_FILE
+  if (!file) return
+  try { writeFileSync(file, JSON.stringify(state)) } catch { /* dev only */ }
 }
 
 function pushPrefs(prefs: Prefs): void {
@@ -156,6 +165,7 @@ function setupGeometry(): void {
   poller.on('lost', () => syncOverlay())
   poller.on('frontmost', () => syncOverlay())
   poller.on('capture', () => refreshTray())
+  poller.on('helper-missing', () => coordinator.setWarning('Window helper missing from the app bundle — overlay cannot locate Arena'))
   poller.start()
 
   layer = new LayerDetector({

@@ -86,9 +86,15 @@ export class StatusTray {
       { label: 'Context HUD', type: 'checkbox', checked: s.prefs.hud, click: () => this.actions.toggleHud() },
       { label: 'Pool & Picks Sheet   ⌘⇧D', click: () => this.actions.toggleSheet() },
       { type: 'separator' },
-      s.layerDetectionAvailable
-        ? { label: 'Lift badges under Arena previews', type: 'checkbox', checked: s.prefs.layerDetection, click: () => this.actions.toggleLayerDetection() }
-        : { label: 'Lift badges under previews: needs Screen Recording…', click: () => this.actions.openScreenRecordingSettings() },
+      {
+        label: 'Precise layering (optional — captures the Arena window)',
+        type: 'checkbox',
+        checked: s.prefs.layerDetection,
+        click: () => this.actions.toggleLayerDetection()
+      },
+      ...(s.prefs.layerDetection && !s.layerDetectionAvailable
+        ? [{ label: '   needs Screen Recording — open System Settings…', click: () => this.actions.openScreenRecordingSettings() }]
+        : []),
       { label: 'Calibrate Card Grid…', click: () => this.actions.calibrate() },
       { type: 'separator' },
       { label: 'Quit MTGA Draft Assistant', click: () => app.quit() }

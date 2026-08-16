@@ -18,14 +18,14 @@ import { CalibrateLayer } from './calibrate'
 
 const EMPTY_LAYER: LayerState = { cells: [], regions: [], covered: false, hudCovered: false }
 const EMPTY_CALIBRATE: CalibrateState = { active: false, count: 14, config: { ...DEFAULT_CALIBRATION }, arenaFound: false }
-const DEFAULT_PREFS: ViewPrefs = { badges: true, hud: true, hudCorner: 'tr', layerDetection: true }
+const DEFAULT_PREFS: ViewPrefs = { badges: true, hud: true, hudCorner: 'tr', layerDetection: false }
 
 const store: Store = {
   state: { ...EMPTY_STATE },
   prefs: { ...DEFAULT_PREFS },
   layer: EMPTY_LAYER,
   calibrate: EMPTY_CALIBRATE,
-  sheetOpen: false,
+  sheetOpen: true,
   hoverCell: -1,
   view: { width: window.innerWidth, height: window.innerHeight }
 }

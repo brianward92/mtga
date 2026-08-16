@@ -284,13 +284,21 @@ export class DraftFM {
    * Set-relative P1P1 curve: every card's logit at pack 1 pick 1 with an empty
    * pool, sorted ascending — powers percentile grades without any server.
    */
-  /** Unsorted P1P1 logits, one per asset row (row order = assets.names). */
-  async p1p1Logits(): Promise<Float32Array> {
+  /**
+   * Whole-set logits (one per asset row, unsorted): every card scored as if it
+   * were in one giant pack, conditioned on `pool` and the pick position. With
+   * an empty pool at P1P1 this is the paper's forecast recipe (the set-relative
+   * "raw" grade); with the live pool it is the "for your pool" scale.
+   */
+  async setLogits(poolGrpIds: number[] = [], packNumber = 0, pickNumber = 0): Promise<Float32Array> {
     const n = this.assets.n
     const rows = Array.from({ length: n }, (_, i) => i)
-    const res = await this.scorer.run(this.feedsFor(this.poolInputs([]), rows, positionFeatures(0, 0, this.picksPerPack)))
+    const res = await this.scorer.run(this.feedsFor(this.poolInputs(poolGrpIds), rows, positionFeatures(packNumber, pickNumber, this.picksPerPack)))
     return new Float32Array(res.logits.data as Float32Array)
   }
+
+  /** @deprecated use setLogits() */
+  async p1p1Logits(): Promise<Float32Array> { return this.setLogits([], 0, 0) }
 
   /** Number of asset rows (unique card names). */
   get setSize(): number { return this.assets.n }

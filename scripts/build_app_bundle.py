@@ -262,7 +262,11 @@ def build_cards(set_code, grp_lists):
                 "grpId": grp_id,
                 "name": wanted[grp_id],
                 "rarity": _rarity(row.rarity),
-                "colors": _colors(row.color_identity),
+                # Printed colours (frame) — what Arena sorts by. Hybrid-cost
+                # artifacts like Baseball Bat are colourless here but have a
+                # colour identity; keep both.
+                "colors": _colors(getattr(row, "colors", None) or ""),
+                "colorIdentity": _colors(row.color_identity),
                 "manaCost": mana_cost,
                 "manaValue": mana_value,
                 "type": _str(row.type_line) or _str(row.types),

@@ -166,18 +166,20 @@ export class DraftCoordinator extends EventEmitter {
       ...this.state,
       cards: this.state.cards.map(row => {
         const s = byGrp.get(row.grpId)
-        return s ? { ...row, ev: s.ev, prob: s.prob, rank: s.rank, percentile: s.percentile, grade: s.grade } : row
+        return s ? { ...row, ev: s.ev, prob: s.prob, rank: s.rank, percentile: s.percentile, grade: s.grade, setPercentile: s.setPercentile, setGrade: s.setGrade } : row
       }),
       scoring: false,
       model: this.modelInfo(snap),
+      pool: this.rows(snap.pool),
       seq: this.state.seq + 1
     }
     this.publish()
   }
 
+  /** Model (re)loaded: refresh model info and re-grade the pool rows (built before load). */
   private refreshModelInfo(): void {
     if (!this.snapshot) return
-    this.state = { ...this.state, model: this.modelInfo(this.snapshot), seq: this.state.seq + 1 }
+    this.state = { ...this.state, model: this.modelInfo(this.snapshot), pool: this.rows(this.snapshot.pool), seq: this.state.seq + 1 }
     this.publish()
   }
 
@@ -206,6 +208,8 @@ export class DraftCoordinator extends EventEmitter {
         ev: null, prob: null, rank: null,
         percentile: intrinsic?.percentile ?? null,
         grade: intrinsic?.grade ?? null,
+        setPercentile: intrinsic?.percentile ?? null,
+        setGrade: intrinsic?.grade ?? null,
         gihWr: typeof r?.gih_wr === 'number' ? r.gih_wr : null,
         alsa: typeof r?.alsa === 'number' ? r.alsa : null
       }

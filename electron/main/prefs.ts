@@ -13,7 +13,9 @@ export const DEFAULT_PREFS: Prefs = {
   badges: true,
   hud: true,
   hudCorner: 'tr',
-  layerDetection: true,
+  // Opt-in: uses one-shot window captures (macOS Screen Recording). Off by
+  // default so the app needs no permission at all out of the box.
+  layerDetection: false,
   calibrations: {}
 }
 
@@ -42,7 +44,7 @@ export function loadPrefs(): Prefs {
     badges: raw.badges !== false,
     hud: raw.hud !== false,
     hudCorner: (['tl', 'tr', 'bl', 'br'] as const).includes(raw.hudCorner as HudCorner) ? (raw.hudCorner as HudCorner) : 'tr',
-    layerDetection: raw.layerDetection !== false,
+    layerDetection: raw.layerDetection === true,
     calibrations
   }
   return cached

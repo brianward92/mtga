@@ -110,6 +110,7 @@ export function whyLine(top: CardRow, runnerUp: CardRow | null, conviction: Conv
 export function detailLine(card: CardRow): string {
   const parts: string[] = []
   if (card.rank !== null) parts.push(`#${card.rank}`)
+  if (card.setGrade && card.grade && card.setGrade !== card.grade) parts.push(`set ${card.setGrade}`)
   if (card.prob !== null && Number.isFinite(card.prob)) parts.push(`p ${Math.round(card.prob * 100)}%`)
   if (card.ev !== null && Number.isFinite(card.ev)) parts.push(`ev ${card.ev >= 0 ? '+' : ''}${card.ev.toFixed(2)}`)
   if (card.gihWr !== null && Number.isFinite(card.gihWr)) parts.push(`GIH ${formatWinRate(card.gihWr)}`)

@@ -231,14 +231,15 @@ export function packLayout(
   if (rows.length === 0) return { pack, cards }
 
   // Card geometry comes from the FULL-pack grid so cards keep their size as the
-  // pack is drafted down; the shrinking grid is then centered in the pack area.
+  // pack is drafted down; Arena keeps the shrinking grid anchored to the TOP of
+  // the pack area (verified live at 10 cards: rows stay put, the last row empties).
   const refRows = Math.max(
     rows.length,
     rowsForCount(Math.max(config.refCount, count), config.maxCols).length
   )
   const rowH = pack.height / refRows
   const cellW = pack.width / config.maxCols
-  const gridTop = pack.y + (pack.height - rows.length * rowH) / 2
+  const gridTop = pack.y
 
   // Card size: fixed aspect, fitted to the cell minus the configured gaps.
   const maxCardH = rowH * (1 - config.rowGap)

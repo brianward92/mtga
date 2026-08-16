@@ -23,9 +23,16 @@ export interface CardRow {
   prob: number | null
   /** 1-based rank within the pack by ev. */
   rank: number | null
-  /** Set-relative intrinsic strength (P1P1 curve). */
+  /**
+   * "For your pool": set-relative percentile/letter of the card under the live
+   * pool + pick position (what we recommend by). Before scores arrive, or with
+   * an empty pool, equals the raw set rating.
+   */
   percentile: number | null
   grade: Grade | null
+  /** Raw set rating: empty-pool P1P1 percentile/letter (the paper's scale). */
+  setPercentile: number | null
+  setGrade: Grade | null
   /** 17Lands display stats (may be absent). */
   gihWr: number | null
   alsa: number | null

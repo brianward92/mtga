@@ -23,9 +23,12 @@ export interface ModelStatus {
 }
 
 export interface ScoredCard extends CardScore {
-  /** Set-relative P1P1 percentile (0..1) of this card's intrinsic strength. */
+  /** "For your pool": set-relative percentile of the card's pool-conditioned score. */
   percentile: number | null
   grade: Grade | null
+  /** Raw set rating: P1P1 / empty-pool percentile (the paper's forecast scale). */
+  setPercentile: number | null
+  setGrade: Grade | null
 }
 
 interface Loaded {
@@ -33,8 +36,10 @@ interface Loaded {
   model: DraftFM
   bundle: SetBundle
   curve: Float32Array
-  /** row -> P1P1 logit (unsorted), for per-card percentile lookups */
+  /** grpId -> P1P1 logit, for per-card percentile lookups */
   p1p1ByGrp: Map<number, number>
+  /** grpId -> asset row */
+  rowByGrp: Map<number, number>
 }
 
 export class ModelManager {
@@ -77,7 +82,7 @@ export class ModelManager {
         const old = this.loaded
         const model = await DraftFM.load(this.index!.modelDir, set, format, bundle.assetsPath)
         const curveInfo = await this.curveFor(model, set, format)
-        this.loaded = { key, model, bundle, curve: curveInfo.curve, p1p1ByGrp: curveInfo.byGrp }
+        this.loaded = { key, model, bundle, curve: curveInfo.curve, p1p1ByGrp: curveInfo.byGrp, rowByGrp: new Map(model.grpRows()) }
         this.lastError = null
         if (old) void old.model.release()
         return this.loaded
@@ -104,7 +109,7 @@ export class ModelManager {
       try { logits = JSON.parse(readFileSync(file, 'utf8')) as number[] } catch { logits = null }
     }
     if (!logits || logits.length !== model.setSize) {
-      const raw = await model.p1p1Logits()
+      const raw = await model.setLogits([], 0, 0)
       logits = Array.from(raw)
       try { mkdirSync(this.cacheDir, { recursive: true }); writeFileSync(file, JSON.stringify(logits)) } catch { /* cache is best-effort */ }
     }
@@ -118,12 +123,26 @@ export class ModelManager {
     const l = await this.ensure(set, format)
     if (!l) return null
     const scores = await l.model.scorePack(pack, pool, pack0, pick0)
+    // "For your pool": the whole set scored under the live pool/position, so a
+    // card's letter reflects what it is worth to THIS draft; the raw set
+    // grade (empty pool, P1P1) is kept alongside for reference.
+    const poolCurve = pool.length ? await l.model.setLogits(pool, pack0, pick0) : null
+    const poolByRow = poolCurve ? poolCurve : null
+    const poolSorted = poolCurve ? Float32Array.from(poolCurve).sort() : null
     return {
       modelId: l.model.modelId,
       cards: scores.map(s => {
         const p1 = l.p1p1ByGrp.get(s.grpId)
-        const percentile = p1 === undefined ? null : percentileOf(p1, l.curve)
-        return { ...s, percentile, grade: percentile === null ? null : gradeForPercentile(percentile) }
+        const setPercentile = p1 === undefined ? null : percentileOf(p1, l.curve)
+        const setGrade = setPercentile === null ? null : gradeForPercentile(setPercentile)
+        let percentile = setPercentile
+        let grade = setGrade
+        const row = l.rowByGrp.get(s.grpId)
+        if (poolByRow && poolSorted && row !== undefined) {
+          percentile = percentileOf(poolByRow[row], poolSorted)
+          grade = gradeForPercentile(percentile)
+        }
+        return { ...s, percentile, grade, setPercentile, setGrade }
       })
     }
   }

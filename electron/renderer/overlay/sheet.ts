@@ -9,31 +9,66 @@
  * Content re-renders only when the state seq or open flag changes.
  */
 import type { CardRow, PickRecord } from '../../shared/state'
-import { gradeTier } from '../../shared/grades'
+import { gradeTier, gradeOrdinal, poolRating } from '../../shared/grades'
 import { agreement, groupPool, POOL_GROUP_NAMES, sheetSide } from './hud-logic'
 import { escapeHtml, renderManaCost } from './shared'
 import type { Rect, Store } from './types'
 
 type Action = (name: string, data?: unknown) => void
 
-function gradeHtml(card: Pick<CardRow, 'grade'>): string {
-  return card.grade
-    ? `<span class="s-grade grade-${gradeTier(card.grade)}">${card.grade}</span>`
+/** Set-review grade for pool display: the raw set rating (falls back to the pool grade). */
+function reviewGrade(card: Pick<CardRow, 'grade' | 'setGrade'>) {
+  return card.setGrade ?? card.grade
+}
+
+function gradeHtml(card: Pick<CardRow, 'grade' | 'setGrade'>): string {
+  const g = reviewGrade(card)
+  return g
+    ? `<span class="s-grade grade-${gradeTier(g)}">${g}</span>`
     : '<span class="s-grade grade-none">—</span>'
 }
 
-export function poolHtml(pool: ReadonlyArray<CardRow>): string {
+/** Pool sorted best → worst on the set-review ladder (A+ … F), lands last, ties by name. */
+export function sortPoolByGrade(pool: ReadonlyArray<CardRow>): CardRow[] {
+  const isLand = (c: CardRow) => /^basic land/i.test(c.type) || c.rarity === 'land'
+  return [...pool].sort((a, b) => {
+    const la = isLand(a) ? 1 : 0, lb = isLand(b) ? 1 : 0
+    if (la !== lb) return la - lb
+    const ga = reviewGrade(a), gb = reviewGrade(b)
+    const oa = ga ? gradeOrdinal(ga) : -1, ob = gb ? gradeOrdinal(gb) : -1
+    if (oa !== ob) return ob - oa
+    return a.name.localeCompare(b.name)
+  })
+}
+
+export function poolRatingLabel(pool: ReadonlyArray<CardRow>): { text: string; grade: string | null } {
+  const r = poolRating(pool.map(c => ({ grade: reviewGrade(c), rarity: c.rarity, type: c.type })))
+  return { text: r.grade ? `${r.grade}` : '—', grade: r.grade }
+}
+
+export function poolHtml(pool: ReadonlyArray<CardRow>, picks: ReadonlyArray<PickRecord> = []): string {
   if (pool.length === 0) return '<div class="s-empty">No cards yet</div>'
-  return groupPool(pool).map(({ group, cards }) => `
+  // Pick number per card (first unmatched pick of that grpId, in order).
+  const pickPos = new Map<number, string[]>()
+  for (const p of picks) {
+    const list = pickPos.get(p.grpId) ?? []
+    list.push(`P${p.pack}p${p.pick}`)
+    pickPos.set(p.grpId, list)
+  }
+  const posOf = (grpId: number): string => pickPos.get(grpId)?.shift() ?? ''
+  const groups = groupPool(pool)
+  const colourCounts = groups.map(g => `<span class="s-count-chip ${g.group}">${g.cards.length}</span>`).join('')
+  return `
     <div class="s-group">
-      <h3 class="sheet-h"><span>${POOL_GROUP_NAMES[group]}</span><span class="s-count">${cards.length}</span></h3>
-      ${cards.map(c => `
+      <h3 class="sheet-h"><span>Cards, best → worst</span><span class="s-counts">${colourCounts}</span></h3>
+      ${sortPoolByGrade(pool).map(c => `
         <div class="s-card">
+          ${gradeHtml(c)}
           <span class="s-mana">${renderManaCost(c.manaCost)}</span>
           <span class="s-name">${escapeHtml(c.name)}</span>
-          ${gradeHtml(c)}
+          <span class="s-pos">${posOf(c.grpId)}</span>
         </div>`).join('')}
-    </div>`).join('')
+    </div>`
 }
 
 export function picksHtml(picks: ReadonlyArray<PickRecord>): string {
@@ -64,6 +99,7 @@ export class Sheet {
   private readonly picks: HTMLElement
   private readonly agree: HTMLElement
   private readonly title: HTMLElement
+  private readonly rating: HTMLElement
   private renderedKey = ''
   private open = false
   private side = ''
@@ -74,6 +110,7 @@ export class Sheet {
     this.picks = root.querySelector('#sheetPicks')!
     this.agree = root.querySelector('#sheetAgree')!
     this.title = root.querySelector('#sheetTitle')!
+    this.rating = root.querySelector('#sheetRating')!
     root.querySelector('#btnSheetClose')!.addEventListener('click', () => action('toggle-sheet'))
   }
 
@@ -101,9 +138,12 @@ export class Sheet {
     this.renderedKey = key
 
     this.title.textContent = `Pool · ${state.pool.length}`
+    const rating = poolRatingLabel(state.pool)
+    this.rating.textContent = `Pool rating ${rating.text}`
+    this.rating.className = `sheet-rating ${rating.grade ? `grade-${gradeTier(rating.grade as never)}` : 'grade-none'}`
     const a = agreement(state.picks)
     this.agree.textContent = a.scored > 0 ? `${a.agreed}/${a.scored} with model${a.rate !== null ? ` · ${Math.round(a.rate * 100)}%` : ''}` : ''
-    this.pool.innerHTML = poolHtml(state.pool)
+    this.pool.innerHTML = poolHtml(state.pool, state.picks)
     this.picks.innerHTML = picksHtml(state.picks)
   }
 
@@ -115,9 +155,9 @@ export class Sheet {
   private anchor(store: Store, hudRect: Rect | null): void {
     const { view } = store
     const corner = store.prefs.hudCorner
-    const gap = Math.round(view.height * 0.012)
-    const topEdge = Math.round(view.height * 0.13)
-    const bottomEdge = Math.round(view.height * 0.02)
+    const gap = 0 // flush: HUD + pool read as one rail panel
+    const topEdge = Math.round(view.height * 0.22)
+    const bottomEdge = Math.round(view.height * 0.09)
     let top = topEdge
     let bottom = bottomEdge
     if (hudRect) {

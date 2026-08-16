@@ -20,6 +20,8 @@ import type { LayerState } from '../../shared/state'
 export type { LayerState }
 
 const EMPTY: LayerState = { cells: [], regions: [], covered: false, hudCovered: false }
+/** Cursor must rest on a card this long before we predict a preview over it. */
+const HOVER_DWELL_MS = 350
 
 export interface LayerDeps {
   poller: ArenaGeometryPoller
@@ -41,11 +43,14 @@ export class LayerDetector extends EventEmitter {
   private layoutKey = ''
   private layoutCache: ReturnType<typeof packLayout> | null = null
   private fallbackTimer: NodeJS.Timeout | null = null
+  /** Dwell tracking for the cursor prediction: Arena's preview needs a rest. */
+  private dwellIdx = -1
+  private dwellSince = 0
 
   constructor(private deps: LayerDeps) {
     super()
     deps.poller.on('frame', (f: HelperFrame) => this.onFrame(f))
-    this.fallbackTimer = setInterval(() => this.fallbackTick(), 100)
+    this.fallbackTimer = setInterval(() => this.fallbackTick(), 50)
   }
 
   get state(): LayerState { return this.last }
@@ -135,14 +140,23 @@ export class LayerDetector extends EventEmitter {
     this.publish({ cells: [], regions, covered: false, hudCovered })
   }
 
-  /** No frame stream (no capture permission / helper missing): cursor prediction. */
+  /**
+   * No frame stream (no capture permission / helper missing): cursor
+   * prediction with dwell hysteresis — Arena only pops its preview after the
+   * cursor rests on a card, so lifting neighbours the instant the cursor
+   * sweeps across a row would just make the badges flap.
+   */
   private fallbackTick(): void {
     const rect = this.deps.poller.lastKnown
     const count = this.deps.packCount()
-    if (!this.deps.active() || !rect || count === 0) { this.publish(EMPTY); return }
+    if (!this.deps.active() || !rect || count === 0) { this.publish(EMPTY); this.dwellIdx = -1; return }
     if (Date.now() - this.lastFrameAt < 1500) return
     const view = { width: rect.width, height: rect.height }
     const cellRects = this.layout(rect, count).cards.map(c => c.card)
-    this.predict(hoveredCardIndex(this.cursorLocal(rect), cellRects), cellRects, view)
+    const idx = hoveredCardIndex(this.cursorLocal(rect), cellRects)
+    const now = Date.now()
+    if (idx !== this.dwellIdx) { this.dwellIdx = idx; this.dwellSince = now }
+    const rested = idx >= 0 && now - this.dwellSince >= HOVER_DWELL_MS
+    this.predict(rested ? idx : -1, cellRects, view)
   }
 }

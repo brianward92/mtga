@@ -302,11 +302,11 @@ describe('packLayout keeps card size constant as a pack is drafted down', () => 
     }
   })
 
-  it('a single-row pack is centered vertically in the pack area', () => {
-    const layout = packLayout(view, 3, config)
-    const packMid = layout.pack.y + layout.pack.height / 2
-    const card = layout.cards[0].card
-    expect(card.y + card.height / 2).toBeCloseTo(packMid, 6)
+  it('a shrinking pack stays anchored to the top row (Arena empties from the bottom)', () => {
+    const full = packLayout(view, 14, config)
+    const small = packLayout(view, 3, config)
+    expect(small.cards[0].card.y).toBeCloseTo(full.cards[0].card.y, 6)
+    expect(small.cards[0].card.height).toBeCloseTo(full.cards[0].card.height, 6)
   })
 
   it('rows stay inside the pack area at every pack size', () => {

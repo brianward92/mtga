@@ -11,6 +11,7 @@ import { gradeTier } from '../../shared/grades'
 import { flamesFromPercentile } from './flames'
 import { modelDisplayName } from './model-tag'
 import { shortBandLabel } from './chips'
+import { renderManaCost, escapeHtml } from './shared'
 import {
   agreement, bestPick, detailLine, eventTitle, laneLean, nextCorner, packConviction,
   pickPosition, POOL_COLORS, poolSummary, progressDots, rankedCards, whyLine
@@ -47,6 +48,9 @@ export class Hud {
   private readonly modelMsg: HTMLElement
   private readonly rec: HTMLElement
   private readonly recGrade: HTMLElement
+  private readonly recSetGrade: HTMLElement
+  private readonly recMeta: HTMLElement
+  private recMetaKey = ''
   private readonly recName: HTMLElement
   private readonly recHovering: HTMLElement
   private readonly recFlames: HTMLElement
@@ -85,6 +89,8 @@ export class Hud {
     this.modelMsg = $(root, 'hudModelMsg')
     this.rec = $(root, 'hudRec')
     this.recGrade = $(root, 'recGrade')
+    this.recSetGrade = $(root, 'recSetGrade')
+    this.recMeta = $(root, 'recMeta')
     this.recName = $(root, 'recName')
     this.recHovering = $(root, 'recHovering')
     this.recFlames = $(root, 'recFlames')
@@ -143,6 +149,8 @@ export class Hud {
     if (state.phase === 'idle' && this.idleTimer === null && !state.warning) classes.push('idle-min')
     if (state.phase === 'complete') classes.push('complete')
     if (state.scoring) classes.push('scoring')
+    // Pool section stacked flush beneath (top corners): one rail panel.
+    if (store.sheetOpen && state.phase !== 'idle' && (prefs.hudCorner === 'tl' || prefs.hudCorner === 'tr')) classes.push('with-sheet')
     const rootClass = classes.join(' ')
     if (rootClass !== this.rootClass) { this.rootClass = rootClass; this.root.className = rootClass }
 
@@ -240,13 +248,15 @@ export class Hud {
       setText(this.recBand, '')
       setText(this.recRank, '')
       setText(this.recWhy, '')
+      if (this.recMetaKey !== '') { this.recMetaKey = ''; this.recMeta.innerHTML = '' }
       for (const r of this.runnerNodes) r.li.hidden = true
       return
     }
 
     const conviction = state.scoring ? null : packConviction(state.cards)
-    this.paintGrade(card.grade)
+    this.paintGrade(card.grade, card.setGrade)
     setText(this.recName, card.name)
+    this.paintMeta(card)
 
     if (hovered) {
       const rating = card.percentile !== null ? flamesFromPercentile(card.percentile * 100) : null
@@ -270,16 +280,34 @@ export class Hud {
       r.li.hidden = !show
       if (!show || !c) return
       setText(r.name, c.name)
-      setText(r.grade, c.grade ?? '—')
+      setText(r.grade, c.grade ? (c.setGrade && c.setGrade !== c.grade ? `${c.grade} · set ${c.setGrade}` : c.grade) : '—')
       const cls = `hud-runner-grade ${gradeClass(c.grade)}`
       if (r.grade.className !== cls) r.grade.className = cls
     })
   }
 
-  private paintGrade(grade: Grade | null): void {
+  /** Mana cost · type · rarity for the card in the top block. */
+  private paintMeta(card: CardRow): void {
+    const key = `${card.grpId}`
+    if (key === this.recMetaKey) return
+    this.recMetaKey = key
+    const rarity = card.rarity ? card.rarity[0].toUpperCase() + card.rarity.slice(1) : ''
+    const type = card.type.replace(/\s*—\s*/g, ' — ')
+    this.recMeta.innerHTML = `${renderManaCost(card.manaCost)}<span class="hud-meta-text">${escapeHtml(type)}${rarity ? ` · ${rarity}` : ''}</span>`
+  }
+
+  private paintGrade(grade: Grade | null, setGrade: Grade | null = null): void {
     setText(this.recGrade, grade ?? '—')
     const cls = `hud-rec-grade ${gradeClass(grade)}`
     if (this.recGrade.className !== cls) this.recGrade.className = cls
+    // Raw set rating alongside, only when it differs from the pool grade.
+    const showSet = !!setGrade && !!grade && setGrade !== grade
+    this.recSetGrade.hidden = !showSet
+    if (showSet) {
+      setText(this.recSetGrade, `set ${setGrade}`)
+      const scls = `hud-rec-setgrade ${gradeClass(setGrade)}`
+      if (this.recSetGrade.className !== scls) this.recSetGrade.className = scls
+    }
   }
 
   private paintFlames(flames: number | null): void {
