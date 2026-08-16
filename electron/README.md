@@ -8,18 +8,19 @@ running **locally**, weights bundled, no server.
 ## What it does
 
 - One transparent overlay glued to the Arena window. It follows moves and
-  resizes at 30 Hz; card badges are click-through, while a 0.97-opacity
+  resizes at 30 Hz; card badges are click-through, while a fully opaque
   sidebar owns Arena's full right column from the Deck header to the bottom.
 - **Card badges** on the pack grid: a frame per card tinted by tier, a chip
   with the pool-conditioned grade (the paper's 13-level ladder), a 5-flame
-  conviction signal and the model's within-pack pick probability, `#1 #2 #3`
+  conviction signal and the model's within-pack pick probability, `#1`–`#5`
   tags, and a LEAN/SLAM label on the model's pick. The raw set grade appears
   beside the pool-conditioned grade when they differ.
 - **Draft sidebar**: set·format, P{pack}P{pick}, model and pool rating; a
-  fixed-height recommendation block with an aligned #1–#5 table; pool colour
+  fixed-height recommendation block with lazy Scryfall card art and an honest
+  probability/pool-fit WHY, followed by an aligned #1–#5 table; pool colour
   and lane summaries; then the drafted-card list. Each ranked row shows its
   pool grade, a differing set grade, and the same pick probability as its card
-  chip. Head-to-head dominance appears only in #1's explanation. The pool
+  chip. Conviction remains a separate signal from those probabilities. The pool
   scrolls internally while provenance and compact controls stay at the bottom.
 - **Layering that works without permissions**: cursor geometry predicts Arena
   card previews and lifts the badges beneath them. If a predicted preview
@@ -27,8 +28,9 @@ running **locally**, weights bundled, no server.
   leaves; resting the pointer on the sidebar never makes it yield. The opt-in
   **Precise layering** menu item uses one-shot captures of only the Arena
   window to also detect previews and modals; captures are never stored.
-- Nothing leaves the machine. Inference and card metadata are bundled; the app
-  has no runtime server or card-data requests.
+- Inference and card metadata stay local. The only runtime content request is
+  the currently displayed recommendation image, fetched directly from
+  `cards.scryfall.io`; there is no DraftFM server.
 
 ## Visual checkpoints
 

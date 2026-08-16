@@ -214,8 +214,9 @@ This section requires explicit permission to change the app/Arena lifecycle.
 - [ ] Every scored card chip and each #1–#5 row shows the same rounded
   within-pack model probability for that card. The underlying softmax values
   are non-increasing by rank and sum to 100% across the pack.
-- [ ] The #1 explanation may show its head-to-head dominance over #2. No badge
-  chip or ranked-table probability cell uses that dominance percentage.
+- [ ] The #1 WHY uses the direct pick-probability point gap to #2, then only
+  supported pool-colour and name/type-hook evidence. It never presents the
+  separate conviction/dominance signal as pick probability.
 - [ ] The full sidebar remains present throughout an active draft. Neither its
   controls nor `Command+Shift+D` expose Arena's deck-list/Sideboard column.
 - [ ] After each pick, the old pack clears before the next one appears; no stale
@@ -231,26 +232,26 @@ This section requires explicit permission to change the app/Arena lifecycle.
 
 - [ ] At 1512×949 and after moving/resizing Arena, one sidebar shell owns the
   full right column: its left edge is approximately 76% of the Arena width,
-  its top is approximately 14% of the height, and it reaches the right and
+  its top is approximately 12.5% of the height, and it reaches the right and
   bottom edges. The designed panel is inset by about 6 px inside that shell.
-- [ ] The shell's 0.97-opacity glass completely masks Arena's Deck header,
+- [ ] The fully opaque shell completely masks Arena's Deck header,
   deck list, and Sideboard bar. Those Arena controls are not visible or
   interactive through the sidebar, including around its rounded inset panel.
 - [ ] The header contains set·format, P#P#, the model chip, and Pool rating.
   The fixed-height recommendation block contains aligned #1–#5 rank, name,
   pool-grade, differing-set-grade, and pick-probability columns.
-- [ ] Score arrival and hovering any pack card change content without moving
-  the ranked block, pool bar, pool-list viewport, or footer. Leaving a card
-  restores the recommendation.
+- [ ] Score arrival and hovering any pack card change content (including its
+  recommendation art) without moving the ranked block, pool bar, pool-list
+  viewport, or footer. Leaving a card restores the recommendation.
 - [ ] Long Pack 2 and Pack 3 pools scroll only inside the list viewport. Rows
   remain best-to-worst with `×N`, pick labels, and a Lands divider, while the
   provenance and compact-button footer stays pinned to the bottom.
 - [ ] Resting the pointer anywhere on the sidebar does not fade it or yield
   interaction to Arena; there is no rail dwell behavior.
 - [ ] A predicted Arena pack-card preview still lifts only the badges it covers.
-  The sidebar fades to 0.08 only while that preview's predicted region
-  intersects it, then restores immediately on leave. A non-intersecting
-  preview and unrelated cursor movement do not change sidebar opacity.
+  The sidebar fades to 0.08 when that region intersects it, or after a 350 ms
+  pack-card dwell identifies Arena's sticky selected preview. Selection remains
+  faded until the pack changes; unrelated movement never starts the fade.
 - [ ] The three-size geometry unit case and strict `04-sheet.png` checkpoint
   agree with the same x/y/right/bottom shell contract.
 

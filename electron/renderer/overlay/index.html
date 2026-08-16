@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://cards.scryfall.io; connect-src 'none'; object-src 'none'; base-uri 'none'">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MTGA Draft Assistant</title>
   <link rel="stylesheet" href="./overlay.css">
@@ -38,6 +39,7 @@
 
       <!-- Recommendation / hover detail -->
       <section class="hud-rec" id="hudRec" data-testid="hud-pick">
+        <img class="hud-rec-image" id="recImage" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">
         <div class="hud-rec-grades">
           <div class="hud-rec-grade" id="recGrade" title="For your pool: set-relative grade under your current pool">—</div>
           <div class="hud-rec-setgrade" id="recSetGrade" title="Raw set rating (P1P1, empty pool)" hidden></div>

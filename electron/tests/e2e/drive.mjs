@@ -47,6 +47,7 @@ const SEL = {
   hudMain: '#hudMain',
   hudWarning: '#hudWarning',
   hudPick: '[data-testid="hud-pick"]',
+  hudPickImage: '#recImage',
   hudRank: '#recRank',
   hudRankedTable: '#hudRunners',
   hudRunners: '#hudRunners .hud-runner',
@@ -277,7 +278,7 @@ async function expectDraftSidebarGeometry(page, label) {
       upperHierarchy && summary.bottom <= s.top + 1 &&
       s.bottom <= f.top + 1 && close(f.bottom, p.bottom) &&
       content.top >= s.top - 1 && content.bottom <= s.bottom + 1
-    const oneSurface = close(railAlpha, 0.97, 0.005) && close(Number.parseFloat(railStyle.opacity), 1, 0.005) &&
+    const oneSurface = close(railAlpha, 1, 0.005) && close(Number.parseFloat(railStyle.opacity), 1, 0.005) &&
       close(panelAlpha, 0, 0.005) && close(hudAlpha, 0, 0.005) && close(sheetAlpha, 0, 0.005) &&
       panelStyle.borderTopWidth === '1px' && panelStyle.borderTopLeftRadius !== '0px' &&
       hudStyle.borderTopWidth === '0px' && sheetStyle.borderTopWidth === '0px' &&
@@ -381,21 +382,32 @@ try {
     const rank = document.querySelector(S.hudRank)?.textContent?.trim()
     const runners = [...document.querySelectorAll(S.hudRunners)].filter(row => !row.hidden)
     const meta = document.querySelector(`${S.hudPick} .hud-rec-meta`)
+    const why = document.querySelector(`${S.hudPick} .hud-rec-why`)
+    const hero = document.querySelector(S.hudPick)
+    const art = document.querySelector(S.hudPickImage)
     const pool = document.querySelector(`${S.hudPool} .hud-pool-bar`)
+    const heroRect = hero?.getBoundingClientRect()
+    const artRect = art?.getBoundingClientRect()
+    const csp = document.querySelector('meta[http-equiv="Content-Security-Policy"]')?.content ?? ''
     return rank === '#1' && runners.length === 5 &&
       runners.map(row => row.querySelector('.hud-runner-rank')?.textContent?.trim()).join('') === '#1#2#3#4#5' &&
       runners.every(row => !!row.querySelector('.hud-runner-name')?.textContent?.trim() &&
         !!row.querySelector('.hud-runner-grade')?.textContent?.trim() &&
         /^\d+%$/.test(row.querySelector('.hud-runner-pct')?.textContent?.trim() ?? '')) &&
-      !!meta?.textContent?.trim() && !!pool
-  }, 'ranked top five, card metadata, grades, and pool bar')
+      !!meta?.textContent?.trim() && !!why?.textContent?.includes('#1') && !!why?.textContent?.includes('#2') &&
+      art instanceof HTMLImageElement && art.loading === 'lazy' &&
+      /^https:\/\/cards\.scryfall\.io\/normal\/front\/[0-9a-f]\/[0-9a-f]\/[0-9a-f-]+\.jpg$/.test(art.src) &&
+      !!heroRect && !!artRect && heroRect.height > 150 && artRect.width / heroRect.width > 0.28 && artRect.width / heroRect.width < 0.38 &&
+      csp.includes('img-src') && csp.includes('https://cards.scryfall.io') && !!pool
+  }, 'ranked top five, card art, honest why, metadata, grades, and pool bar')
   await shot(page, '02-p1p1-scored')
 
   const railBeforeHover = await page.evaluate(S => {
     const rec = document.querySelector(S.hudPick).getBoundingClientRect()
     const pool = document.querySelector(S.hudPool).getBoundingClientRect()
     const sheet = document.querySelector(S.sheetRoot).getBoundingClientRect()
-    return { recHeight: rec.height, poolTop: pool.top, sheetTop: sheet.top }
+    const art = document.querySelector(S.hudPickImage)
+    return { recHeight: rec.height, poolTop: pool.top, sheetTop: sheet.top, artSrc: art?.getAttribute('src') ?? '' }
   }, SEL)
 
   // Hover-to-detail: move the mouse over the 3rd cell.
@@ -406,10 +418,14 @@ try {
     const rec = document.querySelector(S.hudPick).getBoundingClientRect()
     const pool = document.querySelector(S.hudPool).getBoundingClientRect()
     const sheet = document.querySelector(S.sheetRoot).getBoundingClientRect()
-    return { recHeight: rec.height, poolTop: pool.top, sheetTop: sheet.top }
+    const art = document.querySelector(S.hudPickImage)
+    return { recHeight: rec.height, poolTop: pool.top, sheetTop: sheet.top, artSrc: art?.getAttribute('src') ?? '' }
   }, SEL)
-  if (Object.keys(railBeforeHover).some(key => Math.abs(railBeforeHover[key] - railWhileHovering[key]) > 1)) {
+  if (['recHeight', 'poolTop', 'sheetTop'].some(key => Math.abs(railBeforeHover[key] - railWhileHovering[key]) > 1)) {
     failures.push(`hover reflowed rail: ${JSON.stringify({ before: railBeforeHover, hovering: railWhileHovering })}`)
+  }
+  if (!railWhileHovering.artSrc || railWhileHovering.artSrc === railBeforeHover.artSrc) {
+    failures.push(`hover did not swap recommendation art: ${JSON.stringify({ before: railBeforeHover.artSrc, hovering: railWhileHovering.artSrc })}`)
   }
   await shot(page, '03-hover-detail')
   await page.mouse.move(5, 5)
@@ -458,10 +474,12 @@ try {
     const hud = document.querySelector(S.hud)
     if (!rail || !hud) return false
     const style = getComputedStyle(rail)
-    const alpha = Number.parseFloat(style.backgroundColor.split(',').at(-1))
+    const colorParts = style.backgroundColor.match(/^rgba?\(([^)]+)\)$/)?.[1]
+      .split(',').map(part => Number.parseFloat(part.trim())) ?? []
+    const alpha = colorParts.length === 4 ? colorParts[3] : 1
     return !rail.classList.contains('preview-covered') && !hud.classList.contains('covered') &&
-      Math.abs(Number.parseFloat(style.opacity) - 1) < 0.005 && Math.abs(alpha - 0.97) < 0.005
-  }, 'nonintersecting region restores 0.97 sidebar despite hudCovered')
+      Math.abs(Number.parseFloat(style.opacity) - 1) < 0.005 && Math.abs(alpha - 1) < 0.005
+  }, 'nonintersecting region restores the opaque sidebar despite hudCovered')
   await page.evaluate(() => {
     document.dispatchEvent(new CustomEvent('mtga:e2e-layer', {
       detail: { cells: [], regions: [], covered: false, hudCovered: false }

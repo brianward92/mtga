@@ -10,13 +10,15 @@ import type { Rect } from '../../shared/layout'
 import { arenaDisplayOrder } from '../../shared/display-order'
 import { gradeTier } from '../../shared/grades'
 import { flamesFromPercentile } from './flames'
+import { scryfallImageUrl } from './card-art'
 import { bundleProvenance, modelDisplayName } from './model-tag'
 import { shortBandLabel } from './chips'
+import { buildWhy } from './why'
 import { renderManaCost, escapeHtml } from './shared'
 import { hudCornerForPhase, sheetShouldRender } from './visibility'
 import {
   agreement, bestPick, detailLine, eventTitle, laneLean, packConviction,
-  pickPosition, POOL_COLORS, poolSummary, progressDots, rankedCards, rankedRows, whyLine
+  pickPosition, POOL_COLORS, poolSummary, progressDots, rankedCards, rankedRows
 } from './hud-logic'
 import type { OverlayAction, Store } from './types'
 
@@ -46,6 +48,7 @@ export class Hud {
   private readonly model: HTMLElement
   private readonly modelMsg: HTMLElement
   private readonly rec: HTMLElement
+  private readonly recImage: HTMLImageElement
   private readonly recGrade: HTMLElement
   private readonly recSetGrade: HTMLElement
   private readonly recMeta: HTMLElement
@@ -69,6 +72,8 @@ export class Hud {
   private readonly doneBest: HTMLElement
   private readonly btnBadges: HTMLElement
   private readonly attrib: HTMLElement
+  private artUrl: string | null = null
+  private readonly failedArt = new Set<string>()
 
   private corner: HudCorner = 'tr'
   private lastRect: Rect | null = null
@@ -86,6 +91,7 @@ export class Hud {
     this.model = $(root, 'hudModel')
     this.modelMsg = $(root, 'hudModelMsg')
     this.rec = $(root, 'hudRec')
+    this.recImage = $(root, 'recImage') as HTMLImageElement
     this.recGrade = $(root, 'recGrade')
     this.recSetGrade = $(root, 'recSetGrade')
     this.recMeta = $(root, 'recMeta')
@@ -104,6 +110,16 @@ export class Hud {
     this.doneBest = $(root, 'doneBest')
     this.btnBadges = $(rail, 'btnBadges')
     this.attrib = $(rail, 'hudAttrib')
+
+    this.recImage.addEventListener('load', () => {
+      if (this.recImage.src !== this.artUrl) return
+      this.recImage.classList.add('loaded')
+    })
+    this.recImage.addEventListener('error', () => {
+      if (!this.artUrl) return
+      this.failedArt.add(this.artUrl)
+      this.recImage.classList.remove('loaded')
+    })
 
     for (let i = 0; i < 5; i++) {
       const s = document.createElement('span')
@@ -238,6 +254,7 @@ export class Hud {
     this.recHovering.hidden = hovered === null
 
     if (!card) {
+      this.paintArt(null)
       this.paintGrade(null)
       setText(this.recName, 'waiting for pack…')
       this.paintFlames(null)
@@ -250,6 +267,7 @@ export class Hud {
     }
 
     const conviction = state.scoring ? null : packConviction(state.cards)
+    this.paintArt(card)
     this.paintGrade(card.grade, card.setGrade)
     setText(this.recName, card.name)
     this.paintMeta(card)
@@ -266,7 +284,7 @@ export class Hud {
       this.paintFlames(state.scoring ? null : conviction ? conviction.flames : rating?.flames ?? null)
       setText(this.recBand, state.scoring ? '' : conviction ? shortBandLabel(conviction.label) : rating?.label ?? '')
       setText(this.recRank, state.scoring || top.rank === null ? '' : '#1')
-      setText(this.recWhy, state.scoring ? 'scoring…' : whyLine(top, ranked[1] ?? null, conviction))
+      setText(this.recWhy, state.scoring ? 'scoring…' : buildWhy(top, ranked[1] ?? null, state.pool))
     }
 
     this.paintRanked(store)
@@ -301,6 +319,21 @@ export class Hud {
     const rarity = card.rarity ? card.rarity[0].toUpperCase() + card.rarity.slice(1) : ''
     const type = card.type.replace(/\s*—\s*/g, ' — ')
     this.recMeta.innerHTML = `${renderManaCost(card.manaCost)}<span class="hud-meta-text">${escapeHtml(type)}${rarity ? ` · ${rarity}` : ''}</span>`
+  }
+
+  /** Swaps the lazy recommendation art without allowing failed loads to reflow the hero. */
+  private paintArt(card: CardRow | null): void {
+    const url = scryfallImageUrl(card?.scryfallId)
+    if (url === this.artUrl) return
+    this.artUrl = url
+    this.recImage.classList.remove('loaded')
+    if (!url || this.failedArt.has(url)) {
+      this.recImage.removeAttribute('src')
+      this.recImage.alt = ''
+      return
+    }
+    this.recImage.alt = `${card?.name ?? 'Recommended card'} card art`
+    this.recImage.src = url
   }
 
   private paintGrade(grade: Grade | null, setGrade: Grade | null = null): void {
