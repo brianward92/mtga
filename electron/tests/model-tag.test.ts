@@ -2,7 +2,7 @@
  * Model display naming (renderer/overlay/model-tag.ts).
  */
 import { describe, it, expect } from 'vitest'
-import { modelDisplayName, modelVersionTag } from '../renderer/overlay/model-tag'
+import { bundleProvenance, modelDisplayName, modelVersionTag } from '../renderer/overlay/model-tag'
 
 describe('modelVersionTag', () => {
   it('returns the last path segment of a model id', () => {
@@ -30,5 +30,18 @@ describe('modelDisplayName', () => {
     expect(modelDisplayName(null)).toBe('DraftFM')
     expect(modelDisplayName(undefined)).toBe('DraftFM')
     expect(modelDisplayName('')).toBe('DraftFM')
+  })
+})
+
+describe('bundleProvenance', () => {
+  it('pairs the exact model tag with the Scryfall snapshot timestamp', () => {
+    expect(bundleProvenance({ model: 'v20260809_final_d256', scryfall: '2026-08-15T12:34:56Z' }))
+      .toBe('DraftFM v20260809_final_d256 · Scryfall 2026-08-15T12:34:56Z')
+  })
+
+  it('omits unavailable provenance fields without dangling separators', () => {
+    expect(bundleProvenance({ model: 'v1', scryfall: null })).toBe('DraftFM v1')
+    expect(bundleProvenance({ model: null, scryfall: '2026-08-15' })).toBe('Scryfall 2026-08-15')
+    expect(bundleProvenance({ model: null, scryfall: null })).toBe('')
   })
 })

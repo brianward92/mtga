@@ -1,80 +1,65 @@
 # E2E visual test harness
 
-Drives a complete fake SOS Quick draft through the REAL packaged app — no
-MTGA, no human — and screenshots every UI state. An AI agent (or you) can
-inspect the shots for layout regressions after any overlay change.
+Drives a complete synthetic DSK Quick Draft through the built Electron app —
+no Arena and no server — and screenshots the overlay at each checkpoint. The
+run uses the repository's local DraftFM bundle and fails on missing UI states
+or renderer errors.
 
 ## How it works
 
-`drive.mjs` launches the built app binary with a sandboxed `HOME` (fresh
-config/prefs/DB — the real tracker data is never touched; Arena's card DB is
-symlinked in read-only for card names) and `MTGA_LOG_PATH` pointed at a fake
-`Player.log` in a temp dir. It connects `puppeteer-core` over CDP
-(`--remote-debugging-port`), then streams
-`fixtures/quickdraft_sos.log` into the fake log line-by-line with pacing
-(a JS port of `scripts/replay_player_log.py`), pausing at checkpoints to wait
-on the overlay DOM and capture PNGs of the overlay and badge renderer pages.
-The harness also asserts that overlay-only startup does not create a dashboard.
+`drive.mjs` creates a temporary, isolated environment:
+
+- a fresh `HOME` and `MTGA_USER_DATA` for preferences, history, and caches;
+- an empty fake `Player.log` and a fixed `MTGA_FAKE_ARENA_FILE` window rect;
+- `MTGA_BUNDLE_DIR` pointing at `resources/draftfm` in this checkout; and
+- a generated 42-pick log from `gen-draft-log.mjs`.
+
+It launches the repository's built `dist/` app with the local Electron binary,
+connects Puppeteer over CDP, streams the generated log, waits on renderer test
+hooks, and captures PNGs. This does not install, replace, or read data from the
+normal app. A temporary overlay window does appear while the harness runs.
 
 ## Running
 
 ```sh
 cd electron
-npm run e2e                              # live scores from the real server
-npm run e2e -- --scores-mode offline     # dead server: amber/red degradation
-npm run e2e -- --app "/path/to/MTGA Draft Assistant.app/Contents/MacOS/MTGA Draft Assistant"
+npm run build
+npm run e2e
+
+# Optional harness controls:
+npm run e2e -- --keep-tmp --port 9333 --speed 8 --out /tmp/draftfm-e2e-shots
 ```
 
-Windows pop up on screen while it runs (the real app, real windows). Full
-flag list is documented at the top of `drive.mjs`.
+- `--keep-tmp` preserves the isolated home, log, and fake Arena file.
+- `--port` selects the CDP port (default `9333`).
+- `--speed` controls how often log streaming briefly yields (default `10`).
+- `--out` selects the screenshot/log directory (default `tests/e2e/shots`).
 
-The target app must include the `MTGA_E2E_USER_DATA` hook in
-`main/index.ts` (builds after 2026-07-04); against older builds the harness
-aborts rather than write into the real tracker DB. If `/Applications` holds
-an older build, package a fresh one (`npm run build && npx electron-builder
---dir`) and pass
-`--app release/mac-arm64/MTGA Draft Assistant.app/Contents/MacOS/MTGA Draft Assistant`.
+## Checkpoints
 
-## Steps captured (`shots/<step>_<page>.png`)
-
-| step | what it shows |
+| shot | assertion / state |
 | --- | --- |
-| `01_boot` | match-mode overlay, no draft |
-| `02_draft-start` | EventJoin only: draft panel up, "waiting for pack…" |
-| `03_pack1-verdict` | P1P1 pack rendered (on a fast LAN the live scores usually beat this shot, making it identical to `04`) |
-| `04_pack1-scores` | flames/conviction landed (live) or degradation state (offline) |
-| `05_density-full` | full density: ranked table + pool + history |
-| `06_density-mini` | mini density: one-line top pick |
-| `07_mid-draft-p2p5` | P2P5: pool strip progress, pick history count |
-| `08_draft-end` | "Draft complete" card |
-| `09_post-draft` | dismissed: overlay back in match mode |
+| `00-idle.png` | overlay connected, waiting for a draft |
+| `01-p1p1-pack.png` | 14 cells, pool sheet open by default, model + Scryfall snapshot provenance, no legacy card-stat attribution |
+| `02-p1p1-scored.png` | at least ten scored badge chips |
+| `03-hover-detail.png` | cursor-driven card detail |
+| `04-sheet-default.png` | default-open pool and pick-history sheet before the HUD button closes it |
+| `05-p1p7.png` | eight-card pack at P1P7 |
+| `06-p2p6.png` | mid-draft state |
+| `07-calibrate.png` | calibration panel opened from the HUD |
+| `08-complete.png` | completed draft state |
 
-Also written: `console_<page>.log` per renderer plus `console_main.log`
-(main-process stdout/stderr). The run exits non-zero on missing steps or any
-renderer console error. The badge window stays hidden without a real Arena
-window and deliberately renders NOTHING while hidden (idle-badges guard), so
-its shots are expected to be blank — badge chip logic is covered by unit
-tests and by the conviction modules it shares with the panel.
+The output directory also receives `console_main.log` and
+`console_renderer.log`. Renderer console errors make the run fail.
 
-## Scores modes
+## Synthetic log
 
-- **live** — the app talks to the real draft server (default
-  `http://192.168.4.25:8100`). The fixture uses real SOS grp_ids, so
-  `/api/v1/score` returns real EVs: green dot, flames, conviction labels.
-- **offline** — `serverUrls` points at a dead port. The harness seeds
-  `userData/ratings-cache/` from `--server` before boot (when reachable), so
-  the run shows red at boot and amber ("stats only (cached …)") during the
-  draft. If the seed fetch fails, everything degrades to red (names only).
-  Seeding pre-boot doubles as the regression test for the old
-  `userData/cache` location, which Chromium wiped during startup.
-
-## Fixture
-
-`fixtures/quickdraft_sos.log` is generated (deterministically) by
-`scripts/make_e2e_fixture.py`: a full 3×14-pick Quick draft in exact
-`BotDraftDraftStatus`/`BotDraftDraftPick` log shapes, using real SOS grp_ids
-mapped from the model's vocab via the 17Lands card store. Regenerate with:
+`gen-draft-log.mjs` emits Arena's two-line bot-draft response shape with
+0-based raw pack/pick numbers. Its 14 valid DSK grpIds come from
+`tests/fixtures/draftfm-reference-DSK.json`, so log generation does not depend
+on the generated representation of `cards.json`. The seed controls pack order
+and synthetic human choices:
 
 ```sh
-python3 scripts/make_e2e_fixture.py
+node tests/e2e/gen-draft-log.mjs --set DSK --picks 42 --seed 11
 ```

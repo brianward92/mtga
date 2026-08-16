@@ -39,6 +39,7 @@ const SEL = {
   chipScored: '[data-testid="badge-cell"][data-scored="true"]',
   hud: '[data-testid="hud"]',
   hudPick: '[data-testid="hud-pick"]',
+  hudProvenance: '[data-testid="hud-provenance"]',
   hudSheetBtn: '[data-testid="hud-btn-sheet"]',
   hudCalBtn: '[data-testid="hud-btn-calibrate"]',
   sheet: '[data-testid="sheet"]',
@@ -96,6 +97,13 @@ async function waitFor(page, fn, label, timeout = 8000) {
   return false
 }
 
+async function expectPage(page, fn, label) {
+  if (await page.evaluate(fn, SEL)) return true
+  failures.push(label)
+  console.error('  FAIL', label)
+  return false
+}
+
 let fed = 0
 async function feedUntil(pred) {
   while (fed < fixture.length) {
@@ -121,6 +129,16 @@ try {
 
   await feedUntil(nthPickNext(1))
   await waitFor(page, S => document.querySelectorAll(S.cell).length === 14, '14 badge cells')
+  await waitFor(page, S => !!document.querySelector(S.sheet), 'sheet open by default')
+  await waitFor(page, S => {
+    const provenance = document.querySelector(S.hudProvenance)
+    const text = provenance?.textContent?.trim() ?? ''
+    return !!provenance && !provenance.hidden && /^DraftFM \S+ · Scryfall \d{4}-\d{2}-\d{2}/.test(text)
+  }, 'model and Scryfall snapshot provenance')
+  await expectPage(page, () => {
+    const text = document.body.textContent?.toLowerCase() ?? ''
+    return !text.includes('data from 17lands') && !text.includes('gih wr') && !text.includes('alsa')
+  }, 'no legacy card-stat attribution')
   await shot(page, '01-p1p1-pack')
   await waitFor(page, S => document.querySelectorAll(S.chipScored).length >= 10, 'scored chips')
   await shot(page, '02-p1p1-scored')
@@ -132,11 +150,10 @@ try {
   await shot(page, '03-hover-detail')
   await page.mouse.move(5, 5)
 
-  // Sheet via HUD button.
+  // The pool sheet opens with the draft. Capture it, then close it via the HUD.
+  await shot(page, '04-sheet-default')
   await page.click(SEL.hudSheetBtn).catch(e => failures.push(`sheet button: ${e.message}`))
-  await waitFor(page, S => !!document.querySelector(S.sheet), 'sheet open', 3000)
-  await shot(page, '04-sheet')
-  await page.click(SEL.hudSheetBtn).catch(() => {})
+  await waitFor(page, S => !document.querySelector(S.sheet), 'sheet closed', 3000)
 
   await feedUntil(nthPickNext(6)) // 6 more PickNext after P1P1 → P1P7 (8 cards)
   await waitFor(page, S => document.querySelectorAll(S.cell).length === 8, '8 cells at p1p7')

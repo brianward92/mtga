@@ -21,7 +21,7 @@ export interface CardInfo {
   rarity: string
   /** Printed WUBRG colours ('' for colourless cards and lands). */
   colors: string
-  /** WUBRG colour identity (not yet part of the renderer contract). */
+  /** WUBRG colour identity, carried into CardRow for Arena display ordering. */
   colorIdentity: string
   manaCost: string
   manaValue: number | null

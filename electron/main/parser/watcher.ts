@@ -43,7 +43,7 @@ export interface LogWatcherEvents {
 }
 
 // Polling backstop (one stat/s when idle): fsevents can miss writes that land
-// right after watch setup, and the reference 17Lands follower polls anyway.
+// right after watch setup.
 const POLL_INTERVAL_MS = 1_000
 
 /** Incremental byte-offset tail of a single file. */

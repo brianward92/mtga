@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 /**
  * Synthesize a complete Arena Quick Draft (bot draft) Player.log in the REAL
- * 2026 two-line response shape, using card ids from a bundled set.
+ * 2026 two-line response shape, using card ids from the model reference
+ * fixture. This keeps log synthesis independent of the generated bundle's
+ * cards.json representation.
  *
  *   node tests/e2e/gen-draft-log.mjs [--set DSK] [--picks 42] [--seed 7] > draft.log
  *
@@ -22,13 +24,9 @@ let seed = Number(opt('--seed', '7'))
 const rand = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff }
 
 const here = dirname(fileURLToPath(import.meta.url))
-const cards = JSON.parse(readFileSync(join(here, '..', '..', 'resources', 'draftfm', 'sets', SET, 'cards.json'), 'utf8'))
-  .filter(c => c.setCode === SET || cards_any(c))
-function cards_any() { return false }
-const byRarity = r => cards.filter(c => c.rarity === r && !/^Basic Land/.test(c.type))
-const pools = { common: byRarity('common'), uncommon: byRarity('uncommon'), rare: byRarity('rare').concat(byRarity('mythic')) }
-const lands = cards.filter(c => /^Basic Land/.test(c.type))
-const pickN = (arr, n) => { const out = []; const used = new Set(); while (out.length < n && used.size < arr.length) { const i = Math.floor(rand() * arr.length); if (!used.has(i)) { used.add(i); out.push(arr[i]) } } return out }
+const reference = JSON.parse(readFileSync(join(here, '..', 'fixtures', `draftfm-reference-${SET}.json`), 'utf8'))
+const basePack = reference.cases?.find(c => Array.isArray(c.pack) && c.pack.length === 14)?.pack
+if (!basePack) throw new Error(`draftfm-reference-${SET}.json has no 14-card pack`)
 
 const EVENT = `QuickDraft_${SET}_20260811`
 const PPP = 14
@@ -39,8 +37,12 @@ let idc = 1
 const guid = () => `7d1f0a3c-${String(idc++).padStart(4, '0')}-4c2a-9b3d-aaaaaaaaaaaa`
 
 function pack14() {
-  const cs = [...pickN(pools.rare, 1), ...pickN(pools.uncommon, 3), ...pickN(pools.common, 9), ...pickN(lands, 1)]
-  return cs.map(c => String(c.grpId))
+  const pack = basePack.map(String)
+  for (let i = pack.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1))
+    ;[pack[i], pack[j]] = [pack[j], pack[i]]
+  }
+  return pack
 }
 
 line(`[UnityCrossThreadLogger]==> EventJoin {"id":"${guid()}","request":"{\\"EventName\\":\\"${EVENT}\\",\\"EntryCurrencyType\\":\\"Gem\\",\\"EntryCurrencyPaid\\":750}"}`)

@@ -94,7 +94,7 @@ export function packConviction(cards: ReadonlyArray<CardRow>): Conviction | null
 
 /**
  * The recommendation's one-line "why": head-to-head % over the runner-up,
- * GIH win rate and ALSA when present. Empty when nothing is known.
+ * plus the raw set grade when it differs. Empty when nothing is known.
  */
 export function whyLine(top: CardRow, runnerUp: CardRow | null, conviction: Conviction | null): string {
   const parts: string[] = []
@@ -105,7 +105,7 @@ export function whyLine(top: CardRow, runnerUp: CardRow | null, conviction: Conv
   return parts.join(' · ')
 }
 
-/** Detail line for a hovered card: rank, model probability, ev, GIH, ALSA. */
+/** Detail line for a hovered card: rank, raw set grade, probability and EV. */
 export function detailLine(card: CardRow): string {
   const parts: string[] = []
   if (card.rank !== null) parts.push(`#${card.rank}`)

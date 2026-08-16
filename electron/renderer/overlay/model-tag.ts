@@ -33,3 +33,11 @@ export function modelDisplayName(id: string | null | undefined): string {
   const tag = modelVersionTag(id)
   return tag ? `DraftFM ${tag}` : 'DraftFM'
 }
+
+/** Compact provenance shown in the HUD footer for the active set bundle. */
+export function bundleProvenance(snapshot: { model: string | null; scryfall: string | null }): string {
+  return [
+    snapshot.model ? `DraftFM ${snapshot.model}` : '',
+    snapshot.scryfall ? `Scryfall ${snapshot.scryfall}` : ''
+  ].filter(Boolean).join(' · ')
+}

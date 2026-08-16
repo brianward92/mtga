@@ -9,7 +9,7 @@ import type { CardRow, Grade } from '../../shared/state'
 import { arenaDisplayOrder } from '../../shared/display-order'
 import { gradeTier } from '../../shared/grades'
 import { flamesFromPercentile } from './flames'
-import { modelDisplayName } from './model-tag'
+import { bundleProvenance, modelDisplayName } from './model-tag'
 import { shortBandLabel } from './chips'
 import { renderManaCost, escapeHtml } from './shared'
 import {
@@ -186,8 +186,8 @@ export class Hud {
 
     // Footer
     this.btnBadges.classList.toggle('off', !prefs.badges)
-    // Provenance replaces the 17Lands attribution: model tag · Scryfall snapshot.
-    const prov = [state.snapshot.model ? `DraftFM ${state.snapshot.model.replace(/^v/, 'v')}` : '', state.snapshot.scryfall ? `Scryfall ${state.snapshot.scryfall}` : ''].filter(Boolean).join(' · ')
+    // Bundle provenance: model tag · Scryfall snapshot.
+    const prov = bundleProvenance(state.snapshot)
     if (this.attrib.textContent !== prov) this.attrib.textContent = prov
     this.attrib.hidden = !prov
   }
