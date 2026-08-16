@@ -1,11 +1,11 @@
 /** Geometry and presentation state for the full Arena right-column sidebar. */
-import type { Rect } from '../../shared/layout'
+import { arenaContentBox, type Rect } from '../../shared/layout'
 import type { DraftState, LayerState } from '../../shared/state'
 import { intersects } from '../../shared/hover'
 import { isFiniteNumber } from './shared'
 
-const SIDEBAR_LEFT_FRACTION = 0.76
-const SIDEBAR_TOP_FRACTION = 0.125
+const SIDEBAR_LEFT_FRACTION = 0.74
+const SIDEBAR_TOP_FRACTION = 0.115
 const SIDEBAR_INSET = 6
 
 interface ViewSize {
@@ -18,7 +18,10 @@ export function sidebarShellFrame(view: ViewSize): Rect {
   const width = isFiniteNumber(view.width) ? Math.max(0, view.width) : 0
   const height = isFiniteNumber(view.height) ? Math.max(0, view.height) : 0
   if (width === 0 || height === 0) return { x: 0, y: 0, width: 0, height: 0 }
-  const x = width * SIDEBAR_LEFT_FRACTION
+  // Arena's own right rail sits in its centred, height-scaled content box, so
+  // ours starts there too — and always runs to the window's right/bottom edge.
+  const box = arenaContentBox({ width, height })
+  const x = Math.max(0, Math.min(width, box.x + box.width * SIDEBAR_LEFT_FRACTION))
   const y = height * SIDEBAR_TOP_FRACTION
   return { x, y, width: width - x, height: height - y }
 }

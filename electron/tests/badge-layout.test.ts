@@ -17,8 +17,7 @@ import {
   applyCalibrationOp,
   aspectOfBucket,
   nearestCalibrationBucket,
-  CalibrationConfig
-} from '../shared/layout'
+  CalibrationConfig, arenaContentBox } from '../shared/layout'
 
 const VIEWS = [
   { width: 1600, height: 900 },   // 16:9
@@ -52,10 +51,12 @@ describe('packLayout geometry', () => {
         const layout = packLayout(view, n, config)
         expect(layout.cards).toHaveLength(n)
 
-        // Pack area matches the configured fractions
-        expect(layout.pack.x).toBeCloseTo(config.packLeft * view.width, 6)
+        // Pack area matches the configured fractions of Arena's content box
+        // (height-scaled, horizontally centred) — see arenaContentBox.
+        const box = arenaContentBox(view)
+        expect(layout.pack.x).toBeCloseTo(box.x + config.packLeft * box.width, 6)
         expect(layout.pack.y).toBeCloseTo(config.packTop * view.height, 6)
-        expect(layout.pack.width).toBeCloseTo(config.packWidth * view.width, 6)
+        expect(layout.pack.width).toBeCloseTo(config.packWidth * box.width, 6)
         expect(layout.pack.height).toBeCloseTo(config.packHeight * view.height, 6)
 
         for (const slot of layout.cards) {
@@ -365,5 +366,29 @@ describe('packLayout keeps card size constant as a pack is drafted down', () => 
         layout.pack.y + layout.pack.height + 1e-6
       )
     }
+  })
+})
+
+describe('Arena content box (letterbox model)', () => {
+  it('is the window at Arena\'s default aspect and centres elsewhere', () => {
+    const def = arenaContentBox({ width: 1512, height: 949 })
+    expect(def.x).toBeCloseTo(0, 6)
+    expect(def.width).toBeCloseTo(1512, 6)
+  })
+
+  it('scales the pack with window HEIGHT when the window gets wider-and-shorter', () => {
+    // Measured live: resizing 1512x949 -> 1280x748 moved the column pitch from
+    // 167pt to ~130pt (height ratio 0.788), not to 141pt (width ratio 0.847).
+    const big = packLayout({ width: 1512, height: 949 }, 14, DEFAULT_CALIBRATION)
+    const small = packLayout({ width: 1280, height: 748 }, 14, DEFAULT_CALIBRATION)
+    const pitchBig = big.cards[1].card.x - big.cards[0].card.x
+    const pitchSmall = small.cards[1].card.x - small.cards[0].card.x
+    expect(pitchSmall / pitchBig).toBeCloseTo(748 / 949, 6)
+    expect(pitchSmall).toBeGreaterThan(126)
+    expect(pitchSmall).toBeLessThan(136)
+    // First column measured at ~184pt in the resized window.
+    expect(small.cards[0].card.x).toBeGreaterThan(176)
+    expect(small.cards[0].card.x).toBeLessThan(190)
+    expect(small.cards[0].card.height / big.cards[0].card.height).toBeCloseTo(748 / 949, 6)
   })
 })

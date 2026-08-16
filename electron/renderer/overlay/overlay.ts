@@ -17,7 +17,7 @@ import { Sheet } from './sheet'
 import { CalibrateLayer } from './calibrate'
 import { draftStateAdvanced, sameCalibrateState, sameLayerState, sameViewPrefs } from './render-change'
 import { RailInteraction } from './rail-interaction'
-import { sidebarPresentation } from './sidebar'
+import { sidebarPresentation, sidebarShellFrame } from './sidebar'
 
 const EMPTY_LAYER: LayerState = { cells: [], regions: [], covered: false, hudCovered: false }
 const EMPTY_CALIBRATE: CalibrateState = { active: false, count: 14, config: { ...DEFAULT_CALIBRATION }, arenaFound: false }
@@ -59,6 +59,8 @@ function schedule(): void {
   raf = requestAnimationFrame(() => { raf = 0; render() })
 }
 
+let railStyleKey = ''
+
 function render(): void {
   // Nothing to paint while hidden; main re-syncs and we repaint on show.
   if (document.visibilityState === 'hidden') return
@@ -70,6 +72,25 @@ function render(): void {
   railRoot.classList.toggle('open', sidebar.open)
   railRoot.classList.toggle('interactive', sidebar.open)
   railRoot.classList.toggle('preview-covered', sidebar.previewCovered)
+  // Arena letterboxes its UI, so the rail's left edge tracks the content box
+  // rather than a fixed window percentage; drive it from the pure geometry.
+  if (sidebar.open) {
+    const shell = sidebarShellFrame(store.view)
+    const style = `${Math.round(shell.x)}px:${Math.round(shell.y)}px`
+    if (railStyleKey !== style) {
+      railStyleKey = style
+      railRoot.style.left = `${Math.round(shell.x)}px`
+      railRoot.style.top = `${Math.round(shell.y)}px`
+      railRoot.style.right = '0'
+      railRoot.style.bottom = '0'
+    }
+  } else if (railStyleKey !== '') {
+    railStyleKey = ''
+    railRoot.style.left = ''
+    railRoot.style.top = ''
+    railRoot.style.right = ''
+    railRoot.style.bottom = ''
+  }
   // The idle glyph remains nested here while the full-column owner is closed.
   railRoot.setAttribute('aria-hidden', sidebarEnabled ? 'false' : 'true')
   const layout = currentLayout()

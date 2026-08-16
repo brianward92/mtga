@@ -235,15 +235,35 @@ export interface PackLayout {
  * `view` size (the badge window covers the Arena window exactly, so these
  * are window-relative px). Pure: same inputs, same rects.
  */
+/**
+ * Arena's layout aspect: it scales its whole UI with the window HEIGHT and
+ * centres that content horizontally, letterboxing the sides. Calibration
+ * fractions are therefore fractions of this content box, not of the window —
+ * measured at Arena's default 1512x949 window, where the two coincide.
+ * Verified against a resized 1512x949 -> 1280x748 window: column pitch scaled
+ * 167pt -> 130pt (height ratio predicts 131.6; window-width scaling would have
+ * predicted 141) and the first column sat 3pt from the predicted x.
+ */
+export const ARENA_CONTENT_ASPECT = 1512 / 949
+
+/** The centred, height-scaled box Arena lays its UI out in. */
+export function arenaContentBox(view: { width: number; height: number }): { x: number; width: number } {
+  const height = Number.isFinite(view.height) ? Math.max(0, view.height) : 0
+  const width = Number.isFinite(view.width) ? Math.max(0, view.width) : 0
+  const contentWidth = height * ARENA_CONTENT_ASPECT
+  return { x: (width - contentWidth) / 2, width: contentWidth }
+}
+
 export function packLayout(
   view: { width: number; height: number },
   count: number,
   config: CalibrationConfig
 ): PackLayout {
+  const box = arenaContentBox(view)
   const pack: Rect = {
-    x: config.packLeft * view.width,
+    x: box.x + config.packLeft * box.width,
     y: config.packTop * view.height,
-    width: config.packWidth * view.width,
+    width: config.packWidth * box.width,
     height: config.packHeight * view.height
   }
 
