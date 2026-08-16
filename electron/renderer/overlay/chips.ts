@@ -17,7 +17,7 @@
  */
 import type { CardRow } from '../../shared/state'
 import { gradeTier, type Grade } from '../../shared/grades'
-import { bandConviction, dominanceFromEvs, formatDominancePct, runnerDominance } from './conviction'
+import { bandConviction, dominanceFromEvs } from './conviction'
 import { flamesFromPercentile } from './flames'
 import { isFiniteNumber } from './shared'
 
@@ -29,6 +29,9 @@ export interface ChipModel {
   /** Frame tint; null → neutral hairline frame only. */
   tier: Tier | null
   /** Draw the chip at all (grade/flames/pct present). */
+  // pct = the model's pick probability for THIS pick (softmax over the pack),
+  // e.g. "71%": monotone with rank and sums to ~100 across the pack. The
+  // head-to-head dominance ("X% over #2") lives in the HUD why-line only.
   chip: boolean
   grade: Grade | null
   /** 1..5 lit flames, null when unknown. */
@@ -72,6 +75,12 @@ export function rankOrder(cards: ReadonlyArray<CardRow>): number[] {
     .map(e => e.i)
 }
 
+/** "71%" for a pick probability in 0..1; null when unknown. */
+export function formatPickProbPct(prob: number | null | undefined): string | null {
+  if (!isFiniteNumber(prob)) return null
+  return `${Math.round(Math.min(1, Math.max(0, prob)) * 100)}%`
+}
+
 /** Build one badge model per card while withholding stale live scores. */
 export function buildChips(cards: ReadonlyArray<CardRow>, scoring: boolean): ChipModel[] {
   const order = rankOrder(cards)
@@ -94,16 +103,10 @@ export function buildChips(cards: ReadonlyArray<CardRow>, scoring: boolean): Chi
     if (isTop) {
       const flames = conviction ? conviction.flames : rating?.flames ?? null
       const label = conviction ? shortBandLabel(conviction.label) : rating?.label ?? null
-      const pct = conviction && conviction.showPct ? formatDominancePct(conviction.dominance) : null
-      return { tier: 'top', chip: true, grade, flames, label, pct, rank: 1, top: true, shimmer: false }
+      return { tier: 'top', chip: true, grade, flames, label, pct: formatPickProbPct(card.prob), rank: 1, top: true, shimmer: false }
     }
 
-    let pct: string | null = null
-    if (scored && pos > 0) {
-      const above = cards[order[pos - 1]]
-      const h2h = runnerDominance(card.ev, above.ev)
-      if (h2h !== null) pct = formatDominancePct(h2h)
-    }
+    const pct = scored ? formatPickProbPct(card.prob) : null
 
     const known = grade !== null || rating !== null || pct !== null
     if (!known) {

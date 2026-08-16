@@ -4,8 +4,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import type { CardRow } from '../shared/state'
-import { buildChips, rankOrder, shortBandLabel } from '../renderer/overlay/chips'
-import { sigmoid, formatDominancePct } from '../renderer/overlay/conviction'
+import { buildChips, rankOrder, shortBandLabel, formatPickProbPct } from '../renderer/overlay/chips'
 
 function card(over: Partial<CardRow> & { grpId: number }): CardRow {
   return {
@@ -46,24 +45,24 @@ describe('buildChips', () => {
     card({ grpId: 14 }) // unknown card
   ]
 
-  it('gives the top pick the conviction band, dominance %, and #1', () => {
+  it('gives the top pick the conviction band, its pick %, and #1', () => {
     const chips = buildChips(scored, false)
     const top = chips[0]
     expect(top.top).toBe(true)
     expect(top.tier).toBe('top')
     expect(top.rank).toBe(1)
     expect(top.grade).toBe('A')
-    // dominance = sigmoid(3 - 1) ≈ 0.88 → SLAM, 5 flames (setPct 0.97 >= 0.75), pct shown
+    // dominance = sigmoid(3 - 1) ≈ 0.88 → SLAM, 5 flames (setPct 0.97 >= 0.75); % is the pick probability
     expect(top.label).toBe('SLAM')
     expect(top.flames).toBe(5)
-    expect(top.pct).toBe(formatDominancePct(sigmoid(2)))
+    expect(top.pct).toBe('60%')
   })
 
-  it('gives runner-ups percentile flames, tier by grade, and h2h vs the card above', () => {
+  it('gives runner-ups percentile flames, tier by grade, and their pick %', () => {
     const chips = buildChips(scored, false)
-    expect(chips[1]).toMatchObject({ tier: 'b', rank: 2, flames: 4, label: null, pct: formatDominancePct(sigmoid(1 - 3)) })
-    expect(chips[2]).toMatchObject({ tier: 'c', rank: 3, flames: 2, pct: formatDominancePct(sigmoid(0 - 1)) })
-    expect(chips[3]).toMatchObject({ tier: 'd', rank: 4, flames: 1, pct: formatDominancePct(sigmoid(-2 - 0)) })
+    expect(chips[1]).toMatchObject({ tier: 'b', rank: 2, flames: 4, label: null, pct: '20%' })
+    expect(chips[2]).toMatchObject({ tier: 'c', rank: 3, flames: 2, pct: '10%' })
+    expect(chips[3]).toMatchObject({ tier: 'd', rank: 4, flames: 1, pct: '5%' })
   })
 
   it('draws a frame only (no chip) for unknown cards', () => {
@@ -94,11 +93,27 @@ describe('buildChips', () => {
   it('falls back to percentile flames for the top card when only one ev is known', () => {
     const one = scored.map((c, i) => (i === 0 ? c : { ...c, ev: null, rank: null }))
     const chips = buildChips(one, false)
-    expect(chips[0]).toMatchObject({ top: true, rank: 1, flames: 5, label: 'SLAM', pct: null })
+    expect(chips[0]).toMatchObject({ top: true, rank: 1, flames: 5, label: 'SLAM', pct: '60%' })
   })
 
   it('emits one model per card in state order', () => {
     expect(buildChips(scored, false)).toHaveLength(scored.length)
     expect(buildChips([], false)).toEqual([])
+  })
+})
+
+describe('formatPickProbPct', () => {
+  it('rounds a probability to a whole percent and clamps', () => {
+    expect(formatPickProbPct(0.714)).toBe('71%')
+    expect(formatPickProbPct(0.005)).toBe('1%')
+    expect(formatPickProbPct(1.2)).toBe('100%')
+    expect(formatPickProbPct(null)).toBeNull()
+    expect(formatPickProbPct(Number.NaN)).toBeNull()
+  })
+  it('chip percentages across a scored pack are the pick probabilities (sum ≈ 100)', () => {
+    const cards = [0.6, 0.25, 0.1, 0.05].map((prob, i) => card({ grpId: 20 + i, ev: 3 - i, prob, rank: i + 1, percentile: 0.5, grade: 'C' }))
+    const chips = buildChips(cards, false)
+    const total = chips.reduce((s, c) => s + Number((c.pct ?? '0').replace('%', '')), 0)
+    expect(total).toBe(100)
   })
 })
