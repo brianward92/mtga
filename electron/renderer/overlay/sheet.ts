@@ -179,7 +179,7 @@ export class Sheet {
     this.renderedKey = key
 
     const rating = poolRatingLabel(state.pool)
-    this.rating.textContent = `Pool rating ${rating.text}`
+    this.rating.textContent = state.pool.length === 0 ? '' : `Pool rating ${rating.text}`
     this.rating.className = `sheet-rating ${rating.grade ? `grade-${gradeTier(rating.grade as never)}` : 'grade-none'}`
     this.pool.innerHTML = poolHtml(state.pool, state.picks)
   }

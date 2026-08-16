@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { EMPTY_STATE } from '../shared/state'
+import { EMPTY_STATE, type CardRow } from '../shared/state'
 import {
   previewIntersectsSidebar,
   sidebarPanelFrame,
@@ -118,8 +118,36 @@ describe('pinned sidebar pool DOM', () => {
     expect(root.classList.contains('open')).toBe(true)
     expect(root.ariaHidden).toBe('false')
     expect(root.dataset.testid).toBe('sheet')
-    expect(rating.textContent).toBe('Pool rating —')
+    expect(rating.textContent).toBe('')
     expect(pool.innerHTML).toContain('No cards yet')
+  })
+
+  it('shows the pool rating once the pool contains a rated card', () => {
+    const { rating, sheet, store } = sheetHarness(false)
+    const card: CardRow = {
+      grpId: 1,
+      name: 'Rated Card',
+      rarity: 'common',
+      colors: 'U',
+      colorIdentity: 'U',
+      manaCost: '{1}{U}',
+      manaValue: 2,
+      type: 'Creature',
+      imageUrl: null,
+      ev: null,
+      prob: null,
+      rank: null,
+      percentile: 0.75,
+      grade: 'B+',
+      setPercentile: 0.75,
+      setGrade: 'B+'
+    }
+    store.state = { ...store.state, pool: [card] }
+
+    sheet.update(store)
+
+    expect(rating.textContent).toBe('Pool rating B+')
+    expect(rating.className).toBe('sheet-rating grade-b')
   })
 
   it('closes pool content with the master HUD preference or idle phase', () => {

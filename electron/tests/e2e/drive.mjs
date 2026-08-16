@@ -365,6 +365,12 @@ try {
       chips.every(chip => /^\d+$/.test(chip.querySelector('b')?.textContent ?? ''))
   }, 'single WUBRGC pool summary in the sidebar')
   await expectDraftSidebarGeometry(page, 'P1P1 full right-column sidebar geometry, hierarchy, and ownership')
+  await expectPage(page, S => {
+    const footer = document.querySelector(S.hudFooter)
+    const buttonIds = footer ? [...footer.querySelectorAll('button')].map(button => button.id) : []
+    return buttonIds.join(',') === 'btnBadges,btnCalibrate' &&
+      !document.querySelector('#btnCorner, #btnSheet, [title*="Precise layering"], [aria-label*="Precise layering"]')
+  }, 'sidebar footer has badges and calibrate only; corner and precise-layering controls stay out')
   await expectPage(page, () => {
     const text = document.body.textContent?.toLowerCase() ?? ''
     return !text.includes('data from 17lands') && !text.includes('gih wr') && !text.includes('alsa')
