@@ -82,7 +82,9 @@ By default, artifacts go to `tests/e2e/shots/`:
 - `console_main.log` and `console_renderer.log`
 
 The logs are written even when the run fails. Renderer console errors fail the
-run. Existing files with the same names are replaced.
+run. Existing files with the same names are replaced. The `04-sheet.png`
+checkpoint proves the full right-column sidebar at the live-shaped 1512×949
+rectangle; pure geometry tests cover three representative window sizes.
 
 Available harness options are parsed by `tests/e2e/drive.mjs`:
 
@@ -178,8 +180,8 @@ that rectangle. Do not retain or share the image until its contents have been
 reviewed; delete it if it contains unrelated content. Bring Arena forward for
 a clean retry only when changing application focus was explicitly authorized.
 
-Record the Arena size, HUD corner, draft position, and whether the sheet and
-Precise layering were enabled with each screenshot.
+Record the Arena size, draft position, and whether the sidebar and Precise
+layering were enabled with each screenshot.
 
 ### Startup and no Arena
 
@@ -199,7 +201,7 @@ This section requires explicit permission to change the app/Arena lifecycle.
 
 - [ ] With Arena found and the HUD enabled, idle shows only the small,
   click-through top-right glyph.
-- [ ] No card badges, full HUD body, pool sheet, stale warning, or completion
+- [ ] No card badges, draft sidebar, stale warning, or completion
   controls remain visible.
 - [ ] The tray says `No draft in progress`. Disabling the HUD hides even the
   idle glyph.
@@ -207,11 +209,15 @@ This section requires explicit permission to change the app/Arena lifecycle.
 ### Packs 1, 2, and 3
 
 - [ ] At P1P1, badge cells align with every visible Arena card. Scoring replaces
-  placeholders with stable ranks/grades, the HUD shows P1P1 and the top five,
-  and model/Scryfall provenance is present.
-- [ ] On the first draft of a fresh app session, the pool sheet is open by
-  default. Closing and reopening it through the HUD button or `Command+Shift+D`
-  keeps main and renderer state in sync.
+  placeholders with stable ranks/grades, the sidebar shows P1P1 and exactly
+  five ranked rows, and model/Scryfall provenance is present.
+- [ ] Every scored card chip and each #1–#5 row shows the same rounded
+  within-pack model probability for that card. The underlying softmax values
+  are non-increasing by rank and sum to 100% across the pack.
+- [ ] The #1 explanation may show its head-to-head dominance over #2. No badge
+  chip or ranked-table probability cell uses that dominance percentage.
+- [ ] The full sidebar remains present throughout an active draft. Neither its
+  controls nor `Command+Shift+D` expose Arena's deck-list/Sideboard column.
 - [ ] After each pick, the old pack clears before the next one appears; no stale
   badge, score, hover detail, or recommendation survives the transition.
 - [ ] At P2P1 and P3P1 in a 14-card single-pick draft, the pool has 14 and 28
@@ -221,39 +227,43 @@ This section requires explicit permission to change the app/Arena lifecycle.
 - [ ] Basic lands stay at the bottom under a visible `Lands` divider. W/U/B/R/G
   header counts and pick-history agreement/rank tags update after each pick.
 
-### Rail bounds, yielding, controls, and hover
+### Sidebar bounds, layering, controls, and hover
 
-- [ ] At 1512×949 and after moving/resizing Arena, the joined HUD/sheet remains
-  fully inside the overlay. The populated sheet never paints below 91% of the
-  Arena height, preserving the bottom 9% Sideboard area.
-- [ ] Long Pack 2 and Pack 3 content scrolls inside the sheet body. The outer
-  sheet does not scroll or extend below its rail bounds.
-- [ ] Cycle the corner control through top-left, top-right, bottom-right, and
-  bottom-left. The sheet stacks below top HUDs and above bottom HUDs, stays on
-  the same side, and meets the HUD at a flush seam without doubled borders,
-  radius, or shadow.
-- [ ] Resting on either joined panel body for about 250 ms fades both panels to
-  the low-opacity click-through state. Crossing their seam does not restart the
-  dwell or leave only one panel visible.
-- [ ] Moving onto a HUD or sheet button restores both panels immediately and
-  the first click works. Opening/closing the sheet or moving corners clears any
-  pending or yielded state instead of carrying it into the new topology.
-- [ ] Hovering an Arena card changes the HUD to that card's detail without
-  moving the pool bar or sheet seam. Leaving restores the recommendation.
-- [ ] Arena card previews lift only the badges they cover (or use the
-  permission-free geometric prediction); badge and rail surfaces never block
-  unrelated Arena clicks.
+- [ ] At 1512×949 and after moving/resizing Arena, one sidebar shell owns the
+  full right column: its left edge is approximately 76% of the Arena width,
+  its top is approximately 14% of the height, and it reaches the right and
+  bottom edges. The designed panel is inset by about 6 px inside that shell.
+- [ ] The shell's 0.97-opacity glass completely masks Arena's Deck header,
+  deck list, and Sideboard bar. Those Arena controls are not visible or
+  interactive through the sidebar, including around its rounded inset panel.
+- [ ] The header contains set·format, P#P#, the model chip, and Pool rating.
+  The fixed-height recommendation block contains aligned #1–#5 rank, name,
+  pool-grade, differing-set-grade, and pick-probability columns.
+- [ ] Score arrival and hovering any pack card change content without moving
+  the ranked block, pool bar, pool-list viewport, or footer. Leaving a card
+  restores the recommendation.
+- [ ] Long Pack 2 and Pack 3 pools scroll only inside the list viewport. Rows
+  remain best-to-worst with `×N`, pick labels, and a Lands divider, while the
+  provenance and compact-button footer stays pinned to the bottom.
+- [ ] Resting the pointer anywhere on the sidebar does not fade it or yield
+  interaction to Arena; there is no rail dwell behavior.
+- [ ] A predicted Arena pack-card preview still lifts only the badges it covers.
+  The sidebar fades to 0.08 only while that preview's predicted region
+  intersects it, then restores immediately on leave. A non-intersecting
+  preview and unrelated cursor movement do not change sidebar opacity.
+- [ ] The three-size geometry unit case and strict `04-sheet.png` checkpoint
+  agree with the same x/y/right/bottom shell contract.
 
 ### Complete and dismiss
 
-- [ ] Completion removes every badge, shows `Draft complete`, and opens the
-  populated sheet once even if the sheet was closed immediately beforehand.
-- [ ] The completed sheet starts at the top, accounts for every drafted copy,
+- [ ] Completion removes every badge, shows `Draft complete`, and displays the
+  populated sidebar with the complete pool.
+- [ ] The completed pool starts at the top, accounts for every drafted copy,
   preserves grouped rows/pick labels/Lands ordering, and remains internally
-  scrollable above the Sideboard reserve.
-- [ ] Closing the sheet during completion keeps it closed on later state pushes
-  and does not dismiss the summary.
-- [ ] `Dismiss` immediately returns to the idle glyph with no badge or sheet
+  scrollable above the pinned footer.
+- [ ] Sidebar controls remain usable during completion without revealing the
+  underlying Arena right column or dismissing the summary accidentally.
+- [ ] `Dismiss` immediately returns to the idle glyph with no badge or sidebar
   leak. Without dismissal, the summary returns to idle after its 15-second
   linger.
 

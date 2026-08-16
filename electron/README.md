@@ -8,21 +8,25 @@ running **locally**, weights bundled, no server.
 ## What it does
 
 - One transparent overlay glued to the Arena window. It follows moves and
-  resizes at 30 Hz; card badges are click-through, and the right rail yields
-  to Arena when the pointer rests over its body.
+  resizes at 30 Hz; card badges are click-through, while a 0.97-opacity
+  sidebar owns Arena's full right column from the Deck header to the bottom.
 - **Card badges** on the pack grid: a frame per card tinted by tier, a chip
   with the pool-conditioned grade (the paper's 13-level ladder), a 5-flame
-  conviction signal and the head-to-head % vs the next card, `#1 #2 #3` tags,
-  and a LEAN/SLAM label on the model's pick. The raw set grade appears beside
-  the pool-conditioned grade when they differ.
-- **Context HUD** in a corner: set·format, P{pack}P{pick}, the recommendation
-  with a one-line model explanation, runner-ups, your pool by colour, and lane
-  lean. Hover a card in the pack and the HUD shows that card's detail. The pool
-  and pick-history sheet opens with the draft and can be toggled with `⌘⇧D`.
+  conviction signal and the model's within-pack pick probability, `#1 #2 #3`
+  tags, and a LEAN/SLAM label on the model's pick. The raw set grade appears
+  beside the pool-conditioned grade when they differ.
+- **Draft sidebar**: set·format, P{pack}P{pick}, model and pool rating; a
+  fixed-height recommendation block with an aligned #1–#5 table; pool colour
+  and lane summaries; then the drafted-card list. Each ranked row shows its
+  pool grade, a differing set grade, and the same pick probability as its card
+  chip. Head-to-head dominance appears only in #1's explanation. The pool
+  scrolls internally while provenance and compact controls stay at the bottom.
 - **Layering that works without permissions**: cursor geometry predicts Arena
-  card previews and lifts the badges beneath them. The opt-in **Precise
-  layering** menu item uses one-shot captures of only the Arena window to also
-  detect previews and modals; captures are never stored.
+  card previews and lifts the badges beneath them. If a predicted preview
+  intersects the sidebar, the sidebar alone fades to 0.08 until that preview
+  leaves; resting the pointer on the sidebar never makes it yield. The opt-in
+  **Precise layering** menu item uses one-shot captures of only the Arena
+  window to also detect previews and modals; captures are never stored.
 - Nothing leaves the machine. Inference and card metadata are bundled; the app
   has no runtime server or card-data requests.
 
@@ -35,8 +39,8 @@ checked-in product assets; generate them with `npm run build && npm run e2e`.
 | Screenshot | What it verifies |
 | --- | --- |
 | `00-idle.png` | Tiny click-through idle glyph and no draft UI leakage |
-| `04-sheet.png` | Ranked recommendation and joined pool rail |
-| `06-p2p6.png` | Populated Pack 2 pool with internal scrolling and safe bounds |
+| `04-sheet.png` | Full right-column sidebar and fixed #1–#5 probability table |
+| `06-p2p6.png` | Populated Pack 2 pool with internal scrolling and pinned footer |
 | `08-complete.png` | Draft summary, grouped duplicate rows, pick labels, and Lands divider |
 
 The complete checkpoint list and harness controls live in

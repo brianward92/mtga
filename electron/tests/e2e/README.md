@@ -40,17 +40,26 @@ npm run e2e -- --keep-tmp --port 9333 --speed 8 --out /tmp/draftfm-e2e-shots
 | shot | assertion / state |
 | --- | --- |
 | `00-idle.png` | overlay connected, waiting for a draft |
-| `01-p1p1-pack.png` | 14 cells, pool sheet open by default, model + Scryfall snapshot provenance, no legacy card-stat attribution |
-| `02-p1p1-scored.png` | at least ten scored badge chips |
-| `03-hover-detail.png` | cursor-driven card detail |
-| `04-sheet.png` | default-open sheet after joined-rail dwell and button-restore checks, before close/reopen |
-| `05-p1p7.png` | eight-card pack with the reopened, populated sheet contained above the bottom rail boundary |
-| `06-p2p6.png` | mid-draft populated sheet with proven internal scrolling and bottom containment |
-| `07-calibrate.png` | calibration panel opened from the HUD |
+| `01-p1p1-pack.png` | 14 cells, full sidebar, model + Scryfall snapshot provenance, and no legacy card-stat attribution |
+| `02-p1p1-scored.png` | scored badge chips and the stable #1–#5 pick-probability table |
+| `03-hover-detail.png` | cursor-driven card detail without sidebar reflow |
+| `04-sheet.png` | 0.97-opacity right-column shell from the Deck-header line to the bottom, with inset designed sidebar and fixed ranked block |
+| `05-p1p7.png` | eight-card pack with a populated, persistent sidebar |
+| `06-p2p6.png` | mid-draft pool with internal list scrolling and a pinned footer |
+| `07-calibrate.png` | calibration panel opened from the sidebar footer |
 | `08-complete.png` | completed draft state |
 
 The output directory also receives `console_main.log` and
 `console_renderer.log`. Renderer console errors make the run fail.
+
+The strict run uses the live-shaped 1512×949 fake Arena rectangle. Its
+sidebar assertions pin the shell near x=76% and y=14%, through the right and
+bottom edges; verify the resulting design in `04-sheet.png`. The corresponding
+pure geometry test exercises the same contract at three window sizes. The
+harness also proves that pointer dwell never fades the sidebar, while a
+predicted pack preview fades it to 0.08 only when the preview intersects it.
+Ranked rows and badge chips use the same rounded pack-softmax probability;
+head-to-head dominance is restricted to #1's explanation.
 
 ## Synthetic log
 
