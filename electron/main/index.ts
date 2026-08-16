@@ -196,7 +196,13 @@ function setupModelAndDraft(): void {
 }
 
 function setupGeometry(): void {
-  poller.on('geometry', () => { syncOverlay(); refreshTray() })
+  poller.on('geometry', () => {
+    // Dragging or resizing Arena must never leave the overlay hidden: grabbing
+    // the title bar puts the cursor near Arena's menu band.
+    standAside.noteWindowMoved(Date.now())
+    syncOverlay()
+    refreshTray()
+  })
   poller.on('lost', () => { syncOverlay(); refreshTray() })
   poller.on('frontmost', () => syncOverlay())
   poller.on('capture', () => refreshTray())

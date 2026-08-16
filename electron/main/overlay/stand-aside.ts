@@ -1,66 +1,89 @@
 /**
- * "Arena's own UI wins": while the drafter reaches into Arena's top menu bar
- * (Home/Packs/Store/… and the gear that opens Options), the overlay steps
- * aside completely — Arena draws its menus and modals inside its own window,
- * so nothing else can be z-ordered under them.
+ * "Arena's own UI wins": while the drafter reaches into Arena's menu bar
+ * (Packs/Store/… and the gear that opens Options), the overlay steps aside —
+ * Arena draws its menus and modals inside its own window, so nothing else can
+ * be layered under them.
  *
- * Detection is cursor-only (no permissions, no capture): entering the chrome
- * band latches "stand aside" until the draft moves on (a new pack or pick),
- * a timeout expires, or the user toggles the overlay back by hand.
+ * Deliberately simple and self-healing: the overlay is out of the way only
+ * while the cursor is up there, plus a short grace so passing back down does
+ * not flicker. There is no long-lived hidden state to get stuck in — an
+ * overlay that vanishes for tens of seconds reads as a broken app.
+ *
+ * Cursor-only, so it needs no permissions and no window capture.
  */
 import { arenaContentBox } from '../../shared/layout'
 
-/** Fraction of the window height occupied by Arena's title + menu bar. */
+/** Bottom of Arena's own menu bar, as a fraction of the window height. */
 export const CHROME_BAND_FRACTION = 0.145
-/** How long the overlay stays out of the way with no other signal. */
-export const STAND_ASIDE_TIMEOUT_MS = 25_000
-/** The cursor must rest in the menu bar this long: sweeping past is not intent. */
+/**
+ * Top of the band: above it is the macOS title bar, which is where the window
+ * gets dragged — grabbing it must not read as reaching for Arena's menus.
+ */
+export const CHROME_BAND_TOP_FRACTION = 0.05
+/** The cursor must rest in the band this long: sweeping past is not intent. */
 export const CHROME_DWELL_MS = 250
+/** How long the overlay stays away after the cursor leaves the band. */
+export const LEAVE_GRACE_MS = 1_500
+/** Moving or resizing the window suppresses the whole behaviour briefly. */
+export const WINDOW_MOVE_GRACE_MS = 700
 
 export interface Point { x: number; y: number }
 export interface Rect { x: number; y: number; width: number; height: number }
 
-/** True when the cursor sits in Arena's top menu bar (window-relative point). */
+/** True when the cursor sits in Arena's menu bar (window-relative point). */
 export function inChromeBand(local: Point, rect: Pick<Rect, 'width' | 'height'>): boolean {
   if (rect.width <= 0 || rect.height <= 0) return false
-  if (local.y < 0 || local.y > rect.height * CHROME_BAND_FRACTION) return false
+  if (local.y < rect.height * CHROME_BAND_TOP_FRACTION) return false
+  if (local.y > rect.height * CHROME_BAND_FRACTION) return false
   const box = arenaContentBox(rect)
   return local.x >= box.x && local.x <= box.x + box.width
 }
 
-/**
- * Latch: `sample` while the overlay is up, `release` when the draft advances
- * or the user asks for the overlay back.
- */
 export class StandAside {
-  private since: number | null = null
-  private enteredAt: number | null = null
+  private inBandSince: number | null = null
+  private awayUntil = 0
+  private suppressUntil = 0
+  private wasActive = false
 
-  /** True while the overlay should stay hidden. */
-  get active(): boolean { return this.since !== null }
+  /** True while the overlay should stay out of Arena's way. */
+  get active(): boolean { return this.wasActive }
 
-  /** Feed a cursor sample; returns true when the state changed. */
+  /** Feed a cursor sample; returns true when the visible state changed. */
   sample(local: Point, rect: Pick<Rect, 'width' | 'height'>, now: number): boolean {
+    if (now < this.suppressUntil) {
+      this.inBandSince = null
+      this.awayUntil = 0
+      return this.settle(false)
+    }
     if (inChromeBand(local, rect)) {
-      if (this.enteredAt === null) this.enteredAt = now
-      if (now - this.enteredAt < CHROME_DWELL_MS) return false
-      const changed = this.since === null
-      this.since = now
-      return changed
+      if (this.inBandSince === null) this.inBandSince = now
+      const dwelt = now - this.inBandSince >= CHROME_DWELL_MS
+      if (dwelt) this.awayUntil = now + LEAVE_GRACE_MS
+      return this.settle(dwelt)
     }
-    this.enteredAt = null
-    if (this.since !== null && now - this.since >= STAND_ASIDE_TIMEOUT_MS) {
-      this.since = null
-      return true
-    }
-    return false
+    this.inBandSince = null
+    return this.settle(now < this.awayUntil)
   }
 
-  /** The draft moved on (or the user asked): come back. */
+  /**
+   * The window moved or resized: the drafter is arranging their screen, not
+   * opening Arena's menus (dragging holds the cursor near the band).
+   */
+  noteWindowMoved(now: number): boolean {
+    this.suppressUntil = now + WINDOW_MOVE_GRACE_MS
+    return this.release()
+  }
+
+  /** The draft moved on (or the user asked): come back immediately. */
   release(): boolean {
-    this.enteredAt = null
-    if (this.since === null) return false
-    this.since = null
+    this.inBandSince = null
+    this.awayUntil = 0
+    return this.settle(false)
+  }
+
+  private settle(active: boolean): boolean {
+    if (active === this.wasActive) return false
+    this.wasActive = active
     return true
   }
 }
