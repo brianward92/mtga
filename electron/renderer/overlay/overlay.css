@@ -29,6 +29,21 @@
   --tier-b: #9ed0f5;
   --tier-c: #d0d0da;
   --tier-d: #7c7c8a;
+  /* The pick reads a step brighter than a plain A so it wins on busy art. */
+  --tier-top: #7ef2b6;
+
+  /* Badge layer: one pill language for chips, rank tags and band labels.
+     The stroke/separator pair is what keeps a frame readable over both a
+     black-ink night scene and a white-sky splash. */
+  --pill: 999px;
+  --badge-glass: rgba(12, 12, 16, 0.9);
+  --badge-hairline: rgba(255, 255, 255, 0.1);
+  --badge-inner: rgba(255, 255, 255, 0.09);
+  --badge-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.5),
+    0 4px 12px rgba(0, 0, 0, 0.3);
+  --badge-blur: blur(8px) saturate(1.15);
+  --frame-stroke: 1.5px;
+  --frame-sep: rgba(0, 0, 0, 0.55);
 
   --mana-white: #f1e7c5;
   --mana-white-ink: #332f23;
@@ -47,6 +62,8 @@
 
   --t-fast: 60ms ease-out;
   --t: 80ms ease-out;
+  /* Get out of the way instantly (--t-fast), come back unhurried. */
+  --t-settle: 120ms ease-out;
 }
 
 html {
@@ -92,120 +109,192 @@ button {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  transition: opacity 70ms ease-out;
+  transition: opacity var(--t-settle);
 }
 .badges.hidden { display: none; }
-.badges.covered { opacity: 0; }
+/* Arena's own preview is up: get out of the way at once, return unhurried. */
+.badges.covered { opacity: 0; transition: opacity var(--t-fast); }
 
-.card-frame,
-.badge-chip { transition: opacity var(--t-fast), border-color var(--t), box-shadow var(--t); }
-.card-frame.behind { opacity: 0 !important; }
-
-/* Frame: surrounds the card face, tinted by tier. No fills, no dimming — ever. */
+/* --- Frame ----------------------------------------------------------------
+   Two layers and nothing else: a 1.5px tier stroke sitting on a dark
+   separator hairline, so the tint survives both black-ink and white-sky art.
+   The stroke is an `outline` rather than a border because badges.ts offsets
+   the chip against a 2px border box (FRAME_BORDER) — that box must not move.
+   No background, no inner fill, no dimming: the art is never tinted. */
 .card-frame {
   position: absolute;
-  border: 2px solid transparent;
+  border: 2px solid transparent; /* geometry contract with badges.ts FRAME_BORDER */
+  pointer-events: none;
+  outline: var(--frame-stroke) solid transparent;
+  outline-offset: calc(-1 * var(--frame-stroke)); /* stroke lands flush inside the card edge */
+  box-shadow: 0 0 0 1px var(--frame-sep);
+  /* Size container: every measurement below is a share of the CARD, not of
+     the viewport, so the badge layer keeps its proportions past the point
+     where the `html` rem clamp tops out (1rem caps at 14px above ~1556px). */
+  container-type: size;
+  transition: opacity var(--t-settle), outline-color var(--t), box-shadow var(--t);
+}
+.card-frame.behind { opacity: 0 !important; transition: opacity var(--t-fast); }
+
+.card-frame.tier-none { outline-color: rgba(255, 255, 255, 0.14); }
+.card-frame.tier-d { outline-color: rgba(124, 124, 138, 0.45); }
+.card-frame.tier-c { outline-color: rgba(208, 208, 218, 0.42); }
+.card-frame.tier-b { outline-color: rgba(158, 208, 245, 0.72); }
+.card-frame.tier-a { outline-color: rgba(110, 231, 168, 0.78); }
+.card-frame.tier-top { outline-color: var(--tier-top); }
+
+/* Outer glow — the second layer, and only for the tiers worth shouting about.
+   C/D/none never glow. Drawn behind the frame's own content (z-index: -1
+   inside the stacking context the size container establishes) so it can
+   never haze the chip or the tags. */
+.card-frame.tier-a::before,
+.card-frame.tier-top::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
   pointer-events: none;
 }
-.card-frame.tier-none { border-color: rgba(255, 255, 255, 0.10); }
-.card-frame.tier-top {
-  border-color: rgba(110, 231, 168, 0.95);
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), 0 0 14px 3px rgba(110, 231, 168, 0.5);
+.card-frame.tier-a::before { box-shadow: 0 0 10px 1px rgba(110, 231, 168, 0.3); }
+.card-frame.tier-top::before {
+  box-shadow: 0 0 16px 3px rgba(126, 242, 182, 0.55);
+  /* Held value when motion is reduced — the pulse only modulates around it. */
+  opacity: 0.78;
+  animation: frame-pulse 2s ease-in-out infinite;
 }
-.card-frame.tier-a {
-  border-color: rgba(110, 231, 168, 0.7);
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5), 0 0 8px rgba(110, 231, 168, 0.28);
+@keyframes frame-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
 }
-.card-frame.tier-b {
-  border-color: rgba(158, 208, 245, 0.65);
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
-}
-.card-frame.tier-c { border-color: rgba(208, 208, 218, 0.35); }
-.card-frame.tier-d { border-color: rgba(124, 124, 138, 0.35); }
 
-/* Rank tag (#1–#3), bottom-left over the artist credit line. */
-.b-rank {
-  position: absolute;
-  bottom: -1px;
-  left: -1px;
-  padding: 0.15em 0.6em;
-  font-size: 1em;
-  font-weight: 800;
-  line-height: 1.3;
-  background: var(--glass-strong);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 0 8px 0 8px;
-  color: var(--text-2);
-  white-space: nowrap;
-}
-.card-frame.top .b-rank { color: var(--accent); border-color: rgba(110, 231, 168, 0.5); }
-
-/* Conviction label (LEAN / SLAM / …), bottom-right of the top pick's frame. */
+/* --- Rank tag + band label ------------------------------------------------
+   Same pill language as the chip, floated just off the card's bottom corners
+   rather than glued into them — a badge, not a sticker. */
+.b-rank,
 .b-label {
   position: absolute;
-  bottom: -1px;
-  right: -1px;
-  padding: 0.15em 0.6em;
-  font-size: 0.85em;
-  font-weight: 800;
-  line-height: 1.4;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  background: var(--glass-strong);
-  border: 1px solid rgba(110, 231, 168, 0.5);
-  border-radius: 8px 0 8px 0;
-  color: var(--accent);
+  bottom: 0.34em;
+  padding: 0.2em 0.62em;
+  line-height: 1.25;
   white-space: nowrap;
+  background: var(--badge-glass);
+  border: 1px solid var(--badge-hairline);
+  border-radius: var(--pill);
+  box-shadow: var(--badge-shadow), inset 0 1px 0 var(--badge-inner);
+  -webkit-backdrop-filter: var(--badge-blur);
+  backdrop-filter: var(--badge-blur);
 }
 
-/* Chip at the top of the art: grade · flames · h2h %. Sized to content, never clipped. */
+/* #1–#3, bottom-left over the artist credit line. */
+.b-rank {
+  left: 0.34em;
+  font-size: clamp(8px, 5.6cqh, 22px);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+}
+.card-frame.top .b-rank {
+  color: var(--tier-top);
+  border-color: rgba(126, 242, 182, 0.45);
+}
+
+/* Conviction label (LEAN / SLAM / CLEAR PICK), bottom-right of the top pick. */
+.b-label {
+  right: 0.34em;
+  /* A step under the rank tag: the longest band ('OBVIOUS BOMB') still has to
+     clear #1 on a 1280px-wide Arena window. */
+  font-size: clamp(7px, 4.8cqh, 19px);
+  padding: 0.2em 0.55em;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-indent: 0.1em; /* re-centre against the trailing letter-space */
+  text-transform: uppercase;
+  color: var(--tier-top);
+  border-color: rgba(126, 242, 182, 0.45);
+  box-shadow: var(--badge-shadow), inset 0 1px 0 var(--badge-inner),
+    0 0 10px rgba(126, 242, 182, 0.16);
+}
+
+/* --- Chip -----------------------------------------------------------------
+   Top of the art: grade · flames · head-to-head %. The grade letter is the
+   typographic anchor; flames sit a step down and unlit ones nearly vanish;
+   the % is tabular so the column doesn't jitter between packs.
+   badges.ts sets an inline height from the calibrated badge rect; the
+   min/max bracket below pins the pill to 11–12.4% of card height so it reads
+   identically at 720p and 4K, and max-width keeps it inside the card. */
 .badge-chip {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
   display: inline-flex;
   align-items: center;
-  gap: 0.4em;
-  padding: 0 0.7em;
+  gap: clamp(2px, 1.9cqh, 8px);
+  padding: 0 clamp(4px, 3.4cqh, 14px);
+  min-height: 11%;
+  max-height: 12.4%;
+  max-width: 100%;
+  overflow: hidden;
   white-space: nowrap;
-  overflow: visible;
   line-height: 1;
-  background: var(--glass);
-  border: 1px solid var(--hairline);
-  border-radius: 999px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+  background: var(--badge-glass);
+  border: 1px solid var(--badge-hairline);
+  border-radius: var(--pill);
+  box-shadow: var(--badge-shadow), inset 0 1px 0 var(--badge-inner);
+  -webkit-backdrop-filter: var(--badge-blur);
+  backdrop-filter: var(--badge-blur);
+  transition: opacity var(--t-settle), border-color var(--t), box-shadow var(--t);
 }
 .badge-chip.top {
-  border-color: rgba(110, 231, 168, 0.45);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(110, 231, 168, 0.2);
+  border-color: rgba(126, 242, 182, 0.45);
+  box-shadow: var(--badge-shadow), inset 0 1px 0 var(--badge-inner),
+    0 0 12px rgba(126, 242, 182, 0.18);
 }
-.badge-chip.dim { opacity: 0.86; }
+.badge-chip.dim { opacity: 0.88; }
 
-.b-grade { font-weight: 800; letter-spacing: -0.01em; }
-.badge-chip.tier-top .b-grade,
+.b-grade {
+  font-size: clamp(8.5px, 6.2cqh, 26px);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+.badge-chip.tier-top .b-grade { color: var(--tier-top); }
 .badge-chip.tier-a .b-grade { color: var(--tier-a); }
 .badge-chip.tier-b .b-grade { color: var(--tier-b); }
 .badge-chip.tier-c .b-grade { color: var(--tier-c); }
 .badge-chip.tier-d .b-grade { color: var(--tier-d); }
 
-.b-flames { display: inline-flex; font-size: 0.85em; }
-.b-flame { filter: grayscale(1); opacity: 0.22; }
+.b-flames {
+  display: inline-flex;
+  font-size: clamp(6.5px, 4.8cqh, 20px);
+  line-height: 1;
+}
+.b-flame { filter: grayscale(1) contrast(0.55); opacity: 0.18; }
 .b-flame.lit { filter: none; opacity: 1; }
 
-.b-pct { font-weight: 700; color: var(--text-2); }
+.b-pct {
+  font-size: clamp(7.5px, 5.2cqh, 22px);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+}
 .badge-chip.top .b-pct { color: var(--text); }
 
-/* Scoring in flight: shimmer instead of stale numbers. */
-.badge-chip.shimmer { overflow: hidden; }
+/* Scoring in flight: a soft sweep instead of stale numbers. */
 .badge-chip.shimmer::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.10) 50%, transparent 80%);
-  transform: translateX(-100%);
-  animation: shimmer 1.4s ease-in-out infinite;
+  background: linear-gradient(
+    105deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.13) 50%,
+    transparent 70%
+  );
+  transform: translateX(-110%);
+  animation: shimmer 1.5s ease-in-out infinite;
 }
-@keyframes shimmer { to { transform: translateX(100%); } }
+@keyframes shimmer { to { transform: translateX(110%); } }
 
 /* ==========================================================================
    Shared bits: grades, flames, mana pips, icon buttons
