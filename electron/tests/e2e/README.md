@@ -53,9 +53,10 @@ The output directory also receives `console_main.log` and
 `console_renderer.log`. Renderer console errors make the run fail.
 
 The strict run uses the live-shaped 1512×949 fake Arena rectangle. Its
-sidebar assertions pin the shell near x=76% and y=12.5%, through the right and
-bottom edges; verify the resulting design in `04-sheet.png`. The corresponding
-pure geometry test exercises the same contract at three window sizes. The
+sidebar assertions pin the shell 74% through Arena's centred, height-scaled
+content box and y=11.5%, through the right and bottom edges; verify the design
+in `04-sheet.png`. The corresponding pure geometry test exercises the same
+contract at three window sizes, including letterboxed aspect ratios. The
 harness also proves that sidebar-body dwell never yields the sidebar, while a
 predicted intersecting preview fades it to 0.08. Pure integration coverage
 pins the separate 350 ms sticky pack-card selection path. Ranked rows and

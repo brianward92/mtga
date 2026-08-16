@@ -64,6 +64,10 @@ const SEL = {
   calCancel: '[data-testid="calibrate-cancel"]'
 }
 
+// Keep the strict DOM assertions aligned with renderer/overlay/sidebar.ts.
+// Arena scales this 1512:949 content box by height and centres it horizontally.
+const SIDEBAR_GEOMETRY = { contentAspect: 1512 / 949, leftFraction: 0.74, topFraction: 0.115, inset: 6 }
+
 const tmp = mkdtempSync(join(tmpdir(), 'mtga-e2e-'))
 const home = join(tmp, 'home'); mkdirSync(home, { recursive: true })
 const logPath = join(tmp, 'Player.log'); writeFileSync(logPath, '')
@@ -122,7 +126,7 @@ async function expectPage(page, fn, label) {
 }
 
 async function expectSheetContained(page, label, requireScroll = false) {
-  const result = await page.evaluate((S, shouldScroll) => {
+  const result = await page.evaluate((S, geometry, shouldScroll) => {
     const railRoot = document.querySelector(S.rail)
     const panel = document.querySelector(S.railPanel)
     const sheet = document.querySelector(S.sheetRoot)
@@ -137,8 +141,12 @@ async function expectSheetContained(page, label, requireScroll = false) {
     const overflowY = getComputedStyle(body).overflowY
     if (shouldScroll) body.scrollTop = body.scrollHeight
     const scrollTop = body.scrollTop
-    const rootContained = rail.left >= window.innerWidth * 0.76 - 1 && rail.right <= window.innerWidth + 1 &&
-      rail.top >= window.innerHeight * 0.125 - 1 && rail.bottom <= window.innerHeight + 1 && rail.height > 0
+    const contentWidth = window.innerHeight * geometry.contentAspect
+    const contentLeft = (window.innerWidth - contentWidth) / 2
+    const expectedLeft = Math.round(Math.max(0, Math.min(window.innerWidth, contentLeft + contentWidth * geometry.leftFraction)))
+    const expectedTop = Math.round(window.innerHeight * geometry.topFraction)
+    const rootContained = Math.abs(rail.left - expectedLeft) <= 1 && rail.right <= window.innerWidth + 1 &&
+      Math.abs(rail.top - expectedTop) <= 1 && rail.bottom <= window.innerHeight + 1 && rail.height > 0
     const bodyContained = sheetRect.top >= panelRect.top - 1 && sheetRect.bottom <= footerRect.top + 1 &&
       content.top >= sheetRect.top - 1 && content.bottom <= sheetRect.bottom + 1 &&
       sheet.scrollHeight <= sheet.clientHeight + 1
@@ -154,7 +162,7 @@ async function expectSheetContained(page, label, requireScroll = false) {
       body: { top: content.top, bottom: content.bottom, clientHeight: body.clientHeight, scrollHeight: body.scrollHeight, scrollTop, overflowY },
       requireScroll: shouldScroll
     }
-  }, SEL, requireScroll)
+  }, SEL, SIDEBAR_GEOMETRY, requireScroll)
   if (result.ok) return true
   failures.push(`${label}: ${JSON.stringify(result)}`)
   console.error('  FAIL', label, result)
@@ -162,7 +170,7 @@ async function expectSheetContained(page, label, requireScroll = false) {
 }
 
 async function expectLongPoolScroll(page, label) {
-  const result = await page.evaluate(S => {
+  const result = await page.evaluate((S, geometry) => {
     const rail = document.querySelector(S.rail)
     const panel = document.querySelector(S.railPanel)
     const sheet = document.querySelector(S.sheetRoot)
@@ -184,8 +192,12 @@ async function expectLongPoolScroll(page, label) {
     body.scrollTop = body.scrollHeight
     const scrollTop = body.scrollTop
     const footerAfter = footer.getBoundingClientRect()
-    const contained = railRect.left >= window.innerWidth * 0.76 - 1 && railRect.right <= window.innerWidth + 1 &&
-      railRect.top >= window.innerHeight * 0.125 - 1 && railRect.bottom <= window.innerHeight + 1 &&
+    const contentWidth = window.innerHeight * geometry.contentAspect
+    const contentLeft = (window.innerWidth - contentWidth) / 2
+    const expectedLeft = Math.round(Math.max(0, Math.min(window.innerWidth, contentLeft + contentWidth * geometry.leftFraction)))
+    const expectedTop = Math.round(window.innerHeight * geometry.topFraction)
+    const contained = Math.abs(railRect.left - expectedLeft) <= 1 && railRect.right <= window.innerWidth + 1 &&
+      Math.abs(railRect.top - expectedTop) <= 1 && railRect.bottom <= window.innerHeight + 1 &&
       sheetRect.top >= panelRect.top - 1 && bodyRect.top >= sheetRect.top - 1 &&
       bodyRect.bottom <= sheetRect.bottom + 1 && sheetRect.bottom <= footerBefore.top + 1
     const ok = body.scrollHeight > body.clientHeight && scrollTop > 0 &&
@@ -203,7 +215,7 @@ async function expectLongPoolScroll(page, label) {
     probe.remove()
     body.scrollTop = 0
     return details
-  }, SEL)
+  }, SEL, SIDEBAR_GEOMETRY)
   if (result.ok) return true
   failures.push(`${label}: ${JSON.stringify(result)}`)
   console.error('  FAIL', label, result)
@@ -211,7 +223,7 @@ async function expectLongPoolScroll(page, label) {
 }
 
 async function expectDraftSidebarGeometry(page, label) {
-  const result = await page.evaluate(S => {
+  const result = await page.evaluate((S, geometry) => {
     const rail = document.querySelector(S.rail)
     const panel = document.querySelector(S.railPanel)
     const hud = document.querySelector(S.hud)
@@ -239,15 +251,19 @@ async function expectDraftSidebarGeometry(page, label) {
     const content = body.getBoundingClientRect()
     const f = footer.getBoundingClientRect()
     const view = { width: window.innerWidth, height: window.innerHeight }
+    const contentWidth = view.height * geometry.contentAspect
+    const contentLeft = (view.width - contentWidth) / 2
+    const shellLeft = Math.round(Math.max(0, Math.min(view.width, contentLeft + contentWidth * geometry.leftFraction)))
+    const shellTop = Math.round(view.height * geometry.topFraction)
     const expected = {
-      left: view.width * 0.76,
+      left: shellLeft,
       right: view.width,
-      top: view.height * 0.125,
+      top: shellTop,
       bottom: view.height,
-      panelLeft: view.width * 0.76 + 6,
-      panelRight: view.width - 6,
-      panelTop: view.height * 0.125 + 6,
-      panelBottom: view.height - 6
+      panelLeft: shellLeft + geometry.inset,
+      panelRight: view.width - geometry.inset,
+      panelTop: shellTop + geometry.inset,
+      panelBottom: view.height - geometry.inset
     }
     const alpha = color => {
       const match = color.match(/^rgba?\(([^)]+)\)$/)
@@ -302,7 +318,7 @@ async function expectDraftSidebarGeometry(page, label) {
       sheet: { left: s.left, right: s.right, top: s.top, bottom: s.bottom, alpha: sheetAlpha, border: sheetStyle.borderTopWidth, classes: sheet.className },
       checks: { opened, fixedBounds, hierarchy, activeBlocks, oneSurface, edgeOwnership }
     }
-  }, SEL)
+  }, SEL, SIDEBAR_GEOMETRY)
   if (result.ok) return true
   failures.push(`${label}: ${JSON.stringify(result)}`)
   console.error('  FAIL', label, result)

@@ -231,9 +231,10 @@ This section requires explicit permission to change the app/Arena lifecycle.
 ### Sidebar bounds, layering, controls, and hover
 
 - [ ] At 1512×949 and after moving/resizing Arena, one sidebar shell owns the
-  full right column: its left edge is approximately 76% of the Arena width,
-  its top is approximately 12.5% of the height, and it reaches the right and
-  bottom edges. The designed panel is inset by about 6 px inside that shell.
+  full right column: its left edge is approximately 74% through Arena's
+  centred, height-scaled content box, its top is approximately 11.5% of the
+  window height, and it reaches the right and bottom edges. The designed panel
+  is inset by about 6 px inside that shell.
 - [ ] The fully opaque shell completely masks Arena's Deck header,
   deck list, and Sideboard bar. Those Arena controls are not visible or
   interactive through the sidebar, including around its rounded inset panel.
