@@ -9,7 +9,8 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
-import { DraftParser, DraftSessionSnapshot, DraftPickRecord } from '../main/parser/draft-parser'
+import { DraftParser } from '../main/parser/draft-parser'
+import type { DraftSessionSnapshot, DraftPickRecord } from '../main/parser/draft-session'
 
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), 'fixtures')
 

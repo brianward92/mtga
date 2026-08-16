@@ -56,7 +56,7 @@ describe('DraftFM (bundled v1.0 + DSK assets)', () => {
         expect(got[i].prob!).toBeCloseTo(ref.prob!, 4)
       })
     }
-    const curve = Array.from(await model.p1p1Logits()).sort((a, b) => a - b)
+    const curve = Array.from(await model.setLogits([], 0, 0)).sort((a, b) => a - b)
     expect(curve.length).toBe(Object.keys(cards.cards).length)
     expect(curve.length).toBe(286) // curated DSK oracle-name universe
     for (let i = 1; i < curve.length; i++) expect(curve[i]).toBeGreaterThanOrEqual(curve[i - 1])

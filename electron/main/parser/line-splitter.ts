@@ -11,6 +11,7 @@
 const NEWLINE = 0x0a // \n
 const CARRIAGE = 0x0d // \r
 
+/** Splits arbitrary byte chunks into complete UTF-8 lines without tearing. */
 export class LineSplitter {
   private remainder: Buffer = Buffer.alloc(0)
 
@@ -53,6 +54,7 @@ export class LineSplitter {
     return this.remainder.length
   }
 
+  /** Discard any buffered partial line. */
   reset(): void {
     this.remainder = Buffer.alloc(0)
   }

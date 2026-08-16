@@ -5,19 +5,17 @@
 import { app, Menu, Tray, nativeImage } from 'electron'
 import { existsSync } from 'fs'
 import { join } from 'path'
-import type { DraftState } from '../shared/state'
-import type { Prefs } from './prefs'
+import type { DraftState, Prefs } from '../shared/state'
 import { draftLabel, modelLabel } from './status-labels'
 
-export interface TrayState {
+interface TrayState {
   draft: DraftState
   prefs: Prefs
   layerDetectionAvailable: boolean
-  overlayVisible: boolean
   arenaFound: boolean
 }
 
-export interface TrayActions {
+interface TrayActions {
   toggleBadges: () => void
   toggleHud: () => void
   toggleLayerDetection: () => void
@@ -43,6 +41,7 @@ function menuIcon(): Electron.NativeImage {
   return nativeImage.createEmpty()
 }
 
+/** Owns and rebuilds the persistent menu-bar status surface. */
 export class StatusTray {
   private tray: Tray
   private state: TrayState | null = null
@@ -55,11 +54,13 @@ export class StatusTray {
     this.tray.setToolTip('MTGA Draft Assistant')
   }
 
+  /** Replace displayed application state and rebuild the context menu. */
   update(state: TrayState): void {
     this.state = state
     this.rebuild()
   }
 
+  /** Destroy the native tray item. */
   destroy(): void { this.tray.destroy() }
 
   private rebuild(): void {

@@ -33,15 +33,6 @@ import { join, dirname } from 'path'
 import { homedir } from 'os'
 import { LineSplitter } from './line-splitter'
 
-export interface LogWatcherEvents {
-  line: (line: string, replay: boolean) => void
-  error: (error: Error) => void
-  watching: (path: string) => void
-  rotated: (newPath: string) => void
-  'replay-start': () => void
-  'replay-complete': () => void
-}
-
 // Polling backstop (one stat/s when idle): fsevents can miss writes that land
 // right after watch setup.
 const POLL_INTERVAL_MS = 1_000
@@ -61,10 +52,6 @@ class FileTail {
     private readonly onError: (error: Error) => void,
     private readonly onTruncated?: () => void
   ) {}
-
-  get byteOffset(): number {
-    return this.offset
-  }
 
   reset(): void {
     this.offset = 0
@@ -147,6 +134,7 @@ class FileTail {
   }
 }
 
+/** Replays prior Arena logs once, then tails the current Player.log. */
 export class LogWatcher extends EventEmitter {
   private readonly logPath: string
   private readonly logDirectory: string
@@ -173,6 +161,7 @@ export class LogWatcher extends EventEmitter {
     )
   }
 
+  /** Replay existing logs, then start filesystem and polling live tails. */
   async start(): Promise<void> {
     this.stopped = false
 
@@ -228,6 +217,7 @@ export class LogWatcher extends EventEmitter {
     }, POLL_INTERVAL_MS)
   }
 
+  /** Stop filesystem watching and polling; safe to call repeatedly. */
   stop(): void {
     this.stopped = true
     this.watcher?.close()

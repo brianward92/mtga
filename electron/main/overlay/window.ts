@@ -9,6 +9,7 @@ import { BrowserWindow, app } from 'electron'
 import { join } from 'path'
 import type { ArenaRect } from '../arena-geometry'
 
+/** Create the single click-through, non-focusable Arena overlay window. */
 export function createOverlayWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1280,
@@ -45,6 +46,7 @@ export function createOverlayWindow(): BrowserWindow {
   return win
 }
 
+/** Apply Arena's global bounds to the overlay, clamped to valid pixel sizes. */
 export function setOverlayRect(win: BrowserWindow, rect: ArenaRect): void {
   if (win.isDestroyed()) return
   win.setBounds({
@@ -53,11 +55,13 @@ export function setOverlayRect(win: BrowserWindow, rect: ArenaRect): void {
   }, false)
 }
 
+/** Show the overlay without taking keyboard focus from Arena. */
 export function showOverlay(win: BrowserWindow): void {
   if (win.isDestroyed() || win.isVisible()) return
   win.showInactive()
 }
 
+/** Hide the overlay if it is currently visible. */
 export function hideOverlay(win: BrowserWindow): void {
   if (win.isDestroyed() || !win.isVisible()) return
   win.hide()

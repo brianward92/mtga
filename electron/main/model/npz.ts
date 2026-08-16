@@ -7,6 +7,7 @@
  */
 import { inflateRawSync } from 'zlib'
 
+/** Typed array variants supported by the app's NumPy asset reader. */
 export type NpyData =
   | { kind: 'f16'; shape: number[]; data: Uint16Array }
   | { kind: 'f32'; shape: number[]; data: Float32Array }
@@ -22,12 +23,12 @@ export type NpyData =
   | { kind: 'bool'; shape: number[]; data: Uint8Array }
   | { kind: 'str'; shape: number[]; data: string[] }
 
-export interface NpzArchive {
+interface NpzArchive {
   [name: string]: NpyData
 }
 
 /** Parse a .npy buffer. */
-export function parseNpy(buf: Buffer): NpyData {
+function parseNpy(buf: Buffer): NpyData {
   if (buf.length < 10 || buf[0] !== 0x93 || buf.toString('latin1', 1, 6) !== 'NUMPY') {
     throw new Error('not a .npy buffer')
   }
@@ -188,7 +189,7 @@ function isZip64Descriptor(buf: Buffer, pos: number, compSize: number, uncompSiz
 }
 
 /** IEEE half → float32 (scalar). */
-export function halfToFloat(h: number): number {
+function halfToFloat(h: number): number {
   const s = (h & 0x8000) ? -1 : 1
   const e = (h >> 10) & 0x1f
   const f = h & 0x3ff

@@ -8,19 +8,14 @@
  * and JSONL persistence. It knows nothing about windows.
  */
 import { EventEmitter } from 'events'
-import type { DraftSessionSnapshot, DraftPickRecord } from '../parser/draft-parser'
+import type { DraftSessionSnapshot, DraftPickRecord } from '../parser/draft-session'
 import { ModelManager, type ScoredCard } from '../model/manager'
 import { type SetBundle, type CardInfo } from '../data/bundle'
 import { DraftHistory } from '../data/history'
 import { EMPTY_STATE, type CardRow, type DraftState, type PickRecord } from '../../shared/state'
 import { COMPLETE_LINGER_MS } from './completion'
 
-export { COMPLETE_LINGER_MS } from './completion'
-
-export interface CoordinatorEvents {
-  state: (state: DraftState) => void
-}
-
+/** Converts parser snapshots into renderer-ready draft state and history. */
 export class DraftCoordinator extends EventEmitter {
   private state: DraftState = { ...EMPTY_STATE }
   private snapshot: DraftSessionSnapshot | null = null

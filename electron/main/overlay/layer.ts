@@ -21,13 +21,13 @@ import {
   predictPopout,
   previewCoveredCellIndices
 } from '../../shared/hover'
-import { detectOcclusion, scaleRect, cardness, CARDNESS_MIN, ABS_DARK, meanIn, frameFromBytes, type GrayFrame } from './occlusion'
+import { detectOcclusion, scaleRect, cardness, CARDNESS_MIN, ABS_DARK, meanLuminanceInRect, frameFromBytes, type GrayFrame } from './occlusion'
 
 import type { LayerState } from '../../shared/state'
-export type { LayerState }
 
 const EMPTY: LayerState = { cells: [], regions: [], covered: false, hudCovered: false }
-export interface LayerDeps {
+/** Inputs the layer detector reads from main-process application state. */
+interface LayerDeps {
   poller: ArenaGeometryPoller
   /** Number of cards in the live pack (0 when none). */
   packCount: () => number
@@ -38,9 +38,9 @@ export interface LayerDeps {
   active: () => boolean
 }
 
+/** Detects Arena content covering badges, with a cursor-prediction fallback. */
 export class LayerDetector extends EventEmitter {
   private baseline: GrayFrame | null = null
-  private baselineLum = 0
   private baselineCardness = 0
   private lastFrameAt = 0
   private last: LayerState = EMPTY
@@ -57,6 +57,7 @@ export class LayerDetector extends EventEmitter {
     deps.poller.on('frame', (f: HelperFrame) => this.onFrame(f))
   }
 
+  /** Most recently published layer state. */
   get state(): LayerState { return this.last }
 
   /** Renderer tells us where its HUD is (window px) so we can lift it too. */
@@ -65,7 +66,6 @@ export class LayerDetector extends EventEmitter {
   /** New pack / new draft: the clear baseline no longer applies. */
   resetBaseline(): void {
     this.baseline = null
-    this.baselineLum = 0
     this.baselineCardness = 0
   }
 
@@ -84,6 +84,7 @@ export class LayerDetector extends EventEmitter {
     this.publish(EMPTY)
   }
 
+  /** Stop fallback polling and release its timer. */
   dispose(): void {
     if (this.fallbackTimer) clearInterval(this.fallbackTimer)
     this.fallbackTimer = null
@@ -132,14 +133,13 @@ export class LayerDetector extends EventEmitter {
     const hudPx = this.hudRect ? scaleRect(this.hudRect, view, fsize) : null
     const result = detectOcclusion(frame, this.baseline, packPx, cellsPx, hudPx)
 
-    const packLum = meanIn(frame, packPx)
+    const packLum = meanLuminanceInRect(frame, packPx)
     const score = cardness(frame, packPx, cellsPx) ?? 0
     const packOnScreen = score >= CARDNESS_MIN && packLum !== null && packLum >= ABS_DARK
 
     const sizeChanged = this.baseline !== null && (frame.width !== this.baseline.width || frame.height !== this.baseline.height)
     if (packOnScreen && hoveredIdx < 0 && (this.baseline === null || sizeChanged || score >= this.baselineCardness * 0.9)) {
       this.baseline = frame
-      this.baselineLum = packLum!
       this.baselineCardness = score
     }
 

@@ -5,7 +5,7 @@
 import { appendFileSync, mkdirSync } from 'fs'
 import { dirname } from 'path'
 
-export interface HistoryEvent {
+interface HistoryEvent {
   at: string
   type: 'draft-start' | 'pick' | 'draft-end'
   draftId: string | null
@@ -15,8 +15,11 @@ export interface HistoryEvent {
   [k: string]: unknown
 }
 
+/** Appends draft lifecycle events to a best-effort JSONL history file. */
 export class DraftHistory {
   constructor(private file: string) {}
+
+  /** Append one event without allowing persistence failures to stop a draft. */
   append(ev: HistoryEvent): void {
     try {
       mkdirSync(dirname(this.file), { recursive: true })

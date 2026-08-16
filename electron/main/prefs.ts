@@ -7,9 +7,8 @@ import { homedir } from 'os'
 import { join } from 'path'
 import { normalizeCalibration, type CalibrationConfig } from '../shared/layout'
 import type { HudCorner, Prefs } from '../shared/state'
-export type { HudCorner, Prefs }
 
-export const DEFAULT_PREFS: Prefs = {
+const DEFAULT_PREFS: Prefs = {
   badges: true,
   hud: true,
   hudCorner: 'tr',
@@ -25,6 +24,7 @@ const LEGACY_POSITIONS = join(CONFIG_DIR, 'overlay-position.json')
 
 let cached: Prefs | null = null
 
+/** Load normalized preferences, using the in-process cache after first read. */
 export function loadPrefs(): Prefs {
   if (cached) return cached
   let raw: Record<string, unknown> = {}
@@ -41,15 +41,18 @@ export function loadPrefs(): Prefs {
   const calibrations: Record<string, CalibrationConfig> = {}
   for (const [k, v] of Object.entries((raw.calibrations as Record<string, unknown>) ?? {})) calibrations[k] = normalizeCalibration(v)
   cached = {
-    badges: raw.badges !== false,
-    hud: raw.hud !== false,
-    hudCorner: (['tl', 'tr', 'bl', 'br'] as const).includes(raw.hudCorner as HudCorner) ? (raw.hudCorner as HudCorner) : 'tr',
-    layerDetection: raw.layerDetection === true,
+    badges: raw.badges === false ? false : DEFAULT_PREFS.badges,
+    hud: raw.hud === false ? false : DEFAULT_PREFS.hud,
+    hudCorner: (['tl', 'tr', 'bl', 'br'] as const).includes(raw.hudCorner as HudCorner)
+      ? (raw.hudCorner as HudCorner)
+      : DEFAULT_PREFS.hudCorner,
+    layerDetection: raw.layerDetection === true ? true : DEFAULT_PREFS.layerDetection,
     calibrations
   }
   return cached
 }
 
+/** Merge, persist, and return a preference patch. */
 export function savePrefs(patch: Partial<Prefs>): Prefs {
   const next = { ...loadPrefs(), ...patch }
   cached = next
@@ -61,6 +64,3 @@ export function savePrefs(patch: Partial<Prefs>): Prefs {
   }
   return next
 }
-
-/** Test seam. */
-export function _resetPrefsCache(): void { cached = null }

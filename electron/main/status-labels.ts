@@ -1,5 +1,6 @@
 import type { DraftState } from '../shared/state'
 
+/** Format the model-status line shown in the tray menu. */
 export function modelLabel(d: DraftState): string {
   const m = d.model
   if (m.state === 'ready' && m.modelId) return `Model: ${m.modelId.replace(/^_foundation\//, 'DraftFM ')}`
@@ -9,6 +10,7 @@ export function modelLabel(d: DraftState): string {
   return 'Model: DraftFM (loading…)'
 }
 
+/** Format the Arena/draft-status line shown in the tray menu. */
 export function draftLabel(d: DraftState, arenaFound: boolean): string {
   if (!arenaFound) return 'Waiting for Arena…'
   if (d.phase === 'idle') return 'No draft in progress'

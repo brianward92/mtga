@@ -12,7 +12,7 @@ import {
   type OverlayReappearanceState
 } from './reappearance'
 
-export interface OverlayGeometrySyncDeps {
+interface OverlayGeometrySyncDeps {
   targetAvailable: () => boolean
   arenaFound: () => boolean
   arenaRect: () => ArenaRect | null
@@ -25,6 +25,7 @@ export interface OverlayGeometrySyncDeps {
   now?: () => number
 }
 
+/** Synchronizes an overlay target with Arena geometry and reappearance state. */
 export class OverlayGeometrySync {
   private state: OverlayReappearanceState = INITIAL_OVERLAY_REAPPEARANCE
   private timer: NodeJS.Timeout | null = null
@@ -32,6 +33,7 @@ export class OverlayGeometrySync {
 
   constructor(private readonly deps: OverlayGeometrySyncDeps) {}
 
+  /** Apply the latest presence, bounds, foreground, and visibility inputs. */
   sync(): void {
     if (!this.deps.targetAvailable()) {
       this.cancelTimer()
@@ -57,11 +59,13 @@ export class OverlayGeometrySync {
     this.deps.afterSync?.()
   }
 
+  /** Cancel pending reappearance and return to the unobserved state. */
   reset(): void {
     this.cancelTimer()
     this.state = INITIAL_OVERLAY_REAPPEARANCE
   }
 
+  /** Release the pending timer and reset state. */
   dispose(): void { this.reset() }
 
   private cancelTimer(): void {

@@ -8,7 +8,7 @@
  * Bundle layout (electron resources/draftfm/):
  *   model/<tag>/{card_encoder.onnx,card_encoder.onnx.data,scorer.onnx,
  *                scorer.onnx.data,constants.npz,meta.json}
- *   sets/<SET>.npz          per-set assets from scripts/build_set_assets.py
+ *   sets/<SET>/assets.npz   per-set assets from scripts/build_set_assets.py
  *
  * Numeric contract (kept identical to Python so fixtures cross-check):
  *   features float32 [N,775] (fp16 in assets, widened) → card_emb [N,d]
@@ -23,11 +23,12 @@ import { join } from 'path'
 import * as ort from 'onnxruntime-node'
 import { parseNpz, halfArrayToFloat32, type NpyData } from './npz'
 
-export const POOL_COUNT_CAP = 8
+const POOL_COUNT_CAP = 8
 const FORMAT_IDS: Record<string, number> = { PremierDraft: 0, TradDraft: 1 }
-export const OTHER_FORMAT_ID = 2
+const OTHER_FORMAT_ID = 2
 const DEFAULT_PICKS_PER_PACK = 14
 
+/** One pack card's raw model score, probability, and stable rank. */
 export interface CardScore {
   grpId: number
   /** Model logit; null when the card is unknown to the set assets. */
@@ -38,7 +39,8 @@ export interface CardScore {
   rank: number
 }
 
-export interface DraftFMMeta {
+/** Metadata embedded alongside an exported DraftFM model. */
+interface DraftFMMeta {
   model_id: string
   kind: string
   manifest_hash?: string
@@ -48,7 +50,8 @@ export interface DraftFMMeta {
   [k: string]: unknown
 }
 
-export interface SetAssets {
+/** Decoded per-set feature matrix and Arena-id aliases. */
+interface SetAssets {
   set: string
   features: Float32Array // [N, featDim] row-major
   n: number
@@ -62,15 +65,15 @@ export interface SetAssets {
 }
 
 /** Numpy twin of mtga.foundation.model.position_features for one pick. */
-export function positionFeatures(packNumber: number, pickNumber: number, picksPerPack: number): Float32Array {
+export function positionFeatures(pack0: number, pick0: number, picksPerPack: number): Float32Array {
   const ppp = picksPerPack
-  const poolSize = packNumber * ppp + pickNumber
+  const poolSize = pack0 * ppp + pick0
   return Float32Array.from([
-    packNumber === 0 ? 1 : 0,
-    packNumber === 1 ? 1 : 0,
-    packNumber === 2 ? 1 : 0,
-    pickNumber / ppp,
-    Math.max(ppp - 1 - pickNumber, 0) / ppp,
+    pack0 === 0 ? 1 : 0,
+    pack0 === 1 ? 1 : 0,
+    pack0 === 2 ? 1 : 0,
+    pick0 / ppp,
+    Math.max(ppp - 1 - pick0, 0) / ppp,
     poolSize / 45,
     Math.min(poolSize / (3 * ppp), 1)
   ])
@@ -83,7 +86,7 @@ function scalarString(a: NpyData | undefined): string {
 }
 
 /** Load per-set assets from a build_set_assets.py npz. */
-export function loadSetAssets(path: string): SetAssets {
+function loadSetAssets(path: string): SetAssets {
   if (!existsSync(path)) throw new Error(`no DraftFM set assets at ${path}`)
   const z = parseNpz(readFileSync(path))
   const f = z.features
@@ -140,11 +143,12 @@ export function rankScores(grpIds: number[], evs: Array<number | null>): CardSco
   }))
 }
 
+/** In-process ONNX scorer with one pre-encoded table per set. */
 export class DraftFM {
-  readonly meta: DraftFMMeta
+  private readonly meta: DraftFMMeta
+  /** Identifier embedded in the loaded model bundle. */
   readonly modelId: string
-  readonly setCode: string
-  readonly limitedType: string
+  private readonly format: string
   private scorer!: ort.InferenceSession
   private table!: Float32Array // [N, d]
   private d!: number
@@ -154,15 +158,14 @@ export class DraftFM {
   private wrId = 33
   private gamesId = 6
   private formatId = OTHER_FORMAT_ID
-  picksPerPack = DEFAULT_PICKS_PER_PACK
+  private picksPerPack = DEFAULT_PICKS_PER_PACK
   private setScalars!: Float32Array
   private ready: Promise<void>
 
-  private constructor(versionDir: string, setCode: string, limitedType: string, private assets: SetAssets) {
+  private constructor(versionDir: string, setCode: string, format: string, private assets: SetAssets) {
     this.meta = JSON.parse(readFileSync(join(versionDir, 'meta.json'), 'utf8')) as DraftFMMeta
     this.modelId = this.meta.model_id
-    this.setCode = setCode
-    this.limitedType = limitedType
+    this.format = format
     const expected = this.meta.manifest_hash
     if (expected && assets.manifestHash && expected !== assets.manifestHash) {
       throw new Error(`featurizer manifest mismatch for ${setCode}: model ${expected.slice(0, 12)} vs assets ${assets.manifestHash.slice(0, 12)}`)
@@ -171,9 +174,9 @@ export class DraftFM {
   }
 
   /** Construct + warm (card table encoded once). */
-  static async load(versionDir: string, setCode: string, limitedType: string, assetsPath: string): Promise<DraftFM> {
+  static async load(versionDir: string, setCode: string, format: string, assetsPath: string): Promise<DraftFM> {
     const assets = loadSetAssets(assetsPath)
-    const m = new DraftFM(versionDir, setCode, limitedType, assets)
+    const m = new DraftFM(versionDir, setCode, format, assets)
     await m.ready
     return m
   }
@@ -217,14 +220,11 @@ export class DraftFM {
     })
     this.wrId = Number(this.meta.serving?.wr_id ?? 33)
     this.gamesId = Number(this.meta.serving?.games_id ?? 6)
-    this.formatId = FORMAT_IDS[this.limitedType] ?? OTHER_FORMAT_ID
+    this.formatId = FORMAT_IDS[this.format] ?? OTHER_FORMAT_ID
     this.picksPerPack = a.picksPerPack || DEFAULT_PICKS_PER_PACK
     const ppp = this.picksPerPack
     this.setScalars = Float32Array.from([a.names.length / 400, ppp === 13 ? 1 : 0, ppp === 14 ? 1 : 0, ppp === 15 ? 1 : 0])
   }
-
-  /** Whether the set assets know this grpId. */
-  knows(grpId: number): boolean { return this.grpToRow.has(grpId) }
 
   private gather(rows: number[]): Float32Array {
     const out = new Float32Array(rows.length * this.d)
@@ -262,18 +262,19 @@ export class DraftFM {
     return feeds
   }
 
-  async scorePack(packGrpIds: number[], poolGrpIds: number[], packNumber?: number, pickNumber?: number): Promise<CardScore[]> {
+  /** Score one pack at a 0-based draft position, inferring position if omitted. */
+  async scorePack(packGrpIds: number[], poolGrpIds: number[], pack0?: number, pick0?: number): Promise<CardScore[]> {
     const rows = packGrpIds.map(g => this.grpToRow.get(g) ?? null)
     const known = [...new Set(rows.filter((r): r is number => r !== null))].sort((x, y) => x - y)
     if (!known.length) return rankScores(packGrpIds, packGrpIds.map(() => null))
 
     const pool = this.poolInputs(poolGrpIds)
-    if (packNumber === undefined || pickNumber === undefined) {
+    if (pack0 === undefined || pick0 === undefined) {
       const poolSize = poolGrpIds.length
-      packNumber = Math.floor(poolSize / this.picksPerPack)
-      pickNumber = poolSize % this.picksPerPack
+      pack0 = Math.floor(poolSize / this.picksPerPack)
+      pick0 = poolSize % this.picksPerPack
     }
-    const out = await this.scorer.run(this.feedsFor(pool, known, positionFeatures(packNumber, pickNumber, this.picksPerPack)))
+    const out = await this.scorer.run(this.feedsFor(pool, known, positionFeatures(pack0, pick0, this.picksPerPack)))
     const logits = out.logits.data as Float32Array
     const byRow = new Map<number, number>()
     known.forEach((r, i) => byRow.set(r, logits[i]))
@@ -281,24 +282,17 @@ export class DraftFM {
   }
 
   /**
-   * Set-relative P1P1 curve: every card's logit at pack 1 pick 1 with an empty
-   * pool, sorted ascending — powers percentile grades without any server.
-   */
-  /**
    * Whole-set logits (one per asset row, unsorted): every card scored as if it
    * were in one giant pack, conditioned on `pool` and the pick position. With
    * an empty pool at P1P1 this is the paper's forecast recipe (the set-relative
    * "raw" grade); with the live pool it is the "for your pool" scale.
    */
-  async setLogits(poolGrpIds: number[] = [], packNumber = 0, pickNumber = 0): Promise<Float32Array> {
+  async setLogits(poolGrpIds: number[] = [], pack0 = 0, pick0 = 0): Promise<Float32Array> {
     const n = this.assets.n
     const rows = Array.from({ length: n }, (_, i) => i)
-    const res = await this.scorer.run(this.feedsFor(this.poolInputs(poolGrpIds), rows, positionFeatures(packNumber, pickNumber, this.picksPerPack)))
+    const res = await this.scorer.run(this.feedsFor(this.poolInputs(poolGrpIds), rows, positionFeatures(pack0, pick0, this.picksPerPack)))
     return new Float32Array(res.logits.data as Float32Array)
   }
-
-  /** @deprecated use setLogits() */
-  async p1p1Logits(): Promise<Float32Array> { return this.setLogits([], 0, 0) }
 
   /** Number of asset rows (unique card names). */
   get setSize(): number { return this.assets.n }
@@ -306,6 +300,7 @@ export class DraftFM {
   /** grpId -> asset row, for every alias the set knows. */
   grpRows(): IterableIterator<[number, number]> { return this.grpToRow.entries() }
 
+  /** Release native ONNX resources. */
   async release(): Promise<void> {
     await this.scorer.release()
   }

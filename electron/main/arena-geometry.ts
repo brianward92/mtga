@@ -22,6 +22,7 @@ import { readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import { createInterface } from 'readline'
 
+/** Arena window bounds in global screen points. */
 export interface ArenaRect {
   x: number
   y: number
@@ -29,7 +30,7 @@ export interface ArenaRect {
   height: number
 }
 
-export type ArenaProbe =
+type ArenaProbe =
   | { status: 'found'; rect: ArenaRect; frontmost: boolean }
   | { status: 'no-window' }
 
@@ -37,7 +38,7 @@ const FAKE_ARENA_FILE = process.env.MTGA_FAKE_ARENA_FILE
 const FAKE_POLL_MS = 500
 const HELPER_RETRY_MS = 10_000
 
-export interface ArenaGeometryPollerOptions {
+interface ArenaGeometryPollerOptions {
   /** Override the environment seam; primarily useful for deterministic tests. */
   fakeArenaFile?: string
   fakePollMs?: number
@@ -54,7 +55,7 @@ function probeFakeArena(file: string): ArenaProbe {
 }
 
 /** Resolve the bundled helper binary; null when absent (or when faking Arena). */
-export function findWindowWatchHelper(): string | null {
+function findWindowWatchHelper(): string | null {
   if (process.platform !== 'darwin' || FAKE_ARENA_FILE) return null
   const candidates = [
     join(process.resourcesPath ?? '', 'native', 'arena-window-watch'),
@@ -102,6 +103,7 @@ export function parseWatchLine(line: string): ArenaProbe | null {
   return { status: 'found', rect: { x, y, width, height }, frontmost: fm === 1 }
 }
 
+/** Polls Arena window presence, geometry, focus, and optional luminance frames. */
 export class ArenaGeometryPoller extends EventEmitter {
   /** Last observed rect (kept as a cache across lost/found). */
   lastKnown: ArenaRect | null = null
@@ -113,7 +115,6 @@ export class ArenaGeometryPoller extends EventEmitter {
   wantCapture = false
 
   private helper: ChildProcess | null = null
-  private helperAlive = false
   private fakeTimer: NodeJS.Timeout | null = null
   private retryTimer: NodeJS.Timeout | null = null
   private running = false
@@ -128,10 +129,10 @@ export class ArenaGeometryPoller extends EventEmitter {
     this.fakePollMs = Math.max(1, Math.round(options.fakePollMs ?? FAKE_POLL_MS))
   }
 
-  isRunning(): boolean { return this.running }
+  /** Whether the latest probe found an Arena window. */
   isFound(): boolean { return this.state === 'found' }
-  isStreaming(): boolean { return this.helperAlive }
 
+  /** Begin the native-helper stream or deterministic fake-file polling. */
   start(): void {
     if (this.running) return
     this.running = true
@@ -144,6 +145,7 @@ export class ArenaGeometryPoller extends EventEmitter {
     this.startHelper()
   }
 
+  /** Stop polling, child processes, and retry timers, then clear found state. */
   stop(): void {
     this.running = false
     if (this.fakeTimer) { clearInterval(this.fakeTimer); this.fakeTimer = null }
@@ -157,12 +159,6 @@ export class ArenaGeometryPoller extends EventEmitter {
     if (this.wantCapture === on) return
     this.wantCapture = on
     this.helperWrite(`capture ${on ? 'on' : 'off'}`)
-  }
-
-  /** Base capture rate in Hz (0 pauses; helper default 4). */
-  setCaptureRate(hz: number): void {
-    if (!Number.isFinite(hz) || hz < 0) return
-    this.helperWrite(`rate ${hz}`)
   }
 
   private helperWrite(cmd: string): void {
@@ -202,11 +198,9 @@ export class ArenaGeometryPoller extends EventEmitter {
       }
       const probe = parseWatchLine(line)
       if (!probe) return
-      this.helperAlive = true
       this.apply(probe)
     })
     const done = (): void => {
-      this.helperAlive = false
       this.helper = null
       if (this.captureOn) { this.captureOn = false; this.emit('capture', false) }
       this.apply({ status: 'no-window' })
@@ -224,7 +218,6 @@ export class ArenaGeometryPoller extends EventEmitter {
   private stopHelper(): void {
     const h = this.helper
     this.helper = null
-    this.helperAlive = false
     if (h && !h.killed) {
       try { h.stdin?.end() } catch { /* ignore */ }
       try { h.kill() } catch { /* ignore */ }

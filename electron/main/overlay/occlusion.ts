@@ -21,10 +21,11 @@ import type { Rect } from '../../shared/layout'
 /** Mean |Δluminance| (0..255) over a cell above which it counts as covered. */
 export const CELL_DIFF_THRESHOLD = 22
 /** Pack-area brightness ratio vs. baseline below which the pack is covered. */
-export const COVERED_RATIO = 0.62
+const COVERED_RATIO = 0.62
 /** Absolute pack-area luminance floor: a modal scrim over face-up cards. */
 export const ABS_DARK = 48
 
+/** Downscaled row-major luminance frame used by layer detection. */
 export interface GrayFrame {
   width: number
   height: number
@@ -32,17 +33,8 @@ export interface GrayFrame {
   data: Float32Array
 }
 
-/** BGRA bitmap → luminance frame. */
-export function toGray(bitmap: Buffer, size: { width: number; height: number }): GrayFrame {
-  const data = new Float32Array(size.width * size.height)
-  for (let i = 0, p = 0; i < data.length; i++, p += 4) {
-    data[i] = 0.299 * bitmap[p + 2] + 0.587 * bitmap[p + 1] + 0.114 * bitmap[p]
-  }
-  return { width: size.width, height: size.height, data }
-}
-
 /** Mean luminance inside a rect given in frame px. */
-export function meanIn(frame: GrayFrame, r: Rect): number | null {
+export function meanLuminanceInRect(frame: GrayFrame, r: Rect): number | null {
   const x0 = Math.max(0, Math.floor(r.x)), y0 = Math.max(0, Math.floor(r.y))
   const x1 = Math.min(frame.width, Math.ceil(r.x + r.width))
   const y1 = Math.min(frame.height, Math.ceil(r.y + r.height))
@@ -53,7 +45,7 @@ export function meanIn(frame: GrayFrame, r: Rect): number | null {
 }
 
 /** Mean |a-b| inside a rect; null when rect is empty or sizes mismatch. */
-export function meanDiffIn(a: GrayFrame, b: GrayFrame, r: Rect): number | null {
+function meanDiffIn(a: GrayFrame, b: GrayFrame, r: Rect): number | null {
   if (a.width !== b.width || a.height !== b.height) return null
   const x0 = Math.max(0, Math.floor(r.x)), y0 = Math.max(0, Math.floor(r.y))
   const x1 = Math.min(a.width, Math.ceil(r.x + r.width))
@@ -81,6 +73,7 @@ export function scaleRect(r: Rect, from: { width: number; height: number }, to: 
  */
 export const CARDNESS_MIN = 14
 
+/** Measure how much brighter card cells are than the gaps around them. */
 export function cardness(frame: GrayFrame, pack: Rect, cells: Rect[]): number | null {
   const x0 = Math.max(0, Math.floor(pack.x)), y0 = Math.max(0, Math.floor(pack.y))
   const x1 = Math.min(frame.width, Math.ceil(pack.x + pack.width))
@@ -101,7 +94,7 @@ export function cardness(frame: GrayFrame, pack: Rect, cells: Rect[]): number | 
   return inSum / inN - outSum / outN
 }
 
-export interface OcclusionResult {
+interface OcclusionResult {
   /** Indices of pack cells that look covered. */
   coveredCells: number[]
   /** Whole pack area looks covered (modal scrim). */
@@ -121,8 +114,8 @@ export function detectOcclusion(
   cells: Rect[],
   extra: Rect | null
 ): OcclusionResult {
-  const lum = meanIn(frame, pack)
-  const baseLum = baseline ? meanIn(baseline, pack) : null
+  const lum = meanLuminanceInRect(frame, pack)
+  const baseLum = baseline ? meanLuminanceInRect(baseline, pack) : null
   const packCovered =
     (lum !== null && lum < ABS_DARK) ||
     (lum !== null && baseLum !== null && baseLum > 0 && lum < baseLum * COVERED_RATIO)
@@ -146,7 +139,7 @@ export function screenCaptureGranted(): boolean {
   return process.platform !== 'darwin' || systemPreferences.getMediaAccessStatus('screen') === 'granted'
 }
 
-/** Build a GrayFrame from the helper's raw luminance bytes (no copy). */
+/** Build a float luminance frame by copying and widening helper bytes. */
 export function frameFromBytes(width: number, height: number, bytes: Uint8Array): GrayFrame {
   return { width, height, data: Float32Array.from(bytes) }
 }

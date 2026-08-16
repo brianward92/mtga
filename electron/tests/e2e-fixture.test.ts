@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import { spawnSync } from 'child_process'
 import { join } from 'path'
-import { LogParser } from '../main/parser/index'
+import { DraftParser } from '../main/parser/draft-parser'
 
 describe('synthetic draft log generator', () => {
   it('produces a full 42-pick bot draft the parser replays to completion', () => {
     const gen = spawnSync('node', [join(__dirname, 'e2e', 'gen-draft-log.mjs'), '--picks', '42', '--seed', '3'], { encoding: 'utf8' })
     expect(gen.status).toBe(0)
-    const parser = new LogParser()
+    const parser = new DraftParser()
     const events: string[] = []
     for (const ev of ['draft-start', 'draft-pack', 'draft-pick', 'draft-end'] as const) parser.on(ev, () => events.push(ev))
-    for (const line of gen.stdout.split('\n')) parser.parseLine(line)
-    const snap = parser.getDraftSnapshot()!
+    for (const line of gen.stdout.split('\n')) parser.handleLine(line)
+    const snap = parser.getSnapshot()!
     expect(snap.state).toBe('complete')
     expect(snap.set).toBe('DSK')
     expect(snap.format).toBe('QuickDraft')

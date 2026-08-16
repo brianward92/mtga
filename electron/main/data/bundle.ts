@@ -15,6 +15,7 @@ import { existsSync, readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
 import { parseNpz } from '../model/npz'
 
+/** Static card identity and display metadata keyed by Arena grpId. */
 export interface CardInfo {
   grpId: number
   name: string
@@ -28,6 +29,7 @@ export interface CardInfo {
   type: string
 }
 
+/** One shipped set's assets, card metadata, and draft constants. */
 export interface SetBundle {
   set: string
   dir: string
@@ -42,7 +44,7 @@ export interface SetBundle {
   names: string[]
 }
 
-export interface BundleSetEntry {
+interface BundleSetEntry {
   picks_per_pack?: number
   manifest_hash?: string
   cards?: number
@@ -52,6 +54,7 @@ export interface BundleSetEntry {
   scryfall_updated_at?: string
 }
 
+/** Resolved model bundle metadata and its available sets. */
 export interface BundleIndex {
   modelDir: string
   modelTag: string
@@ -103,6 +106,7 @@ function readJson<T>(path: string): T | null {
   try { return JSON.parse(readFileSync(path, 'utf8')) as T } catch { return null }
 }
 
+/** Read the newest model plus its set index, discovering set dirs as fallback. */
 export function readBundleIndex(root: string): BundleIndex | null {
   const modelParent = join(root, 'model')
   if (!existsSync(modelParent)) return null

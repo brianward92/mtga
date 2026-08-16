@@ -1,12 +1,15 @@
+/** Grace period before showing the overlay after Arena returns. */
 export const OVERLAY_REAPPEARANCE_DELAY_MS = 250
 
-export type OverlayReappearancePhase = 'unknown' | 'lost' | 'waiting' | 'ready'
+type OverlayReappearancePhase = 'unknown' | 'lost' | 'waiting' | 'ready'
 
+/** Pure state carried between Arena-presence observations. */
 export interface OverlayReappearanceState {
   readonly phase: OverlayReappearancePhase
   readonly readyAt: number | null
 }
 
+/** Initial state before Arena presence has been observed. */
 export const INITIAL_OVERLAY_REAPPEARANCE: OverlayReappearanceState = {
   phase: 'unknown',
   readyAt: null

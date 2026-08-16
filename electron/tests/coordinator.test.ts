@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
-import { COMPLETE_LINGER_MS, DraftCoordinator } from '../main/draft/coordinator'
-import type { DraftSessionSnapshot } from '../main/parser/draft-parser'
+import { DraftCoordinator } from '../main/draft/coordinator'
+import { COMPLETE_LINGER_MS } from '../main/draft/completion'
+import type { DraftSessionSnapshot } from '../main/parser/draft-session'
 import type { DraftState } from '../shared/state'
 
 // A stub ModelManager: knows two cards, prefers grpId 2, and grades them.

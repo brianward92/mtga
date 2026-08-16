@@ -9,9 +9,11 @@ import { DraftFM, type CardScore } from './draftfm'
 import { findBundleRoot, readBundleIndex, loadSetBundle, type BundleIndex, type SetBundle } from '../data/bundle'
 import { gradeForPercentile, percentileOf, type Grade } from '../../shared/grades'
 
-export type ModelState = 'ready' | 'loading' | 'no-bundle' | 'no-set' | 'error'
+/** Model availability shown by the draft UI. */
+type ModelState = 'ready' | 'loading' | 'no-bundle' | 'no-set' | 'error'
 
-export interface ModelStatus {
+/** Load/status metadata for the currently requested set and format. */
+interface ModelStatus {
   state: ModelState
   modelId: string | null
   modelTag: string | null
@@ -22,6 +24,7 @@ export interface ModelStatus {
   sets: string[]
 }
 
+/** One scored card enriched with pool-relative and set-relative grades. */
 export interface ScoredCard extends CardScore {
   /** "For your pool": set-relative percentile of the card's pool-conditioned score. */
   percentile: number | null
@@ -34,7 +37,6 @@ export interface ScoredCard extends CardScore {
 interface Loaded {
   key: string
   model: DraftFM
-  bundle: SetBundle
   curve: Float32Array
   /** grpId -> P1P1 logit, for per-card percentile lookups */
   p1p1ByGrp: Map<number, number>
@@ -42,6 +44,7 @@ interface Loaded {
   rowByGrp: Map<number, number>
 }
 
+/** Loads and caches the one local DraftFM scorer needed by the live draft. */
 export class ModelManager {
   private root: string | null
   private index: BundleIndex | null
@@ -54,12 +57,16 @@ export class ModelManager {
     this.index = this.root ? readBundleIndex(this.root) : null
   }
 
-  get available(): boolean { return !!this.index }
+  /** Shipped model version tag, or null when no bundle is available. */
   get modelTag(): string | null { return this.index?.modelTag ?? null }
+  /** Shipped set codes in stable display order. */
   get sets(): string[] { return this.index ? Object.keys(this.index.sets).sort() : [] }
+  /** Whether a set has both index metadata and model assets. */
   hasSet(set: string): boolean { return !!this.index && !!this.index.sets[set] && !!this.root && existsSync(join(this.root, 'sets', set, 'assets.npz')) }
+  /** Load static card metadata for a set without loading ONNX sessions. */
   bundleFor(set: string): SetBundle | null { return this.root ? loadSetBundle(this.root, set) : null }
 
+  /** Report model readiness for a requested set and format. */
   status(set: string | null, format: string | null): ModelStatus {
     const base = { modelId: this.loaded?.model.modelId ?? null, modelTag: this.index?.modelTag ?? null, set, format, sets: this.sets, message: null as string | null }
     if (!this.index) return { ...base, state: 'no-bundle', message: 'model bundle missing' }
@@ -83,7 +90,7 @@ export class ModelManager {
         const old = this.loaded
         const model = await DraftFM.load(this.index!.modelDir, set, format, bundle.assetsPath)
         const curveInfo = await this.curveFor(model, set, format)
-        this.loaded = { key, model, bundle, curve: curveInfo.curve, p1p1ByGrp: curveInfo.byGrp, rowByGrp: new Map(model.grpRows()) }
+        this.loaded = { key, model, curve: curveInfo.curve, p1p1ByGrp: curveInfo.byGrp, rowByGrp: new Map(model.grpRows()) }
         this.lastError = null
         if (old) void old.model.release()
         return this.loaded

@@ -7,7 +7,7 @@ AUDIT-2026-08-15.md for what was cut and why.)
 
 ```
 main/index.ts               bootstrap + wiring; overlay visibility policy; tray; global shortcuts; IPC
-main/parser/                LogWatcher (Player-prev.log replay + Player.log tail) → LogParser → DraftParser
+main/parser/                LogWatcher (Player-prev.log replay + Player.log tail) → DraftParser
 main/draft/coordinator.ts   DraftState machine: start/pack/pick/end/idle; scoring (0-based pack/pick);
                             grades; pool/picks; JSONL history; replay-safe
 main/model/draftfm.ts       OnnxDraftFMModel port (onnxruntime-node); bit-for-bit vs Python fixtures

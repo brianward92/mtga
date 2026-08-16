@@ -5,7 +5,7 @@
  * overlay draws per-card badges on the pack grid and a corner HUD; the pack is
  * scored locally by the bundled DraftFM model. Nothing here talks to a server.
  *
- * Wiring: LogWatcher → LogParser (draft events) → DraftCoordinator (state)
+ * Wiring: LogWatcher → DraftParser (draft events) → DraftCoordinator (state)
  *         ArenaGeometryPoller (native helper) → overlay bounds + LayerDetector
  *         prefs/tray/shortcuts → user intent
  */
@@ -13,7 +13,7 @@ import { app, BrowserWindow, globalShortcut, ipcMain, shell } from 'electron'
 import { join } from 'path'
 import { writeFileSync } from 'fs'
 import { LogWatcher } from './parser/watcher'
-import { LogParser } from './parser/index'
+import { startDraftLogPipeline } from './parser/pipeline'
 import { ArenaGeometryPoller, type ArenaRect } from './arena-geometry'
 import { ModelManager } from './model/manager'
 import { DraftHistory } from './data/history'
@@ -24,9 +24,10 @@ import { LayerDetector } from './overlay/layer'
 import { Calibration } from './overlay/calibration'
 import { screenCaptureGranted } from './overlay/occlusion'
 import { OverlayGeometrySync } from './overlay/geometry-sync'
-import { loadPrefs, savePrefs, type Prefs } from './prefs'
+import { badgesAreLive, wantsOverlayContent, type OverlayActivity } from './overlay/activity-policy'
+import { loadPrefs, savePrefs } from './prefs'
 import { StatusTray } from './status-tray'
-import type { DraftState } from '../shared/state'
+import type { DraftState, Prefs } from '../shared/state'
 import type { CalibrationOp, Rect } from '../shared/layout'
 import { arenaDisplayOrder } from '../shared/display-order'
 
@@ -37,7 +38,6 @@ import { arenaDisplayOrder } from '../shared/display-order'
 let overlay: BrowserWindow | null = null
 let tray: StatusTray | null = null
 let logWatcher: LogWatcher | null = null
-let logParser: LogParser | null = null
 let models: ModelManager
 let coordinator: DraftCoordinator
 let layer: LayerDetector
@@ -52,23 +52,25 @@ let sheetOpen = true
 // Overlay visibility policy
 // ---------------------------------------------------------------------------
 
-/** Does current Arena/draft state call for overlay content? */
-function overlayContentWanted(): boolean {
-  if (!poller.lastKnown || !poller.isFound()) return false
+/** Snapshot the inputs shared by overlay visibility and capture policy. */
+function currentOverlayActivity(): OverlayActivity {
   const prefs = loadPrefs()
-  const d = coordinator.current
-  if (calibration.active) return true
-  if (d.phase !== 'idle') return prefs.badges || prefs.hud
-  return prefs.hud
+  const draft = coordinator.current
+  return {
+    arenaFound: poller.lastKnown !== null && poller.isFound(),
+    arenaFrontmost: poller.arenaFrontmost,
+    overlayAvailable: !!overlay && !overlay.isDestroyed(),
+    calibrating: calibration.active,
+    phase: draft.phase,
+    cardCount: draft.cards.length,
+    badgesEnabled: prefs.badges,
+    hudEnabled: prefs.hud
+  }
 }
 
-/** Badges are live: draft with a pack on screen, badges enabled, overlay wanted. */
-function badgesLive(): boolean {
-  if (!overlay || overlay.isDestroyed()) return false
-  const d = coordinator.current
-  return loadPrefs().badges && d.phase === 'active' && d.cards.length > 0 &&
-    poller.arenaFrontmost && overlayContentWanted()
-}
+function isOverlayContentWanted(): boolean { return wantsOverlayContent(currentOverlayActivity()) }
+
+function areBadgesLive(): boolean { return badgesAreLive(currentOverlayActivity()) }
 
 function syncOverlay(): void {
   overlayGeometrySync.sync()
@@ -79,7 +81,7 @@ const overlayGeometrySync = new OverlayGeometrySync({
   arenaFound: () => poller.isFound(),
   arenaRect: () => poller.lastKnown,
   arenaFrontmost: () => poller.arenaFrontmost,
-  contentWanted: overlayContentWanted,
+  contentWanted: isOverlayContentWanted,
   setRect: rect => { if (overlay) setOverlayRect(overlay, rect) },
   show: () => { if (overlay) showOverlay(overlay) },
   hide: () => { if (overlay) hideOverlay(overlay) },
@@ -87,7 +89,7 @@ const overlayGeometrySync = new OverlayGeometrySync({
     // Cursor polling is useful only while badge geometry is live.
     layer?.syncActivity()
     // Window capture only while badges need layer awareness.
-    poller.setCapture(loadPrefs().layerDetection && badgesLive())
+    poller.setCapture(loadPrefs().layerDetection && areBadgesLive())
   }
 })
 
@@ -130,7 +132,6 @@ function refreshTray(): void {
     draft: coordinator.current,
     prefs: loadPrefs(),
     layerDetectionAvailable: poller.captureOn || screenCaptureGranted(),
-    overlayVisible: !!overlay && !overlay.isDestroyed() && overlay.isVisible(),
     arenaFound: poller.isFound() && poller.lastKnown !== null
   })
 }
@@ -160,26 +161,6 @@ function setupModelAndDraft(): void {
   })())
 }
 
-function setupLogPipeline(): void {
-  logParser = new LogParser()
-  logParser.on('draft-start', s => coordinator.onDraftStart(s))
-  logParser.on('draft-pack', s => coordinator.onDraftPack(s))
-  logParser.on('draft-pick', (s, p) => coordinator.onDraftPick(s, p))
-  logParser.on('draft-end', s => coordinator.onDraftEnd(s))
-  logParser.on('detailed-logs', ({ enabled }: { enabled: boolean }) => {
-    coordinator.setWarning(enabled ? null : 'Enable Detailed Logs in Arena: Options → Account → Detailed Logs (Plugin Support)')
-  })
-
-  logWatcher = new LogWatcher()
-  logWatcher.on('line', (line: string) => logParser?.parseLine(line))
-  logWatcher.on('replay-start', () => coordinator.setReplaying(true))
-  logWatcher.on('replay-complete', () => {
-    console.log('[Watcher] replay complete, tailing live')
-    coordinator.resumeAfterReplay()
-  })
-  void logWatcher.start()
-}
-
 function setupGeometry(): void {
   poller.on('geometry', () => { syncOverlay(); refreshTray() })
   poller.on('lost', () => { syncOverlay(); refreshTray() })
@@ -196,7 +177,7 @@ function setupGeometry(): void {
       return arenaDisplayOrder(cards).map(i => cards[i].name)
     },
     config: (rect: ArenaRect) => calibration.configFor(rect),
-    active: () => badgesLive() && !calibration.active
+    active: () => areBadgesLive() && !calibration.active
   })
   layer.on('change', state => send('overlay:layer', state))
   layer.syncActivity()
@@ -297,7 +278,7 @@ if (!app.requestSingleInstanceLock()) {
     await createOverlay()
     setupTray()
     setupShortcuts()
-    setupLogPipeline()
+    logWatcher = startDraftLogPipeline(coordinator)
   })
 }
 
