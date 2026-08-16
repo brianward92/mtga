@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "e2e": "node tests/e2e/drive.mjs",
-    "bundle:sets": "cd .. && .venv/bin/python scripts/build_app_bundle.py --all-curated",
+    "bundle:sets": "cd .. && .venv/bin/python scripts/build_app_bundle.py --all",
     "install:local": "bash scripts/install-local.sh"
   },
   "dependencies": {

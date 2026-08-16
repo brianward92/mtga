@@ -26,6 +26,22 @@ running **locally**, weights bundled, no server.
 - Nothing leaves the machine. Inference and card metadata are bundled; the app
   has no runtime server or card-data requests.
 
+## Visual checkpoints
+
+The strict E2E run produces the canonical UI screenshots below from an
+isolated synthetic 42-pick DSK draft. PNGs are test artifacts rather than
+checked-in product assets; generate them with `npm run build && npm run e2e`.
+
+| Screenshot | What it verifies |
+| --- | --- |
+| `00-idle.png` | Tiny click-through idle glyph and no draft UI leakage |
+| `04-sheet.png` | Ranked recommendation and joined pool rail |
+| `06-p2p6.png` | Populated Pack 2 pool with internal scrolling and safe bounds |
+| `08-complete.png` | Draft summary, grouped duplicate rows, pick labels, and Lands divider |
+
+The complete checkpoint list and harness controls live in
+[`tests/e2e/README.md`](tests/e2e/README.md).
+
 ## Requirements
 
 - macOS 14+ (Apple silicon build), MTG Arena with **Detailed Logs** enabled
@@ -49,6 +65,8 @@ the app to `/Applications`, and refuses to replace a running copy.
 
 `npm run dev` runs from source. The app lives in the menu bar (card icon):
 toggles for badges / HUD / Precise layering, grid calibration, quit.
+See [`docs/RELEASE.md`](docs/RELEASE.md) for the full verification gate,
+artifact audit, set-update workflow, and signing/permission boundaries.
 
 ## The model bundle
 
