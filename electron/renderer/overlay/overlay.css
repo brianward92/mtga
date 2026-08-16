@@ -515,6 +515,8 @@ body.calibrating .sheet { display: none; }
   z-index: 30;
   top: 22%;
   bottom: 9%;
+  max-height: 91vh;
+  min-height: 0;
   width: clamp(220px, 22vw, 340px);
   display: flex;
   flex-direction: column;
@@ -527,14 +529,16 @@ body.calibrating .sheet { display: none; }
   visibility: hidden;
   transition: transform var(--t), opacity var(--t), visibility 0s linear 80ms;
   opacity: 0;
+  overflow: hidden;
 }
 .sheet.side-right { right: 2%; transform: translateX(6%); }
 .sheet.side-left { left: 2%; transform: translateX(-6%); }
 .sheet.open { visibility: visible; transform: none; opacity: 1; transition: transform var(--t), opacity var(--t), visibility 0s; }
 .sheet.open.yield { opacity: 0.08; pointer-events: none; }
 
-/* Panel bodies yield to Arena; controls remain discoverable by elementFromPoint
-   so forwarded mouse movement can restore the interactive window before click. */
+/* Joined panel bodies receive .yield together; standalone panels receive it
+   alone. Controls remain discoverable by elementFromPoint so forwarded mouse
+   movement restores the whole rail before click. */
 .hud.yield:not(.covered) button,
 .sheet.open.yield button { pointer-events: auto; }
 
@@ -604,7 +608,7 @@ body.calibrating .sheet { display: none; }
 }
 
 .sheet-body {
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;

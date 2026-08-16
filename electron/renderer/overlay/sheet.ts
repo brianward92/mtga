@@ -12,10 +12,42 @@ import type { CardRow, PickRecord } from '../../shared/state'
 import { gradeTier, gradeOrdinal, poolRating } from '../../shared/grades'
 import { agreement, COLOR_NAMES, POOL_COLORS, poolSummary, sheetSide } from './hud-logic'
 import { escapeHtml, renderManaCost } from './shared'
-import type { Rect, Store } from './types'
+import type { HudCorner, Rect, Store } from './types'
 import { sheetShouldRender } from './visibility'
 
 type Action = (name: string, data?: unknown) => void
+
+const SHEET_TOP_FRACTION = 0.22
+const SHEET_BOTTOM_FRACTION = 0.09
+
+export interface SheetAnchor {
+  readonly top: number
+  readonly bottom: number
+  readonly height: number
+}
+
+/**
+ * Keep the sheet inside the Arena view. The bottom safe area is a hard floor;
+ * long pool/pick content scrolls inside this geometry instead of extending it.
+ */
+export function sheetAnchor(viewHeight: number, corner: HudCorner, hudRect: Rect | null): SheetAnchor {
+  const height = Number.isFinite(viewHeight) ? Math.max(0, viewHeight) : 0
+  if (height === 0) return { top: 0, bottom: 0, height: 0 }
+
+  const topEdge = Math.round(height * SHEET_TOP_FRACTION)
+  // ceil, rather than round, guarantees at least 9% remains clear.
+  const bottomEdge = Math.ceil(height * SHEET_BOTTOM_FRACTION)
+  let top = topEdge
+  let bottom = bottomEdge
+  if (hudRect) {
+    if (corner === 'tl' || corner === 'tr') {
+      top = Math.min(Math.max(0, Math.round(hudRect.y + hudRect.height)), height - bottom)
+    } else {
+      bottom = Math.min(Math.max(bottomEdge, Math.round(height - hudRect.y)), height - top)
+    }
+  }
+  return { top, bottom, height: Math.max(0, height - top - bottom) }
+}
 
 /** Set-review grade for pool display: the raw set rating (falls back to the pool grade). */
 function reviewGrade(card: Pick<CardRow, 'grade' | 'setGrade'>) {
@@ -174,17 +206,7 @@ export class Sheet {
   private anchor(store: Store, hudRect: Rect | null): void {
     const { view } = store
     const corner = store.prefs.hudCorner
-    const gap = 0 // flush: HUD + pool read as one rail panel
-    const topEdge = Math.round(view.height * 0.22)
-    const bottomEdge = Math.round(view.height * 0.09)
-    let top = topEdge
-    let bottom = bottomEdge
-    if (hudRect) {
-      if (corner === 'tl' || corner === 'tr') top = Math.round(hudRect.y + hudRect.height + gap)
-      else bottom = Math.round(view.height - hudRect.y + gap)
-    }
-    // Never collapse below a usable height: fall back to the full rail.
-    if (view.height - top - bottom < view.height * 0.25) { top = topEdge; bottom = bottomEdge }
+    const { top, bottom } = sheetAnchor(view.height, corner, hudRect)
     const key = `${top}:${bottom}`
     if (key === this.anchorKey) return
     this.anchorKey = key

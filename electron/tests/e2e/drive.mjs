@@ -51,6 +51,7 @@ const SEL = {
   hudSheetBtn: '[data-testid="hud-btn-sheet"]',
   hudCalBtn: '[data-testid="hud-btn-calibrate"]',
   sheetRoot: '#sheet',
+  sheetBody: '.sheet-body',
   sheetColours: '#sheetColours',
   sheet: '[data-testid="sheet"]',
   calPanel: '[data-testid="calibrate-panel"]',
@@ -111,6 +112,37 @@ async function expectPage(page, fn, label) {
   if (await page.evaluate(fn, SEL)) return true
   failures.push(label)
   console.error('  FAIL', label)
+  return false
+}
+
+async function expectSheetContained(page, label, requireScroll = false) {
+  const result = await page.evaluate((S, shouldScroll) => {
+    const sheet = document.querySelector(S.sheetRoot)
+    const body = document.querySelector(S.sheetBody)
+    if (!sheet || !body) return { ok: false, reason: 'missing sheet/body' }
+    const rail = sheet.getBoundingClientRect()
+    const content = body.getBoundingClientRect()
+    const overflowY = getComputedStyle(body).overflowY
+    const safeBottom = window.innerHeight * 0.91 + 1
+    if (shouldScroll) body.scrollTop = body.scrollHeight
+    const scrollTop = body.scrollTop
+    const rootContained = rail.top >= -1 && rail.bottom <= safeBottom && rail.bottom <= window.innerHeight + 1 && rail.height > 0
+    const bodyContained = content.top >= rail.top - 1 && content.bottom <= rail.bottom + 1 &&
+      sheet.scrollHeight <= sheet.clientHeight + 1
+    const scrollReady = overflowY === 'auto' || overflowY === 'scroll'
+    const scrolls = body.scrollHeight > body.clientHeight && scrollTop > 0
+    return {
+      ok: rootContained && bodyContained && scrollReady && (!shouldScroll || scrolls),
+      viewHeight: window.innerHeight,
+      rail: { top: rail.top, bottom: rail.bottom, height: rail.height },
+      body: { top: content.top, bottom: content.bottom, clientHeight: body.clientHeight, scrollHeight: body.scrollHeight, scrollTop, overflowY },
+      rootScroll: { clientHeight: sheet.clientHeight, scrollHeight: sheet.scrollHeight },
+      requireScroll: shouldScroll
+    }
+  }, SEL, requireScroll)
+  if (result.ok) return true
+  failures.push(`${label}: ${JSON.stringify(result)}`)
+  console.error('  FAIL', label, result)
   return false
 }
 
@@ -224,18 +256,53 @@ try {
   await page.mouse.move(5, 5)
   await sleep(100)
 
+  // HUD + sheet are one dwell surface: resting on either body yields both,
+  // while entering a button restores the complete rail before the click.
+  const sheetBodyPoint = await page.evaluate(S => {
+    const r = document.querySelector(S.sheetBody).getBoundingClientRect()
+    return { x: r.x + r.width / 2, y: r.y + Math.min(40, r.height / 2) }
+  }, SEL)
+  await page.mouse.move(sheetBodyPoint.x, sheetBodyPoint.y)
+  await sleep(400)
+  await expectPage(page, S => {
+    const hud = document.querySelector(S.hud)
+    const sheet = document.querySelector(S.sheetRoot)
+    if (!hud || !sheet) return false
+    const hudOpacity = Number.parseFloat(getComputedStyle(hud).opacity)
+    const sheetOpacity = Number.parseFloat(getComputedStyle(sheet).opacity)
+    return hud.classList.contains('yield') && sheet.classList.contains('yield') &&
+      Math.abs(hudOpacity - 0.08) < 0.02 && Math.abs(sheetOpacity - 0.08) < 0.02
+  }, 'joined HUD and sheet yield together after body dwell')
+  const railButtonPoint = await page.evaluate(S => {
+    const r = document.querySelector(S.hudSheetBtn).getBoundingClientRect()
+    return { x: r.x + r.width / 2, y: r.y + r.height / 2 }
+  }, SEL)
+  await page.mouse.move(railButtonPoint.x, railButtonPoint.y)
+  await sleep(100)
+  await expectPage(page, S => {
+    const hud = document.querySelector(S.hud)
+    const sheet = document.querySelector(S.sheetRoot)
+    const button = document.querySelector(S.hudSheetBtn)
+    return !!hud && !!sheet && !!button && !hud.classList.contains('yield') &&
+      !sheet.classList.contains('yield') && getComputedStyle(button).pointerEvents === 'auto'
+  }, 'rail button restores both joined panels before click')
+
   // The pool sheet opens with the draft. Capture it, then close it via the HUD.
   await shot(page, '04-sheet')
   await page.click(SEL.hudSheetBtn).catch(e => failures.push(`sheet button: ${e.message}`))
   await waitFor(page, S => !document.querySelector(S.sheet), 'sheet closed', 3000)
+  await page.click(SEL.hudSheetBtn).catch(e => failures.push(`sheet reopen button: ${e.message}`))
+  await waitFor(page, S => !!document.querySelector(S.sheet), 'sheet reopened for populated-pool checks', 3000)
 
   await feedUntil(nthPickNext(6)) // 6 more PickNext after P1P1 → P1P7 (8 cards)
   await waitFor(page, S => document.querySelectorAll(S.cell).length === 8, '8 cells at p1p7')
   await sleep(600)
+  await expectSheetContained(page, 'P1P7 sheet stays inside the Arena rail')
   await shot(page, '05-p1p7')
 
   await feedUntil(nthPickNext(13)) // → P2P6
   await sleep(700)
+  await expectSheetContained(page, 'P2P6 sheet scrolls inside the Arena rail', true)
   await shot(page, '06-p2p6')
 
   // Calibration mode through the HUD.

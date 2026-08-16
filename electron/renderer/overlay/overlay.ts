@@ -21,8 +21,14 @@ import {
   advanceRailDwell,
   pointInRailBounds,
   railDwellDelay,
+  railDwellIncludes,
+  railDwellTarget,
+  railTopology,
+  reconcileRailDwellTopology,
   type RailDwellState,
-  type RailPanel
+  type RailDwellTarget,
+  type RailPanel,
+  type RailTopology
 } from './rail-dwell'
 
 const EMPTY_LAYER: LayerState = { cells: [], regions: [], covered: false, hudCovered: false }
@@ -71,10 +77,11 @@ function render(): void {
   badges.update(store, layout)
   hud.update(store)
   calibrate.update(store)
-  // One layout read per frame, after all writes above: main lifts the HUD
-  // when Arena covers it, and the sheet stacks against it on the same rail.
+  // Layout reads happen after the layer writes: the HUD rect anchors the
+  // sheet, then their measured seam determines joined-rail dwell topology.
   const hudRect = hud.reportRect(rect => bridge?.setHudRect(rect))
   sheet.update(store, hudRect)
+  syncRailTopology()
 }
 
 // ---------------------------------------------------------------------------
@@ -103,6 +110,7 @@ function currentLayout(): PackLayout | null {
 let interactive = false
 let railDwell: RailDwellState = EMPTY_RAIL_DWELL
 let railDwellTimer: number | null = null
+let currentRailTopology: RailTopology = 'none'
 
 function setInteractive(on: boolean): void {
   if (on === interactive) return
@@ -110,28 +118,86 @@ function setInteractive(on: boolean): void {
   bridge?.setInteractive(on)
 }
 
-function railBodyAt(el: Element | null, x: number, y: number): RailPanel | null {
-  // Buttons opt back into pointer events inside a yielded panel. Check them
-  // before the bounds fallback so entering one immediately restores clicks.
+function railPanelVisible(panel: RailPanel): boolean {
+  if (document.body.classList.contains('calibrating')) return false
+  if (panel === 'hud') {
+    return hudRoot.classList.contains('interactive') &&
+      !hudRoot.classList.contains('hidden') &&
+      !hudRoot.classList.contains('covered')
+  }
+  return sheetRoot.classList.contains('interactive') && sheetRoot.classList.contains('open')
+}
+
+function measuredRailTopology(): RailTopology {
+  const hudVisible = railPanelVisible('hud')
+  const sheetVisible = railPanelVisible('sheet')
+  let joined = false
+  if (hudVisible && sheetVisible) {
+    const hudBounds = hudRoot.getBoundingClientRect()
+    const sheetBounds = sheetRoot.getBoundingClientRect()
+    joined = sheetBounds.height > 0 && (
+      (sheetRoot.classList.contains('stack-below') && Math.abs(hudBounds.bottom - sheetBounds.top) <= 1) ||
+      (sheetRoot.classList.contains('stack-above') && Math.abs(sheetBounds.bottom - hudBounds.top) <= 1)
+    )
+  }
+  return railTopology(hudVisible, sheetVisible, joined)
+}
+
+function applyRailYield(): void {
+  hudRoot.classList.toggle('yield', railDwellIncludes(railDwell.yielded, 'hud'))
+  sheetRoot.classList.toggle('yield', railDwellIncludes(railDwell.yielded, 'sheet'))
+}
+
+function syncRailTopology(): void {
+  const next = measuredRailTopology()
+  if (next !== currentRailTopology) {
+    railDwell = reconcileRailDwellTopology(railDwell, currentRailTopology, next)
+    currentRailTopology = next
+    if (railDwellTimer !== null) {
+      window.clearTimeout(railDwellTimer)
+      railDwellTimer = null
+    }
+    // A shortcut/phase/pref transition can move the rail out from under a
+    // stationary cursor. Resume click-through until forwarded movement
+    // establishes a target in the new topology.
+    setInteractive(false)
+  }
+  // Hud.update replaces its base class string; preserve a valid active yield.
+  applyRailYield()
+}
+
+function railBodyAt(el: Element | null, x: number, y: number): RailDwellTarget | null {
+  // Buttons opt back into pointer events inside a yielded rail. Check them
+  // before the bounds fallback so entering one immediately restores both
+  // joined panels and their clicks.
   if (el?.closest('button, .hud-icon, .sheet-close')) return null
+  const joined = currentRailTopology === 'rail'
   if (railDwell.yielded !== null) {
-    const root = railDwell.yielded === 'hud' ? hudRoot : sheetRoot
-    if (pointInRailBounds(x, y, root.getBoundingClientRect())) return railDwell.yielded
+    // Map a bounds hit through the *current* topology. Opening/closing or
+    // hiding a sibling therefore restores the rail and starts a fresh dwell
+    // for the new grouped/standalone surface.
+    if (railDwellIncludes(railDwell.yielded, 'hud') && railPanelVisible('hud') && pointInRailBounds(x, y, hudRoot.getBoundingClientRect())) {
+      return railDwellTarget('hud', joined)
+    }
+    if (railDwellIncludes(railDwell.yielded, 'sheet') && railPanelVisible('sheet') && pointInRailBounds(x, y, sheetRoot.getBoundingClientRect())) {
+      return railDwellTarget('sheet', joined)
+    }
   }
   if (!el) return null
   const panel = el.closest<HTMLElement>('.hud.interactive, .sheet.interactive')
-  if (panel === hudRoot) return 'hud'
-  if (panel === sheetRoot) return 'sheet'
+  let railPanel: RailPanel | null = null
+  if (panel === hudRoot) railPanel = 'hud'
+  if (panel === sheetRoot) railPanel = 'sheet'
+  if (railPanel !== null) return railDwellTarget(railPanel, joined)
   return null
 }
 
-function updateRailDwell(target: RailPanel | null, now = performance.now()): boolean {
+function updateRailDwell(target: RailDwellTarget | null, now = performance.now()): boolean {
   const previousYield = railDwell.yielded
   railDwell = advanceRailDwell(railDwell, target, now)
 
   if (previousYield !== railDwell.yielded) {
-    hudRoot.classList.toggle('yield', railDwell.yielded === 'hud')
-    sheetRoot.classList.toggle('yield', railDwell.yielded === 'sheet')
+    applyRailYield()
   }
 
   if (railDwellTimer !== null) {

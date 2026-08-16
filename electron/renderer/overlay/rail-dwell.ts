@@ -1,11 +1,13 @@
 export const RAIL_DWELL_MS = 250
 
 export type RailPanel = 'hud' | 'sheet'
+export type RailDwellTarget = RailPanel | 'rail'
+export type RailTopology = 'none' | RailPanel | 'split' | 'rail'
 
 export interface RailDwellState {
-  readonly target: RailPanel | null
+  readonly target: RailDwellTarget | null
   readonly since: number
-  readonly yielded: RailPanel | null
+  readonly yielded: RailDwellTarget | null
 }
 
 export interface RailBounds {
@@ -26,10 +28,36 @@ export function pointInRailBounds(x: number, y: number, bounds: RailBounds): boo
   return x >= bounds.left && x < bounds.right && y >= bounds.top && y < bounds.bottom
 }
 
+/** Treat flush HUD + sheet panels as one dwell surface. */
+export function railDwellTarget(panel: RailPanel, joined: boolean): RailDwellTarget {
+  return joined ? 'rail' : panel
+}
+
+/** Which DOM roots should yield for a dwell target. */
+export function railDwellIncludes(target: RailDwellTarget | null, panel: RailPanel): boolean {
+  return target === 'rail' || target === panel
+}
+
+export function railTopology(hudVisible: boolean, sheetVisible: boolean, joined: boolean): RailTopology {
+  if (!hudVisible && !sheetVisible) return 'none'
+  if (hudVisible && !sheetVisible) return 'hud'
+  if (!hudVisible && sheetVisible) return 'sheet'
+  return joined ? 'rail' : 'split'
+}
+
+/** A topology change invalidates pending timers and existing yields. */
+export function reconcileRailDwellTopology(
+  state: RailDwellState,
+  previous: RailTopology,
+  next: RailTopology
+): RailDwellState {
+  return previous === next ? state : EMPTY_RAIL_DWELL
+}
+
 /** Pure dwell transition; the renderer owns the timer and DOM side effects. */
 export function advanceRailDwell(
   state: RailDwellState,
-  target: RailPanel | null,
+  target: RailDwellTarget | null,
   now: number,
   dwellMs = RAIL_DWELL_MS
 ): RailDwellState {

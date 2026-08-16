@@ -43,9 +43,9 @@ npm run e2e -- --keep-tmp --port 9333 --speed 8 --out /tmp/draftfm-e2e-shots
 | `01-p1p1-pack.png` | 14 cells, pool sheet open by default, model + Scryfall snapshot provenance, no legacy card-stat attribution |
 | `02-p1p1-scored.png` | at least ten scored badge chips |
 | `03-hover-detail.png` | cursor-driven card detail |
-| `04-sheet.png` | default-open pool and pick-history sheet before the HUD button closes it |
-| `05-p1p7.png` | eight-card pack at P1P7 |
-| `06-p2p6.png` | mid-draft state |
+| `04-sheet.png` | default-open sheet after joined-rail dwell and button-restore checks, before close/reopen |
+| `05-p1p7.png` | eight-card pack with the reopened, populated sheet contained above the bottom rail boundary |
+| `06-p2p6.png` | mid-draft populated sheet with proven internal scrolling and bottom containment |
 | `07-calibrate.png` | calibration panel opened from the HUD |
 | `08-complete.png` | completed draft state |
 
