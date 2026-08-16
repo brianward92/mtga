@@ -33,13 +33,19 @@ running **locally**, weights bundled, no server.
 - No macOS permissions are required by default. **Precise layering** is opt-in
   and requires Screen Recording. Accessibility permission is never required.
 
-## Install / run
+## Package / install
 
 ```bash
 cd electron
 npm install
-npm run install:local -- --launch   # typecheck, tests, build, package, copy to /Applications
+npm run package                     # unsigned Apple-silicon DMG + ZIP in release/
 ```
+
+Open the DMG and drag **MTGA Draft Assistant** to Applications. Because this
+development build is unsigned, macOS may require Control-clicking the app and
+choosing **Open** on first launch. For a local development install, run
+`npm run install:local -- --launch`; it typechecks, tests, builds, and copies
+the app to `/Applications`, and refuses to replace a running copy.
 
 `npm run dev` runs from source. The app lives in the menu bar (card icon):
 toggles for badges / HUD / Precise layering, grid calibration, quit.
