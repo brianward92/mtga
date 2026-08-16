@@ -173,9 +173,11 @@ export class BadgeLayer {
     if (scored !== n.scored) { n.scored = scored; n.cell.dataset.scored = scored ? 'true' : 'false' }
 
     // Rank tag / conviction label.
-    const rankText = chip.rank !== null && chip.rank <= 3 ? `#${chip.rank}` : ''
+    // #1–#5 (Brian: seeing 4 and 5 helps); #4/#5 render dimmer via a class.
+    const rankText = chip.rank !== null && chip.rank <= 5 ? `#${chip.rank}` : ''
     if (n.rank.textContent !== rankText) n.rank.textContent = rankText
     n.rank.hidden = rankText === ''
+    n.rank.classList.toggle('minor', chip.rank !== null && chip.rank >= 4)
     const labelText = chip.label ?? ''
     if (n.label.textContent !== labelText) n.label.textContent = labelText
     n.label.hidden = labelText === ''
