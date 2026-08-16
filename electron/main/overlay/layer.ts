@@ -13,16 +13,20 @@ import { EventEmitter } from 'events'
 import { screen } from 'electron'
 import type { ArenaGeometryPoller, ArenaRect, HelperFrame } from '../arena-geometry'
 import { packLayout, type CalibrationConfig, type Rect } from '../../shared/layout'
-import { hoveredCardIndex, predictPopout, intersects } from '../../shared/hover'
+import {
+  HoverPreviewIntent,
+  hoveredCardIndex,
+  intersects,
+  isRightmostGridColumn,
+  predictPopout,
+  previewCoveredCellIndices
+} from '../../shared/hover'
 import { detectOcclusion, scaleRect, cardness, CARDNESS_MIN, ABS_DARK, meanIn, frameFromBytes, type GrayFrame } from './occlusion'
 
 import type { LayerState } from '../../shared/state'
 export type { LayerState }
 
 const EMPTY: LayerState = { cells: [], regions: [], covered: false, hudCovered: false }
-/** Cursor must rest on a card this long before we predict a preview over it. */
-const HOVER_DWELL_MS = 350
-
 export interface LayerDeps {
   poller: ArenaGeometryPoller
   /** Number of cards in the live pack (0 when none). */
@@ -45,9 +49,8 @@ export class LayerDetector extends EventEmitter {
   private layoutKey = ''
   private layoutCache: ReturnType<typeof packLayout> | null = null
   private fallbackTimer: NodeJS.Timeout | null = null
-  /** Dwell tracking for the cursor prediction: Arena's preview needs a rest. */
-  private dwellIdx = -1
-  private dwellSince = 0
+  /** Enter dwell + leave grace for the cursor prediction fallback. */
+  private hoverIntent = new HoverPreviewIntent()
 
   constructor(private deps: LayerDeps) {
     super()
@@ -77,8 +80,7 @@ export class LayerDetector extends EventEmitter {
     }
     if (this.fallbackTimer) clearInterval(this.fallbackTimer)
     this.fallbackTimer = null
-    this.dwellIdx = -1
-    this.dwellSince = 0
+    this.hoverIntent.reset()
     this.publish(EMPTY)
   }
 
@@ -149,15 +151,22 @@ export class LayerDetector extends EventEmitter {
       this.publish({ cells: result.coveredCells.filter(i => i !== hoveredIdx), regions: [], covered: result.packCovered, hudCovered: result.extraCovered || result.packCovered })
       return
     }
-    this.predict(hoveredIdx, cellRects, view)
+    this.predict(hoveredIdx, cellRects, view, this.deps.config(rect).maxCols)
   }
 
-  private predict(hoveredIdx: number, cellRects: Rect[], view: { width: number; height: number }): void {
+  private predict(
+    hoveredIdx: number,
+    cellRects: Rect[],
+    view: { width: number; height: number },
+    maxCols: number
+  ): void {
     const name = hoveredIdx >= 0 ? this.deps.names?.()[hoveredIdx] : undefined
     const split = typeof name === 'string' && name.includes(' // ')
-    const regions = hoveredIdx >= 0 ? predictPopout(cellRects[hoveredIdx], view, { split }) : []
+    const flipLeft = isRightmostGridColumn(hoveredIdx, maxCols)
+    const regions = hoveredIdx >= 0 ? predictPopout(cellRects[hoveredIdx], view, { split, flipLeft }) : []
+    const cells = previewCoveredCellIndices(cellRects, hoveredIdx, regions)
     const hudCovered = !!this.hudRect && regions.some(r => intersects(r, this.hudRect!))
-    this.publish({ cells: [], regions, covered: false, hudCovered })
+    this.publish({ cells, regions, covered: false, hudCovered })
   }
 
   /**
@@ -169,14 +178,13 @@ export class LayerDetector extends EventEmitter {
   private fallbackTick(): void {
     const rect = this.deps.poller.lastKnown
     const count = this.deps.packCount()
-    if (!this.deps.active() || !rect || count === 0) { this.publish(EMPTY); this.dwellIdx = -1; return }
-    if (Date.now() - this.lastFrameAt < 1500) return
+    if (!this.deps.active() || !rect || count === 0) { this.publish(EMPTY); this.hoverIntent.reset(); return }
+    if (Date.now() - this.lastFrameAt < 1500) { this.hoverIntent.reset(); return }
     const view = { width: rect.width, height: rect.height }
     const cellRects = this.layout(rect, count).cards.map(c => c.card)
     const idx = hoveredCardIndex(this.cursorLocal(rect), cellRects)
     const now = Date.now()
-    if (idx !== this.dwellIdx) { this.dwellIdx = idx; this.dwellSince = now }
-    const rested = idx >= 0 && now - this.dwellSince >= HOVER_DWELL_MS
-    this.predict(rested ? idx : -1, cellRects, view)
+    const intendedIdx = this.hoverIntent.update(idx, now)
+    this.predict(intendedIdx, cellRects, view, this.deps.config(rect).maxCols)
   }
 }

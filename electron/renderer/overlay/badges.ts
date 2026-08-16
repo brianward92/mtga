@@ -7,12 +7,12 @@
  * updated in place (text/classes/geometry) — no innerHTML churn on state
  * pushes. Cells not in use are detached, so `[data-testid="badge-cell"]`
  * counts exactly the pack on screen. Layer awareness: cells main reports as
- * covered (or that intersect a predicted preview region) get `behind`;
- * `covered` lifts the whole layer.
+ * covered get `behind`; main applies the preview's calibrated overlap
+ * threshold before reporting those cell indices. `covered` lifts the whole
+ * layer.
  */
 import type { PackLayout, Rect } from '../../shared/layout'
 import { arenaDisplayOrder } from '../../shared/display-order'
-import { intersects } from '../../shared/hover'
 import { buildChips, type ChipModel } from './chips'
 import type { Store } from './types'
 
@@ -54,7 +54,6 @@ export class BadgeLayer {
     const chips = buildChips(cards, state.scoring)
     const order = arenaDisplayOrder(cards)
     const coveredCells = new Set(layer.cells)
-    const regions = layer.regions
 
     let used = 0
     for (let cell = 0; cell < order.length; cell++) {
@@ -64,7 +63,7 @@ export class BadgeLayer {
       if (!slot || !chip) continue
       const nodes = this.cellAt(used++)
       this.attach(nodes)
-      const behind = coveredCells.has(cell) || regions.some(r => intersects(r, slot.card))
+      const behind = coveredCells.has(cell)
       const scored = cards[cardIndex].ev !== null
       this.paintCell(nodes, chip, slot.card, slot.badge, behind, scored)
     }
