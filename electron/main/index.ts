@@ -72,6 +72,7 @@ function overlayContentWanted(): boolean {
 
 /** Badges are live: draft with a pack on screen, badges enabled, overlay wanted. */
 function badgesLive(): boolean {
+  if (!overlay || overlay.isDestroyed()) return false
   const d = coordinator.current
   return loadPrefs().badges && d.phase === 'active' && d.cards.length > 0 &&
     poller.arenaFrontmost && overlayContentWanted()
@@ -112,6 +113,8 @@ function syncOverlay(): void {
   if (rect) setOverlayRect(overlay, rect)
   if (mayShowOverlay(overlayReappearance, overlayContentWanted(), poller.arenaFrontmost)) showOverlay(overlay)
   else hideOverlay(overlay)
+  // Cursor polling is useful only while badge geometry is live.
+  layer?.syncActivity()
   // Window capture only while badges need layer awareness.
   poller.setCapture(loadPrefs().layerDetection && badgesLive())
 }
@@ -219,6 +222,7 @@ function setupGeometry(): void {
     active: () => badgesLive() && !calibration.active
   })
   layer.on('change', state => send('overlay:layer', state))
+  layer.syncActivity()
   calibration.on('change', () => pushCalibrate())
 }
 
@@ -290,6 +294,8 @@ async function createOverlay(): Promise<void> {
     cancelOverlayReappearanceSync()
     overlayReappearance = INITIAL_OVERLAY_REAPPEARANCE
     overlay = null
+    layer?.syncActivity()
+    poller.setCapture(false)
   })
 }
 

@@ -52,7 +52,6 @@ export class LayerDetector extends EventEmitter {
   constructor(private deps: LayerDeps) {
     super()
     deps.poller.on('frame', (f: HelperFrame) => this.onFrame(f))
-    this.fallbackTimer = setInterval(() => this.fallbackTick(), 50)
   }
 
   get state(): LayerState { return this.last }
@@ -67,8 +66,25 @@ export class LayerDetector extends EventEmitter {
     this.baselineCardness = 0
   }
 
+  /**
+   * Start the cursor fallback only while badges are live. Main calls this
+   * whenever draft, preference, calibration, or Arena visibility changes.
+   */
+  syncActivity(): void {
+    if (this.deps.active()) {
+      if (!this.fallbackTimer) this.fallbackTimer = setInterval(() => this.fallbackTick(), 50)
+      return
+    }
+    if (this.fallbackTimer) clearInterval(this.fallbackTimer)
+    this.fallbackTimer = null
+    this.dwellIdx = -1
+    this.dwellSince = 0
+    this.publish(EMPTY)
+  }
+
   dispose(): void {
     if (this.fallbackTimer) clearInterval(this.fallbackTimer)
+    this.fallbackTimer = null
   }
 
   private layout(rect: ArenaRect, count: number) {

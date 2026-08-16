@@ -15,6 +15,7 @@ import { BadgeLayer } from './badges'
 import { Hud } from './hud'
 import { Sheet } from './sheet'
 import { CalibrateLayer } from './calibrate'
+import { draftStateAdvanced, sameCalibrateState, sameLayerState, sameViewPrefs } from './render-change'
 import {
   EMPTY_RAIL_DWELL,
   advanceRailDwell,
@@ -177,7 +178,7 @@ window.addEventListener('blur', () => { updateRailDwell(null); setInteractive(fa
 function onState(raw: unknown): void {
   const next = raw as DraftState | null
   if (!next || typeof next !== 'object') return
-  if (typeof next.seq === 'number' && next.seq < store.state.seq) return // stale push
+  if (next === store.state || (typeof next.seq === 'number' && !draftStateAdvanced(store.state.seq, next.seq))) return
   const packChanged = next.pack !== store.state.pack || next.pick !== store.state.pick || next.cards.length !== store.state.cards.length
   store.state = next
   if (packChanged) store.hoverCell = -1
@@ -187,34 +188,40 @@ function onState(raw: unknown): void {
 function onPrefs(raw: unknown): void {
   const p = raw as Partial<ViewPrefs> | null
   if (!p || typeof p !== 'object') return
-  store.prefs = {
+  const next: ViewPrefs = {
     badges: p.badges !== false,
     hud: p.hud !== false,
     hudCorner: p.hudCorner === 'tl' || p.hudCorner === 'tr' || p.hudCorner === 'bl' || p.hudCorner === 'br' ? p.hudCorner : 'tr',
     layerDetection: p.layerDetection !== false
   }
+  if (sameViewPrefs(store.prefs, next)) return
+  store.prefs = next
   schedule()
 }
 
 function onLayer(raw: unknown): void {
   const l = raw as Partial<LayerState> | null
-  store.layer = {
+  const next: LayerState = {
     cells: Array.isArray(l?.cells) ? l!.cells : [],
     regions: Array.isArray(l?.regions) ? l!.regions : [],
     covered: l?.covered === true,
     hudCovered: l?.hudCovered === true
   }
+  if (sameLayerState(store.layer, next)) return
+  store.layer = next
   schedule()
 }
 
 function onCalibrate(raw: unknown): void {
   const c = raw as Partial<CalibrateState> | null
-  store.calibrate = {
+  const next: CalibrateState = {
     active: c?.active === true,
     count: c?.count === 13 || c?.count === 15 ? c.count : 14,
     config: c?.config && typeof c.config === 'object' ? { ...DEFAULT_CALIBRATION, ...c.config } : { ...DEFAULT_CALIBRATION },
     arenaFound: c?.arenaFound === true
   }
+  if (sameCalibrateState(store.calibrate, next)) return
+  store.calibrate = next
   if (store.calibrate.active) store.hoverCell = -1
   schedule()
 }
@@ -225,7 +232,9 @@ function onCommand(raw: unknown): void {
     case 'toggle-sheet': {
       // Main owns the truth; it sends the resulting state with the command.
       const open = (cmd?.data as { open?: boolean } | undefined)?.open
-      store.sheetOpen = typeof open === 'boolean' ? open : !store.sheetOpen
+      const next = typeof open === 'boolean' ? open : !store.sheetOpen
+      if (next === store.sheetOpen) break
+      store.sheetOpen = next
       schedule()
       break
     }
