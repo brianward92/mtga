@@ -10,9 +10,10 @@
  */
 import type { CardRow, PickRecord } from '../../shared/state'
 import { gradeTier, gradeOrdinal, poolRating } from '../../shared/grades'
-import { agreement, groupPool, POOL_GROUP_NAMES, sheetSide } from './hud-logic'
+import { agreement, COLOR_NAMES, POOL_COLORS, poolSummary, sheetSide } from './hud-logic'
 import { escapeHtml, renderManaCost } from './shared'
 import type { Rect, Store } from './types'
+import { sheetShouldRender } from './visibility'
 
 type Action = (name: string, data?: unknown) => void
 
@@ -46,6 +47,15 @@ export function poolRatingLabel(pool: ReadonlyArray<CardRow>): { text: string; g
   return { text: r.grade ? `${r.grade}` : '—', grade: r.grade }
 }
 
+/** Compact W/U/B/R/G card counts for the pool header (lands excluded). */
+export function poolColourCountsHtml(pool: ReadonlyArray<Pick<CardRow, 'colors' | 'type'>>): string {
+  const counts = poolSummary(pool).counts
+  return POOL_COLORS.map(colour => {
+    const count = counts[colour]
+    return `<span class="sheet-colour-chip ${colour}" data-colour="${colour}" aria-label="${COLOR_NAMES[colour]}: ${count}" title="${COLOR_NAMES[colour]} cards"><i>${colour}</i><b>${count}</b></span>`
+  }).join('')
+}
+
 export function poolHtml(pool: ReadonlyArray<CardRow>, picks: ReadonlyArray<PickRecord> = []): string {
   if (pool.length === 0) return '<div class="s-empty">No cards yet</div>'
   // Pick number per card (first unmatched pick of that grpId, in order).
@@ -56,11 +66,9 @@ export function poolHtml(pool: ReadonlyArray<CardRow>, picks: ReadonlyArray<Pick
     pickPos.set(p.grpId, list)
   }
   const posOf = (grpId: number): string => pickPos.get(grpId)?.shift() ?? ''
-  const groups = groupPool(pool)
-  const colourCounts = groups.map(g => `<span class="s-count-chip ${g.group}">${g.cards.length}</span>`).join('')
   return `
     <div class="s-group">
-      <h3 class="sheet-h"><span>Cards, best → worst</span><span class="s-counts">${colourCounts}</span></h3>
+      <h3 class="sheet-h">Cards, best → worst</h3>
       ${sortPoolByGrade(pool).map(c => `
         <div class="s-card">
           ${gradeHtml(c)}
@@ -100,9 +108,11 @@ export class Sheet {
   private readonly agree: HTMLElement
   private readonly title: HTMLElement
   private readonly rating: HTMLElement
+  private readonly colours: HTMLElement
   private renderedKey = ''
   private open = false
   private side = ''
+  private stack = ''
   private anchorKey = ''
 
   constructor(private root: HTMLElement, action: Action) {
@@ -111,6 +121,7 @@ export class Sheet {
     this.agree = root.querySelector('#sheetAgree')!
     this.title = root.querySelector('#sheetTitle')!
     this.rating = root.querySelector('#sheetRating')!
+    this.colours = root.querySelector('#sheetColours')!
     root.querySelector('#btnSheetClose')!.addEventListener('click', () => action('toggle-sheet'))
   }
 
@@ -121,9 +132,16 @@ export class Sheet {
       this.root.classList.remove('side-left', 'side-right')
       this.root.classList.add(side)
     }
+    const stack = store.prefs.hudCorner === 'tl' || store.prefs.hudCorner === 'tr' ? 'stack-below' : 'stack-above'
+    if (stack !== this.stack) {
+      this.stack = stack
+      this.root.classList.remove('stack-below', 'stack-above')
+      this.root.classList.add(stack)
+    }
     this.anchor(store, hudRect)
-    if (store.sheetOpen !== this.open) {
-      this.open = store.sheetOpen
+    const shouldOpen = sheetShouldRender(store.state.phase, store.sheetOpen)
+    if (shouldOpen !== this.open) {
+      this.open = shouldOpen
       this.root.classList.toggle('open', this.open)
       this.root.setAttribute('aria-hidden', this.open ? 'false' : 'true')
       // Test hook: present only while open.
@@ -141,6 +159,7 @@ export class Sheet {
     const rating = poolRatingLabel(state.pool)
     this.rating.textContent = `Pool rating ${rating.text}`
     this.rating.className = `sheet-rating ${rating.grade ? `grade-${gradeTier(rating.grade as never)}` : 'grade-none'}`
+    this.colours.innerHTML = poolColourCountsHtml(state.pool)
     const a = agreement(state.picks)
     this.agree.textContent = a.scored > 0 ? `${a.agreed}/${a.scored} with model${a.rate !== null ? ` · ${Math.round(a.rate * 100)}%` : ''}` : ''
     this.pool.innerHTML = poolHtml(state.pool, state.picks)

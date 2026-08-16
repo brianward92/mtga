@@ -43,7 +43,7 @@ const bridge = window.overlay
 const hudRoot = document.getElementById('hud')!
 const sheetRoot = document.getElementById('sheet')!
 const badges = new BadgeLayer(document.getElementById('badges')!)
-const hud = new Hud(hudRoot, action, schedule)
+const hud = new Hud(hudRoot, action)
 const sheet = new Sheet(sheetRoot, action)
 const calibrate = new CalibrateLayer(document.getElementById('ghosts')!, document.getElementById('calPanel')!, action)
 

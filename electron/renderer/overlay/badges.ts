@@ -15,6 +15,7 @@ import type { PackLayout, Rect } from '../../shared/layout'
 import { arenaDisplayOrder } from '../../shared/display-order'
 import { buildChips, type ChipModel } from './chips'
 import type { Store } from './types'
+import { badgesShouldRender } from './visibility'
 
 interface CellNodes {
   /** The frame — also the cell wrapper (its rect IS the card rect). */
@@ -38,14 +39,22 @@ const FRAME_BORDER = 2
 
 export class BadgeLayer {
   private cells: CellNodes[] = []
-  private visible = true
+  private visible: boolean
   private covered = false
 
-  constructor(private root: HTMLElement) {}
+  constructor(private root: HTMLElement) {
+    this.visible = !root.classList.contains('hidden')
+  }
 
   update(store: Store, layout: PackLayout | null): void {
     const { state, prefs, layer, calibrate } = store
-    const show = state.phase === 'active' && state.cards.length > 0 && prefs.badges && !calibrate.active && layout !== null
+    const show = badgesShouldRender(
+      state.phase,
+      state.cards.length,
+      prefs.badges,
+      calibrate.active,
+      layout !== null
+    )
     this.setVisible(show)
     if (!show || !layout) { this.detachFrom(0); return }
     this.setCovered(layer.covered)

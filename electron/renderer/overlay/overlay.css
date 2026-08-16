@@ -309,6 +309,10 @@ body.calibrating .sheet { display: none; }
 
 /* Idle pill → glyph */
 .hud.idle {
+  top: 2%;
+  right: 2%;
+  bottom: auto;
+  left: auto;
   width: auto;
   max-width: 60vw;
   padding: 0.4rem 0.8rem;
@@ -374,7 +378,10 @@ body.calibrating .sheet { display: none; }
   display: flex;
   align-items: flex-start;
   gap: 0.7rem;
+  height: 6.75rem;
+  min-height: 6.75rem;
   min-width: 0;
+  overflow: hidden;
   transition: opacity var(--t);
 }
 .hud.scoring .hud-rec { opacity: 0.75; }
@@ -396,8 +403,8 @@ body.calibrating .sheet { display: none; }
   text-align: center;
 }
 .hud-rec-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 0.25rem; }
-.hud-rec-meta { display: flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; color: var(--text-2); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.hud-rec-meta:empty { display: none; }
+.hud-rec-meta { display: flex; align-items: center; gap: 0.35rem; min-width: 0; min-height: 1rem; font-size: 0.75rem; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hud-rec-meta:empty { visibility: hidden; }
 .hud-meta-text { overflow: hidden; text-overflow: ellipsis; }
 .hud-rec-top { display: flex; align-items: baseline; gap: 0.4rem; min-width: 0; }
 .hud-rec-name {
@@ -532,23 +539,69 @@ body.calibrating .sheet { display: none; }
 .sheet.open.yield button { pointer-events: auto; }
 
 .sheet-head {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 0.5rem;
+  column-gap: 0.5rem;
+  row-gap: 0.4rem;
   padding: 0.6rem 0.6rem 0.5rem 0.85rem;
   border-bottom: 1px solid var(--hairline-soft);
 }
 .sheet-title { font-weight: 700; font-size: 0.95rem; }
 .sheet-rating { flex: 0 0 auto; font-weight: 800; font-size: 0.85rem; padding: 0.05rem 0.45rem; border-radius: 6px; border: 1px solid var(--hairline); white-space: nowrap; }
-.sheet-agree { flex: 1 1 auto; font-size: 0.75rem; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; }
-.s-counts { display: inline-flex; gap: 0.25rem; }
-.s-count-chip { font-size: 0.7rem; font-weight: 700; padding: 0 0.35rem; border-radius: 6px; background: rgba(255,255,255,0.08); }
-.s-count-chip.W { color: #f3edc9; } .s-count-chip.U { color: #9ed0f5; } .s-count-chip.B { color: #c9b8d8; }
-.s-count-chip.R { color: #f0a08c; } .s-count-chip.G { color: #a6dea6; }
-/* Flush stacking under a top-corner HUD: read as one rail panel */
-.sheet.side-right.open, .sheet.side-left.open { border-top-left-radius: 0; border-top-right-radius: 0; }
-.hud.with-sheet { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
-.sheet-close { flex: 0 0 auto; }
+.sheet-agree { min-width: 0; font-size: 0.75rem; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; }
+.sheet-close { justify-self: end; }
+.sheet-colours {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.25rem;
+}
+.sheet-colour-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  min-width: 0;
+  padding: 0.08rem 0.25rem;
+  border: 1px solid var(--hairline-soft);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 0.7rem;
+}
+.sheet-colour-chip i { font-style: normal; font-weight: 800; }
+.sheet-colour-chip b { font-weight: 700; color: var(--text-2); }
+.sheet-colour-chip.W i { color: #f3edc9; }
+.sheet-colour-chip.U i { color: #9ed0f5; }
+.sheet-colour-chip.B i { color: #c9b8d8; }
+.sheet-colour-chip.R i { color: #f0a08c; }
+.sheet-colour-chip.G i { color: #a6dea6; }
+
+/* Flush stacking reads as one surface: only the combined outer edge keeps
+   its border/radius, and neither child paints a shadow across the join. */
+.hud.with-sheet,
+.sheet.stack-below.open,
+.sheet.stack-above.open { box-shadow: none; }
+.hud.with-sheet.sheet-below {
+  border-bottom-color: transparent;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.sheet.stack-below.open {
+  border-top-color: transparent;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+.hud.with-sheet.sheet-above {
+  border-top-color: transparent;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+.sheet.stack-above.open {
+  border-bottom-color: transparent;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
 
 .sheet-body {
   flex: 1 1 auto;

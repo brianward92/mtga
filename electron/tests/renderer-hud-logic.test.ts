@@ -8,7 +8,7 @@ import {
   agreement, bestPick, detailLine, eventTitle, groupPool, laneLean, nextCorner, packConviction,
   pickPosition, poolGroupOf, poolSummary, progressDots, rankedCards, sheetSide, whyLine
 } from '../renderer/overlay/hud-logic'
-import { picksHtml, poolHtml } from '../renderer/overlay/sheet'
+import { picksHtml, poolColourCountsHtml, poolHtml } from '../renderer/overlay/sheet'
 import { sigmoid, formatDominancePct } from '../renderer/overlay/conviction'
 
 function card(over: Partial<CardRow> & { grpId: number }): CardRow {
@@ -170,6 +170,20 @@ describe('groupPool', () => {
 })
 
 describe('sheet html', () => {
+  it('shows explicit WUBRG counts in a stable header order', () => {
+    const html = poolColourCountsHtml([
+      card({ grpId: 1, colors: 'WU' }),
+      card({ grpId: 2, colors: 'R' }),
+      card({ grpId: 3, colors: 'G', type: 'Land' })
+    ])
+    expect(html.match(/sheet-colour-chip/g)).toHaveLength(5)
+    expect(html).toContain('data-colour="W" aria-label="White: 1"')
+    expect(html).toContain('data-colour="U" aria-label="Blue: 1"')
+    expect(html).toContain('data-colour="B" aria-label="Black: 0"')
+    expect(html).toContain('data-colour="R" aria-label="Red: 1"')
+    expect(html).toContain('data-colour="G" aria-label="Green: 0"')
+  })
+
   it('escapes names and shows grades', () => {
     const html = poolHtml([card({ grpId: 1, colors: 'R', name: 'Fire <b>Bolt</b>', manaCost: '{R}', grade: 'B+' })])
     expect(html).toContain('Fire &lt;b&gt;Bolt&lt;/b&gt;')

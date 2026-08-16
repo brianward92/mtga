@@ -9,13 +9,13 @@
 <body>
   <div id="app" class="app" data-testid="overlay-root">
   <!-- 1. Badge layer: frames + chips on Arena's pack grid. Never interactive. -->
-  <div id="badges" class="badges" aria-hidden="true"></div>
+  <div id="badges" class="badges hidden" aria-hidden="true"></div>
 
   <!-- 4. Calibration ghosts (dashed cells + numbers). Never interactive. -->
   <div id="ghosts" class="ghosts" aria-hidden="true"></div>
 
   <!-- 2. Context HUD (corner glass card). Interactive: buttons + hover. -->
-  <aside id="hud" class="hud interactive hud-tr" role="complementary" aria-label="Draft assistant" data-testid="hud">
+  <aside id="hud" class="hud hud-tr idle idle-min" role="complementary" aria-label="Draft assistant" data-testid="hud">
     <div class="hud-idle" id="hudIdle">
       <span class="hud-glyph" aria-hidden="true">◇</span>
       <span class="hud-idle-text">DraftFM · waiting for a draft</span>
@@ -23,7 +23,7 @@
 
     <div class="hud-warning" id="hudWarning" hidden></div>
 
-    <div class="hud-main" id="hudMain">
+    <div class="hud-main" id="hudMain" hidden>
       <header class="hud-head">
         <span class="hud-title" id="hudTitle"></span>
         <span class="hud-pos" id="hudPos"></span>
@@ -99,6 +99,7 @@
       <span class="sheet-rating grade-none" id="sheetRating" title="Rarity-weighted mean of the pool's set-review grades (common 1, uncommon 2, rare 4, mythic 8)">Pool rating —</span>
       <span class="sheet-agree" id="sheetAgree"></span>
       <button class="hud-icon sheet-close" id="btnSheetClose" type="button" title="Close" aria-label="Close">✕</button>
+      <span class="sheet-colours" id="sheetColours" aria-label="Pool colour counts"></span>
     </header>
     <div class="sheet-body">
       <section class="sheet-pool" id="sheetPool"></section>

@@ -35,13 +35,23 @@ mkdirSync(OUT, { recursive: true })
 // Selectors the renderer exposes for tests (data-testid attributes).
 const SEL = {
   root: '[data-testid="overlay-root"]',
+  badges: '#badges',
   cell: '[data-testid="badge-cell"]',
   chipScored: '[data-testid="badge-cell"][data-scored="true"]',
   hud: '[data-testid="hud"]',
+  hudPool: '#hudPool',
+  hudIdle: '#hudIdle',
+  hudIdleText: '.hud-idle-text',
+  hudMain: '#hudMain',
+  hudWarning: '#hudWarning',
   hudPick: '[data-testid="hud-pick"]',
+  hudRank: '#recRank',
+  hudRunners: '#hudRunners .hud-runner',
   hudProvenance: '[data-testid="hud-provenance"]',
   hudSheetBtn: '[data-testid="hud-btn-sheet"]',
   hudCalBtn: '[data-testid="hud-btn-calibrate"]',
+  sheetRoot: '#sheet',
+  sheetColours: '#sheetColours',
   sheet: '[data-testid="sheet"]',
   calPanel: '[data-testid="calibrate-panel"]',
   calCancel: '[data-testid="calibrate-cancel"]'
@@ -125,6 +135,24 @@ try {
   // Park the (real) cursor: the layer detector predicts hover previews from it.
   await page.mouse.move(2, 2)
   await sleep(1500)
+  await expectPage(page, S => {
+    const visible = selector => {
+      const el = document.querySelector(selector)
+      if (!el || el.hidden) return false
+      const style = getComputedStyle(el)
+      const rect = el.getBoundingClientRect()
+      return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0
+    }
+    const hud = document.querySelector(S.hud)
+    const sheet = document.querySelector(S.sheetRoot)
+    const badges = document.querySelector(S.badges)
+    return !!hud && hud.classList.contains('idle') && hud.classList.contains('idle-min') &&
+      hud.classList.contains('hud-tr') && !hud.classList.contains('interactive') &&
+      visible(S.hudIdle) && !visible(S.hudIdleText) && !visible(S.hudMain) &&
+      !visible(S.hudWarning) && document.querySelectorAll(S.cell).length === 0 &&
+      !!badges && !visible(S.badges) && !!sheet && !sheet.classList.contains('open') &&
+      !visible(S.sheetRoot) && !document.querySelector(S.sheet)
+  }, 'idle renders only the click-through top-right glyph')
   await shot(page, '00-idle')
 
   await feedUntil(nthPickNext(1))
@@ -135,23 +163,69 @@ try {
     const text = provenance?.textContent?.trim() ?? ''
     return !!provenance && !provenance.hidden && /^DraftFM \S+ · Scryfall \d{4}-\d{2}-\d{2}/.test(text)
   }, 'model and Scryfall snapshot provenance')
+  await expectPage(page, S => {
+    const chips = [...document.querySelectorAll(`${S.sheetColours} [data-colour]`)]
+    return chips.map(chip => chip.getAttribute('data-colour')).join('') === 'WUBRG' &&
+      chips.every(chip => /^\d+$/.test(chip.querySelector('b')?.textContent ?? ''))
+  }, 'WUBRG pool counts in the sheet header')
+  await expectPage(page, S => {
+    const hud = document.querySelector(S.hud)
+    const sheet = document.querySelector(S.sheetRoot)
+    if (!hud || !sheet) return false
+    const h = hud.getBoundingClientRect()
+    const s = sheet.getBoundingClientRect()
+    const hs = getComputedStyle(hud)
+    const ss = getComputedStyle(sheet)
+    return hud.classList.contains('with-sheet') && hud.classList.contains('sheet-below') &&
+      sheet.classList.contains('stack-below') && Math.abs(h.bottom - s.top) <= 1 &&
+      hs.borderBottomColor === 'rgba(0, 0, 0, 0)' && ss.borderTopColor === 'rgba(0, 0, 0, 0)' &&
+      hs.borderBottomLeftRadius === '0px' && ss.borderTopLeftRadius === '0px' &&
+      hs.boxShadow === 'none' && ss.boxShadow === 'none'
+  }, 'HUD and pool sheet form one seamless rail')
   await expectPage(page, () => {
     const text = document.body.textContent?.toLowerCase() ?? ''
     return !text.includes('data from 17lands') && !text.includes('gih wr') && !text.includes('alsa')
   }, 'no legacy card-stat attribution')
   await shot(page, '01-p1p1-pack')
   await waitFor(page, S => document.querySelectorAll(S.chipScored).length >= 10, 'scored chips')
+  await expectPage(page, S => {
+    const rank = document.querySelector(S.hudRank)?.textContent?.trim()
+    const runners = [...document.querySelectorAll(S.hudRunners)].filter(row => !row.hidden)
+    const meta = document.querySelector(`${S.hudPick} .hud-rec-meta`)
+    const pool = document.querySelector(`${S.hudPool} .hud-pool-bar`)
+    return rank === '#1' && runners.length === 4 &&
+      runners.map(row => row.querySelector('.hud-runner-rank')?.textContent?.trim()).join('') === '#2#3#4#5' &&
+      runners.every(row => !!row.querySelector('.hud-runner-name')?.textContent?.trim() && !!row.querySelector('.hud-runner-grade')?.textContent?.trim()) &&
+      !!meta?.textContent?.trim() && !!pool
+  }, 'ranked top five, card metadata, grades, and pool bar')
   await shot(page, '02-p1p1-scored')
+
+  const railBeforeHover = await page.evaluate(S => {
+    const rec = document.querySelector(S.hudPick).getBoundingClientRect()
+    const pool = document.querySelector(S.hudPool).getBoundingClientRect()
+    const sheet = document.querySelector(S.sheetRoot).getBoundingClientRect()
+    return { recHeight: rec.height, poolTop: pool.top, sheetTop: sheet.top }
+  }, SEL)
 
   // Hover-to-detail: move the mouse over the 3rd cell.
   const rect = await page.evaluate(S => { const c = document.querySelectorAll(S.cell)[2]; const r = c.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 } }, SEL)
   await page.mouse.move(rect.x, rect.y)
   await sleep(300)
+  const railWhileHovering = await page.evaluate(S => {
+    const rec = document.querySelector(S.hudPick).getBoundingClientRect()
+    const pool = document.querySelector(S.hudPool).getBoundingClientRect()
+    const sheet = document.querySelector(S.sheetRoot).getBoundingClientRect()
+    return { recHeight: rec.height, poolTop: pool.top, sheetTop: sheet.top }
+  }, SEL)
+  if (Object.keys(railBeforeHover).some(key => Math.abs(railBeforeHover[key] - railWhileHovering[key]) > 1)) {
+    failures.push(`hover reflowed rail: ${JSON.stringify({ before: railBeforeHover, hovering: railWhileHovering })}`)
+  }
   await shot(page, '03-hover-detail')
   await page.mouse.move(5, 5)
+  await sleep(100)
 
   // The pool sheet opens with the draft. Capture it, then close it via the HUD.
-  await shot(page, '04-sheet-default')
+  await shot(page, '04-sheet')
   await page.click(SEL.hudSheetBtn).catch(e => failures.push(`sheet button: ${e.message}`))
   await waitFor(page, S => !document.querySelector(S.sheet), 'sheet closed', 3000)
 
@@ -171,7 +245,14 @@ try {
   await page.click(SEL.calCancel).catch(() => {})
 
   await feedUntil(() => false) // rest of the draft incl. Completed
-  await waitFor(page, S => (document.querySelector(S.hud)?.textContent ?? '').toLowerCase().includes('complete') || document.querySelectorAll(S.cell).length === 0, 'draft complete', 6000)
+  await waitFor(page, S => {
+    const hud = document.querySelector(S.hud)
+    const main = document.querySelector(S.hudMain)
+    return !!hud && hud.classList.contains('complete') && hud.classList.contains('interactive') &&
+      !hud.classList.contains('idle') && !!main && !main.hidden &&
+      (hud.textContent ?? '').toLowerCase().includes('draft complete') &&
+      document.querySelectorAll(S.cell).length === 0
+  }, 'completion HUD with no badge leak', 6000)
   await sleep(500)
   await shot(page, '08-complete')
 

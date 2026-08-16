@@ -2,8 +2,8 @@
  * Context HUD: a compact glass card in a corner. Draft: header (set·format,
  * P#P#, progress dots, model chip), the recommendation (or the hovered
  * card's detail), runner-ups, pool colour bar + lane lean, footer buttons.
- * Idle: a slim pill that collapses to a glyph after 8 s. Complete: agreement
- * summary + Dismiss. Skeleton lives in index.html; this updates it in place.
+ * Idle: a tiny, fixed top-right glyph. Complete: agreement summary + Dismiss.
+ * Skeleton lives in index.html; this updates it in place.
  */
 import type { CardRow, Grade } from '../../shared/state'
 import { arenaDisplayOrder } from '../../shared/display-order'
@@ -12,13 +12,12 @@ import { flamesFromPercentile } from './flames'
 import { bundleProvenance, modelDisplayName } from './model-tag'
 import { shortBandLabel } from './chips'
 import { renderManaCost, escapeHtml } from './shared'
+import { hudCornerForPhase } from './visibility'
 import {
   agreement, bestPick, detailLine, eventTitle, laneLean, nextCorner, packConviction,
   pickPosition, POOL_COLORS, poolSummary, progressDots, rankedCards, whyLine
 } from './hud-logic'
 import type { HudCorner, Rect, Store } from './types'
-
-const IDLE_COLLAPSE_MS = 8000
 
 type Action = (name: string, data?: unknown) => void
 
@@ -72,13 +71,11 @@ export class Hud {
   private readonly attrib: HTMLElement
 
   private corner: HudCorner = 'tr'
-  private phase: string = ''
-  private idleTimer: number | null = null
   private lastRect: Rect | null = null
   private lastRectKey = 'init'
   private rootClass = ''
 
-  constructor(private root: HTMLElement, private action: Action, private schedule: () => void) {
+  constructor(private root: HTMLElement, private action: Action) {
     this.idle = $(root, 'hudIdle')
     this.main = $(root, 'hudMain')
     this.warning = $(root, 'hudWarning')
@@ -131,34 +128,29 @@ export class Hud {
 
   update(store: Store): void {
     const { state, prefs, layer } = store
-    this.corner = prefs.hudCorner
-
-    if (state.phase !== this.phase) {
-      this.phase = state.phase
-      this.resetIdleTimer(state.phase === 'idle')
-    }
+    const idle = state.phase === 'idle'
+    this.corner = hudCornerForPhase(state.phase, prefs.hudCorner)
 
     // The idle pill has nothing to click: stay click-through so Arena's own
     // UI underneath keeps working.
-    const classes = ['hud', `hud-${prefs.hudCorner}`]
-    if (state.phase !== 'idle') classes.push('interactive')
+    const classes = ['hud', `hud-${this.corner}`]
+    if (!idle) classes.push('interactive')
     if (!prefs.hud) classes.push('hidden')
     if (layer.hudCovered) classes.push('covered')
-    if (state.phase === 'idle') classes.push('idle')
-    // Collapse to the glyph after a while — unless a setup warning needs reading.
-    if (state.phase === 'idle' && this.idleTimer === null && !state.warning) classes.push('idle-min')
+    if (idle) classes.push('idle', 'idle-min')
     if (state.phase === 'complete') classes.push('complete')
     if (state.scoring) classes.push('scoring')
-    // Pool section stacked flush beneath (top corners): one rail panel.
-    if (store.sheetOpen && state.phase !== 'idle' && (prefs.hudCorner === 'tl' || prefs.hudCorner === 'tr')) classes.push('with-sheet')
+    // Pool sheet stacks flush against either edge: one continuous rail panel.
+    if (store.sheetOpen && state.phase !== 'idle') {
+      classes.push('with-sheet', prefs.hudCorner === 'tl' || prefs.hudCorner === 'tr' ? 'sheet-below' : 'sheet-above')
+    }
     const rootClass = classes.join(' ')
     if (rootClass !== this.rootClass) { this.rootClass = rootClass; this.root.className = rootClass }
 
-    // Warning: shown in every phase (setup problems matter most while idle).
-    this.warning.hidden = !state.warning
+    // Idle stays glyph-only; surface setup warnings once a draft view is live.
+    this.warning.hidden = idle || !state.warning
     setText(this.warning, state.warning ?? '')
 
-    const idle = state.phase === 'idle'
     this.idle.hidden = !idle
     this.main.hidden = idle
     if (idle) return
@@ -207,12 +199,6 @@ export class Hud {
   }
 
   // ---- pieces --------------------------------------------------------------
-
-  private resetIdleTimer(idle: boolean): void {
-    if (this.idleTimer !== null) { window.clearTimeout(this.idleTimer); this.idleTimer = null }
-    if (!idle) return
-    this.idleTimer = window.setTimeout(() => { this.idleTimer = null; this.schedule() }, IDLE_COLLAPSE_MS)
-  }
 
   private updateDots(store: Store): void {
     const dots = progressDots(store.state)
@@ -276,7 +262,7 @@ export class Hud {
       setText(this.recWhy, state.scoring ? 'scoring…' : whyLine(top, ranked[1] ?? null, conviction))
     }
 
-    // Runner-ups (#2, #3) — always the model's, even while hovering.
+    // Runner-ups (#2–#5) — always the model's, even while hovering.
     this.runnerNodes.forEach((r, i) => {
       const c = state.scoring ? undefined : ranked[i + 1]
       const show = !!c && (c.rank !== null || c.ev !== null)
