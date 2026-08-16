@@ -14,7 +14,10 @@
   <!-- 4. Calibration ghosts (dashed cells + numbers). Never interactive. -->
   <div id="ghosts" class="ghosts" aria-hidden="true"></div>
 
-  <!-- 2. Context HUD (corner glass card). Interactive: buttons + hover. -->
+  <!-- 2–3. One full Arena right-column owner. Its inset panel orders the
+       header/recommendations/pool summary, scrolling pool, then footer. -->
+  <div id="draftRail" class="draft-rail" aria-hidden="true" data-testid="draft-rail">
+  <div class="draft-rail-panel">
   <aside id="hud" class="hud hud-tr idle idle-min" role="complementary" aria-label="Draft assistant" data-testid="hud">
     <div class="hud-idle" id="hudIdle">
       <span class="hud-glyph" aria-hidden="true">◇</span>
@@ -29,6 +32,7 @@
         <span class="hud-pos" id="hudPos"></span>
         <span class="hud-dots" id="hudDots" aria-hidden="true"></span>
         <span class="hud-model" id="hudModel" title="">DraftFM</span>
+        <span class="sheet-rating grade-none" id="sheetRating" title="Rarity-weighted mean of the pool's set-review grades (common 1, uncommon 2, rare 4, mythic 8)">Pool rating —</span>
       </header>
       <div class="hud-model-msg" id="hudModelMsg" hidden></div>
 
@@ -82,33 +86,23 @@
         <button class="hud-btn hud-dismiss" id="btnDismiss" type="button">Dismiss</button>
       </section>
 
-      <footer class="hud-foot">
-        <button class="hud-icon" id="btnSheet" type="button" data-testid="hud-btn-sheet" title="Pool &amp; picks (⌘⇧D)" aria-label="Pool and picks">▤</button>
-        <button class="hud-icon" id="btnBadges" type="button" title="Toggle card badges (⌘⇧B)" aria-label="Toggle badges">◧</button>
-        <button class="hud-icon" id="btnCorner" type="button" title="Move HUD" aria-label="Move HUD to the next corner">⤢</button>
-        <button class="hud-icon" id="btnCalibrate" type="button" data-testid="hud-btn-calibrate" title="Calibrate the pack grid" aria-label="Calibrate">⌖</button>
-        <span class="hud-attrib" id="hudAttrib" data-testid="hud-provenance" hidden></span>
-      </footer>
     </div>
   </aside>
 
-  <!-- 3. Pool / pick-history sheet. Interactive. -->
-  <aside id="sheet" class="sheet interactive side-right" aria-label="Pool and picks" aria-hidden="true">
-    <header class="sheet-head">
-      <span class="sheet-title" id="sheetTitle">Pool</span>
-      <span class="sheet-rating grade-none" id="sheetRating" title="Rarity-weighted mean of the pool's set-review grades (common 1, uncommon 2, rare 4, mythic 8)">Pool rating —</span>
-      <span class="sheet-agree" id="sheetAgree"></span>
-      <button class="hud-icon sheet-close" id="btnSheetClose" type="button" title="Close" aria-label="Close">✕</button>
-      <span class="sheet-colours" id="sheetColours" aria-label="Pool colour counts"></span>
-    </header>
+  <!-- The grouped pool list owns all remaining height and scrolls internally. -->
+  <aside id="sheet" class="sheet interactive side-right stack-below" aria-label="Pool and picks" aria-hidden="true">
     <div class="sheet-body">
       <section class="sheet-pool" id="sheetPool"></section>
-      <section class="sheet-picks">
-        <h3 class="sheet-h">Picks</h3>
-        <ol class="sheet-picklist" id="sheetPicks"></ol>
-      </section>
     </div>
   </aside>
+
+  <footer class="hud-foot">
+    <button class="hud-icon" id="btnBadges" type="button" title="Toggle card badges (⌘⇧B)" aria-label="Toggle badges">◧</button>
+    <button class="hud-icon" id="btnCalibrate" type="button" data-testid="hud-btn-calibrate" title="Calibrate the pack grid" aria-label="Calibrate">⌖</button>
+    <span class="hud-attrib" id="hudAttrib" data-testid="hud-provenance" hidden></span>
+  </footer>
+  </div>
+  </div>
 
   <!-- 4. Calibration helper panel (right rail). Interactive. -->
   <div id="calPanel" class="cal-panel interactive" hidden>

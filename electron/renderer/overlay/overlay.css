@@ -8,6 +8,7 @@
 :root {
   --glass: rgba(14, 14, 18, 0.86);
   --glass-strong: rgba(14, 14, 18, 0.94);
+  --rail-glass: rgba(14, 14, 18, 0.97);
   --hairline: rgba(255, 255, 255, 0.12);
   --hairline-soft: rgba(255, 255, 255, 0.07);
   --hover: rgba(255, 255, 255, 0.07);
@@ -371,7 +372,16 @@ body.calibrating .sheet { display: none; }
   white-space: nowrap;
 }
 .hud-model.off { color: var(--amber); border-color: rgba(255, 200, 87, 0.4); }
-.hud-model-msg { font-size: 0.75rem; color: var(--amber); }
+.hud-model-msg {
+  height: 1.15rem;
+  overflow: hidden;
+  color: var(--amber);
+  font-size: 0.75rem;
+  line-height: 1.15rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hud-model-msg.empty { visibility: hidden; }
 
 /* Recommendation / hover detail */
 .hud-rec {
@@ -691,6 +701,127 @@ body.calibrating .sheet { display: none; }
 .s-tag.ok { color: var(--accent); }
 .s-tag.off { color: var(--amber); }
 .s-tag.none { color: var(--text-3); }
+
+/* ==========================================================================
+   Draft sidebar — owns Arena's complete right column while a draft is live.
+
+   The raw strip has no click-through gutters. One rounded, six-pixel-inset
+   surface orders header → recommendation → ranked table → pool summary →
+   internally scrolling grouped pool → footer. Only a predicted card preview
+   may fade this common owner; it remains interactive while faded.
+   ========================================================================== */
+
+.draft-rail {
+  position: fixed;
+  z-index: 30;
+  inset: 0;
+  pointer-events: none;
+}
+.draft-rail-panel { display: contents; }
+.draft-rail:not(.open) > .draft-rail-panel > .hud-foot { display: none; }
+.draft-rail:not(.open) .sheet { display: none; }
+
+.draft-rail.open {
+  top: 14%;
+  right: 0;
+  bottom: 0;
+  left: 76%;
+  padding: 6px;
+  overflow: hidden;
+  background: var(--rail-glass);
+  opacity: 1;
+  pointer-events: auto;
+}
+.draft-rail.open.preview-covered { opacity: 0.08; }
+.draft-rail.open > .draft-rail-panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: transparent;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  pointer-events: auto;
+}
+
+.draft-rail.open .hud {
+  position: relative;
+  z-index: auto;
+  top: auto;
+  right: auto;
+  bottom: auto;
+  left: auto;
+  flex: 0 0 auto;
+  width: 100%;
+  max-height: none;
+  padding: 0.7rem 0.85rem 0.45rem;
+  overflow: visible;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.draft-rail.open .hud-main { gap: 0.5rem; }
+.draft-rail.open .hud-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 0.25rem 0.45rem;
+}
+.draft-rail.open .hud-title { grid-column: 1; grid-row: 1; }
+.draft-rail.open .hud-pos { grid-column: 2; grid-row: 1; }
+.draft-rail.open .sheet-rating { grid-column: 3; grid-row: 1; }
+.draft-rail.open .hud-dots { grid-column: 1; grid-row: 2; }
+.draft-rail.open .hud-model { grid-column: 2 / 4; grid-row: 2; justify-self: end; }
+
+.draft-rail.open .sheet {
+  position: relative;
+  z-index: auto;
+  top: auto;
+  right: auto;
+  bottom: auto;
+  left: auto;
+  flex: 1 1 0;
+  width: 100%;
+  max-height: none;
+  min-height: 0;
+  overflow: hidden;
+  visibility: visible;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  opacity: 1;
+  transform: none;
+  transition: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.draft-rail.open .sheet-body {
+  flex: 1 1 0;
+  min-height: 0;
+  padding: 0.25rem 0.85rem 0.5rem;
+  overflow-y: auto;
+}
+.draft-rail.open .hud-foot {
+  flex: 0 0 auto;
+  width: 100%;
+  min-width: 0;
+  padding: 0.45rem 0.85rem 0.55rem;
+  background: transparent;
+  border-top: 1px solid var(--hairline-soft);
+}
+.draft-rail.open .hud-attrib {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+body.calibrating .draft-rail.open { display: none; }
 
 /* ==========================================================================
    4. Calibration — ghosts (click-through) + helper panel (interactive)

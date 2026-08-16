@@ -1,52 +1,17 @@
 /**
- * Pool / pick-history sheet: slides in from the HUD's side. Lists grouped
- * copies best-to-worst with every pick label, then full pick history (taken
- * card, the model's pick when different, ✓ / rank tag) and agreement rate.
- * Toggled by main's 'toggle-sheet' command (global
- * shortcut, menu, HUD button); the close button routes through the same
- * action so main's notion of open/closed stays in step.
+ * The sidebar's internally scrolling pool list. Identical cards collapse to
+ * one best-to-worst row with every pick label; basic lands stay last.
  *
- * Content re-renders only when the state seq or open flag changes.
+ * Active and complete drafts pin this content open. The legacy sheet toggle
+ * may still change main-process preference state, but never exposes Arena's
+ * owned right column or removes the pool from the sidebar.
  */
-import type { CardRow, HudCorner, PickRecord } from '../../shared/state'
-import type { Rect } from '../../shared/layout'
+import type { CardRow, PickRecord } from '../../shared/state'
 import { gradeTier, gradeOrdinal, poolRating } from '../../shared/grades'
-import { agreement, COLOR_NAMES, POOL_COLORS, poolSummary, sheetSide } from './hud-logic'
-import { escapeHtml, isFiniteNumber, renderManaCost } from './shared'
-import type { OverlayAction, Store } from './types'
+import { COLOR_NAMES, POOL_COLORS, poolSummary } from './hud-logic'
+import { escapeHtml, renderManaCost } from './shared'
+import type { Store } from './types'
 import { sheetShouldRender } from './visibility'
-
-const SHEET_TOP_FRACTION = 0.22
-const SHEET_BOTTOM_FRACTION = 0.09
-
-interface SheetAnchor {
-  readonly top: number
-  readonly bottom: number
-  readonly height: number
-}
-
-/**
- * Keep the sheet inside the Arena view. The bottom safe area is a hard floor;
- * long pool/pick content scrolls inside this geometry instead of extending it.
- */
-export function sheetAnchor(viewHeight: number, corner: HudCorner, hudRect: Rect | null): SheetAnchor {
-  const height = isFiniteNumber(viewHeight) ? Math.max(0, viewHeight) : 0
-  if (height === 0) return { top: 0, bottom: 0, height: 0 }
-
-  const topEdge = Math.round(height * SHEET_TOP_FRACTION)
-  // ceil, rather than round, guarantees at least 9% remains clear.
-  const bottomEdge = Math.ceil(height * SHEET_BOTTOM_FRACTION)
-  let top = topEdge
-  let bottom = bottomEdge
-  if (hudRect) {
-    if (corner === 'tl' || corner === 'tr') {
-      top = Math.min(Math.max(0, Math.round(hudRect.y + hudRect.height)), height - bottom)
-    } else {
-      bottom = Math.min(Math.max(bottomEdge, Math.round(height - hudRect.y)), height - top)
-    }
-  }
-  return { top, bottom, height: Math.max(0, height - top - bottom) }
-}
 
 /** Set-review grade for pool display: the raw set rating (falls back to the pool grade). */
 function reviewGrade(card: Pick<CardRow, 'grade' | 'setGrade'>) {
@@ -186,45 +151,18 @@ export function picksHtml(picks: ReadonlyArray<PickRecord>): string {
   }).join('')
 }
 
-/** Updates and anchors the internally scrolling pool and pick-history sheet. */
+/** Updates the pinned, internally scrolling pool content in the sidebar. */
 export class Sheet {
   private readonly pool: HTMLElement
-  private readonly picks: HTMLElement
-  private readonly agree: HTMLElement
-  private readonly title: HTMLElement
-  private readonly rating: HTMLElement
-  private readonly colors: HTMLElement
   private renderedKey = ''
   private open = false
-  private side = ''
-  private stack = ''
-  private anchorKey = ''
 
-  constructor(private root: HTMLElement, action: OverlayAction) {
+  constructor(private root: HTMLElement, private readonly rating: HTMLElement) {
     this.pool = root.querySelector('#sheetPool')!
-    this.picks = root.querySelector('#sheetPicks')!
-    this.agree = root.querySelector('#sheetAgree')!
-    this.title = root.querySelector('#sheetTitle')!
-    this.rating = root.querySelector('#sheetRating')!
-    this.colors = root.querySelector('#sheetColours')!
-    root.querySelector('#btnSheetClose')!.addEventListener('click', () => action('toggle-sheet'))
   }
 
-  update(store: Store, hudRect: Rect | null): void {
-    const side = `side-${sheetSide(store.prefs.hudCorner)}`
-    if (side !== this.side) {
-      this.side = side
-      this.root.classList.remove('side-left', 'side-right')
-      this.root.classList.add(side)
-    }
-    const stack = store.prefs.hudCorner === 'tl' || store.prefs.hudCorner === 'tr' ? 'stack-below' : 'stack-above'
-    if (stack !== this.stack) {
-      this.stack = stack
-      this.root.classList.remove('stack-below', 'stack-above')
-      this.root.classList.add(stack)
-    }
-    this.anchor(store, hudRect)
-    const shouldOpen = sheetShouldRender(store.state.phase, store.sheetOpen)
+  update(store: Store): void {
+    const shouldOpen = store.prefs.hud && !store.calibrate.active && sheetShouldRender(store.state.phase, store.sheetOpen)
     if (shouldOpen !== this.open) {
       this.open = shouldOpen
       this.root.classList.toggle('open', this.open)
@@ -240,30 +178,9 @@ export class Sheet {
     if (key === this.renderedKey) return
     this.renderedKey = key
 
-    this.title.textContent = `Pool · ${state.pool.length}`
     const rating = poolRatingLabel(state.pool)
     this.rating.textContent = `Pool rating ${rating.text}`
     this.rating.className = `sheet-rating ${rating.grade ? `grade-${gradeTier(rating.grade as never)}` : 'grade-none'}`
-    this.colors.innerHTML = poolColorCountsHtml(state.pool)
-    const a = agreement(state.picks)
-    this.agree.textContent = a.scored > 0 ? `${a.agreed}/${a.scored} with model${a.rate !== null ? ` · ${Math.round(a.rate * 100)}%` : ''}` : ''
     this.pool.innerHTML = poolHtml(state.pool, state.picks)
-    this.picks.innerHTML = picksHtml(state.picks)
-  }
-
-  /**
-   * Stack against the HUD on its rail: below it for the top corners, above
-   * it for the bottom corners (the HUD keeps priority; the sheet gets the
-   * rest of the rail). Without a HUD the sheet spans the rail.
-   */
-  private anchor(store: Store, hudRect: Rect | null): void {
-    const { view } = store
-    const corner = store.prefs.hudCorner
-    const { top, bottom } = sheetAnchor(view.height, corner, hudRect)
-    const key = `${top}:${bottom}`
-    if (key === this.anchorKey) return
-    this.anchorKey = key
-    this.root.style.top = `${top}px`
-    this.root.style.bottom = `${bottom}px`
   }
 }

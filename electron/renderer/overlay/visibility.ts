@@ -13,9 +13,9 @@ export function badgesShouldRender(
   return phase === 'active' && cardCount > 0 && enabled && !calibrating && hasLayout
 }
 
-/** The pool rail never follows the overlay onto Home, deck, or other idle screens. */
-export function sheetShouldRender(phase: Phase, requestedOpen: boolean): boolean {
-  return phase !== 'idle' && requestedOpen
+/** Active/complete sidebar pool content stays pinned regardless of the legacy toggle. */
+export function sheetShouldRender(phase: Phase, _requestedOpen: boolean): boolean {
+  return phase !== 'idle'
 }
 
 /** Idle is a fixed, tiny status glyph; draft and completion views keep the user's corner. */

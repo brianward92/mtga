@@ -17,6 +17,7 @@ import { Sheet } from './sheet'
 import { CalibrateLayer } from './calibrate'
 import { draftStateAdvanced, sameCalibrateState, sameLayerState, sameViewPrefs } from './render-change'
 import { RailInteraction } from './rail-interaction'
+import { sidebarPresentation } from './sidebar'
 
 const EMPTY_LAYER: LayerState = { cells: [], regions: [], covered: false, hudCovered: false }
 const EMPTY_CALIBRATE: CalibrateState = { active: false, count: 14, config: { ...DEFAULT_CALIBRATION }, arenaFound: false }
@@ -33,14 +34,15 @@ const store: Store = {
 }
 
 const bridge = window.overlay
+const railRoot = document.getElementById('draftRail')!
 const hudRoot = document.getElementById('hud')!
 const sheetRoot = document.getElementById('sheet')!
 const sheetBody = sheetRoot.querySelector<HTMLElement>('.sheet-body')!
 const badges = new BadgeLayer(document.getElementById('badges')!)
 const hud = new Hud(hudRoot, action)
-const sheet = new Sheet(sheetRoot, action)
+const sheet = new Sheet(sheetRoot, document.getElementById('sheetRating')!)
 const calibrate = new CalibrateLayer(document.getElementById('ghosts')!, document.getElementById('calPanel')!, action)
-const railInteraction = new RailInteraction(hudRoot, sheetRoot, on => bridge?.setInteractive(on))
+const railInteraction = new RailInteraction(hudRoot, sheetRoot, on => bridge?.setInteractive(on), railRoot)
 
 function action(name: string, data?: unknown): void {
   bridge?.action(name, data)
@@ -63,14 +65,21 @@ function render(): void {
   store.view = { width: window.innerWidth, height: window.innerHeight }
   if (store.view.width <= 0 || store.view.height <= 0) return
   document.body.classList.toggle('calibrating', store.calibrate.active)
+  const sidebarEnabled = store.prefs.hud && !store.calibrate.active
+  const sidebar = sidebarPresentation(store.state.phase, sidebarEnabled, store.view, store.layer)
+  railRoot.classList.toggle('open', sidebar.open)
+  railRoot.classList.toggle('interactive', sidebar.open)
+  railRoot.classList.toggle('preview-covered', sidebar.previewCovered)
+  // The idle glyph remains nested here while the full-column owner is closed.
+  railRoot.setAttribute('aria-hidden', sidebarEnabled ? 'false' : 'true')
   const layout = currentLayout()
   badges.update(store, layout)
   hud.update(store)
   calibrate.update(store)
-  // Layout reads happen after the layer writes: the HUD rect anchors the
-  // sheet, then their measured seam determines joined-rail dwell topology.
-  const hudRect = hud.reportRect(rect => bridge?.setHudRect(rect))
-  sheet.update(store, hudRect)
+  // Main still receives the header rect for preview prediction telemetry;
+  // renderer-owned sidebar fading uses the full pure rail frame above.
+  hud.reportRect(rect => bridge?.setHudRect(rect))
+  sheet.update(store)
   if (resetSheetScroll) {
     sheetBody.scrollTop = 0
     resetSheetScroll = false
@@ -197,6 +206,14 @@ function init(): void {
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') schedule() })
 
   if (!bridge) { render(); return }
+  // Deliberately absent in production. The source E2E uses this to prove the
+  // same predicted-region fade/restore path while main's real cursor polling
+  // is disabled for deterministic screenshots.
+  if (bridge.e2e) {
+    document.addEventListener('mtga:e2e-layer', event => {
+      onLayer((event as CustomEvent<unknown>).detail)
+    })
+  }
   bridge.onState(onState)
   bridge.onPrefs(onPrefs)
   bridge.onLayer(onLayer)

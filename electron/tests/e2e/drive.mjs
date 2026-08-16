@@ -38,6 +38,8 @@ const SEL = {
   badges: '#badges',
   cell: '[data-testid="badge-cell"]',
   chipScored: '[data-testid="badge-cell"][data-scored="true"]',
+  rail: '[data-testid="draft-rail"]',
+  railPanel: '.draft-rail-panel',
   hud: '[data-testid="hud"]',
   hudPool: '#hudPool',
   hudIdle: '#hudIdle',
@@ -46,16 +48,16 @@ const SEL = {
   hudWarning: '#hudWarning',
   hudPick: '[data-testid="hud-pick"]',
   hudRank: '#recRank',
+  hudRankedTable: '#hudRunners',
   hudRunners: '#hudRunners .hud-runner',
   hudProvenance: '[data-testid="hud-provenance"]',
-  hudSheetBtn: '[data-testid="hud-btn-sheet"]',
   hudCalBtn: '[data-testid="hud-btn-calibrate"]',
   hudDismiss: '#btnDismiss',
+  hudFooter: '.hud-foot',
   sheetRoot: '#sheet',
   sheetBody: '.sheet-body',
   sheetPool: '#sheetPool',
-  sheetTitle: '#sheetTitle',
-  sheetColours: '#sheetColours',
+  sheetRating: '#sheetRating',
   sheet: '[data-testid="sheet"]',
   calPanel: '[data-testid="calibrate-panel"]',
   calCancel: '[data-testid="calibrate-cancel"]'
@@ -120,29 +122,186 @@ async function expectPage(page, fn, label) {
 
 async function expectSheetContained(page, label, requireScroll = false) {
   const result = await page.evaluate((S, shouldScroll) => {
+    const railRoot = document.querySelector(S.rail)
+    const panel = document.querySelector(S.railPanel)
     const sheet = document.querySelector(S.sheetRoot)
     const body = document.querySelector(S.sheetBody)
-    if (!sheet || !body) return { ok: false, reason: 'missing sheet/body' }
-    const rail = sheet.getBoundingClientRect()
+    const footer = document.querySelector(S.hudFooter)
+    if (!railRoot || !panel || !sheet || !body || !footer) return { ok: false, reason: 'missing rail/panel/sheet/body/footer' }
+    const rail = railRoot.getBoundingClientRect()
+    const panelRect = panel.getBoundingClientRect()
+    const sheetRect = sheet.getBoundingClientRect()
     const content = body.getBoundingClientRect()
+    const footerRect = footer.getBoundingClientRect()
     const overflowY = getComputedStyle(body).overflowY
-    const safeBottom = window.innerHeight * 0.91 + 1
     if (shouldScroll) body.scrollTop = body.scrollHeight
     const scrollTop = body.scrollTop
-    const rootContained = rail.top >= -1 && rail.bottom <= safeBottom && rail.bottom <= window.innerHeight + 1 && rail.height > 0
-    const bodyContained = content.top >= rail.top - 1 && content.bottom <= rail.bottom + 1 &&
+    const rootContained = rail.left >= window.innerWidth * 0.76 - 1 && rail.right <= window.innerWidth + 1 &&
+      rail.top >= window.innerHeight * 0.14 - 1 && rail.bottom <= window.innerHeight + 1 && rail.height > 0
+    const bodyContained = sheetRect.top >= panelRect.top - 1 && sheetRect.bottom <= footerRect.top + 1 &&
+      content.top >= sheetRect.top - 1 && content.bottom <= sheetRect.bottom + 1 &&
       sheet.scrollHeight <= sheet.clientHeight + 1
     const scrollReady = overflowY === 'auto' || overflowY === 'scroll'
     const scrolls = body.scrollHeight > body.clientHeight && scrollTop > 0
     return {
       ok: rootContained && bodyContained && scrollReady && (!shouldScroll || scrolls),
-      viewHeight: window.innerHeight,
-      rail: { top: rail.top, bottom: rail.bottom, height: rail.height },
+      view: { width: window.innerWidth, height: window.innerHeight },
+      rail: { left: rail.left, right: rail.right, top: rail.top, bottom: rail.bottom, height: rail.height },
+      panel: { top: panelRect.top, bottom: panelRect.bottom },
+      sheet: { top: sheetRect.top, bottom: sheetRect.bottom, clientHeight: sheet.clientHeight, scrollHeight: sheet.scrollHeight },
+      footer: { top: footerRect.top, bottom: footerRect.bottom },
       body: { top: content.top, bottom: content.bottom, clientHeight: body.clientHeight, scrollHeight: body.scrollHeight, scrollTop, overflowY },
-      rootScroll: { clientHeight: sheet.clientHeight, scrollHeight: sheet.scrollHeight },
       requireScroll: shouldScroll
     }
   }, SEL, requireScroll)
+  if (result.ok) return true
+  failures.push(`${label}: ${JSON.stringify(result)}`)
+  console.error('  FAIL', label, result)
+  return false
+}
+
+async function expectLongPoolScroll(page, label) {
+  const result = await page.evaluate(S => {
+    const rail = document.querySelector(S.rail)
+    const panel = document.querySelector(S.railPanel)
+    const sheet = document.querySelector(S.sheetRoot)
+    const body = document.querySelector(S.sheetBody)
+    const footer = document.querySelector(S.hudFooter)
+    if (!rail || !panel || !sheet || !body || !footer) return { ok: false, reason: 'missing rail/panel/sheet/body/footer' }
+    const railRect = rail.getBoundingClientRect()
+    const panelRect = panel.getBoundingClientRect()
+    const sheetRect = sheet.getBoundingClientRect()
+    const bodyRect = body.getBoundingClientRect()
+    const footerBefore = footer.getBoundingClientRect()
+    // The deterministic fixture deliberately repeats one 14-card reference
+    // pack three times, so grouping can make all 42 copies fit. Add a
+    // reversible long-pool probe to exercise the same real overflow surface.
+    const probe = document.createElement('div')
+    probe.setAttribute('aria-hidden', 'true')
+    probe.style.flex = `0 0 ${body.clientHeight + 100}px`
+    body.appendChild(probe)
+    body.scrollTop = body.scrollHeight
+    const scrollTop = body.scrollTop
+    const footerAfter = footer.getBoundingClientRect()
+    const contained = railRect.left >= window.innerWidth * 0.76 - 1 && railRect.right <= window.innerWidth + 1 &&
+      railRect.top >= window.innerHeight * 0.14 - 1 && railRect.bottom <= window.innerHeight + 1 &&
+      sheetRect.top >= panelRect.top - 1 && bodyRect.top >= sheetRect.top - 1 &&
+      bodyRect.bottom <= sheetRect.bottom + 1 && sheetRect.bottom <= footerBefore.top + 1
+    const ok = body.scrollHeight > body.clientHeight && scrollTop > 0 &&
+      contained &&
+      Math.abs(footerBefore.top - footerAfter.top) <= 1 && Math.abs(footerBefore.bottom - footerAfter.bottom) <= 1
+    const details = {
+      ok,
+      contained,
+      rail: { left: railRect.left, right: railRect.right, top: railRect.top, bottom: railRect.bottom },
+      sheet: { top: sheetRect.top, bottom: sheetRect.bottom },
+      body: { clientHeight: body.clientHeight, scrollHeight: body.scrollHeight, scrollTop },
+      footerBefore: { top: footerBefore.top, bottom: footerBefore.bottom },
+      footerAfter: { top: footerAfter.top, bottom: footerAfter.bottom }
+    }
+    probe.remove()
+    body.scrollTop = 0
+    return details
+  }, SEL)
+  if (result.ok) return true
+  failures.push(`${label}: ${JSON.stringify(result)}`)
+  console.error('  FAIL', label, result)
+  return false
+}
+
+async function expectDraftSidebarGeometry(page, label) {
+  const result = await page.evaluate(S => {
+    const rail = document.querySelector(S.rail)
+    const panel = document.querySelector(S.railPanel)
+    const hud = document.querySelector(S.hud)
+    const sheet = document.querySelector(S.sheetRoot)
+    const header = hud?.querySelector('.hud-head')
+    const rating = document.querySelector(S.sheetRating)
+    const rec = document.querySelector(S.hudPick)
+    const ranked = document.querySelector(S.hudRankedTable)
+    const pool = document.querySelector(S.hudPool)
+    const body = document.querySelector(S.sheetBody)
+    const footer = document.querySelector(S.hudFooter)
+    if (!rail || !panel || !hud || !sheet || !header || !rating || !rec || !ranked || !pool || !body || !footer) {
+      return { ok: false, reason: 'missing sidebar hierarchy node' }
+    }
+
+    const r = rail.getBoundingClientRect()
+    const p = panel.getBoundingClientRect()
+    const h = hud.getBoundingClientRect()
+    const s = sheet.getBoundingClientRect()
+    const head = header.getBoundingClientRect()
+    const rate = rating.getBoundingClientRect()
+    const recommendation = rec.getBoundingClientRect()
+    const table = ranked.getBoundingClientRect()
+    const summary = pool.getBoundingClientRect()
+    const content = body.getBoundingClientRect()
+    const f = footer.getBoundingClientRect()
+    const view = { width: window.innerWidth, height: window.innerHeight }
+    const expected = {
+      left: view.width * 0.76,
+      right: view.width,
+      top: view.height * 0.14,
+      bottom: view.height,
+      panelLeft: view.width * 0.76 + 6,
+      panelRight: view.width - 6,
+      panelTop: view.height * 0.14 + 6,
+      panelBottom: view.height - 6
+    }
+    const alpha = color => {
+      const match = color.match(/^rgba?\(([^)]+)\)$/)
+      if (!match) return Number.NaN
+      const parts = match[1].split(',').map(part => Number.parseFloat(part.trim()))
+      return parts.length === 4 ? parts[3] : 1
+    }
+    const railStyle = getComputedStyle(rail)
+    const panelStyle = getComputedStyle(panel)
+    const hudStyle = getComputedStyle(hud)
+    const sheetStyle = getComputedStyle(sheet)
+    const railAlpha = alpha(railStyle.backgroundColor)
+    const panelAlpha = alpha(panelStyle.backgroundColor)
+    const hudAlpha = alpha(hudStyle.backgroundColor)
+    const sheetAlpha = alpha(sheetStyle.backgroundColor)
+    const close = (actual, wanted, tolerance = 1) => Math.abs(actual - wanted) <= tolerance
+    const opened = rail.classList.contains('open') && rail.classList.contains('interactive') &&
+      !rail.classList.contains('preview-covered') && sheet.classList.contains('open')
+    const fixedBounds = close(r.left, expected.left) && close(r.right, expected.right) &&
+      close(r.top, expected.top) && close(r.bottom, expected.bottom) &&
+      close(p.left, expected.panelLeft) && close(p.right, expected.panelRight) &&
+      close(p.top, expected.panelTop) && close(p.bottom, expected.panelBottom)
+    const activeBlocks = recommendation.height > 0 && table.height > 0
+    const upperHierarchy = activeBlocks
+      ? head.bottom <= recommendation.top + 1 && recommendation.bottom <= table.top + 1 && table.bottom <= summary.top + 1
+      : recommendation.height === 0 && table.height === 0 && head.bottom <= summary.top + 1
+    const hierarchy = head.top >= p.top - 1 && rate.top >= head.top - 1 && rate.bottom <= head.bottom + 1 &&
+      upperHierarchy && summary.bottom <= s.top + 1 &&
+      s.bottom <= f.top + 1 && close(f.bottom, p.bottom) &&
+      content.top >= s.top - 1 && content.bottom <= s.bottom + 1
+    const oneSurface = close(railAlpha, 0.97, 0.005) && close(Number.parseFloat(railStyle.opacity), 1, 0.005) &&
+      close(panelAlpha, 0, 0.005) && close(hudAlpha, 0, 0.005) && close(sheetAlpha, 0, 0.005) &&
+      panelStyle.borderTopWidth === '1px' && panelStyle.borderTopLeftRadius !== '0px' &&
+      hudStyle.borderTopWidth === '0px' && sheetStyle.borderTopWidth === '0px' &&
+      hudStyle.boxShadow === 'none' && sheetStyle.boxShadow === 'none'
+    const edgePoints = [
+      [expected.left + 1, expected.top + 1],
+      [expected.right - 1, expected.top + 1],
+      [expected.left + 1, expected.bottom - 1],
+      [expected.right - 1, expected.bottom - 1]
+    ]
+    const edgeOwnership = railStyle.pointerEvents === 'auto' && edgePoints.every(([x, y]) =>
+      document.elementFromPoint(x, y)?.closest(S.rail) === rail)
+    return {
+      ok: opened && fixedBounds && hierarchy && oneSurface && edgeOwnership,
+      view,
+      expected,
+      rail: { left: r.left, right: r.right, top: r.top, bottom: r.bottom, alpha: railAlpha, opacity: railStyle.opacity, classes: rail.className },
+      panel: { left: p.left, right: p.right, top: p.top, bottom: p.bottom, alpha: panelAlpha, radius: panelStyle.borderTopLeftRadius },
+      hud: { left: h.left, right: h.right, top: h.top, bottom: h.bottom, alpha: hudAlpha, border: hudStyle.borderTopWidth, classes: hud.className },
+      order: { header: [head.top, head.bottom], rating: [rate.top, rate.bottom], rec: [recommendation.top, recommendation.bottom], table: [table.top, table.bottom], pool: [summary.top, summary.bottom], sheet: [s.top, s.bottom], body: [content.top, content.bottom], footer: [f.top, f.bottom] },
+      sheet: { left: s.left, right: s.right, top: s.top, bottom: s.bottom, alpha: sheetAlpha, border: sheetStyle.borderTopWidth, classes: sheet.className },
+      checks: { opened, fixedBounds, hierarchy, activeBlocks, oneSurface, edgeOwnership }
+    }
+  }, SEL)
   if (result.ok) return true
   failures.push(`${label}: ${JSON.stringify(result)}`)
   console.error('  FAIL', label, result)
@@ -178,10 +337,12 @@ try {
       const rect = el.getBoundingClientRect()
       return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0
     }
+    const rail = document.querySelector(S.rail)
     const hud = document.querySelector(S.hud)
     const sheet = document.querySelector(S.sheetRoot)
     const badges = document.querySelector(S.badges)
-    return !!hud && hud.classList.contains('idle') && hud.classList.contains('idle-min') &&
+    return !!rail && !rail.classList.contains('open') && rail.getAttribute('aria-hidden') === 'false' &&
+      !!hud && hud.classList.contains('idle') && hud.classList.contains('idle-min') &&
       hud.classList.contains('hud-tr') && !hud.classList.contains('interactive') &&
       visible(S.hudIdle) && !visible(S.hudIdleText) && !visible(S.hudMain) &&
       !visible(S.hudWarning) && document.querySelectorAll(S.cell).length === 0 &&
@@ -192,31 +353,18 @@ try {
 
   await feedUntil(nthPickNext(1))
   await waitFor(page, S => document.querySelectorAll(S.cell).length === 14, '14 badge cells')
-  await waitFor(page, S => !!document.querySelector(S.sheet), 'sheet open by default')
+  await waitFor(page, S => !!document.querySelector(S.sheet), 'pool list pinned in the draft sidebar')
   await waitFor(page, S => {
     const provenance = document.querySelector(S.hudProvenance)
     const text = provenance?.textContent?.trim() ?? ''
     return !!provenance && !provenance.hidden && /^DraftFM \S+ · Scryfall \d{4}-\d{2}-\d{2}/.test(text)
   }, 'model and Scryfall snapshot provenance')
   await expectPage(page, S => {
-    const chips = [...document.querySelectorAll(`${S.sheetColours} [data-colour]`)]
-    return chips.map(chip => chip.getAttribute('data-colour')).join('') === 'WUBRG' &&
+    const chips = [...document.querySelectorAll(`${S.hudPool} .hud-pool-counts .pc`)]
+    return chips.map(chip => [...chip.classList].find(name => /^[WUBRGC]$/.test(name))).join('') === 'WUBRGC' &&
       chips.every(chip => /^\d+$/.test(chip.querySelector('b')?.textContent ?? ''))
-  }, 'WUBRG pool counts in the sheet header')
-  await expectPage(page, S => {
-    const hud = document.querySelector(S.hud)
-    const sheet = document.querySelector(S.sheetRoot)
-    if (!hud || !sheet) return false
-    const h = hud.getBoundingClientRect()
-    const s = sheet.getBoundingClientRect()
-    const hs = getComputedStyle(hud)
-    const ss = getComputedStyle(sheet)
-    return hud.classList.contains('with-sheet') && hud.classList.contains('sheet-below') &&
-      sheet.classList.contains('stack-below') && Math.abs(h.bottom - s.top) <= 1 &&
-      hs.borderBottomColor === 'rgba(0, 0, 0, 0)' && ss.borderTopColor === 'rgba(0, 0, 0, 0)' &&
-      hs.borderBottomLeftRadius === '0px' && ss.borderTopLeftRadius === '0px' &&
-      hs.boxShadow === 'none' && ss.boxShadow === 'none'
-  }, 'HUD and pool sheet form one seamless rail')
+  }, 'single WUBRGC pool summary in the sidebar')
+  await expectDraftSidebarGeometry(page, 'P1P1 full right-column sidebar geometry, hierarchy, and ownership')
   await expectPage(page, () => {
     const text = document.body.textContent?.toLowerCase() ?? ''
     return !text.includes('data from 17lands') && !text.includes('gih wr') && !text.includes('alsa')
@@ -259,8 +407,8 @@ try {
   await page.mouse.move(5, 5)
   await sleep(100)
 
-  // HUD + sheet are one dwell surface: resting on either body yields both,
-  // while entering a button restores the complete rail before the click.
+  // The sidebar owns the whole column: body dwell must never yield it or make
+  // Arena behind it interactive.
   const sheetBodyPoint = await page.evaluate(S => {
     const r = document.querySelector(S.sheetBody).getBoundingClientRect()
     return { x: r.x + r.width / 2, y: r.y + Math.min(40, r.height / 2) }
@@ -268,34 +416,52 @@ try {
   await page.mouse.move(sheetBodyPoint.x, sheetBodyPoint.y)
   await sleep(400)
   await expectPage(page, S => {
+    const rail = document.querySelector(S.rail)
     const hud = document.querySelector(S.hud)
     const sheet = document.querySelector(S.sheetRoot)
-    if (!hud || !sheet) return false
-    const hudOpacity = Number.parseFloat(getComputedStyle(hud).opacity)
-    const sheetOpacity = Number.parseFloat(getComputedStyle(sheet).opacity)
-    return hud.classList.contains('yield') && sheet.classList.contains('yield') &&
-      Math.abs(hudOpacity - 0.08) < 0.02 && Math.abs(sheetOpacity - 0.08) < 0.02
-  }, 'joined HUD and sheet yield together after body dwell')
-  const railButtonPoint = await page.evaluate(S => {
-    const r = document.querySelector(S.hudSheetBtn).getBoundingClientRect()
-    return { x: r.x + r.width / 2, y: r.y + r.height / 2 }
-  }, SEL)
-  await page.mouse.move(railButtonPoint.x, railButtonPoint.y)
-  await sleep(100)
-  await expectPage(page, S => {
-    const hud = document.querySelector(S.hud)
-    const sheet = document.querySelector(S.sheetRoot)
-    const button = document.querySelector(S.hudSheetBtn)
-    return !!hud && !!sheet && !!button && !hud.classList.contains('yield') &&
-      !sheet.classList.contains('yield') && getComputedStyle(button).pointerEvents === 'auto'
-  }, 'rail button restores both joined panels before click')
+    if (!rail || !hud || !sheet) return false
+    const style = getComputedStyle(rail)
+    return rail.classList.contains('open') && rail.classList.contains('interactive') &&
+      !rail.classList.contains('preview-covered') && !hud.classList.contains('yield') &&
+      !sheet.classList.contains('yield') && Math.abs(Number.parseFloat(style.opacity) - 1) < 0.005 &&
+      style.pointerEvents === 'auto'
+  }, '400ms sidebar dwell never fades, yields, or releases pointer ownership')
 
-  // The pool sheet opens with the draft. Capture it, then close it via the HUD.
+  // Clean test-only injection proves the production predicted-region path.
+  // `hudCovered` alone is explicitly insufficient: only region intersection
+  // may fade the common owner, while badge preview lifting remains intact.
+  await page.evaluate(layer => {
+    document.dispatchEvent(new CustomEvent('mtga:e2e-layer', { detail: layer }))
+  }, { cells: [1], regions: [{ x: 1120, y: 200, width: 160, height: 300 }], covered: false, hudCovered: true })
+  await waitFor(page, S => {
+    const rail = document.querySelector(S.rail)
+    const cells = [...document.querySelectorAll(S.cell)]
+    if (!rail || cells.length < 2) return false
+    const style = getComputedStyle(rail)
+    return rail.classList.contains('preview-covered') &&
+      Math.abs(Number.parseFloat(style.opacity) - 0.08) < 0.005 && style.pointerEvents === 'auto' &&
+      cells[1].classList.contains('behind')
+  }, 'intersecting predicted preview fades interactive sidebar and lifts covered badge')
+  await page.evaluate(layer => {
+    document.dispatchEvent(new CustomEvent('mtga:e2e-layer', { detail: layer }))
+  }, { cells: [], regions: [{ x: 100, y: 100, width: 200, height: 200 }], covered: false, hudCovered: true })
+  await waitFor(page, S => {
+    const rail = document.querySelector(S.rail)
+    const hud = document.querySelector(S.hud)
+    if (!rail || !hud) return false
+    const style = getComputedStyle(rail)
+    const alpha = Number.parseFloat(style.backgroundColor.split(',').at(-1))
+    return !rail.classList.contains('preview-covered') && !hud.classList.contains('covered') &&
+      Math.abs(Number.parseFloat(style.opacity) - 1) < 0.005 && Math.abs(alpha - 0.97) < 0.005
+  }, 'nonintersecting region restores 0.97 sidebar despite hudCovered')
+  await page.evaluate(() => {
+    document.dispatchEvent(new CustomEvent('mtga:e2e-layer', {
+      detail: { cells: [], regions: [], covered: false, hudCovered: false }
+    }))
+  })
+
+  await expectDraftSidebarGeometry(page, '04-sheet full sidebar remains restored and pointer-owning')
   await shot(page, '04-sheet')
-  await page.click(SEL.hudSheetBtn).catch(e => failures.push(`sheet button: ${e.message}`))
-  await waitFor(page, S => !document.querySelector(S.sheet), 'sheet closed', 3000)
-  await page.click(SEL.hudSheetBtn).catch(e => failures.push(`sheet reopen button: ${e.message}`))
-  await waitFor(page, S => !!document.querySelector(S.sheet), 'sheet reopened for populated-pool checks', 3000)
 
   await feedUntil(nthPickNext(6)) // 6 more PickNext after P1P1 → P1P7 (8 cards)
   await waitFor(page, S => document.querySelectorAll(S.cell).length === 8, '8 cells at p1p7')
@@ -305,22 +471,28 @@ try {
 
   await feedUntil(nthPickNext(13)) // → P2P6
   await sleep(700)
-  await expectSheetContained(page, 'P2P6 sheet scrolls inside the Arena rail', true)
+  await expectSheetContained(page, 'P2P6 grouped pool stays in its internal-scroll viewport')
+  await expectDraftSidebarGeometry(page, 'P2P6 sidebar pins the live 1512×949 right-column bounds')
   await shot(page, '06-p2p6')
 
   // Calibration mode through the HUD.
   await page.click(SEL.hudCalBtn).catch(e => failures.push(`calibrate button: ${e.message}`))
-  await waitFor(page, S => !!document.querySelector(S.calPanel), 'calibration panel', 3000)
+  await waitFor(page, S => {
+    const rail = document.querySelector(S.rail)
+    const panel = document.querySelector(S.calPanel)
+    return !!rail && !rail.classList.contains('open') && rail.getAttribute('aria-hidden') === 'true' &&
+      getComputedStyle(rail).pointerEvents === 'none' && !!panel && getComputedStyle(panel).pointerEvents === 'auto'
+  }, 'calibration panel replaces the closed/noninteractive sidebar owner', 3000)
   await shot(page, '07-calibrate')
   await page.click(SEL.calCancel).catch(() => {})
-  await waitFor(page, S => !document.querySelector(S.calPanel), 'calibration closed', 3000)
-
-  // Completion must override a previously closed sheet for the full linger.
-  await page.click(SEL.hudSheetBtn).catch(e => failures.push(`sheet close before completion: ${e.message}`))
-  await waitFor(page, S => !document.querySelector(S.sheet), 'sheet closed before completion', 3000)
+  await waitFor(page, S => {
+    const rail = document.querySelector(S.rail)
+    return !document.querySelector(S.calPanel) && !!rail && rail.classList.contains('open') && !!document.querySelector(S.sheet)
+  }, 'calibration closes back to the pinned sidebar', 3000)
 
   await feedUntil(() => false) // rest of the draft incl. Completed
   await waitFor(page, S => {
+    const rail = document.querySelector(S.rail)
     const hud = document.querySelector(S.hud)
     const main = document.querySelector(S.hudMain)
     const sheet = document.querySelector(S.sheetRoot)
@@ -335,25 +507,29 @@ try {
       const bodyRect = sheetBody?.getBoundingClientRect()
       return !!bodyRect && cardRect.bottom > bodyRect.top && cardRect.top < bodyRect.bottom
     })
-    return !!hud && hud.classList.contains('complete') && hud.classList.contains('interactive') &&
+    const gradeOrder = ['F', 'D-', 'D', 'D+', 'C-', 'C', 'C+', 'B-', 'B', 'B+', 'A-', 'A', 'A+']
+    const nonLandGrades = poolCards.filter(card => !card.classList.contains('basic-land'))
+      .map(card => gradeOrder.indexOf(card.querySelector('.s-grade')?.textContent?.trim() ?? ''))
+    const bestToWorst = nonLandGrades.every((grade, index) => index === 0 || nonLandGrades[index - 1] >= grade)
+    const pickLabels = [...document.querySelectorAll(`${S.sheetPool} .s-pick-labels`)]
+      .flatMap(label => label.textContent?.match(/P\d+p\d+/g) ?? [])
+    const lands = document.querySelector(`${S.sheetPool} [data-pool-section="lands"]`)
+    const firstLand = document.querySelector(`${S.sheetPool} .s-card.basic-land`)
+    const landsOrdered = (!lands && !firstLand) || (!!lands && !!firstLand && !!(lands.compareDocumentPosition(firstLand) & Node.DOCUMENT_POSITION_FOLLOWING))
+    return !!rail && rail.classList.contains('open') && rail.classList.contains('interactive') &&
+      !!hud && hud.classList.contains('complete') && hud.classList.contains('interactive') &&
       !hud.classList.contains('idle') && !!main && !main.hidden &&
       (hud.textContent ?? '').toLowerCase().includes('draft complete') &&
       !!sheet && sheet.classList.contains('open') && !!document.querySelector(S.sheet) &&
-      document.querySelector(S.sheetTitle)?.textContent?.trim() === 'Pool · 42' &&
-      poolCopies === 42 && visiblePoolCards.length > 0 && sheetBody?.scrollTop === 0 &&
+      document.querySelector(S.sheetRating)?.textContent?.startsWith('Pool rating ') &&
+      poolCopies === 42 && pickLabels.length === 42 && bestToWorst && landsOrdered &&
+      !document.querySelector('.sheet-picks') && visiblePoolCards.length > 0 && sheetBody?.scrollTop === 0 &&
       document.querySelectorAll(S.cell).length === 0
-  }, 'completion HUD and populated pool sheet with no badge leak', 6000)
+  }, 'completion sidebar keeps grouped ordered pool, pick labels, lands divider, and no badge leak', 6000)
   await sleep(500)
+  await expectDraftSidebarGeometry(page, 'completion keeps the full opaque sidebar and bottom footer')
+  await expectLongPoolScroll(page, 'long grouped pool scrolls internally without moving the pinned footer')
   await shot(page, '08-complete')
-
-  // Pool controls keep their normal meaning throughout completion; this is
-  // the same toggle function registered for Command+Shift+D.
-  await page.click(SEL.hudSheetBtn).catch(e => failures.push(`completion sheet toggle: ${e.message}`))
-  await waitFor(page, S => {
-    const hud = document.querySelector(S.hud)
-    return !!hud && hud.classList.contains('complete') && !hud.classList.contains('idle') &&
-      !document.querySelector(S.sheet)
-  }, 'completion sheet toggles closed without dismissing the summary', 3000)
 
   // The explicit Dismiss control ends the linger immediately and leaves only
   // the fixed click-through idle glyph.
@@ -366,9 +542,11 @@ try {
       const rect = el.getBoundingClientRect()
       return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0
     }
+    const rail = document.querySelector(S.rail)
     const hud = document.querySelector(S.hud)
     const sheet = document.querySelector(S.sheetRoot)
-    return !!hud && hud.classList.contains('idle') && hud.classList.contains('idle-min') &&
+    return !!rail && !rail.classList.contains('open') && rail.getAttribute('aria-hidden') === 'false' &&
+      !!hud && hud.classList.contains('idle') && hud.classList.contains('idle-min') &&
       hud.classList.contains('hud-tr') && !hud.classList.contains('interactive') &&
       visible(S.hudIdle) && !visible(S.hudMain) && !!sheet && !sheet.classList.contains('open') &&
       !visible(S.sheetRoot) && document.querySelectorAll(S.cell).length === 0

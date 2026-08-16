@@ -10,6 +10,7 @@
  *   window.overlay.setInteractive(on)  → take/release mouse events (HUD hover)
  *   window.overlay.setHudRect(rect)    → where the HUD is (layer awareness lifts it)
  *   window.overlay.action(name, data)  → user intent (toggle-badges, calibrate-op, dismiss, …)
+ *   window.overlay.e2e                 → enables renderer-only E2E injection seams
  */
 import { contextBridge, ipcRenderer } from 'electron'
 
@@ -23,7 +24,8 @@ const api = {
   onCommand: (cb: (data: unknown) => void) => { ipcRenderer.on('overlay:command', (_e, d) => cb(d)) },
   setInteractive: (on: boolean) => ipcRenderer.send('overlay:interactive', on),
   setHudRect: (rect: { x: number; y: number; width: number; height: number } | null) => ipcRenderer.send('overlay:hud-rect', rect),
-  action: (name: string, data?: unknown) => ipcRenderer.send('overlay:action', { name, data })
+  action: (name: string, data?: unknown) => ipcRenderer.send('overlay:action', { name, data }),
+  e2e: process.env.MTGA_E2E === '1'
 }
 
 contextBridge.exposeInMainWorld('overlay', api)

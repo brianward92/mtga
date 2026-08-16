@@ -198,7 +198,6 @@ function setupIpc(): void {
         if (c) pushPrefs(savePrefs({ hudCorner: c }))
         break
       }
-      case 'toggle-sheet': toggleSheet(); break
       case 'dismiss': coordinator.idle(); break
       case 'calibrate-start': calibration.start(poller.lastKnown); break
       case 'calibrate-op': calibration.adjust(msg.data as CalibrationOp, poller.lastKnown); break
@@ -209,10 +208,6 @@ function setupIpc(): void {
       default: console.warn('[IPC] unknown action', msg?.name)
     }
   })
-}
-
-function toggleSheet(): void {
-  setSheetOpen(!sheetOpen)
 }
 
 function setSheetOpen(open: boolean): void {
@@ -230,7 +225,6 @@ function setupTray(): void {
     toggleHud: () => pushPrefs(savePrefs({ hud: !loadPrefs().hud })),
     toggleLayerDetection: () => pushPrefs(savePrefs({ layerDetection: !loadPrefs().layerDetection })),
     calibrate: () => calibration.start(poller.lastKnown),
-    toggleSheet,
     openScreenRecordingSettings
   })
   refreshTray()
@@ -238,7 +232,6 @@ function setupTray(): void {
 
 function setupShortcuts(): void {
   // The overlay is never focused; these are global by necessity.
-  globalShortcut.register('CommandOrControl+Shift+D', toggleSheet)
   globalShortcut.register('CommandOrControl+Shift+B', () => pushPrefs(savePrefs({ badges: !loadPrefs().badges })))
 }
 

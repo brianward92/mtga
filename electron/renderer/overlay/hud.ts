@@ -15,7 +15,7 @@ import { shortBandLabel } from './chips'
 import { renderManaCost, escapeHtml } from './shared'
 import { hudCornerForPhase, sheetShouldRender } from './visibility'
 import {
-  agreement, bestPick, detailLine, eventTitle, laneLean, nextCorner, packConviction,
+  agreement, bestPick, detailLine, eventTitle, laneLean, packConviction,
   pickPosition, POOL_COLORS, poolSummary, progressDots, rankedCards, whyLine
 } from './hud-logic'
 import type { OverlayAction, Store } from './types'
@@ -76,6 +76,7 @@ export class Hud {
   private rootClass = ''
 
   constructor(private root: HTMLElement, private action: OverlayAction) {
+    const rail = root.closest<HTMLElement>('.draft-rail') ?? root
     this.idle = $(root, 'hudIdle')
     this.main = $(root, 'hudMain')
     this.warning = $(root, 'hudWarning')
@@ -101,8 +102,8 @@ export class Hud {
     this.done = $(root, 'hudDone')
     this.doneAgree = $(root, 'doneAgree')
     this.doneBest = $(root, 'doneBest')
-    this.btnBadges = $(root, 'btnBadges')
-    this.attrib = $(root, 'hudAttrib')
+    this.btnBadges = $(rail, 'btnBadges')
+    this.attrib = $(rail, 'hudAttrib')
 
     for (let i = 0; i < 5; i++) {
       const s = document.createElement('span')
@@ -119,15 +120,13 @@ export class Hud {
       this.poolCounts[c] = $(root, 'poolCounts').querySelector<HTMLElement>(`.pc.${c}`)!
     }
 
-    $(root, 'btnSheet').addEventListener('click', () => this.action('toggle-sheet'))
     this.btnBadges.addEventListener('click', () => this.action('toggle-badges'))
-    $(root, 'btnCorner').addEventListener('click', () => this.action('set-hud-corner', { corner: nextCorner(this.corner) }))
-    $(root, 'btnCalibrate').addEventListener('click', () => this.action('calibrate-start'))
+    $(rail, 'btnCalibrate').addEventListener('click', () => this.action('calibrate-start'))
     $(root, 'btnDismiss').addEventListener('click', () => this.action('dismiss'))
   }
 
   update(store: Store): void {
-    const { state, prefs, layer } = store
+    const { state, prefs } = store
     const idle = state.phase === 'idle'
     this.corner = hudCornerForPhase(state.phase, prefs.hudCorner)
 
@@ -136,13 +135,13 @@ export class Hud {
     const classes = ['hud', `hud-${this.corner}`]
     if (!idle) classes.push('interactive')
     if (!prefs.hud) classes.push('hidden')
-    if (layer.hudCovered) classes.push('covered')
     if (idle) classes.push('idle', 'idle-min')
     if (state.phase === 'complete') classes.push('complete')
     if (state.scoring) classes.push('scoring')
-    // Pool sheet stacks flush against either edge: one continuous rail panel.
+    // Active/complete content belongs to the fixed sidebar, independent of
+    // the legacy sheet-open preference.
     if (sheetShouldRender(state.phase, store.sheetOpen)) {
-      classes.push('with-sheet', prefs.hudCorner === 'tl' || prefs.hudCorner === 'tr' ? 'sheet-below' : 'sheet-above')
+      classes.push('with-sheet', 'sheet-below')
     }
     const rootClass = classes.join(' ')
     if (rootClass !== this.rootClass) { this.rootClass = rootClass; this.root.className = rootClass }
@@ -163,7 +162,9 @@ export class Hud {
     this.model.title = state.model.modelId ?? ''
     this.model.classList.toggle('off', state.model.state !== 'ready')
     const modelMsg = state.model.state !== 'ready' ? (state.model.message ?? `model ${state.model.state}`) : ''
-    this.modelMsg.hidden = modelMsg === ''
+    this.modelMsg.hidden = false
+    this.modelMsg.classList.toggle('empty', modelMsg === '')
+    this.modelMsg.title = modelMsg
     setText(this.modelMsg, modelMsg)
 
     // Body

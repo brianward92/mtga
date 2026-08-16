@@ -19,12 +19,12 @@ describe('overlay visibility outside drafts', () => {
     expect(badgesShouldRender('active', 14, true, false, false)).toBe(false)
   })
 
-  it('suppresses the sheet while idle but preserves active and complete toggles', () => {
+  it('pins active and complete pool content regardless of the legacy toggle', () => {
     expect(sheetShouldRender('idle', true)).toBe(false)
     expect(sheetShouldRender('active', true)).toBe(true)
-    expect(sheetShouldRender('active', false)).toBe(false)
+    expect(sheetShouldRender('active', false)).toBe(true)
     expect(sheetShouldRender('complete', true)).toBe(true)
-    expect(sheetShouldRender('complete', false)).toBe(false)
+    expect(sheetShouldRender('complete', false)).toBe(true)
   })
 
   it('pins only the idle glyph top-right', () => {

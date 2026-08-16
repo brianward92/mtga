@@ -40,6 +40,7 @@ class FakeElement {
 }
 
 function harness() {
+  const sidebar = new FakeElement(['draft-rail', 'open', 'interactive'])
   const hud = new FakeElement(
     ['hud', 'interactive'],
     { left: 700, top: 20, right: 980, bottom: 200, width: 280, height: 180 }
@@ -52,7 +53,8 @@ function harness() {
   const rail = new RailInteraction(
     hud as unknown as HTMLElement,
     sheet as unknown as HTMLElement,
-    on => changes.push(on)
+    on => changes.push(on),
+    sidebar as unknown as HTMLElement
   )
   const body = new FakeElement([])
   body.panel = sheet
@@ -60,7 +62,7 @@ function harness() {
   button.panel = hud
   button.button = true
   rail.syncTopology()
-  return { rail, hud, sheet, body, button, changes }
+  return { rail, sidebar, hud, sheet, body, button, changes }
 }
 
 beforeEach(() => {
@@ -81,26 +83,29 @@ afterEach(() => {
 })
 
 describe('rail interaction controller', () => {
-  it('yields a joined rail together and restores both panels on a button', () => {
+  it('never arms dwell or yields anywhere in the authoritative draft sidebar', () => {
     const { rail, hud, sheet, body, button, changes } = harness()
 
     expect(rail.handlePointerMove(body as unknown as Element, 800, 260)).toBe(true)
     expect(changes).toEqual([true])
-    vi.advanceTimersByTime(250)
-    expect(hud.classList.contains('yield')).toBe(true)
-    expect(sheet.classList.contains('yield')).toBe(true)
-    expect(changes).toEqual([true, false])
+    vi.advanceTimersByTime(1_000)
+    expect(hud.classList.contains('yield')).toBe(false)
+    expect(sheet.classList.contains('yield')).toBe(false)
+    expect(changes).toEqual([true])
+    expect(vi.getTimerCount()).toBe(0)
 
     expect(rail.handlePointerMove(button as unknown as Element, 900, 100)).toBe(true)
     expect(hud.classList.contains('yield')).toBe(false)
     expect(sheet.classList.contains('yield')).toBe(false)
-    expect(changes).toEqual([true, false, true])
+    expect(changes).toEqual([true])
     rail.releasePointer()
   })
 
   it('cancels a pending dwell when the rendered topology changes', () => {
-    const { rail, hud, sheet, body, changes } = harness()
+    const { rail, sidebar, hud, sheet, body, changes } = harness()
 
+    sidebar.classList.remove('open')
+    rail.syncTopology()
     rail.handlePointerMove(body as unknown as Element, 800, 260)
     sheet.classList.remove('open')
     rail.syncTopology()

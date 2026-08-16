@@ -29,7 +29,8 @@ export class RailInteraction {
   constructor(
     private readonly hudRoot: HTMLElement,
     private readonly sheetRoot: HTMLElement,
-    private readonly setWindowInteractive: (on: boolean) => void
+    private readonly setWindowInteractive: (on: boolean) => void,
+    private readonly sidebarRoot: HTMLElement | null = null
   ) {}
 
   /** Reconcile dwell state after a render may have changed rail geometry. */
@@ -44,6 +45,7 @@ export class RailInteraction {
       // establishes a target in the new topology.
       this.setInteractive(false)
     }
+    if (this.sidebarRoot?.classList.contains('open')) this.resetDwell()
     // Hud.update replaces its base class string; preserve a valid active yield.
     this.applyYield()
   }
@@ -51,6 +53,13 @@ export class RailInteraction {
   /** Process one forwarded pointer move; true means pack hover must stay clear. */
   handlePointerMove(element: Element | null, x: number, y: number): boolean {
     const hit = !!(element && element.closest('.interactive'))
+    // The full draft sidebar owns Arena's right column. It must remain opaque
+    // and interactive on dwell; only predicted pack-preview state may fade it.
+    if (this.sidebarRoot?.classList.contains('open')) {
+      this.resetDwell()
+      this.setInteractive(hit)
+      return hit
+    }
     const railTarget = this.railTargetAt(element, x, y)
     const yielded = this.updateDwell(railTarget)
     this.setInteractive(hit && !yielded)
@@ -146,5 +155,12 @@ export class RailInteraction {
     if (this.dwellTimer === null) return
     window.clearTimeout(this.dwellTimer)
     this.dwellTimer = null
+  }
+
+  private resetDwell(): void {
+    this.clearDwellTimer()
+    if (this.dwell === EMPTY_RAIL_DWELL) return
+    this.dwell = EMPTY_RAIL_DWELL
+    this.applyYield()
   }
 }

@@ -20,7 +20,6 @@ interface TrayActions {
   toggleHud: () => void
   toggleLayerDetection: () => void
   calibrate: () => void
-  toggleSheet: () => void
   openScreenRecordingSettings: () => void
 }
 
@@ -71,8 +70,7 @@ export class StatusTray {
       { label: draftLabel(s.draft, s.arenaFound), enabled: false },
       { type: 'separator' },
       { label: 'Card Badges', type: 'checkbox', checked: s.prefs.badges, click: () => this.actions.toggleBadges() },
-      { label: 'Context HUD', type: 'checkbox', checked: s.prefs.hud, click: () => this.actions.toggleHud() },
-      { label: 'Pool & Picks Sheet   ⌘⇧D', click: () => this.actions.toggleSheet() },
+      { label: 'Draft Sidebar', type: 'checkbox', checked: s.prefs.hud, click: () => this.actions.toggleHud() },
       { type: 'separator' },
       {
         label: 'Precise layering (optional — captures the Arena window)',
