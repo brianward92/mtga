@@ -66,6 +66,32 @@ describe('recommendation WHY builder', () => {
     ])).toBe('')
   })
 
+  it('never claims colour fit for candidates outside an opposite-colour pool lane', () => {
+    const blackPool = Array.from({ length: 6 }, () => card({ colors: 'B' }))
+
+    for (const colors of ['W', 'U', 'R', 'G', 'WB', 'UB']) {
+      expect(buildWhy(card({ colors }), null, blackPool), colors).toBe('')
+    }
+  })
+
+  it('degrades to the probability gap when neither pool fit nor a hook is honest', () => {
+    const top = card({
+      name: 'Eerie Candidate',
+      colors: 'R',
+      prob: 0.56,
+      rank: 1
+    })
+    const runnerUp = card({ prob: 0.31, rank: 2 })
+    const spreadPool = [
+      card({ colors: 'W' }),
+      card({ colors: 'U' }),
+      card({ colors: 'B' }),
+      card({ colors: 'G' })
+    ]
+
+    expect(buildWhy(top, runnerUp, spreadPool)).toBe('#1 by 25 pts over #2')
+  })
+
   it('matches whole mechanic terms, deduplicates, and requires a current-pool match', () => {
     expect(buildWhy(
       card({ name: 'Survival Delirium Eerie', type: 'Enchantment — Room' }),

@@ -22,7 +22,7 @@ export interface Rect {
 
 /** User-tunable fractions and dimensions for Arena's pack grid. */
 export interface CalibrationConfig {
-  /** Pack area origin/size, as fractions of the Arena window. */
+  /** Pack area origin/size as fractions of Arena's centred content box. */
   packLeft: number
   packTop: number
   packWidth: number
@@ -75,7 +75,7 @@ export const DEFAULT_CALIBRATION: CalibrationConfig = {
   refCount: 14
 }
 
-/** Calibration nudge/scale steps (fractions of the window / multipliers). */
+/** Calibration nudge step as a fraction of each content-box axis. */
 export const NUDGE_STEP = 0.005
 /** Multiplicative step for pack-area scaling controls. */
 export const SCALE_STEP = 1.02

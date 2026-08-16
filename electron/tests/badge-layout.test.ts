@@ -391,4 +391,63 @@ describe('Arena content box (letterbox model)', () => {
     expect(small.cards[0].card.x).toBeLessThan(190)
     expect(small.cards[0].card.height / big.cards[0].card.height).toBeCloseTo(748 / 949, 6)
   })
+
+  it('makes calibration nudges content-box fractions at 1280x748', () => {
+    const view = { width: 1280, height: 748 }
+    const box = arenaContentBox(view)
+    const before = packLayout(view, 14, DEFAULT_CALIBRATION)
+    const moved = packLayout(view, 14, applyCalibrationOp(DEFAULT_CALIBRATION, {
+      type: 'nudge', dx: 1, dy: 1
+    }))
+
+    // The horizontal content box is ~1191.76 px wide inside 44.12 px side
+    // gutters. A nudge is therefore ~5.96 px, not 0.5% of the 1280 px window.
+    expect(box.x).toBeCloseTo(44.1222339305, 8)
+    expect(box.width).toBeCloseTo(1191.7555321391, 8)
+    expect(moved.pack.x - before.pack.x).toBeCloseTo(box.width * NUDGE_STEP, 8)
+    expect(moved.pack.x - before.pack.x).toBeCloseTo(5.9587776607, 8)
+    expect(moved.pack.y - before.pack.y).toBeCloseTo(view.height * NUDGE_STEP, 8)
+    expect(moved.pack.y - before.pack.y).toBeCloseTo(3.74, 8)
+    expect(moved.pack.width).toBeCloseTo(before.pack.width, 8)
+    expect(moved.pack.height).toBeCloseTo(before.pack.height, 8)
+
+    for (let i = 0; i < before.cards.length; i++) {
+      expect(moved.cards[i].card.x - before.cards[i].card.x).toBeCloseTo(box.width * NUDGE_STEP, 8)
+      expect(moved.cards[i].card.y - before.cards[i].card.y).toBeCloseTo(view.height * NUDGE_STEP, 8)
+      expect(moved.cards[i].badge.x - before.cards[i].badge.x).toBeCloseTo(box.width * NUDGE_STEP, 8)
+      expect(moved.cards[i].badge.y - before.cards[i].badge.y).toBeCloseTo(view.height * NUDGE_STEP, 8)
+    }
+  })
+
+  it('scales calibration frames and ghosts within the same 1280x748 content box', () => {
+    const view = { width: 1280, height: 748 }
+    const before = packLayout(view, 14, DEFAULT_CALIBRATION)
+    const grown = packLayout(view, 14, applyCalibrationOp(DEFAULT_CALIBRATION, {
+      type: 'scale', dir: 1
+    }))
+    const wider = packLayout(view, 14, applyCalibrationOp(DEFAULT_CALIBRATION, {
+      type: 'scale-width', dir: 1
+    }))
+    const taller = packLayout(view, 14, applyCalibrationOp(DEFAULT_CALIBRATION, {
+      type: 'scale-height', dir: 1
+    }))
+
+    // Scale controls adjust stored content-box fractions; they do not move the
+    // configured top-left or accidentally use the full letterboxed window.
+    for (const layout of [grown, wider, taller]) {
+      expect(layout.pack.x).toBeCloseTo(before.pack.x, 8)
+      expect(layout.pack.y).toBeCloseTo(before.pack.y, 8)
+    }
+    expect(grown.pack.width / before.pack.width).toBeCloseTo(SCALE_STEP, 8)
+    expect(grown.pack.height / before.pack.height).toBeCloseTo(SCALE_STEP, 8)
+    expect(wider.pack.width / before.pack.width).toBeCloseTo(SCALE_STEP, 8)
+    expect(wider.pack.height).toBeCloseTo(before.pack.height, 8)
+    expect(taller.pack.width).toBeCloseTo(before.pack.width, 8)
+    expect(taller.pack.height / before.pack.height).toBeCloseTo(SCALE_STEP, 8)
+
+    // CalibrateLayer paints these exact pack/card/badge rectangles as ghosts.
+    expect(grown.cards[0].card.width / before.cards[0].card.width).toBeCloseTo(SCALE_STEP, 8)
+    expect(grown.cards[0].card.height / before.cards[0].card.height).toBeCloseTo(SCALE_STEP, 8)
+    expect(grown.cards[0].badge.height).toBe(before.cards[0].badge.height)
+  })
 })
