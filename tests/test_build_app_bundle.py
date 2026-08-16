@@ -507,9 +507,10 @@ def test_hob_without_overlay_fails_loudly_continues_and_removes_stale_output(wor
     (hob_dir / "ratings.json").write_text("stale")
     (hob_dir / "keep.txt").write_text("unrelated")
 
-    entries, failures, index, _ = _build(world, ["HOB", SET])
+    entries, failures, index, stale = _build(world, ["HOB", SET])
     assert set(entries) == {SET}
     assert "HOB" not in index["sets"]
+    assert stale == []
     assert (
         "Scryfall has no arena_id for HOB yet; re-run after Scryfall updates"
         in failures["HOB"]

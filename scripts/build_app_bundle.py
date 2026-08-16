@@ -1115,14 +1115,16 @@ def update_index(out_dir, entries, meta, manifest, snapshot, requested=()):
     existing, stale = {}, []
     for code, entry in raw_existing.items():
         clean = public_entry(entry)
+        # Requested sets are deliberately replaced or omitted after a failed
+        # rebuild; they are not unrelated stale-manifest entries.
+        if code in requested:
+            continue
         if (
             not compatible_index
             or clean is None
             or clean["manifest_hash"] != manifest_hash
-            or code in requested
         ):
-            if code not in entries:
-                stale.append(code)
+            stale.append(code)
             continue
         existing[code] = clean
 
