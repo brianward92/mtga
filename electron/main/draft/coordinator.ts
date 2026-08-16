@@ -199,6 +199,7 @@ export class DraftCoordinator extends EventEmitter {
         name: c?.name ?? `Card #${grpId}`,
         rarity: c?.rarity ?? 'common',
         colors: c?.colors ?? '',
+        colorIdentity: c?.colorIdentity ?? '',
         manaCost: c?.manaCost ?? '',
         manaValue: c?.manaValue ?? null,
         type: c?.type ?? '',

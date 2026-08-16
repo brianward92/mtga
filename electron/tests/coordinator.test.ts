@@ -59,6 +59,7 @@ describe('DraftCoordinator', () => {
     const fr = c.current.cards.find(r => r.grpId === 2)!
     expect(fr.rank).toBe(1); expect(fr.grade).toBe('A'); expect(fr.ev).toBe(2.5)
     expect(fr.colors).toBe('B')
+    expect(fr.colorIdentity).toBe('WB')
     expect(fr.imageUrl).toBeNull()
 
     c.onDraftPick(snap({ currentPack: { pack: 1, pick: 1, grpIds: [1, 2, 999] }, pool: [1] }), { pack: 1, pick: 1, grpIds: [1], packGrpIds: [1, 2, 999] })

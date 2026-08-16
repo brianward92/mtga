@@ -13,6 +13,8 @@ export interface CardRow {
   rarity: string
   /** WUBRG letters ('' colourless). */
   colors: string
+  /** Full WUBRG identity, used to place lands in Arena's display order. */
+  colorIdentity: string
   manaCost: string
   manaValue: number | null
   type: string
