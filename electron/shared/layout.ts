@@ -136,7 +136,9 @@ export function mergeCalibration(
 /**
  * Aspect bucket key for persisting one calibration per window shape:
  * width/height rounded to one decimal ("aspect-1.8" covers 16:9 ≈ 1.78).
- * Invalid sizes land in the shared "default" bucket.
+ * Conventional keys are "aspect-1.3" (4:3), "aspect-1.6" (16:10),
+ * "aspect-1.8" (16:9), and "aspect-2.4" (3440×1440 ultrawide); other
+ * positive one-decimal aspects are valid too. Invalid sizes use "default".
  */
 export function aspectBucketOf(width: number, height: number): string {
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
@@ -154,11 +156,11 @@ export function aspectOfBucket(bucket: string): number | null {
 }
 
 /**
- * Best stored calibration bucket for a window shape: the exact bucket when it
- * exists, else the numerically nearest calibrated aspect. A user who tuned the
- * overlay at one window size should not drop back to raw guesses after
- * resizing Arena slightly — a 1.7 calibration is far closer to 1.8 than the
- * built-in defaults are.
+ * Best stored numeric calibration bucket for a valid window shape: the exact
+ * bucket when it exists, else the numerically nearest calibrated aspect.
+ * Invalid sizes return null; "default" is not treated as geometry. A user who
+ * tuned the overlay at one window size should not drop back to raw guesses
+ * after resizing Arena slightly — 1.7 is far closer to 1.8 than the defaults.
  */
 export function nearestCalibrationBucket(
   buckets: string[],
@@ -166,19 +168,33 @@ export function nearestCalibrationBucket(
   height: number
 ): string | null {
   const exact = aspectBucketOf(width, height)
+  if (exact === 'default') return null
+  const target = width / height
+  if (!Number.isFinite(target) || target <= 0) return null
   if (buckets.includes(exact)) return exact
 
-  const target = aspectOfBucket(exact)
-  if (target === null) return null
+  // Compare fallbacks with the real aspect rather than the rounded bucket key.
+  // Near a rounding boundary, 1.34 may be closer to a stored 1.5 calibration
+  // than 1.1 even though its persisted key rounds to 1.3.
 
-  let best: { bucket: string; distance: number } | null = null
+  let best: { bucket: string; aspect: number; distance: number } | null = null
   for (const bucket of buckets) {
     const aspect = aspectOfBucket(bucket)
     if (aspect === null) continue
     const distance = Math.abs(aspect - target)
-    // Ties resolve to the lexically smaller key so the choice is deterministic.
-    if (!best || distance < best.distance || (distance === best.distance && bucket < best.bucket)) {
-      best = { bucket, distance }
+    if (!best) {
+      best = { bucket, aspect, distance }
+      continue
+    }
+    // Four ULPs at the operands' scale cover rounding from the subtractions
+    // used to derive and compare distances. Mathematical ties then resolve to
+    // the lexically smaller key, independent of bucket iteration order.
+    const epsilon = 4 * Number.EPSILON * Math.max(
+      1, Math.abs(target), Math.abs(aspect), Math.abs(best.aspect)
+    )
+    const tied = Math.abs(distance - best.distance) <= epsilon
+    if (distance < best.distance - epsilon || (tied && bucket < best.bucket)) {
+      best = { bucket, aspect, distance }
     }
   }
   return best?.bucket ?? null

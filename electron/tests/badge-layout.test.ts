@@ -127,6 +127,24 @@ describe('packLayout geometry', () => {
   it('returns an empty layout for zero cards', () => {
     expect(packLayout({ width: 1600, height: 900 }, 0, config).cards).toEqual([])
   })
+
+  it.each([
+    [13, '4:3', { width: 1200, height: 900 }],
+    [15, '4:3', { width: 1200, height: 900 }],
+    [13, 'ultrawide', { width: 3440, height: 1440 }],
+    [15, 'ultrawide', { width: 3440, height: 1440 }]
+  ] as const)('keeps a %i-card default grid inside the pack area at %s', (count, _shape, view) => {
+    const layout = packLayout(view, count, DEFAULT_CALIBRATION)
+    expect(layout.cards).toHaveLength(count)
+    for (const { card, badge } of layout.cards) {
+      for (const rect of [card, badge]) {
+        expect(rect.x).toBeGreaterThanOrEqual(layout.pack.x - 1e-6)
+        expect(rect.y).toBeGreaterThanOrEqual(layout.pack.y - 1e-6)
+        expect(rect.x + rect.width).toBeLessThanOrEqual(layout.pack.x + layout.pack.width + 1e-6)
+        expect(rect.y + rect.height).toBeLessThanOrEqual(layout.pack.y + layout.pack.height + 1e-6)
+      }
+    }
+  })
 })
 
 describe('calibration config normalize/merge', () => {
@@ -170,6 +188,7 @@ describe('calibration config normalize/merge', () => {
 
 describe('aspectBucketOf', () => {
   it('buckets by width/height rounded to one decimal', () => {
+    expect(aspectBucketOf(1200, 900)).toBe('aspect-1.3')
     expect(aspectBucketOf(1920, 1080)).toBe('aspect-1.8')
     expect(aspectBucketOf(2560, 1440)).toBe('aspect-1.8')
     expect(aspectBucketOf(1920, 1200)).toBe('aspect-1.6')
@@ -254,6 +273,13 @@ describe('nearestCalibrationBucket', () => {
     expect(nearestCalibrationBucket(stored, 2560, 1080)).toBe('aspect-1.8')
   })
 
+  it.each([
+    [1200, 900, ['aspect-1.1', 'aspect-1.5'], 'aspect-1.5'],
+    [2440, 1000, ['aspect-2.3', 'aspect-2.5'], 'aspect-2.5']
+  ] as const)('uses the exact aspect at %i×%i, not its rounded bucket', (width, height, stored, expected) => {
+    expect(nearestCalibrationBucket([...stored], width, height)).toBe(expected)
+  })
+
   it('returns null when nothing usable is stored', () => {
     expect(nearestCalibrationBucket([], 1600, 900)).toBeNull()
     expect(nearestCalibrationBucket(['default'], 1600, 900)).toBeNull()
@@ -261,12 +287,22 @@ describe('nearestCalibrationBucket', () => {
 
   it('returns null for a degenerate window size', () => {
     expect(nearestCalibrationBucket(['aspect-1.8'], 0, 0)).toBeNull()
+    expect(nearestCalibrationBucket(['aspect-1.8'], -1600, -900)).toBeNull()
+    expect(nearestCalibrationBucket(['default', 'aspect-1.8'], 0, 0)).toBeNull()
+    expect(nearestCalibrationBucket(['default', 'aspect-1.8'], NaN, 900)).toBeNull()
   })
 
   it('resolves ties deterministically', () => {
     // 1.5 is equidistant from 1.4 and 1.6; the lexically smaller key wins.
     const stored = ['aspect-1.6', 'aspect-1.4']
     expect(nearestCalibrationBucket(stored, 1500, 1000)).toBe('aspect-1.4')
+  })
+
+  it('resolves mathematical ties lexically despite floating-point noise', () => {
+    // Both are exactly 0.15 from 1.35, but their binary distances differ.
+    const stored = ['aspect-1.5', 'aspect-1.2']
+    expect(nearestCalibrationBucket(stored, 1350, 1000)).toBe('aspect-1.2')
+    expect(nearestCalibrationBucket([...stored].reverse(), 1350, 1000)).toBe('aspect-1.2')
   })
 
   it('aspectOfBucket parses aspects and rejects non-aspect keys', () => {
