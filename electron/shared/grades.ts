@@ -49,12 +49,13 @@ export function gradeTier(grade: Grade): 'a' | 'b' | 'c' | 'd' {
 }
 
 /** Ladder as an ordinal scale: F = 0 … A+ = 12. */
-export const GRADE_ORDER: Grade[] = ['F', 'D-', 'D', 'D+', 'C-', 'C', 'C+', 'B-', 'B', 'B+', 'A-', 'A', 'A+']
+const GRADE_ORDER: Grade[] = ['F', 'D-', 'D', 'D+', 'C-', 'C', 'C+', 'B-', 'B', 'B+', 'A-', 'A', 'A+']
 
+/** Zero-based position of a letter grade on the frozen ladder. */
 export function gradeOrdinal(grade: Grade): number { return GRADE_ORDER.indexOf(grade) }
 
 /** Rarity weights for pool rating: exponential, common 1 → mythic 8. */
-export const RARITY_WEIGHT: Record<string, number> = { common: 1, uncommon: 2, rare: 4, mythic: 8 }
+const RARITY_WEIGHT: Record<string, number> = { common: 1, uncommon: 2, rare: 4, mythic: 8 }
 
 /**
  * Pool rating: rarity-weighted mean of the pool's set-review grades on the

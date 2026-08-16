@@ -41,7 +41,7 @@ function letters(s: string | null | undefined): string {
 }
 
 /** Any land (basic or not): Arena files them in the land tier after commons. */
-export function isLand(card: DisplayOrderCard): boolean {
+function isLand(card: DisplayOrderCard): boolean {
   const r = (card.rarity ?? '').toLowerCase()
   return /\bland\b/i.test(card.type ?? '') || r === 'land' || r === 'basic'
 }
@@ -66,7 +66,7 @@ export function colorOrder(card: DisplayOrderCard): number {
 }
 
 /** Arena's Order_Title: lowercase, letters/digits only (Rooms keep "//"). */
-export function titleKey(name: string | null | undefined): string {
+function titleKey(name: string | null | undefined): string {
   return (name ?? '').toLowerCase().replace(/[^a-z0-9/]/g, '')
 }
 

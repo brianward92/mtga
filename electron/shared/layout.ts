@@ -20,6 +20,7 @@ export interface Rect {
   height: number
 }
 
+/** User-tunable fractions and dimensions for Arena's pack grid. */
 export interface CalibrationConfig {
   /** Pack area origin/size, as fractions of the Arena window. */
   packLeft: number
@@ -76,7 +77,9 @@ export const DEFAULT_CALIBRATION: CalibrationConfig = {
 
 /** Calibration nudge/scale steps (fractions of the window / multipliers). */
 export const NUDGE_STEP = 0.005
+/** Multiplicative step for pack-area scaling controls. */
 export const SCALE_STEP = 1.02
+/** Fractional vertical step for the badge anchor control. */
 export const BADGE_Y_STEP = 0.01
 
 type NumericKey = Exclude<keyof CalibrationConfig, 'lastRowAlign'>
@@ -195,6 +198,7 @@ export function rowsForCount(count: number, maxCols: number): number[] {
   return rows
 }
 
+/** Card and badge rectangles for one row-major pack position. */
 export interface CardSlot {
   /** Full card cell rect (calibration ghosts). */
   card: Rect
@@ -202,6 +206,7 @@ export interface CardSlot {
   badge: Rect
 }
 
+/** Computed pack bounds and row-major card slots for one Arena view. */
 export interface PackLayout {
   /** The configured pack area rect (calibration frame). */
   pack: Rect
@@ -280,6 +285,7 @@ export function packLayout(
 // Calibration ops (helper-panel buttons -> config transforms)
 // ---------------------------------------------------------------------------
 
+/** One adjustment emitted by the calibration helper panel. */
 export type CalibrationOp =
   | { type: 'nudge'; dx: -1 | 0 | 1; dy: -1 | 0 | 1 }
   | { type: 'scale'; dir: 1 | -1 }

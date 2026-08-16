@@ -7,6 +7,7 @@ import type { Grade } from './grades'
 
 export type { Grade }
 
+/** One pack or pool card with immutable identity and live model scores. */
 export interface CardRow {
   grpId: number
   name: string
@@ -37,6 +38,7 @@ export interface CardRow {
   setGrade: Grade | null
 }
 
+/** The recorded human/model decision for one completed draft pick. */
 export interface PickRecord {
   pack: number   // 1-based for display
   pick: number   // 1-based for display
@@ -50,12 +52,14 @@ export interface PickRecord {
   ev: number | null
 }
 
+/** Model availability and diagnostic state exposed to the renderer. */
 export interface ModelInfo {
   state: 'ready' | 'loading' | 'no-bundle' | 'no-set' | 'error'
   modelId: string | null
   message: string | null
 }
 
+/** Complete JSON-plain renderer snapshot for the current draft lifecycle. */
 export interface DraftState {
   phase: 'idle' | 'active' | 'complete'
   set: string | null
@@ -81,6 +85,7 @@ export interface DraftState {
   seq: number
 }
 
+/** Initial snapshot used before a draft is discovered. */
 export const EMPTY_STATE: DraftState = {
   phase: 'idle', set: null, format: null, eventName: null, isBotDraft: false,
   pack: null, pick: null, picksPerPack: 14, totalPicks: 42, cards: [], scoring: false,
@@ -106,6 +111,7 @@ export interface LayerState {
   hudCovered: boolean
 }
 
+/** Calibration-panel state pushed independently of draft snapshots. */
 export interface CalibrateState {
   active: boolean
   count: number
@@ -113,8 +119,10 @@ export interface CalibrateState {
   arenaFound: boolean
 }
 
+/** Supported corners for the joined HUD and pool rail. */
 export type HudCorner = 'tl' | 'tr' | 'bl' | 'br'
 
+/** Persisted overlay presentation and calibration preferences. */
 export interface Prefs {
   badges: boolean
   hud: boolean

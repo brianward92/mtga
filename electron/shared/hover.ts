@@ -12,17 +12,26 @@
  */
 import type { Rect } from './layout'
 
-export const POPOUT_SCALE = 2.1
-export const POPOUT_GAP = 0.19
-export const SPLIT_POPOUT_WIDTH_SCALE = 5.0
-export const SPLIT_POPOUT_HEIGHT_SCALE = 2.35
-export const SPLIT_POPOUT_GAP = 0.5
-export const SPLIT_POPOUT_TOP_OFFSET = 0.35
+/** Portrait preview size relative to its source card. */
+const POPOUT_SCALE = 2.1
+/** Portrait preview gap in source-card widths. */
+const POPOUT_GAP = 0.19
+/** Split/Room preview width in source-card widths. */
+const SPLIT_POPOUT_WIDTH_SCALE = 5.0
+/** Split/Room preview height in source-card heights. */
+const SPLIT_POPOUT_HEIGHT_SCALE = 2.35
+/** Split/Room preview gap in source-card widths. */
+const SPLIT_POPOUT_GAP = 0.5
+/** Split/Room preview lift in source-card heights. */
+const SPLIT_POPOUT_TOP_OFFSET = 0.35
 /** A mere edge-touch must not make a neighbouring badge disappear. */
-export const PREVIEW_CELL_COVERAGE_THRESHOLD = 0.15
-export const HOVER_ENTER_DWELL_MS = 350
-export const HOVER_LEAVE_GRACE_MS = 120
+const PREVIEW_CELL_COVERAGE_THRESHOLD = 0.15
+/** Required stable hover before predicted preview regions activate. */
+const HOVER_ENTER_DWELL_MS = 350
+/** Grace period that preserves a preview during a brief cursor excursion. */
+const HOVER_LEAVE_GRACE_MS = 120
 
+/** Arena preview variants inferred from the hovered card and grid column. */
 export interface PopoutOptions {
   /** Arena renders Rooms/split cards as a wide landscape preview. */
   split?: boolean
@@ -30,11 +39,13 @@ export interface PopoutOptions {
   flipLeft?: boolean
 }
 
+/** Whether two positive-area rectangles overlap. */
 export function intersects(a: Rect, b: Rect): boolean {
   return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y
 }
 
-export function contains(r: Rect, p: { x: number; y: number }): boolean {
+/** Whether a point lies within a rectangle's half-open bounds. */
+function contains(r: Rect, p: { x: number; y: number }): boolean {
   return p.x >= r.x && p.x < r.x + r.width && p.y >= r.y && p.y < r.y + r.height
 }
 
