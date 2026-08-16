@@ -12,7 +12,7 @@ import { flamesFromPercentile } from './flames'
 import { bundleProvenance, modelDisplayName } from './model-tag'
 import { shortBandLabel } from './chips'
 import { renderManaCost, escapeHtml } from './shared'
-import { hudCornerForPhase } from './visibility'
+import { hudCornerForPhase, sheetShouldRender } from './visibility'
 import {
   agreement, bestPick, detailLine, eventTitle, laneLean, nextCorner, packConviction,
   pickPosition, POOL_COLORS, poolSummary, progressDots, rankedCards, whyLine
@@ -141,7 +141,7 @@ export class Hud {
     if (state.phase === 'complete') classes.push('complete')
     if (state.scoring) classes.push('scoring')
     // Pool sheet stacks flush against either edge: one continuous rail panel.
-    if (store.sheetOpen && state.phase !== 'idle') {
+    if (sheetShouldRender(state.phase, store.sheetOpen)) {
       classes.push('with-sheet', prefs.hudCorner === 'tl' || prefs.hudCorner === 'tr' ? 'sheet-below' : 'sheet-above')
     }
     const rootClass = classes.join(' ')

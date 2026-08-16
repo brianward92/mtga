@@ -61,17 +61,60 @@ function gradeHtml(card: Pick<CardRow, 'grade' | 'setGrade'>): string {
     : '<span class="s-grade grade-none">—</span>'
 }
 
-/** Pool sorted best → worst on the set-review ladder (A+ … F), lands last, ties by name. */
+/** Basic lands form the final, separately labelled section of the pool. */
+function isBasicLand(card: Pick<CardRow, 'type' | 'rarity'>): boolean {
+  return /\bbasic land\b/i.test(card.type) || card.rarity.toLowerCase() === 'land'
+}
+
+/** Pool sorted best → worst on the set-review ladder (A+ … F), basic lands last, ties by name. */
 export function sortPoolByGrade(pool: ReadonlyArray<CardRow>): CardRow[] {
-  const isLand = (c: CardRow) => /^basic land/i.test(c.type) || c.rarity === 'land'
   return [...pool].sort((a, b) => {
-    const la = isLand(a) ? 1 : 0, lb = isLand(b) ? 1 : 0
+    const la = isBasicLand(a) ? 1 : 0, lb = isBasicLand(b) ? 1 : 0
     if (la !== lb) return la - lb
     const ga = reviewGrade(a), gb = reviewGrade(b)
     const oa = ga ? gradeOrdinal(ga) : -1, ob = gb ? gradeOrdinal(gb) : -1
     if (oa !== ob) return ob - oa
     return a.name.localeCompare(b.name)
   })
+}
+
+export interface PoolDisplayRow {
+  /** Representative copy; identical names share intrinsic display metadata. */
+  card: CardRow
+  count: number
+  pickLabels: string[]
+  basicLand: boolean
+}
+
+/**
+ * Collapse identical names after best→worst sorting, then associate every
+ * chronological pick label with the grouped row. grpId is authoritative; the
+ * name fallback covers equivalent Arena printings that resolve to one card.
+ */
+export function poolDisplayRows(
+  pool: ReadonlyArray<CardRow>,
+  picks: ReadonlyArray<PickRecord> = []
+): PoolDisplayRow[] {
+  const byName = new Map<string, PoolDisplayRow>()
+  const byGrpId = new Map<number, PoolDisplayRow>()
+  const rows: PoolDisplayRow[] = []
+
+  for (const card of sortPoolByGrade(pool)) {
+    let row = byName.get(card.name)
+    if (!row) {
+      row = { card, count: 0, pickLabels: [], basicLand: isBasicLand(card) }
+      byName.set(card.name, row)
+      rows.push(row)
+    }
+    row.count += 1
+    byGrpId.set(card.grpId, row)
+  }
+
+  for (const pick of [...picks].sort((a, b) => a.pack - b.pack || a.pick - b.pick)) {
+    const row = byGrpId.get(pick.grpId) ?? byName.get(pick.name)
+    if (row) row.pickLabels.push(`P${pick.pack}p${pick.pick}`)
+  }
+  return rows
 }
 
 export function poolRatingLabel(pool: ReadonlyArray<CardRow>): { text: string; grade: string | null } {
@@ -90,24 +133,32 @@ export function poolColourCountsHtml(pool: ReadonlyArray<Pick<CardRow, 'colors' 
 
 export function poolHtml(pool: ReadonlyArray<CardRow>, picks: ReadonlyArray<PickRecord> = []): string {
   if (pool.length === 0) return '<div class="s-empty">No cards yet</div>'
-  // Pick number per card (first unmatched pick of that grpId, in order).
-  const pickPos = new Map<number, string[]>()
-  for (const p of picks) {
-    const list = pickPos.get(p.grpId) ?? []
-    list.push(`P${p.pack}p${p.pick}`)
-    pickPos.set(p.grpId, list)
-  }
-  const posOf = (grpId: number): string => pickPos.get(grpId)?.shift() ?? ''
+  const rows = poolDisplayRows(pool, picks)
+  let landsStarted = false
   return `
     <div class="s-group">
       <h3 class="sheet-h">Cards, best → worst</h3>
-      ${sortPoolByGrade(pool).map(c => `
-        <div class="s-card">
-          ${gradeHtml(c)}
-          <span class="s-mana">${renderManaCost(c.manaCost)}</span>
-          <span class="s-name">${escapeHtml(c.name)}</span>
-          <span class="s-pos">${posOf(c.grpId)}</span>
-        </div>`).join('')}
+      ${rows.map(row => {
+        const divider = row.basicLand && !landsStarted
+          ? '<h3 class="sheet-h s-land-divider" data-pool-section="lands">Lands</h3>'
+          : ''
+        landsStarted ||= row.basicLand
+        const copies = row.count > 1
+          ? `<span class="s-copy-count" aria-label="${row.count} copies">×${row.count}</span>`
+          : ''
+        const picksText = row.pickLabels.join(' · ')
+        const pickLabels = picksText
+          ? `<span class="s-pick-labels" aria-label="Picked ${row.pickLabels.join(', ')}">${picksText}</span>`
+          : ''
+        return `${divider}
+        <div class="s-card${row.basicLand ? ' basic-land' : ''}">
+          ${gradeHtml(row.card)}
+          <span class="s-mana">${renderManaCost(row.card.manaCost)}</span>
+          <span class="s-name">${escapeHtml(row.card.name)}</span>
+          ${copies}
+          ${pickLabels}
+        </div>`
+      }).join('')}
     </div>`
 }
 

@@ -646,6 +646,31 @@ body.calibrating .sheet { display: none; }
 .s-mana { flex: 0 0 auto; display: inline-flex; font-size: 0.85rem; min-width: 1.2rem; }
 .s-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .s-grade { flex: 0 0 auto; font-weight: 800; font-size: 0.8rem; min-width: 1.6rem; text-align: left; }
+.s-copy-count {
+  flex: 0 0 auto;
+  padding: 0.02rem 0.3rem;
+  border: 1px solid var(--hairline-soft);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-2);
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+.s-pick-labels {
+  flex: 0 1 auto;
+  max-width: 8rem;
+  color: var(--text-3);
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: right;
+  white-space: normal;
+}
+.s-land-divider {
+  margin-top: 0.55rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--hairline-soft);
+}
 .s-empty { font-size: 0.85rem; color: var(--text-3); padding: 0.3rem 0; list-style: none; }
 
 .sheet-picklist { list-style: none; display: flex; flex-direction: column; }

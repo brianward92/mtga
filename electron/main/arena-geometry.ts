@@ -37,6 +37,12 @@ const FAKE_ARENA_FILE = process.env.MTGA_FAKE_ARENA_FILE
 const FAKE_POLL_MS = 500
 const HELPER_RETRY_MS = 10_000
 
+export interface ArenaGeometryPollerOptions {
+  /** Override the environment seam; primarily useful for deterministic tests. */
+  fakeArenaFile?: string
+  fakePollMs?: number
+}
+
 function probeFakeArena(file: string): ArenaProbe {
   try {
     const raw = JSON.parse(readFileSync(file, 'utf8')) as Record<string, unknown>
@@ -113,6 +119,14 @@ export class ArenaGeometryPoller extends EventEmitter {
   private running = false
   private state: 'unknown' | 'found' | 'lost' = 'unknown'
   private warnedMissing = false
+  private readonly fakeArenaFile: string | undefined
+  private readonly fakePollMs: number
+
+  constructor(options: ArenaGeometryPollerOptions = {}) {
+    super()
+    this.fakeArenaFile = options.fakeArenaFile ?? FAKE_ARENA_FILE
+    this.fakePollMs = Math.max(1, Math.round(options.fakePollMs ?? FAKE_POLL_MS))
+  }
 
   isRunning(): boolean { return this.running }
   isFound(): boolean { return this.state === 'found' }
@@ -121,10 +135,10 @@ export class ArenaGeometryPoller extends EventEmitter {
   start(): void {
     if (this.running) return
     this.running = true
-    if (FAKE_ARENA_FILE) {
-      const tick = (): void => this.apply(probeFakeArena(FAKE_ARENA_FILE))
+    if (this.fakeArenaFile) {
+      const tick = (): void => this.apply(probeFakeArena(this.fakeArenaFile!))
       tick()
-      this.fakeTimer = setInterval(tick, FAKE_POLL_MS)
+      this.fakeTimer = setInterval(tick, this.fakePollMs)
       return
     }
     this.startHelper()

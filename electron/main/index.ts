@@ -18,17 +18,12 @@ import { ArenaGeometryPoller, type ArenaRect } from './arena-geometry'
 import { ModelManager } from './model/manager'
 import { DraftHistory } from './data/history'
 import { DraftCoordinator } from './draft/coordinator'
+import { sheetOpenForPhaseTransition } from './draft/completion'
 import { createOverlayWindow, setOverlayRect, showOverlay, hideOverlay, setOverlayInteractive } from './overlay/window'
 import { LayerDetector } from './overlay/layer'
 import { Calibration } from './overlay/calibration'
 import { screenCaptureGranted } from './overlay/occlusion'
-import {
-  INITIAL_OVERLAY_REAPPEARANCE,
-  advanceOverlayReappearance,
-  mayShowOverlay,
-  overlayReappearanceDelay,
-  type OverlayReappearanceState
-} from './overlay/reappearance'
+import { OverlayGeometrySync } from './overlay/geometry-sync'
 import { loadPrefs, savePrefs, type Prefs } from './prefs'
 import { StatusTray } from './status-tray'
 import type { DraftState } from '../shared/state'
@@ -50,9 +45,6 @@ const calibration = new Calibration()
 const poller = new ArenaGeometryPoller()
 let quitCommitted = false
 let quitTimer: NodeJS.Timeout | null = null
-let overlayReappearance: OverlayReappearanceState = INITIAL_OVERLAY_REAPPEARANCE
-let overlayReappearanceTimer: NodeJS.Timeout | null = null
-let overlayReappearanceToken = 0
 /** Pool & picks section of the rail: open by default during a draft. */
 let sheetOpen = true
 
@@ -78,46 +70,26 @@ function badgesLive(): boolean {
     poller.arenaFrontmost && overlayContentWanted()
 }
 
-function cancelOverlayReappearanceSync(): void {
-  overlayReappearanceToken += 1
-  if (overlayReappearanceTimer) clearTimeout(overlayReappearanceTimer)
-  overlayReappearanceTimer = null
-}
-
-function scheduleOverlayReappearanceSync(delayMs: number): void {
-  cancelOverlayReappearanceSync()
-  const token = overlayReappearanceToken
-  overlayReappearanceTimer = setTimeout(() => {
-    if (token !== overlayReappearanceToken) return
-    overlayReappearanceTimer = null
-    syncOverlay()
-  }, delayMs)
-}
-
 function syncOverlay(): void {
-  if (!overlay || overlay.isDestroyed()) {
-    cancelOverlayReappearanceSync()
-    return
-  }
-  const now = Date.now()
-  overlayReappearance = advanceOverlayReappearance(
-    overlayReappearance,
-    poller.isFound() && poller.lastKnown !== null,
-    now
-  )
-  const delay = overlayReappearanceDelay(overlayReappearance, now)
-  if (delay === null) cancelOverlayReappearanceSync()
-  else scheduleOverlayReappearanceSync(delay)
-
-  const rect = poller.lastKnown
-  if (rect) setOverlayRect(overlay, rect)
-  if (mayShowOverlay(overlayReappearance, overlayContentWanted(), poller.arenaFrontmost)) showOverlay(overlay)
-  else hideOverlay(overlay)
-  // Cursor polling is useful only while badge geometry is live.
-  layer?.syncActivity()
-  // Window capture only while badges need layer awareness.
-  poller.setCapture(loadPrefs().layerDetection && badgesLive())
+  overlayGeometrySync.sync()
 }
+
+const overlayGeometrySync = new OverlayGeometrySync({
+  targetAvailable: () => !!overlay && !overlay.isDestroyed(),
+  arenaFound: () => poller.isFound(),
+  arenaRect: () => poller.lastKnown,
+  arenaFrontmost: () => poller.arenaFrontmost,
+  contentWanted: overlayContentWanted,
+  setRect: rect => { if (overlay) setOverlayRect(overlay, rect) },
+  show: () => { if (overlay) showOverlay(overlay) },
+  hide: () => { if (overlay) hideOverlay(overlay) },
+  afterSync: () => {
+    // Cursor polling is useful only while badge geometry is live.
+    layer?.syncActivity()
+    // Window capture only while badges need layer awareness.
+    poller.setCapture(loadPrefs().layerDetection && badgesLive())
+  }
+})
 
 // ---------------------------------------------------------------------------
 // Pushes to the renderer
@@ -158,7 +130,8 @@ function refreshTray(): void {
     draft: coordinator.current,
     prefs: loadPrefs(),
     layerDetectionAvailable: poller.captureOn || screenCaptureGranted(),
-    overlayVisible: !!overlay && !overlay.isDestroyed() && overlay.isVisible()
+    overlayVisible: !!overlay && !overlay.isDestroyed() && overlay.isVisible(),
+    arenaFound: poller.isFound() && poller.lastKnown !== null
   })
 }
 
@@ -170,7 +143,11 @@ function setupModelAndDraft(): void {
   const userData = app.getPath('userData')
   models = new ModelManager(join(userData, 'model-cache'), process.env.MTGA_BUNDLE_DIR || undefined)
   coordinator = new DraftCoordinator(models, new DraftHistory(join(userData, 'draft-history.jsonl')))
+  let previousPhase = coordinator.current.phase
   coordinator.on('state', (state: DraftState) => {
+    const completionSheetOpen = sheetOpenForPhaseTransition(previousPhase, state.phase, sheetOpen)
+    previousPhase = state.phase
+    if (completionSheetOpen !== sheetOpen) setSheetOpen(completionSheetOpen)
     pushState(state)
     if (state.phase !== 'active') layer.resetBaseline()
   })
@@ -204,8 +181,8 @@ function setupLogPipeline(): void {
 }
 
 function setupGeometry(): void {
-  poller.on('geometry', () => syncOverlay())
-  poller.on('lost', () => syncOverlay())
+  poller.on('geometry', () => { syncOverlay(); refreshTray() })
+  poller.on('lost', () => { syncOverlay(); refreshTray() })
   poller.on('frontmost', () => syncOverlay())
   poller.on('capture', () => refreshTray())
   poller.on('helper-missing', () => coordinator.setWarning('Window helper missing from the app bundle — overlay cannot locate Arena'))
@@ -254,7 +231,11 @@ function setupIpc(): void {
 }
 
 function toggleSheet(): void {
-  sheetOpen = !sheetOpen
+  setSheetOpen(!sheetOpen)
+}
+
+function setSheetOpen(open: boolean): void {
+  sheetOpen = open
   send('overlay:command', { name: 'toggle-sheet', data: { open: sheetOpen } })
 }
 
@@ -281,7 +262,7 @@ function setupShortcuts(): void {
 }
 
 async function createOverlay(): Promise<void> {
-  overlayReappearance = INITIAL_OVERLAY_REAPPEARANCE
+  overlayGeometrySync.reset()
   overlay = createOverlayWindow()
   overlay.webContents.on('did-finish-load', () => {
     send('overlay:state', coordinator.current)
@@ -291,8 +272,7 @@ async function createOverlay(): Promise<void> {
     syncOverlay()
   })
   overlay.on('closed', () => {
-    cancelOverlayReappearanceSync()
-    overlayReappearance = INITIAL_OVERLAY_REAPPEARANCE
+    overlayGeometrySync.reset()
     overlay = null
     layer?.syncActivity()
     poller.setCapture(false)
@@ -333,7 +313,7 @@ app.on('before-quit', event => {
 })
 
 function cleanup(): void {
-  cancelOverlayReappearanceSync()
+  overlayGeometrySync.dispose()
   globalShortcut.unregisterAll()
   layer?.dispose()
   poller.stop()

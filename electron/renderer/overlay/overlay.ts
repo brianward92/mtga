@@ -48,6 +48,7 @@ const store: Store = {
 const bridge = window.overlay
 const hudRoot = document.getElementById('hud')!
 const sheetRoot = document.getElementById('sheet')!
+const sheetBody = sheetRoot.querySelector<HTMLElement>('.sheet-body')!
 const badges = new BadgeLayer(document.getElementById('badges')!)
 const hud = new Hud(hudRoot, action)
 const sheet = new Sheet(sheetRoot, action)
@@ -62,6 +63,7 @@ function action(name: string, data?: unknown): void {
 // ---------------------------------------------------------------------------
 
 let raf = 0
+let resetSheetScroll = false
 function schedule(): void {
   if (raf) return
   raf = requestAnimationFrame(() => { raf = 0; render() })
@@ -81,6 +83,10 @@ function render(): void {
   // sheet, then their measured seam determines joined-rail dwell topology.
   const hudRect = hud.reportRect(rect => bridge?.setHudRect(rect))
   sheet.update(store, hudRect)
+  if (resetSheetScroll) {
+    sheetBody.scrollTop = 0
+    resetSheetScroll = false
+  }
   syncRailTopology()
 }
 
@@ -246,6 +252,7 @@ function onState(raw: unknown): void {
   if (!next || typeof next !== 'object') return
   if (next === store.state || (typeof next.seq === 'number' && !draftStateAdvanced(store.state.seq, next.seq))) return
   const packChanged = next.pack !== store.state.pack || next.pick !== store.state.pick || next.cards.length !== store.state.cards.length
+  if (next.phase === 'complete' && store.state.phase !== 'complete') resetSheetScroll = true
   store.state = next
   if (packChanged) store.hoverCell = -1
   schedule()

@@ -13,9 +13,9 @@ import { ModelManager, type ScoredCard } from '../model/manager'
 import { type SetBundle, type CardInfo } from '../data/bundle'
 import { DraftHistory } from '../data/history'
 import { EMPTY_STATE, type CardRow, type DraftState, type PickRecord } from '../../shared/state'
+import { COMPLETE_LINGER_MS } from './completion'
 
-/** How long a completed draft stays on screen before the overlay idles. */
-export const COMPLETE_LINGER_MS = 15_000
+export { COMPLETE_LINGER_MS } from './completion'
 
 export interface CoordinatorEvents {
   state: (state: DraftState) => void

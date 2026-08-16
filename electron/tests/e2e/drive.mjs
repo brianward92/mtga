@@ -50,8 +50,11 @@ const SEL = {
   hudProvenance: '[data-testid="hud-provenance"]',
   hudSheetBtn: '[data-testid="hud-btn-sheet"]',
   hudCalBtn: '[data-testid="hud-btn-calibrate"]',
+  hudDismiss: '#btnDismiss',
   sheetRoot: '#sheet',
   sheetBody: '.sheet-body',
+  sheetPool: '#sheetPool',
+  sheetTitle: '#sheetTitle',
   sheetColours: '#sheetColours',
   sheet: '[data-testid="sheet"]',
   calPanel: '[data-testid="calibrate-panel"]',
@@ -310,18 +313,66 @@ try {
   await waitFor(page, S => !!document.querySelector(S.calPanel), 'calibration panel', 3000)
   await shot(page, '07-calibrate')
   await page.click(SEL.calCancel).catch(() => {})
+  await waitFor(page, S => !document.querySelector(S.calPanel), 'calibration closed', 3000)
+
+  // Completion must override a previously closed sheet for the full linger.
+  await page.click(SEL.hudSheetBtn).catch(e => failures.push(`sheet close before completion: ${e.message}`))
+  await waitFor(page, S => !document.querySelector(S.sheet), 'sheet closed before completion', 3000)
 
   await feedUntil(() => false) // rest of the draft incl. Completed
   await waitFor(page, S => {
     const hud = document.querySelector(S.hud)
     const main = document.querySelector(S.hudMain)
+    const sheet = document.querySelector(S.sheetRoot)
+    const sheetBody = document.querySelector(S.sheetBody)
+    const poolCards = [...document.querySelectorAll(`${S.sheetPool} .s-card`)]
+    const poolCopies = poolCards.reduce((total, card) => {
+      const copies = card.querySelector('.s-copy-count')?.textContent?.match(/\d+/)?.[0]
+      return total + (copies ? Number(copies) : 1)
+    }, 0)
+    const visiblePoolCards = poolCards.filter(card => {
+      const cardRect = card.getBoundingClientRect()
+      const bodyRect = sheetBody?.getBoundingClientRect()
+      return !!bodyRect && cardRect.bottom > bodyRect.top && cardRect.top < bodyRect.bottom
+    })
     return !!hud && hud.classList.contains('complete') && hud.classList.contains('interactive') &&
       !hud.classList.contains('idle') && !!main && !main.hidden &&
       (hud.textContent ?? '').toLowerCase().includes('draft complete') &&
+      !!sheet && sheet.classList.contains('open') && !!document.querySelector(S.sheet) &&
+      document.querySelector(S.sheetTitle)?.textContent?.trim() === 'Pool · 42' &&
+      poolCopies === 42 && visiblePoolCards.length > 0 && sheetBody?.scrollTop === 0 &&
       document.querySelectorAll(S.cell).length === 0
-  }, 'completion HUD with no badge leak', 6000)
+  }, 'completion HUD and populated pool sheet with no badge leak', 6000)
   await sleep(500)
   await shot(page, '08-complete')
+
+  // Pool controls keep their normal meaning throughout completion; this is
+  // the same toggle function registered for Command+Shift+D.
+  await page.click(SEL.hudSheetBtn).catch(e => failures.push(`completion sheet toggle: ${e.message}`))
+  await waitFor(page, S => {
+    const hud = document.querySelector(S.hud)
+    return !!hud && hud.classList.contains('complete') && !hud.classList.contains('idle') &&
+      !document.querySelector(S.sheet)
+  }, 'completion sheet toggles closed without dismissing the summary', 3000)
+
+  // The explicit Dismiss control ends the linger immediately and leaves only
+  // the fixed click-through idle glyph.
+  await page.click(SEL.hudDismiss).catch(e => failures.push(`completion dismiss: ${e.message}`))
+  await waitFor(page, S => {
+    const visible = selector => {
+      const el = document.querySelector(selector)
+      if (!el || el.hidden) return false
+      const style = getComputedStyle(el)
+      const rect = el.getBoundingClientRect()
+      return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0
+    }
+    const hud = document.querySelector(S.hud)
+    const sheet = document.querySelector(S.sheetRoot)
+    return !!hud && hud.classList.contains('idle') && hud.classList.contains('idle-min') &&
+      hud.classList.contains('hud-tr') && !hud.classList.contains('interactive') &&
+      visible(S.hudIdle) && !visible(S.hudMain) && !!sheet && !sheet.classList.contains('open') &&
+      !visible(S.sheetRoot) && document.querySelectorAll(S.cell).length === 0
+  }, 'dismiss returns completion rail to the idle glyph', 3000)
 
   await browser.disconnect()
 } catch (err) {

@@ -7,12 +7,14 @@ import { existsSync } from 'fs'
 import { join } from 'path'
 import type { DraftState } from '../shared/state'
 import type { Prefs } from './prefs'
+import { draftLabel, modelLabel } from './status-labels'
 
 export interface TrayState {
   draft: DraftState
   prefs: Prefs
   layerDetectionAvailable: boolean
   overlayVisible: boolean
+  arenaFound: boolean
 }
 
 export interface TrayActions {
@@ -41,21 +43,6 @@ function menuIcon(): Electron.NativeImage {
   return nativeImage.createEmpty()
 }
 
-function modelLabel(d: DraftState): string {
-  const m = d.model
-  if (m.state === 'ready' && m.modelId) return `Model: ${m.modelId.replace(/^_foundation\//, 'DraftFM ')}`
-  if (m.state === 'no-bundle') return 'Model: bundle missing'
-  if (m.state === 'no-set') return `Model: ${d.set ?? 'set'} not bundled`
-  if (m.state === 'error') return `Model: error — ${m.message ?? ''}`
-  return 'Model: DraftFM (loading…)'
-}
-
-function draftLabel(d: DraftState): string {
-  if (d.phase === 'idle') return 'No draft in progress'
-  const where = d.pack && d.pick ? ` P${d.pack}P${d.pick}` : ''
-  return `${d.set ?? '?'} ${d.format ?? ''}${where}${d.phase === 'complete' ? ' — complete' : ''}`
-}
-
 export class StatusTray {
   private tray: Tray
   private state: TrayState | null = null
@@ -80,7 +67,7 @@ export class StatusTray {
     if (!s) return
     const menu = Menu.buildFromTemplate([
       { label: modelLabel(s.draft), enabled: false },
-      { label: draftLabel(s.draft), enabled: false },
+      { label: draftLabel(s.draft, s.arenaFound), enabled: false },
       { type: 'separator' },
       { label: 'Card Badges', type: 'checkbox', checked: s.prefs.badges, click: () => this.actions.toggleBadges() },
       { label: 'Context HUD', type: 'checkbox', checked: s.prefs.hud, click: () => this.actions.toggleHud() },

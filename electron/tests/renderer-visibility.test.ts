@@ -19,9 +19,10 @@ describe('overlay visibility outside drafts', () => {
     expect(badgesShouldRender('active', 14, true, false, false)).toBe(false)
   })
 
-  it('suppresses the sheet while idle but preserves active and complete rails', () => {
+  it('suppresses the sheet while idle but preserves active and complete toggles', () => {
     expect(sheetShouldRender('idle', true)).toBe(false)
     expect(sheetShouldRender('active', true)).toBe(true)
+    expect(sheetShouldRender('active', false)).toBe(false)
     expect(sheetShouldRender('complete', true)).toBe(true)
     expect(sheetShouldRender('complete', false)).toBe(false)
   })

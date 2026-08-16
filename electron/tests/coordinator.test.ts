@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { DraftCoordinator } from '../main/draft/coordinator'
+import { COMPLETE_LINGER_MS, DraftCoordinator } from '../main/draft/coordinator'
 import type { DraftSessionSnapshot } from '../main/parser/draft-parser'
 import type { DraftState } from '../shared/state'
 
@@ -37,6 +37,31 @@ function snap(over: Partial<DraftSessionSnapshot>): DraftSessionSnapshot {
 const flush = () => new Promise(r => setTimeout(r, 0))
 
 describe('DraftCoordinator', () => {
+  it('keeps the completed pool for exactly the 15-second linger, then idles', () => {
+    vi.useFakeTimers()
+    const c = new DraftCoordinator(stubModels() as never, { append() {} } as never)
+    try {
+      c.setReplaying(true)
+      c.onDraftStart(snap({ pool: [1] }))
+      c.onDraftEnd(snap({ state: 'complete', pool: [1, 2] }))
+
+      expect(COMPLETE_LINGER_MS).toBe(15_000)
+      expect(c.current.phase).toBe('complete')
+      expect(c.current.pool.map(card => card.name)).toEqual(['Murder', 'Funeral Room'])
+
+      vi.advanceTimersByTime(COMPLETE_LINGER_MS - 1)
+      expect(c.current.phase).toBe('complete')
+      expect(c.current.pool).toHaveLength(2)
+
+      vi.advanceTimersByTime(1)
+      expect(c.current.phase).toBe('idle')
+      expect(c.current.pool).toEqual([])
+    } finally {
+      c.idle()
+      vi.useRealTimers()
+    }
+  })
+
   it('start → pack → scores → pick → end, with 0-based model indexing', async () => {
     const models = stubModels()
     const history = { append: vi.fn() }

@@ -8,7 +8,7 @@ import {
   agreement, bestPick, detailLine, eventTitle, groupPool, laneLean, nextCorner, packConviction,
   pickPosition, poolGroupOf, poolSummary, progressDots, rankedCards, sheetSide, whyLine
 } from '../renderer/overlay/hud-logic'
-import { picksHtml, poolColourCountsHtml, poolHtml } from '../renderer/overlay/sheet'
+import { picksHtml, poolColourCountsHtml, poolDisplayRows, poolHtml } from '../renderer/overlay/sheet'
 import { sigmoid, formatDominancePct } from '../renderer/overlay/conviction'
 
 function card(over: Partial<CardRow> & { grpId: number }): CardRow {
@@ -190,6 +190,52 @@ describe('sheet html', () => {
     expect(html).toContain('class="mana-symbol R"')
     expect(html).toContain('grade-b">B+')
     expect(poolHtml([])).toContain('No cards yet')
+  })
+
+  it('groups duplicate names, keeps grade order, and retains every pick label', () => {
+    const pool = [
+      card({ grpId: 50, name: 'Plains', rarity: 'land', type: 'Basic Land — Plains' }),
+      card({ grpId: 20, name: 'Twin Spell', grade: 'B', setGrade: 'B' }),
+      card({ grpId: 30, name: 'Filler', grade: 'C', setGrade: 'C' }),
+      card({ grpId: 10, name: 'Bomb', grade: 'A', setGrade: 'A' }),
+      card({ grpId: 21, name: 'Twin Spell', grade: 'B', setGrade: 'B' }),
+      card({ grpId: 40, name: 'Island', rarity: 'land', type: 'Basic Land — Island' })
+    ]
+    const picks = [
+      pick({ pack: 2, pick: 5, grpId: 21, name: 'Twin Spell' }),
+      pick({ pack: 1, pick: 2, grpId: 20, name: 'Twin Spell' }),
+      pick({ pack: 1, pick: 1, grpId: 10, name: 'Bomb' })
+    ]
+
+    const rows = poolDisplayRows(pool, picks)
+    expect(rows.map(row => row.card.name)).toEqual(['Bomb', 'Twin Spell', 'Filler', 'Island', 'Plains'])
+    expect(rows.map(row => row.count)).toEqual([1, 2, 1, 1, 1])
+    expect(rows.find(row => row.card.name === 'Twin Spell')?.pickLabels).toEqual(['P1p2', 'P2p5'])
+    expect(rows.slice(-2).every(row => row.basicLand)).toBe(true)
+  })
+
+  it('renders one duplicate row with a count chip and a divider immediately before lands', () => {
+    const pool = [
+      card({ grpId: 50, name: 'Plains', rarity: 'land', type: 'Basic Land — Plains' }),
+      card({ grpId: 20, name: 'Twin Spell', grade: 'B', setGrade: 'B' }),
+      card({ grpId: 30, name: 'Filler', grade: 'C', setGrade: 'C' }),
+      card({ grpId: 10, name: 'Bomb', grade: 'A', setGrade: 'A' }),
+      card({ grpId: 21, name: 'Twin Spell', grade: 'B', setGrade: 'B' })
+    ]
+    const html = poolHtml(pool, [
+      pick({ pack: 2, pick: 5, grpId: 21, name: 'Twin Spell' }),
+      pick({ pack: 1, pick: 2, grpId: 20, name: 'Twin Spell' })
+    ])
+
+    expect(html.match(/<span class="s-name">Twin Spell<\/span>/g)).toHaveLength(1)
+    expect(html).toContain('class="s-copy-count" aria-label="2 copies">×2</span>')
+    expect(html).toContain('class="s-pick-labels" aria-label="Picked P1p2, P2p5">P1p2 · P2p5</span>')
+    expect(html.match(/data-pool-section="lands"/g)).toHaveLength(1)
+    expect(html).toMatch(/data-pool-section="lands">Lands<\/h3>\s*<div class="s-card basic-land">/)
+    expect(html.indexOf('>Bomb</span>')).toBeLessThan(html.indexOf('>Twin Spell</span>'))
+    expect(html.indexOf('>Twin Spell</span>')).toBeLessThan(html.indexOf('>Filler</span>'))
+    expect(html.indexOf('>Filler</span>')).toBeLessThan(html.indexOf('data-pool-section="lands"'))
+    expect(html.indexOf('data-pool-section="lands"')).toBeLessThan(html.indexOf('>Plains</span>'))
   })
 
   it('lists picks newest first with ✓ / rank tags and the model pick when different', () => {
