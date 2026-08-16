@@ -8,10 +8,22 @@ export interface RailDwellState {
   readonly yielded: RailPanel | null
 }
 
+export interface RailBounds {
+  readonly left: number
+  readonly top: number
+  readonly right: number
+  readonly bottom: number
+}
+
 export const EMPTY_RAIL_DWELL: RailDwellState = {
   target: null,
   since: 0,
   yielded: null
+}
+
+/** Geometry fallback while pointer-events make a yielded panel miss hit-testing. */
+export function pointInRailBounds(x: number, y: number, bounds: RailBounds): boolean {
+  return x >= bounds.left && x < bounds.right && y >= bounds.top && y < bounds.bottom
 }
 
 /** Pure dwell transition; the renderer owns the timer and DOM side effects. */

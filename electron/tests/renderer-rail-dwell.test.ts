@@ -3,6 +3,7 @@ import {
   EMPTY_RAIL_DWELL,
   RAIL_DWELL_MS,
   advanceRailDwell,
+  pointInRailBounds,
   railDwellDelay
 } from '../renderer/overlay/rail-dwell'
 
@@ -26,6 +27,18 @@ describe('rail panel dwell', () => {
     const entered = advanceRailDwell(EMPTY_RAIL_DWELL, 'sheet', 0)
     const yielded = advanceRailDwell(entered, 'sheet', RAIL_DWELL_MS)
     expect(advanceRailDwell(yielded, null, RAIL_DWELL_MS + 1)).toBe(EMPTY_RAIL_DWELL)
+  })
+
+  it('keeps a yielded panel armed by bounds after CSS removes it from hit-testing', () => {
+    const bounds = { left: 100, top: 200, right: 300, bottom: 500 }
+    expect(pointInRailBounds(100, 200, bounds)).toBe(true)
+    expect(pointInRailBounds(299, 499, bounds)).toBe(true)
+    expect(pointInRailBounds(300, 499, bounds)).toBe(false)
+    expect(pointInRailBounds(299, 500, bounds)).toBe(false)
+
+    const entered = advanceRailDwell(EMPTY_RAIL_DWELL, 'sheet', 0)
+    const yielded = advanceRailDwell(entered, 'sheet', RAIL_DWELL_MS)
+    expect(advanceRailDwell(yielded, 'sheet', RAIL_DWELL_MS + 1)).toBe(yielded)
   })
 
   it('reports only the remaining delay for a pending dwell', () => {

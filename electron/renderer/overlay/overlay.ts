@@ -18,6 +18,7 @@ import { CalibrateLayer } from './calibrate'
 import {
   EMPTY_RAIL_DWELL,
   advanceRailDwell,
+  pointInRailBounds,
   railDwellDelay,
   type RailDwellState,
   type RailPanel
@@ -108,8 +109,15 @@ function setInteractive(on: boolean): void {
   bridge?.setInteractive(on)
 }
 
-function railBodyAt(el: Element | null): RailPanel | null {
-  if (!el || el.closest('button, .hud-icon, .sheet-close')) return null
+function railBodyAt(el: Element | null, x: number, y: number): RailPanel | null {
+  // Buttons opt back into pointer events inside a yielded panel. Check them
+  // before the bounds fallback so entering one immediately restores clicks.
+  if (el?.closest('button, .hud-icon, .sheet-close')) return null
+  if (railDwell.yielded !== null) {
+    const root = railDwell.yielded === 'hud' ? hudRoot : sheetRoot
+    if (pointInRailBounds(x, y, root.getBoundingClientRect())) return railDwell.yielded
+  }
+  if (!el) return null
   const panel = el.closest<HTMLElement>('.hud.interactive, .sheet.interactive')
   if (panel === hudRoot) return 'hud'
   if (panel === sheetRoot) return 'sheet'
@@ -150,9 +158,10 @@ function setHoverCell(cell: number): void {
 document.addEventListener('mousemove', e => {
   const el = document.elementFromPoint(e.clientX, e.clientY)
   const hit = !!(el && el.closest('.interactive'))
-  const yielded = updateRailDwell(railBodyAt(el))
+  const railBody = railBodyAt(el, e.clientX, e.clientY)
+  const yielded = updateRailDwell(railBody)
   setInteractive(hit && !yielded)
-  if (hit || store.calibrate.active) { setHoverCell(-1); return }
+  if (hit || railBody !== null || store.calibrate.active) { setHoverCell(-1); return }
   const layout = currentLayout()
   if (!layout) { setHoverCell(-1); return }
   setHoverCell(hoveredCardIndex({ x: e.clientX, y: e.clientY }, layout.cards.map(s => s.card)))
