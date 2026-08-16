@@ -1,4 +1,5 @@
-import type { CalibrateState, LayerState, ViewPrefs } from './types'
+import type { CalibrateState, LayerState } from '../../shared/state'
+import type { ViewPrefs } from './types'
 
 function sameNumbers(a: ReadonlyArray<number>, b: ReadonlyArray<number>): boolean {
   return a.length === b.length && a.every((value, i) => value === b[i])
@@ -9,11 +10,13 @@ export function draftStateAdvanced(currentSeq: number, nextSeq: number): boolean
   return nextSeq > currentSeq
 }
 
+/** Compare normalized renderer preferences field-for-field. */
 export function sameViewPrefs(a: ViewPrefs, b: ViewPrefs): boolean {
   return a.badges === b.badges && a.hud === b.hud &&
     a.hudCorner === b.hudCorner && a.layerDetection === b.layerDetection
 }
 
+/** Compare layer-awareness payloads without relying on object identity. */
 export function sameLayerState(a: LayerState, b: LayerState): boolean {
   return a.covered === b.covered && a.hudCovered === b.hudCovered &&
     sameNumbers(a.cells, b.cells) && a.regions.length === b.regions.length &&
@@ -24,6 +27,7 @@ export function sameLayerState(a: LayerState, b: LayerState): boolean {
     })
 }
 
+/** Compare calibration payloads, including every grid geometry field. */
 export function sameCalibrateState(a: CalibrateState, b: CalibrateState): boolean {
   const ac = a.config
   const bc = b.config

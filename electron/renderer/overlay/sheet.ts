@@ -1,26 +1,25 @@
 /**
- * Pool / pick-history sheet: slides in from the HUD's side. Lists the pool
- * grouped by colour (mana cost · name · grade) and every pick (P1p1 …:
- * taken card, the model's pick when different, ✓ / rank tag) with the
- * agreement rate. Toggled by main's 'toggle-sheet' command (global
+ * Pool / pick-history sheet: slides in from the HUD's side. Lists grouped
+ * copies best-to-worst with every pick label, then full pick history (taken
+ * card, the model's pick when different, ✓ / rank tag) and agreement rate.
+ * Toggled by main's 'toggle-sheet' command (global
  * shortcut, menu, HUD button); the close button routes through the same
  * action so main's notion of open/closed stays in step.
  *
  * Content re-renders only when the state seq or open flag changes.
  */
-import type { CardRow, PickRecord } from '../../shared/state'
+import type { CardRow, HudCorner, PickRecord } from '../../shared/state'
+import type { Rect } from '../../shared/layout'
 import { gradeTier, gradeOrdinal, poolRating } from '../../shared/grades'
 import { agreement, COLOR_NAMES, POOL_COLORS, poolSummary, sheetSide } from './hud-logic'
-import { escapeHtml, renderManaCost } from './shared'
-import type { HudCorner, Rect, Store } from './types'
+import { escapeHtml, isFiniteNumber, renderManaCost } from './shared'
+import type { OverlayAction, Store } from './types'
 import { sheetShouldRender } from './visibility'
-
-type Action = (name: string, data?: unknown) => void
 
 const SHEET_TOP_FRACTION = 0.22
 const SHEET_BOTTOM_FRACTION = 0.09
 
-export interface SheetAnchor {
+interface SheetAnchor {
   readonly top: number
   readonly bottom: number
   readonly height: number
@@ -31,7 +30,7 @@ export interface SheetAnchor {
  * long pool/pick content scrolls inside this geometry instead of extending it.
  */
 export function sheetAnchor(viewHeight: number, corner: HudCorner, hudRect: Rect | null): SheetAnchor {
-  const height = Number.isFinite(viewHeight) ? Math.max(0, viewHeight) : 0
+  const height = isFiniteNumber(viewHeight) ? Math.max(0, viewHeight) : 0
   if (height === 0) return { top: 0, bottom: 0, height: 0 }
 
   const topEdge = Math.round(height * SHEET_TOP_FRACTION)
@@ -62,14 +61,14 @@ function gradeHtml(card: Pick<CardRow, 'grade' | 'setGrade'>): string {
 }
 
 /** Basic lands form the final, separately labelled section of the pool. */
-function isBasicLand(card: Pick<CardRow, 'type' | 'rarity'>): boolean {
+function isBasicLandCard(card: Pick<CardRow, 'type' | 'rarity'>): boolean {
   return /\bbasic land\b/i.test(card.type) || card.rarity.toLowerCase() === 'land'
 }
 
 /** Pool sorted best → worst on the set-review ladder (A+ … F), basic lands last, ties by name. */
-export function sortPoolByGrade(pool: ReadonlyArray<CardRow>): CardRow[] {
+function sortPoolByGrade(pool: ReadonlyArray<CardRow>): CardRow[] {
   return [...pool].sort((a, b) => {
-    const la = isBasicLand(a) ? 1 : 0, lb = isBasicLand(b) ? 1 : 0
+    const la = isBasicLandCard(a) ? 1 : 0, lb = isBasicLandCard(b) ? 1 : 0
     if (la !== lb) return la - lb
     const ga = reviewGrade(a), gb = reviewGrade(b)
     const oa = ga ? gradeOrdinal(ga) : -1, ob = gb ? gradeOrdinal(gb) : -1
@@ -78,7 +77,7 @@ export function sortPoolByGrade(pool: ReadonlyArray<CardRow>): CardRow[] {
   })
 }
 
-export interface PoolDisplayRow {
+interface PoolDisplayRow {
   /** Representative copy; identical names share intrinsic display metadata. */
   card: CardRow
   count: number
@@ -102,7 +101,7 @@ export function poolDisplayRows(
   for (const card of sortPoolByGrade(pool)) {
     let row = byName.get(card.name)
     if (!row) {
-      row = { card, count: 0, pickLabels: [], basicLand: isBasicLand(card) }
+      row = { card, count: 0, pickLabels: [], basicLand: isBasicLandCard(card) }
       byName.set(card.name, row)
       rows.push(row)
     }
@@ -117,20 +116,21 @@ export function poolDisplayRows(
   return rows
 }
 
-export function poolRatingLabel(pool: ReadonlyArray<CardRow>): { text: string; grade: string | null } {
+function poolRatingLabel(pool: ReadonlyArray<CardRow>): { text: string; grade: string | null } {
   const r = poolRating(pool.map(c => ({ grade: reviewGrade(c), rarity: c.rarity, type: c.type })))
   return { text: r.grade ? `${r.grade}` : '—', grade: r.grade }
 }
 
 /** Compact W/U/B/R/G card counts for the pool header (lands excluded). */
-export function poolColourCountsHtml(pool: ReadonlyArray<Pick<CardRow, 'colors' | 'type'>>): string {
+export function poolColorCountsHtml(pool: ReadonlyArray<Pick<CardRow, 'colors' | 'type'>>): string {
   const counts = poolSummary(pool).counts
-  return POOL_COLORS.map(colour => {
-    const count = counts[colour]
-    return `<span class="sheet-colour-chip ${colour}" data-colour="${colour}" aria-label="${COLOR_NAMES[colour]}: ${count}" title="${COLOR_NAMES[colour]} cards"><i>${colour}</i><b>${count}</b></span>`
+  return POOL_COLORS.map(color => {
+    const count = counts[color]
+    return `<span class="sheet-colour-chip ${color}" data-colour="${color}" aria-label="${COLOR_NAMES[color]}: ${count}" title="${COLOR_NAMES[color]} cards"><i>${color}</i><b>${count}</b></span>`
   }).join('')
 }
 
+/** Render the grouped best-to-worst pool rows and optional lands section. */
 export function poolHtml(pool: ReadonlyArray<CardRow>, picks: ReadonlyArray<PickRecord> = []): string {
   if (pool.length === 0) return '<div class="s-empty">No cards yet</div>'
   const rows = poolDisplayRows(pool, picks)
@@ -162,6 +162,7 @@ export function poolHtml(pool: ReadonlyArray<CardRow>, picks: ReadonlyArray<Pick
     </div>`
 }
 
+/** Render pick history newest-first with agreement and recommendation tags. */
 export function picksHtml(picks: ReadonlyArray<PickRecord>): string {
   if (picks.length === 0) return '<li class="s-empty">No picks yet</li>'
   return [...picks].reverse().map(p => {
@@ -185,26 +186,27 @@ export function picksHtml(picks: ReadonlyArray<PickRecord>): string {
   }).join('')
 }
 
+/** Updates and anchors the internally scrolling pool and pick-history sheet. */
 export class Sheet {
   private readonly pool: HTMLElement
   private readonly picks: HTMLElement
   private readonly agree: HTMLElement
   private readonly title: HTMLElement
   private readonly rating: HTMLElement
-  private readonly colours: HTMLElement
+  private readonly colors: HTMLElement
   private renderedKey = ''
   private open = false
   private side = ''
   private stack = ''
   private anchorKey = ''
 
-  constructor(private root: HTMLElement, action: Action) {
+  constructor(private root: HTMLElement, action: OverlayAction) {
     this.pool = root.querySelector('#sheetPool')!
     this.picks = root.querySelector('#sheetPicks')!
     this.agree = root.querySelector('#sheetAgree')!
     this.title = root.querySelector('#sheetTitle')!
     this.rating = root.querySelector('#sheetRating')!
-    this.colours = root.querySelector('#sheetColours')!
+    this.colors = root.querySelector('#sheetColours')!
     root.querySelector('#btnSheetClose')!.addEventListener('click', () => action('toggle-sheet'))
   }
 
@@ -242,7 +244,7 @@ export class Sheet {
     const rating = poolRatingLabel(state.pool)
     this.rating.textContent = `Pool rating ${rating.text}`
     this.rating.className = `sheet-rating ${rating.grade ? `grade-${gradeTier(rating.grade as never)}` : 'grade-none'}`
-    this.colours.innerHTML = poolColourCountsHtml(state.pool)
+    this.colors.innerHTML = poolColorCountsHtml(state.pool)
     const a = agreement(state.picks)
     this.agree.textContent = a.scored > 0 ? `${a.agreed}/${a.scored} with model${a.rate !== null ? ` · ${Math.round(a.rate * 100)}%` : ''}` : ''
     this.pool.innerHTML = poolHtml(state.pool, state.picks)

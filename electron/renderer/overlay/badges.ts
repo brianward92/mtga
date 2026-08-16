@@ -37,6 +37,7 @@ interface CellNodes {
 
 const FRAME_BORDER = 2
 
+/** Paints keyed, non-interactive badge nodes over Arena's visible pack cards. */
 export class BadgeLayer {
   private cells: CellNodes[] = []
   private visible: boolean

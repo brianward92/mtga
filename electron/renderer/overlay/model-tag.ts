@@ -16,7 +16,7 @@ const KNOWN_MODELS: Readonly<Record<string, string>> = {
  * ("SOS/PremierDraft/v20260703" -> "v20260703"); the full id goes in the
  * tooltip. Ids without a path keep their full text.
  */
-export function modelVersionTag(id: string): string {
+function modelVersionTag(id: string): string {
   const segments = id.split('/').filter(Boolean)
   return segments[segments.length - 1] || id
 }

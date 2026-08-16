@@ -2,20 +2,21 @@
  * Renderer-side view of the payloads main pushes over the preload bridge.
  * The authoritative shapes live in shared/ (type-only imports).
  */
-import type { DraftState, LayerState, CalibrateState, HudCorner, Prefs } from '../../shared/state'
-import type { CalibrationConfig, Rect } from '../../shared/layout'
-
-export type { DraftState, CalibrationConfig, Rect, LayerState, CalibrateState, HudCorner, Prefs }
+import type { DraftState, LayerState, CalibrateState, Prefs } from '../../shared/state'
 
 /** Renderer prefs: the persisted prefs minus the calibration table. */
 export type ViewPrefs = Pick<Prefs, 'badges' | 'hud' | 'hudCorner' | 'layerDetection'>
 
-export interface Command {
+/** User intent emitted by renderer controls through the preload bridge. */
+export type OverlayAction = (name: string, data?: unknown) => void
+
+/** Main-to-renderer command received through the preload bridge. */
+export interface OverlayCommand {
   name: string
   data?: unknown
 }
 
-export interface Size {
+interface ViewportSize {
   width: number
   height: number
 }
@@ -29,5 +30,5 @@ export interface Store {
   sheetOpen: boolean
   /** Display-order pack cell under the cursor (-1 when none). */
   hoverCell: number
-  view: Size
+  view: ViewportSize
 }

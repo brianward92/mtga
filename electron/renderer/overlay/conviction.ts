@@ -17,7 +17,9 @@
  * their sigmoid gaps aren't calibrated probabilities. `heuristic: true` caps
  * the label at SLAM (never OBVIOUS BOMB / BOMB).
  */
+import { isFiniteNumber } from './shared'
 
+/** Display band derived from head-to-head model dominance. */
 export interface Conviction {
   /** 1..5 filled flames */
   flames: number
@@ -31,6 +33,7 @@ export interface Conviction {
   closeCall: boolean
 }
 
+/** Logistic transform used to turn an EV gap into pairwise dominance. */
 export function sigmoid(x: number): number {
   return 1 / (1 + Math.exp(-x))
 }
@@ -43,7 +46,7 @@ export function sigmoid(x: number): number {
  */
 export function dominanceFromEvs(evs: ReadonlyArray<number | null | undefined>): number | null {
   const finite = evs
-    .filter((v): v is number => v !== null && v !== undefined && Number.isFinite(v))
+    .filter(isFiniteNumber)
     .sort((a, b) => b - a)
   if (finite.length < 2) return null
   return sigmoid(finite[0] - finite[1])
@@ -58,8 +61,7 @@ export function runnerDominance(
   ev: number | null | undefined,
   evAbove: number | null | undefined
 ): number | null {
-  if (ev === null || ev === undefined || !Number.isFinite(ev)) return null
-  if (evAbove === null || evAbove === undefined || !Number.isFinite(evAbove)) return null
+  if (!isFiniteNumber(ev) || !isFiniteNumber(evAbove)) return null
   return sigmoid(ev - evAbove)
 }
 

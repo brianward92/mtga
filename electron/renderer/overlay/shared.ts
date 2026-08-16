@@ -2,6 +2,11 @@
  * Small pure rendering helpers shared by the overlay's layers (unit tested).
  */
 
+/** True only for finite JavaScript numbers. */
+export function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value)
+}
+
 /** Escape text for insertion into an HTML string (no DOM needed). */
 export function escapeHtml(text: string): string {
   return String(text).replace(/[&<>"']/g, char => ({
@@ -13,10 +18,7 @@ export function escapeHtml(text: string): string {
   })[char]!)
 }
 
-/**
- * Render mana cost symbols
- * Parses mana cost like "{2}{W}{W}" into pip spans.
- */
+/** Canonical accessible names for mana symbols. */
 const MANA_SYMBOL_NAMES: Readonly<Record<string, string>> = {
   W: 'White',
   U: 'Blue',
@@ -44,6 +46,7 @@ export function renderManaSymbol(symbol: string, options: { decorative?: boolean
   return `<span class="mana-symbol ${generic ? 'generic' : upper}"${accessibility}>${safe}</span>`
 }
 
+/** Parse a brace-delimited mana cost into accessible pip spans. */
 export function renderManaCost(manaCost: string): string {
   if (!manaCost) return ''
 
@@ -56,13 +59,4 @@ export function renderManaCost(manaCost: string): string {
   }
 
   return symbols.map(symbol => renderManaSymbol(symbol)).join('')
-}
-
-/**
- * Format a win rate that may arrive as a fraction (0.57) or percentage (57).
- */
-export function formatWinRate(value: number | null | undefined): string {
-  if (value === null || value === undefined || !Number.isFinite(value)) return '—'
-  const pct = value <= 1 ? value * 100 : value
-  return `${pct.toFixed(1)}%`
 }

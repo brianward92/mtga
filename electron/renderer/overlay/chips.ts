@@ -19,9 +19,12 @@ import type { CardRow } from '../../shared/state'
 import { gradeTier, type Grade } from '../../shared/grades'
 import { bandConviction, dominanceFromEvs, formatDominancePct, runnerDominance } from './conviction'
 import { flamesFromPercentile } from './flames'
+import { isFiniteNumber } from './shared'
 
+/** Visual tier used to tint badge frames and chips. */
 export type Tier = 'top' | 'a' | 'b' | 'c' | 'd'
 
+/** Render-ready badge content for one card in state order. */
 export interface ChipModel {
   /** Frame tint; null → neutral hairline frame only. */
   tier: Tier | null
@@ -40,10 +43,6 @@ export interface ChipModel {
   shimmer: boolean
 }
 
-function finite(v: number | null | undefined): v is number {
-  return v !== null && v !== undefined && Number.isFinite(v)
-}
-
 /** Short uppercase label for the frame's corner tag ('clear pick' → 'CLEAR PICK'). */
 export function shortBandLabel(label: string): string {
   const cut = label.split('—')[0].trim()
@@ -58,13 +57,13 @@ export function rankOrder(cards: ReadonlyArray<CardRow>): number[] {
   return cards
     .map((c, i) => ({ c, i }))
     .sort((a, b) => {
-      const ar = finite(a.c.rank) ? a.c.rank : null
-      const br = finite(b.c.rank) ? b.c.rank : null
+      const ar = isFiniteNumber(a.c.rank) ? a.c.rank : null
+      const br = isFiniteNumber(b.c.rank) ? b.c.rank : null
       if (ar !== null && br !== null && ar !== br) return ar - br
       if (ar !== null && br === null) return -1
       if (ar === null && br !== null) return 1
-      const ae = finite(a.c.ev) ? a.c.ev : null
-      const be = finite(b.c.ev) ? b.c.ev : null
+      const ae = isFiniteNumber(a.c.ev) ? a.c.ev : null
+      const be = isFiniteNumber(b.c.ev) ? b.c.ev : null
       if (ae !== null && be !== null && ae !== be) return be - ae
       if (ae !== null && be === null) return -1
       if (ae === null && be !== null) return 1
@@ -73,23 +72,24 @@ export function rankOrder(cards: ReadonlyArray<CardRow>): number[] {
     .map(e => e.i)
 }
 
+/** Build one badge model per card while withholding stale live scores. */
 export function buildChips(cards: ReadonlyArray<CardRow>, scoring: boolean): ChipModel[] {
   const order = rankOrder(cards)
   const positionOf = new Map(order.map((cardIndex, pos) => [cardIndex, pos]))
-  const scored = !scoring && cards.some(c => finite(c.ev))
+  const scored = !scoring && cards.some(c => isFiniteNumber(c.ev))
   const dominance = scored ? dominanceFromEvs(cards.map(c => c.ev)) : null
   const topIndex = order[0] ?? -1
   const top = topIndex >= 0 ? cards[topIndex] : null
-  const conviction = scored && dominance !== null && top && finite(top.ev)
-    ? bandConviction(dominance, finite(top.percentile) ? top.percentile : null)
+  const conviction = scored && dominance !== null && top && isFiniteNumber(top.ev)
+    ? bandConviction(dominance, isFiniteNumber(top.percentile) ? top.percentile : null)
     : null
 
   return cards.map((card, index) => {
     const pos = positionOf.get(index) ?? -1
-    const rating = finite(card.percentile) ? flamesFromPercentile(card.percentile * 100) : null
+    const rating = isFiniteNumber(card.percentile) ? flamesFromPercentile(card.percentile * 100) : null
     const grade = card.grade ?? null
-    const isTop = scored && pos === 0 && finite(card.ev)
-    const rank = scored && pos >= 0 && finite(card.ev) ? pos + 1 : null
+    const isTop = scored && pos === 0 && isFiniteNumber(card.ev)
+    const rank = scored && pos >= 0 && isFiniteNumber(card.ev) ? pos + 1 : null
 
     if (isTop) {
       const flames = conviction ? conviction.flames : rating?.flames ?? null

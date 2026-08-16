@@ -1,15 +1,23 @@
+/** Pointer-rest duration before a rail surface yields to Arena. */
 export const RAIL_DWELL_MS = 250
 
+/** One independently visible rail panel. */
 export type RailPanel = 'hud' | 'sheet'
+
+/** A standalone panel or both joined panels as one dwell target. */
 export type RailDwellTarget = RailPanel | 'rail'
+
+/** Current visible/joined relationship between the two rail panels. */
 export type RailTopology = 'none' | RailPanel | 'split' | 'rail'
 
+/** Pure pointer dwell state shared by the controller and unit tests. */
 export interface RailDwellState {
   readonly target: RailDwellTarget | null
   readonly since: number
   readonly yielded: RailDwellTarget | null
 }
 
+/** Rectangle shape accepted by rail hit-testing, including DOMRect. */
 export interface RailBounds {
   readonly left: number
   readonly top: number
@@ -17,6 +25,7 @@ export interface RailBounds {
   readonly bottom: number
 }
 
+/** Stable empty state used whenever the pointer or rail topology resets. */
 export const EMPTY_RAIL_DWELL: RailDwellState = {
   target: null,
   since: 0,
@@ -38,6 +47,7 @@ export function railDwellIncludes(target: RailDwellTarget | null, panel: RailPan
   return target === 'rail' || target === panel
 }
 
+/** Classify panel visibility and seam contact into one rail topology. */
 export function railTopology(hudVisible: boolean, sheetVisible: boolean, joined: boolean): RailTopology {
   if (!hudVisible && !sheetVisible) return 'none'
   if (hudVisible && !sheetVisible) return 'hud'

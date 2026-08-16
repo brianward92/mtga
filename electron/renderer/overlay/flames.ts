@@ -7,7 +7,9 @@
  * ratings — a card's set-relative P1P1 percentile (chips for runner-ups,
  * hover detail, and the top card while fewer than 2 EVs are known).
  */
+import { isFiniteNumber } from './shared'
 
+/** Percentile-derived flame count and optional headline label. */
 export interface FlameRating {
   /** 1..5 filled flames */
   flames: number
@@ -27,7 +29,7 @@ export function flamesFromPercentile(
   percentile: number | null | undefined,
   opts: { heuristic?: boolean } = {}
 ): FlameRating | null {
-  if (percentile === null || percentile === undefined || !Number.isFinite(percentile)) return null
+  if (!isFiniteNumber(percentile)) return null
   if (percentile >= 99) return { flames: 5, label: opts.heuristic ? 'SLAM' : 'OBVIOUS BOMB' }
   if (percentile >= 95) return { flames: 5, label: 'SLAM' }
   if (percentile >= 80) return { flames: 4, label: null }

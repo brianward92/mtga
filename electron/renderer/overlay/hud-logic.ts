@@ -3,21 +3,25 @@
  *
  * Everything the HUD shows that is more than a field lookup: pool colour
  * summary + lane lean, the recommendation "why" line, pick progress, the
- * agreement rate and the end-of-draft summary, model naming, corner cycling.
+ * agreement rate and the end-of-draft summary, event naming, corner cycling.
  */
-import type { CardRow, DraftState, PickRecord } from '../../shared/state'
+import type { CardRow, DraftState, HudCorner, PickRecord } from '../../shared/state'
 import { bandConviction, dominanceFromEvs, formatDominancePct, type Conviction } from './conviction'
-import { formatWinRate } from './shared'
+import { isFiniteNumber } from './shared'
 import { rankOrder } from './chips'
-import type { HudCorner } from './types'
 
+/** WUBRG in the stable order used by pool summaries and UI chips. */
 export const POOL_COLORS = ['W', 'U', 'B', 'R', 'G'] as const
+
+/** One canonical Magic color letter. */
 export type PoolColor = (typeof POOL_COLORS)[number]
 
+/** Human-readable names for canonical color and colorless labels. */
 export const COLOR_NAMES: Readonly<Record<PoolColor | 'C', string>> = {
   W: 'White', U: 'Blue', B: 'Black', R: 'Red', G: 'Green', C: 'Colorless'
 }
 
+/** Color and land counts derived from a drafted pool. */
 export interface PoolSummary {
   /** Colour pips per colour (multicolour cards count once per colour). */
   counts: Record<PoolColor, number>
@@ -29,7 +33,7 @@ export interface PoolSummary {
   lands: number
 }
 
-function isLand(card: Pick<CardRow, 'type'>): boolean {
+function isLandCard(card: Pick<CardRow, 'type'>): boolean {
   return /\bland\b/i.test(card.type || '')
 }
 
@@ -40,7 +44,7 @@ export function poolSummary(pool: ReadonlyArray<Pick<CardRow, 'colors' | 'type'>
   let cards = 0
   let lands = 0
   for (const card of pool) {
-    if (isLand(card)) { lands++; continue }
+    if (isLandCard(card)) { lands++; continue }
     cards++
     const letters = new Set((card.colors || '').toUpperCase().split('').filter((c): c is PoolColor => c in counts))
     if (letters.size === 0) { colorless++; continue }
@@ -49,6 +53,7 @@ export function poolSummary(pool: ReadonlyArray<Pick<CardRow, 'colors' | 'type'>
   return { counts, colorless, cards, lands }
 }
 
+/** Dominant one- or two-color lane inferred from pool color pips. */
 export interface LaneLean {
   colors: PoolColor[]
   /** 'W/U' or 'G' */
@@ -110,8 +115,8 @@ export function detailLine(card: CardRow): string {
   const parts: string[] = []
   if (card.rank !== null) parts.push(`#${card.rank}`)
   if (card.setGrade && card.grade && card.setGrade !== card.grade) parts.push(`set ${card.setGrade}`)
-  if (card.prob !== null && Number.isFinite(card.prob)) parts.push(`p ${Math.round(card.prob * 100)}%`)
-  if (card.ev !== null && Number.isFinite(card.ev)) parts.push(`ev ${card.ev >= 0 ? '+' : ''}${card.ev.toFixed(2)}`)
+  if (isFiniteNumber(card.prob)) parts.push(`p ${Math.round(card.prob * 100)}%`)
+  if (isFiniteNumber(card.ev)) parts.push(`ev ${card.ev >= 0 ? '+' : ''}${card.ev.toFixed(2)}`)
   return parts.join(' · ')
 }
 
@@ -134,6 +139,7 @@ export function eventTitle(state: Pick<DraftState, 'set' | 'format'>): string {
   return `${set} · ${format}`
 }
 
+/** Model-agreement counts for scored picks. */
 export interface Agreement {
   agreed: number
   scored: number
@@ -152,13 +158,13 @@ export function agreement(picks: ReadonlyArray<PickRecord>): Agreement {
 export function bestPick(pool: ReadonlyArray<CardRow>): CardRow | null {
   let best: CardRow | null = null
   for (const card of pool) {
-    if (card.percentile === null || !Number.isFinite(card.percentile)) continue
+    if (!isFiniteNumber(card.percentile)) continue
     if (!best || (card.percentile > (best.percentile ?? -1))) best = card
   }
   return best
 }
 
-export const HUD_CORNERS: readonly HudCorner[] = ['tl', 'tr', 'br', 'bl']
+const HUD_CORNERS: readonly HudCorner[] = ['tl', 'tr', 'br', 'bl']
 
 /** tl → tr → br → bl → tl */
 export function nextCorner(corner: HudCorner): HudCorner {
@@ -169,36 +175,4 @@ export function nextCorner(corner: HudCorner): HudCorner {
 /** Which side the sheet slides in from for a HUD corner. */
 export function sheetSide(corner: HudCorner): 'left' | 'right' {
   return corner === 'tl' || corner === 'bl' ? 'left' : 'right'
-}
-
-/** Group order for the pool sheet: WUBRG, multicolour, colourless, lands. */
-export type PoolGroup = PoolColor | 'M' | 'C' | 'L'
-export const POOL_GROUP_ORDER: readonly PoolGroup[] = ['W', 'U', 'B', 'R', 'G', 'M', 'C', 'L']
-export const POOL_GROUP_NAMES: Readonly<Record<PoolGroup, string>> = {
-  W: 'White', U: 'Blue', B: 'Black', R: 'Red', G: 'Green', M: 'Multicolour', C: 'Colourless', L: 'Lands'
-}
-
-export function poolGroupOf(card: Pick<CardRow, 'colors' | 'type'>): PoolGroup {
-  if (isLand(card)) return 'L'
-  const letters = [...new Set((card.colors || '').toUpperCase().split('').filter(c => POOL_COLORS.includes(c as PoolColor)))]
-  if (letters.length === 0) return 'C'
-  if (letters.length > 1) return 'M'
-  return letters[0] as PoolColor
-}
-
-/** Pool grouped by colour, groups in POOL_GROUP_ORDER, cards by mana value then name. */
-export function groupPool(pool: ReadonlyArray<CardRow>): Array<{ group: PoolGroup; cards: CardRow[] }> {
-  const buckets = new Map<PoolGroup, CardRow[]>()
-  for (const card of pool) {
-    const g = poolGroupOf(card)
-    const list = buckets.get(g) ?? []
-    list.push(card)
-    buckets.set(g, list)
-  }
-  return POOL_GROUP_ORDER
-    .filter(g => buckets.has(g))
-    .map(g => ({
-      group: g,
-      cards: [...buckets.get(g)!].sort((a, b) => (a.manaValue ?? 99) - (b.manaValue ?? 99) || a.name.localeCompare(b.name))
-    }))
 }

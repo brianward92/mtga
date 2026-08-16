@@ -5,7 +5,8 @@
  * Idle: a tiny, fixed top-right glyph. Complete: agreement summary + Dismiss.
  * Skeleton lives in index.html; this updates it in place.
  */
-import type { CardRow, Grade } from '../../shared/state'
+import type { CardRow, Grade, HudCorner } from '../../shared/state'
+import type { Rect } from '../../shared/layout'
 import { arenaDisplayOrder } from '../../shared/display-order'
 import { gradeTier } from '../../shared/grades'
 import { flamesFromPercentile } from './flames'
@@ -17,9 +18,7 @@ import {
   agreement, bestPick, detailLine, eventTitle, laneLean, nextCorner, packConviction,
   pickPosition, POOL_COLORS, poolSummary, progressDots, rankedCards, whyLine
 } from './hud-logic'
-import type { HudCorner, Rect, Store } from './types'
-
-type Action = (name: string, data?: unknown) => void
+import type { OverlayAction, Store } from './types'
 
 function $(root: HTMLElement, id: string): HTMLElement {
   const el = root.querySelector<HTMLElement>(`#${id}`)
@@ -35,6 +34,7 @@ function gradeClass(grade: Grade | null): string {
   return grade ? `grade-${gradeTier(grade)}` : 'grade-none'
 }
 
+/** Updates the persistent HUD skeleton without replacing its DOM nodes. */
 export class Hud {
   private readonly idle: HTMLElement
   private readonly main: HTMLElement
@@ -75,7 +75,7 @@ export class Hud {
   private lastRectKey = 'init'
   private rootClass = ''
 
-  constructor(private root: HTMLElement, private action: Action) {
+  constructor(private root: HTMLElement, private action: OverlayAction) {
     this.idle = $(root, 'hudIdle')
     this.main = $(root, 'hudMain')
     this.warning = $(root, 'hudWarning')

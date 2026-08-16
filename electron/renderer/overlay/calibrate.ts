@@ -9,9 +9,7 @@
  * by design — the arrow BUTTONS are the nudge surface.
  */
 import { packLayout, type Rect } from '../../shared/layout'
-import type { Store } from './types'
-
-type Action = (name: string, data?: unknown) => void
+import type { OverlayAction, Store } from './types'
 
 interface GhostNodes { card: HTMLDivElement; num: HTMLSpanElement; badge: HTMLDivElement; key: string }
 
@@ -22,6 +20,7 @@ function place(el: HTMLElement, r: Rect): void {
   el.style.height = `${r.height.toFixed(1)}px`
 }
 
+/** Renders pack-grid calibration ghosts and relays panel controls to main. */
 export class CalibrateLayer {
   private readonly frame: HTMLDivElement
   private readonly ghosts: GhostNodes[] = []
@@ -30,7 +29,7 @@ export class CalibrateLayer {
   private active = false
   private frameKey = ''
 
-  constructor(private ghostRoot: HTMLElement, private panel: HTMLElement, action: Action) {
+  constructor(private ghostRoot: HTMLElement, private panel: HTMLElement, action: OverlayAction) {
     this.frame = document.createElement('div')
     this.frame.className = 'ghost-frame'
     ghostRoot.appendChild(this.frame)

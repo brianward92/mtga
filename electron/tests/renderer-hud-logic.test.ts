@@ -5,10 +5,10 @@
 import { describe, it, expect } from 'vitest'
 import type { CardRow, PickRecord } from '../shared/state'
 import {
-  agreement, bestPick, detailLine, eventTitle, groupPool, laneLean, nextCorner, packConviction,
-  pickPosition, poolGroupOf, poolSummary, progressDots, rankedCards, sheetSide, whyLine
+  agreement, bestPick, detailLine, eventTitle, laneLean, nextCorner, packConviction,
+  pickPosition, poolSummary, progressDots, rankedCards, sheetSide, whyLine
 } from '../renderer/overlay/hud-logic'
-import { picksHtml, poolColourCountsHtml, poolDisplayRows, poolHtml } from '../renderer/overlay/sheet'
+import { picksHtml, poolColorCountsHtml, poolDisplayRows, poolHtml } from '../renderer/overlay/sheet'
 import { sigmoid, formatDominancePct } from '../renderer/overlay/conviction'
 
 function card(over: Partial<CardRow> & { grpId: number }): CardRow {
@@ -153,25 +153,9 @@ describe('agreement / bestPick', () => {
   })
 })
 
-describe('groupPool', () => {
-  it('groups WUBRG, multicolour, colourless, lands in order and sorts by mana value', () => {
-    const groups = groupPool([
-      card({ grpId: 1, colors: 'G', manaValue: 3, name: 'Bear' }),
-      card({ grpId: 2, colors: 'G', manaValue: 1, name: 'Elf' }),
-      card({ grpId: 3, colors: 'WU', manaValue: 2 }),
-      card({ grpId: 4, colors: '', manaValue: 4 }),
-      card({ grpId: 5, colors: '', type: 'Land', manaValue: 0 }),
-      card({ grpId: 6, colors: 'W', manaValue: 2 })
-    ])
-    expect(groups.map(g => g.group)).toEqual(['W', 'G', 'M', 'C', 'L'])
-    expect(groups[1].cards.map(c => c.name)).toEqual(['Elf', 'Bear'])
-    expect(poolGroupOf(card({ grpId: 9, colors: 'ub' }))).toBe('M')
-  })
-})
-
 describe('sheet html', () => {
   it('shows explicit WUBRG counts in a stable header order', () => {
-    const html = poolColourCountsHtml([
+    const html = poolColorCountsHtml([
       card({ grpId: 1, colors: 'WU' }),
       card({ grpId: 2, colors: 'R' }),
       card({ grpId: 3, colors: 'G', type: 'Land' })

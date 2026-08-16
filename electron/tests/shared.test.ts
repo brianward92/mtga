@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { escapeHtml, formatWinRate, renderManaCost, renderManaSymbol } from '../renderer/overlay/shared'
+import { escapeHtml, isFiniteNumber, renderManaCost, renderManaSymbol } from '../renderer/overlay/shared'
 
 describe('mana symbols', () => {
   it('renders precise visible W/U/B/R/G labels with accessible color names', () => {
@@ -41,16 +41,13 @@ describe('escapeHtml', () => {
   })
 })
 
-describe('formatWinRate', () => {
-  it('accepts fractions and percentages', () => {
-    expect(formatWinRate(0.573)).toBe('57.3%')
-    expect(formatWinRate(57.3)).toBe('57.3%')
-    expect(formatWinRate(1)).toBe('100.0%')
-  })
-
-  it('shows a dash when missing', () => {
-    expect(formatWinRate(null)).toBe('—')
-    expect(formatWinRate(undefined)).toBe('—')
-    expect(formatWinRate(Number.NaN)).toBe('—')
+describe('finite number guard', () => {
+  it('accepts finite numbers and rejects missing or non-finite values', () => {
+    expect(isFiniteNumber(0)).toBe(true)
+    expect(isFiniteNumber(-3.2)).toBe(true)
+    expect(isFiniteNumber(null)).toBe(false)
+    expect(isFiniteNumber(undefined)).toBe(false)
+    expect(isFiniteNumber(Number.NaN)).toBe(false)
+    expect(isFiniteNumber(Number.POSITIVE_INFINITY)).toBe(false)
   })
 })
