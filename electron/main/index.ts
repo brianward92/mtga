@@ -22,6 +22,13 @@ import { createOverlayWindow, setOverlayRect, showOverlay, hideOverlay, setOverl
 import { LayerDetector } from './overlay/layer'
 import { Calibration } from './overlay/calibration'
 import { screenCaptureGranted } from './overlay/occlusion'
+import {
+  INITIAL_OVERLAY_REAPPEARANCE,
+  advanceOverlayReappearance,
+  mayShowOverlay,
+  overlayReappearanceDelay,
+  type OverlayReappearanceState
+} from './overlay/reappearance'
 import { loadPrefs, savePrefs, type Prefs } from './prefs'
 import { StatusTray } from './status-tray'
 import type { DraftState } from '../shared/state'
@@ -43,6 +50,9 @@ const calibration = new Calibration()
 const poller = new ArenaGeometryPoller()
 let quitCommitted = false
 let quitTimer: NodeJS.Timeout | null = null
+let overlayReappearance: OverlayReappearanceState = INITIAL_OVERLAY_REAPPEARANCE
+let overlayReappearanceTimer: NodeJS.Timeout | null = null
+let overlayReappearanceToken = 0
 /** Pool & picks section of the rail: open by default during a draft. */
 let sheetOpen = true
 
@@ -50,10 +60,9 @@ let sheetOpen = true
 // Overlay visibility policy
 // ---------------------------------------------------------------------------
 
-/** Should the overlay window be on screen right now? */
-function overlayWanted(): boolean {
+/** Does current Arena/draft state call for overlay content? */
+function overlayContentWanted(): boolean {
   if (!poller.lastKnown || !poller.isFound()) return false
-  if (!poller.arenaFrontmost) return false
   const prefs = loadPrefs()
   const d = coordinator.current
   if (calibration.active) return true
@@ -64,14 +73,44 @@ function overlayWanted(): boolean {
 /** Badges are live: draft with a pack on screen, badges enabled, overlay wanted. */
 function badgesLive(): boolean {
   const d = coordinator.current
-  return loadPrefs().badges && d.phase === 'active' && d.cards.length > 0 && overlayWanted()
+  return loadPrefs().badges && d.phase === 'active' && d.cards.length > 0 &&
+    poller.arenaFrontmost && overlayContentWanted()
+}
+
+function cancelOverlayReappearanceSync(): void {
+  overlayReappearanceToken += 1
+  if (overlayReappearanceTimer) clearTimeout(overlayReappearanceTimer)
+  overlayReappearanceTimer = null
+}
+
+function scheduleOverlayReappearanceSync(delayMs: number): void {
+  cancelOverlayReappearanceSync()
+  const token = overlayReappearanceToken
+  overlayReappearanceTimer = setTimeout(() => {
+    if (token !== overlayReappearanceToken) return
+    overlayReappearanceTimer = null
+    syncOverlay()
+  }, delayMs)
 }
 
 function syncOverlay(): void {
-  if (!overlay || overlay.isDestroyed()) return
+  if (!overlay || overlay.isDestroyed()) {
+    cancelOverlayReappearanceSync()
+    return
+  }
+  const now = Date.now()
+  overlayReappearance = advanceOverlayReappearance(
+    overlayReappearance,
+    poller.isFound() && poller.lastKnown !== null,
+    now
+  )
+  const delay = overlayReappearanceDelay(overlayReappearance, now)
+  if (delay === null) cancelOverlayReappearanceSync()
+  else scheduleOverlayReappearanceSync(delay)
+
   const rect = poller.lastKnown
   if (rect) setOverlayRect(overlay, rect)
-  if (overlayWanted()) showOverlay(overlay)
+  if (mayShowOverlay(overlayReappearance, overlayContentWanted(), poller.arenaFrontmost)) showOverlay(overlay)
   else hideOverlay(overlay)
   // Window capture only while badges need layer awareness.
   poller.setCapture(loadPrefs().layerDetection && badgesLive())
@@ -238,6 +277,7 @@ function setupShortcuts(): void {
 }
 
 async function createOverlay(): Promise<void> {
+  overlayReappearance = INITIAL_OVERLAY_REAPPEARANCE
   overlay = createOverlayWindow()
   overlay.webContents.on('did-finish-load', () => {
     send('overlay:state', coordinator.current)
@@ -246,7 +286,11 @@ async function createOverlay(): Promise<void> {
     pushCalibrate()
     syncOverlay()
   })
-  overlay.on('closed', () => { overlay = null })
+  overlay.on('closed', () => {
+    cancelOverlayReappearanceSync()
+    overlayReappearance = INITIAL_OVERLAY_REAPPEARANCE
+    overlay = null
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -283,6 +327,7 @@ app.on('before-quit', event => {
 })
 
 function cleanup(): void {
+  cancelOverlayReappearanceSync()
   globalShortcut.unregisterAll()
   layer?.dispose()
   poller.stop()
