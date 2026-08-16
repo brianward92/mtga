@@ -76,6 +76,34 @@ describe('arenaDisplayOrder', () => {
     expect(arenaDisplayOrder(log).map(i => log[i].name)).toEqual(['Vicious Clown', 'Glimmerlight', 'Murky Sewer'])
   })
 
+  it('sorts a rare land with the rares and common lands last (real DSK P3P2)', () => {
+    // Verified against Arena's own Order_MythicToCommon/Order_ColorOrder for
+    // these grpIds: Thornspire Verge is a rare land (tier 1), Island is a
+    // basic (tier 4), everything else tiers by rarity.
+    const log = [
+      { name: 'Ripchain Razorkin', rarity: 'common', colors: 'R', type: 'Creature — Human Assassin' },
+      { name: 'Bear Trap', rarity: 'common', colors: '', type: 'Artifact' },
+      { name: 'Vicious Clown', rarity: 'common', colors: 'R', type: 'Creature — Human Clown' },
+      { name: 'Spineseeker Centipede', rarity: 'common', colors: 'G', type: 'Creature — Insect' },
+      { name: 'Living Phone', rarity: 'common', colors: 'W', type: 'Artifact Creature — Phone' },
+      { name: 'Erratic Apparition', rarity: 'common', colors: 'U', type: 'Creature — Spirit' },
+      { name: 'Fanatic of the Harrowing', rarity: 'common', colors: 'B', type: 'Creature — Human Cleric' },
+      { name: 'Anthropede', rarity: 'common', colors: 'G', type: 'Creature — Insect' },
+      { name: 'Midnight Mayhem', rarity: 'uncommon', colors: 'WR', type: 'Sorcery' },
+      { name: 'Overgrown Zealot', rarity: 'uncommon', colors: 'G', type: 'Creature — Human Cleric' },
+      { name: 'Oblivious Bookworm', rarity: 'uncommon', colors: 'UG', type: 'Creature — Human Citizen' },
+      { name: 'Thornspire Verge', rarity: 'rare', colors: '', colorIdentity: 'RG', type: 'Land' },
+      { name: 'Island', rarity: 'land', colors: '', colorIdentity: 'U', type: 'Basic Land — Island' }
+    ]
+    expect(arenaDisplayOrder(log).map(i => log[i].name)).toEqual([
+      'Thornspire Verge',
+      'Overgrown Zealot', 'Midnight Mayhem', 'Oblivious Bookworm',
+      'Living Phone', 'Erratic Apparition', 'Fanatic of the Harrowing',
+      'Ripchain Razorkin', 'Vicious Clown', 'Anthropede', 'Spineseeker Centipede', 'Bear Trap',
+      'Island'
+    ])
+  })
+
   it('colour order table matches Arena (mono, pairs, colourless, basic land by identity)', () => {
     expect(colorOrder({ name: 'x', rarity: 'common', colors: 'W' })).toBe(0)
     expect(colorOrder({ name: 'x', rarity: 'common', colors: 'GB' })).toBe(10)

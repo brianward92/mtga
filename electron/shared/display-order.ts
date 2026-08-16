@@ -46,9 +46,18 @@ function isLand(card: DisplayOrderCard): boolean {
   return /\bland\b/i.test(card.type ?? '') || r === 'land' || r === 'basic'
 }
 
+/**
+ * Arena files lands in its bottom tier only when they carry its "land" rarity:
+ * basic lands and the common cycle lands (Murky Sewer). A land printed at
+ * uncommon or above sorts with its rarity — a rare land such as Thornspire
+ * Verge leads the pack, and treating it as a land shifted every badge by one
+ * cell for the rest of the pack.
+ */
 function rarityRank(card: DisplayOrderCard): number {
-  if (isLand(card)) return RARITY_RANK.land
   const key = (card.rarity ?? '').toLowerCase()
+  if (isLand(card) && (key === 'land' || key === 'basic' || key === 'common' || key === '')) {
+    return RARITY_RANK.land
+  }
   if (key in RARITY_RANK) return RARITY_RANK[key]
   return RARITY_RANK.common
 }
