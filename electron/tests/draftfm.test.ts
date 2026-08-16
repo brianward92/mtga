@@ -137,10 +137,16 @@ describe('DraftFM (bundled v1.0 + DSK assets)', () => {
     const model = await DraftFM.load(MODEL, 'DSK', 'QuickDraft', DSK)
     const pack = [92188, 92154, 92073, 92248, 92224, 92346, 92290, 92076, 92231, 92161, 92082, 92310, 92176, 92380]
     await model.scorePack(pack, [], 0, 0)
-    const t = performance.now()
-    for (let i = 0; i < 20; i++) await model.scorePack(pack, [92176, 92231], 0, 2)
-    const per = (performance.now() - t) / 20
-    expect(per).toBeLessThan(5)
+    // Median, not mean: this runs alongside the rest of the suite, so a single
+    // scheduling hiccup must not fail an assertion about scoring being cheap.
+    const samples: number[] = []
+    for (let i = 0; i < 21; i++) {
+      const t = performance.now()
+      await model.scorePack(pack, [92176, 92231], 0, 2)
+      samples.push(performance.now() - t)
+    }
+    samples.sort((a, b) => a - b)
+    expect(samples[Math.floor(samples.length / 2)]).toBeLessThan(5)
     await model.release()
   }, 30000)
 })
