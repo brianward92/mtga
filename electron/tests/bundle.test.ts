@@ -82,6 +82,29 @@ describe('set bundle', () => {
     expect(bundle).not.toHaveProperty('attribution')
   })
 
+  it.skipIf(!have)('warns loudly when a legacy per-grpId cards file is loaded', () => {
+    const root = mkdtempSync(join(tmpdir(), 'draftfm-legacy-bundle-'))
+    const modelDir = join(root, 'model', 'v-test')
+    const setDir = join(root, 'sets', 'DSK')
+    mkdirSync(modelDir, { recursive: true })
+    mkdirSync(setDir, { recursive: true })
+    writeFileSync(join(modelDir, 'scorer.onnx'), '')
+    copyFileSync(DSK_ASSETS, join(setDir, 'assets.npz'))
+    writeJson(join(setDir, 'cards.json'), [{ grpId: 92188, name: 'Murder', rarity: 'common' }])
+
+    const previous = console.warn
+    const warnings: string[] = []
+    console.warn = (message?: unknown) => { warnings.push(String(message)) }
+    try {
+      loadSetBundle(root, 'DSK')
+    } finally {
+      console.warn = previous
+    }
+    expect(warnings).toEqual([
+      '[Bundle] DSK cards.json is missing the name-keyed cards object; rebuild the shipped set bundles'
+    ])
+  })
+
   it.skipIf(!have)('ModelManager scores a real pack with grades and caches the P1P1 curve', async () => {
     const cache = mkdtempSync(join(tmpdir(), 'p1p1-'))
     const m = new ModelManager(cache, ROOT)

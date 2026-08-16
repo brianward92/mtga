@@ -163,6 +163,9 @@ export function loadSetBundle(root: string, set: string): SetBundle | null {
   try { ({ names, grpIds } = readAssetsIdentity(assetsPath)) } catch { /* identity is best-effort */ }
 
   const cardsFile = readJson<CardsFile>(join(dir, 'cards.json'))
+  if (!cardsFile?.cards || typeof cardsFile.cards !== 'object' || Array.isArray(cardsFile.cards)) {
+    console.warn(`[Bundle] ${set} cards.json is missing the name-keyed cards object; rebuild the shipped set bundles`)
+  }
   const byName = cardsFile?.cards ?? {}
   const cards = new Map<number, CardInfo>()
   for (const [name, ids] of Object.entries(grpIds)) {
