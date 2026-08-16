@@ -65,6 +65,8 @@ the app to `/Applications`, and refuses to replace a running copy.
 
 `npm run dev` runs from source. The app lives in the menu bar (card icon):
 toggles for badges / HUD / Precise layering, grid calibration, quit.
+See [`docs/TESTING.md`](docs/TESTING.md) for automated, source E2E, and live
+verification checklists plus the development seams.
 See [`docs/RELEASE.md`](docs/RELEASE.md) for the full verification gate,
 artifact audit, set-update workflow, and signing/permission boundaries.
 
