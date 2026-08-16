@@ -9,7 +9,7 @@
  *         ArenaGeometryPoller (native helper) → overlay bounds + LayerDetector
  *         prefs/tray/shortcuts → user intent
  */
-import { app, BrowserWindow, globalShortcut, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, globalShortcut, ipcMain, screen, shell } from 'electron'
 import { join } from 'path'
 import { writeFileSync } from 'fs'
 import { LogWatcher } from './parser/watcher'
@@ -22,6 +22,7 @@ import { sheetOpenForPhaseTransition } from './draft/completion'
 import { createOverlayWindow, setOverlayRect, showOverlay, hideOverlay, setOverlayInteractive } from './overlay/window'
 import { LayerDetector } from './overlay/layer'
 import { Calibration } from './overlay/calibration'
+import { StandAside } from './overlay/stand-aside'
 import { screenCaptureGranted } from './overlay/occlusion'
 import { OverlayGeometrySync } from './overlay/geometry-sync'
 import { badgesAreLive, wantsOverlayContent, type OverlayActivity } from './overlay/activity-policy'
@@ -42,6 +43,8 @@ let models: ModelManager
 let coordinator: DraftCoordinator
 let layer: LayerDetector
 const calibration = new Calibration()
+const standAside = new StandAside()
+let standAsideTimer: NodeJS.Timeout | null = null
 const poller = new ArenaGeometryPoller()
 let quitCommitted = false
 let quitTimer: NodeJS.Timeout | null = null
@@ -64,8 +67,28 @@ function currentOverlayActivity(): OverlayActivity {
     phase: draft.phase,
     cardCount: draft.cards.length,
     badgesEnabled: prefs.badges,
-    hudEnabled: prefs.hud
+    hudEnabled: prefs.hud,
+    standAside: standAside.active
   }
+}
+
+/**
+ * Poll the cursor while the overlay is up: reaching into Arena's top menu bar
+ * (Options, Packs, Store…) makes the overlay stand aside until the draft moves
+ * on. Arena draws its menus inside its own window, so stepping out of the way
+ * is the only way to let them win.
+ */
+function standAsideTick(): void {
+  const rect = poller.lastKnown
+  if (!rect || calibration.active) return
+  const cursor = screen.getCursorScreenPoint()
+  const local = { x: cursor.x - rect.x, y: cursor.y - rect.y }
+  if (standAside.sample(local, rect, Date.now())) syncOverlay()
+}
+
+/** The draft moved on (or the user asked for it back): show the overlay again. */
+function releaseStandAside(): void {
+  if (standAside.release()) syncOverlay()
 }
 
 function isOverlayContentWanted(): boolean { return wantsOverlayContent(currentOverlayActivity()) }
@@ -102,7 +125,12 @@ function send(channel: string, payload: unknown): void {
   overlay.webContents.send(channel, payload)
 }
 
+let lastPickKey = ''
+
 function pushState(state: DraftState): void {
+  // A new pack or pick means the drafter is back at the table.
+  const pickKey = `${state.phase}:${state.pack}:${state.pick}`
+  if (pickKey !== lastPickKey) { lastPickKey = pickKey; releaseStandAside() }
   send('overlay:state', state)
   syncOverlay()
   refreshTray()
@@ -166,6 +194,7 @@ function setupGeometry(): void {
   poller.on('lost', () => { syncOverlay(); refreshTray() })
   poller.on('frontmost', () => syncOverlay())
   poller.on('capture', () => refreshTray())
+  standAsideTimer = setInterval(standAsideTick, 120)
   poller.on('helper-missing', () => coordinator.setWarning('Window helper missing from the app bundle — overlay cannot locate Arena'))
   poller.start()
 
@@ -232,7 +261,10 @@ function setupTray(): void {
 
 function setupShortcuts(): void {
   // The overlay is never focused; these are global by necessity.
-  globalShortcut.register('CommandOrControl+Shift+B', () => pushPrefs(savePrefs({ badges: !loadPrefs().badges })))
+  globalShortcut.register('CommandOrControl+Shift+B', () => {
+    releaseStandAside()
+    pushPrefs(savePrefs({ badges: !loadPrefs().badges }))
+  })
 }
 
 async function createOverlay(): Promise<void> {
@@ -287,6 +319,7 @@ app.on('before-quit', event => {
 })
 
 function cleanup(): void {
+  if (standAsideTimer) { clearInterval(standAsideTimer); standAsideTimer = null }
   overlayGeometrySync.dispose()
   globalShortcut.unregisterAll()
   layer?.dispose()

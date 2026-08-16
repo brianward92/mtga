@@ -10,12 +10,15 @@ export interface OverlayActivity {
   cardCount: number
   badgesEnabled: boolean
   hudEnabled: boolean
+  /** The drafter is in Arena's own menus: our overlay steps aside entirely. */
+  standAside: boolean
 }
 
 /** Whether any overlay content should be visible for the current app state. */
 export function wantsOverlayContent(activity: OverlayActivity): boolean {
   if (!activity.arenaFound) return false
   if (activity.calibrating) return true
+  if (activity.standAside) return false
   if (activity.phase !== 'idle') return activity.badgesEnabled || activity.hudEnabled
   return activity.hudEnabled
 }
