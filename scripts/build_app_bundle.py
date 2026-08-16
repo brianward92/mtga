@@ -31,7 +31,9 @@ sets; already includes bonus sheets), else the non-basic English names among
 the set's Scryfall booster or Arena-game printings. grpIds per name = every
 Scryfall printing with an arena_id whose oracle name matches (in-set first,
 then other sets). No ratings, art, processed card store, or hand-maintained
-Arena-id overlay enters this path.
+Arena-id data ships in the repository. A complete, explicit JSON
+name-to-grpIds mapping may be supplied with --arena-ids for a set whose
+Scryfall ids have not landed yet.
 
   build_app_bundle.py --set DSK
   build_app_bundle.py --all --fetch
@@ -58,6 +60,7 @@ DEFAULT_OUT = REPO_ROOT / "electron" / "resources" / "draftfm" / "sets"
 MODEL_ROOT = REPO_ROOT / "electron" / "resources" / "draftfm" / "model"
 BULK_TYPE = "default_cards"
 ALL_EXTRA_SETS = ("HOB",)
+SET_CODE_RE = re.compile(r"^[A-Z0-9]+$")
 SNAPSHOT_RE = re.compile(
     r"^default_cards-(\d{4}-\d{2}-\d{2})\.(jsonl\.gz|jsonl|json\.gz|json)$"
 )
@@ -68,9 +71,9 @@ EMBED_SETUP = REPO_ROOT / "scripts" / "setup_embed.sh"
 EMBED_PYTHON = REPO_ROOT / ".venv-embed" / "bin" / "python"
 
 # Scryfall can briefly advertise Arena availability before publishing
-# arena_id. Keep the unresolved-id decision in one place until product policy
-# is settled: "report" builds the otherwise useful set assets and reports
-# every missing name; "fail" rejects that set while the outer build continues.
+# arena_id. Sparse gaps in normal sets are reported while otherwise useful
+# assets build; the near-empty day-zero HOB case is rejected explicitly in
+# universe(). Keep the generic policy switch here so its behavior stays tested.
 MISSING_GRP_IDS_POLICY = "report"
 PUBLIC_SET_KEYS = (
     "picks_per_pack",
@@ -147,7 +150,69 @@ def create_parser():
         help="model dir under electron/resources/draftfm/model "
         "(default: newest tag with a meta.json)",
     )
+    parser.add_argument(
+        "--arena-ids",
+        default=None,
+        metavar="PATH",
+        help="optional JSON object mapping card names to non-empty grpId arrays; "
+        "nothing is loaded implicitly",
+    )
     return parser
+
+
+def load_arena_ids(path):
+    """Load a strictly validated explicit ``name -> [grpIds]`` overlay."""
+    path = Path(path)
+    if not path.is_file():
+        raise BundleError(f"--arena-ids {path} does not exist or is not a file")
+
+    def unique_object(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise BundleError(f"--arena-ids {path} repeats JSON key {key!r}")
+            result[key] = value
+        return result
+
+    try:
+        payload = json.loads(path.read_text(), object_pairs_hook=unique_object)
+    except (json.JSONDecodeError, OSError) as err:
+        raise BundleError(f"could not read --arena-ids {path}: {err}") from err
+    if not isinstance(payload, dict) or not payload:
+        raise BundleError(
+            f"--arena-ids {path} must be a non-empty JSON object mapping "
+            "names to grpId arrays"
+        )
+
+    result = {}
+    owner = {}
+    for name, raw_ids in payload.items():
+        if not isinstance(name, str) or not name or name != name.strip():
+            raise BundleError(
+                f"--arena-ids {path} has an empty or whitespace-padded card name"
+            )
+        if not isinstance(raw_ids, list) or not raw_ids:
+            raise BundleError(
+                f"--arena-ids {path}: {name!r} must map to a non-empty array"
+            )
+        ids = []
+        for value in raw_ids:
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                raise BundleError(
+                    f"--arena-ids {path}: {name!r} has invalid grpId {value!r}; "
+                    "grpIds must be positive JSON integers"
+                )
+            if value in ids:
+                raise BundleError(f"--arena-ids {path}: {name!r} repeats grpId {value}")
+            if value in owner:
+                raise BundleError(
+                    f"--arena-ids {path}: grpId {value} is assigned to both "
+                    f"{owner[value]!r} and {name!r}"
+                )
+            ids.append(value)
+            owner[value] = name
+        result[name] = ids
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -645,7 +710,60 @@ def _handle_missing_grp_ids(set_code, missing):
     )
 
 
-def universe(set_code, snapshot):
+def apply_arena_ids(set_code, grp_lists, arena_ids):
+    """Merge an explicit overlay, resolving face aliases to full model rows.
+
+    Returns the overlay keys used by this set. An alias must resolve to exactly
+    one universe row; this prevents a grpId from silently targeting the wrong
+    row when a face name is ambiguous.
+    """
+    aliases = {}
+    grp_owner = {}
+    for model_name in grp_lists:
+        keys = {names_mod.norm_17lands(model_name)}
+        front = _front(model_name)
+        back = _back(model_name)
+        keys.add(names_mod.norm_17lands(front))
+        if back:
+            keys.add(names_mod.norm_17lands(back))
+        for key in keys:
+            aliases.setdefault(key, []).append(model_name)
+        for grp_id in grp_lists[model_name]:
+            previous = grp_owner.get(grp_id)
+            if previous is not None and previous != model_name:
+                raise BundleError(
+                    f"{set_code}: Scryfall grpId {grp_id} resolves to both "
+                    f"{previous!r} and {model_name!r}"
+                )
+            grp_owner[grp_id] = model_name
+
+    used = set()
+    for overlay_name, overlay_ids in arena_ids.items():
+        key = names_mod.norm_17lands(overlay_name)
+        targets = aliases.get(key, [])
+        if not targets:
+            continue
+        if len(targets) != 1:
+            raise BundleError(
+                f"{set_code}: --arena-ids name {overlay_name!r} is ambiguous; "
+                f"it matches model rows {json.dumps(targets, ensure_ascii=False)}"
+            )
+        target = targets[0]
+        used.add(overlay_name)
+        for grp_id in overlay_ids:
+            previous = grp_owner.get(grp_id)
+            if previous is not None and previous != target:
+                raise BundleError(
+                    f"{set_code}: --arena-ids grpId {grp_id} targets {target!r} "
+                    f"but Scryfall already maps it to {previous!r}"
+                )
+            if grp_id not in grp_lists[target]:
+                grp_lists[target].append(grp_id)
+            grp_owner[grp_id] = target
+    return used
+
+
+def universe(set_code, snapshot, arena_ids=None):
     """Ordered {name: [grpIds]} plus internal reporting metadata."""
     names = vocab_names(set_code)
     source = "vocab"
@@ -668,9 +786,34 @@ def universe(set_code, snapshot):
     grp_lists = {}
     for name in names:
         grp_lists[name] = snapshot.arena_ids(name, set_code)
+    overlay_used = set()
+    if arena_ids is not None:
+        overlay_used = apply_arena_ids(set_code, grp_lists, arena_ids)
     missing = [name for name, ids in grp_lists.items() if not ids]
+    if set_code == "HOB" and missing:
+        if arena_ids is None:
+            raise BundleError(
+                "Scryfall has no arena_id for HOB yet; re-run after Scryfall "
+                "updates, or pass --arena-ids PATH with a complete JSON "
+                f"name-to-grpIds mapping. Missing: "
+                f"{json.dumps(missing, ensure_ascii=False)}"
+            )
+        unused = [name for name in arena_ids if name not in overlay_used]
+        detail = (
+            f" Unresolved overlay names: {json.dumps(unused, ensure_ascii=False)}"
+            if unused
+            else ""
+        )
+        raise BundleError(
+            f"HOB: --arena-ids does not cover {len(missing)} model row(s): "
+            f"{json.dumps(missing, ensure_ascii=False)}.{detail}"
+        )
     _handle_missing_grp_ids(set_code, missing)
-    return grp_lists, {"source": source, "names_without_grp_ids": missing}
+    return grp_lists, {
+        "source": source,
+        "names_without_grp_ids": missing,
+        "arena_ids_used": overlay_used,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -844,9 +987,10 @@ def build_set(
     allow_missing_text=False,
     run_hint="",
     membership=None,
+    arena_ids=None,
 ):
     """Write <out>/<SET>/{assets.npz,cards.json}; returns the index entry."""
-    grp_lists, prov = universe(set_code, snapshot)
+    grp_lists, prov = universe(set_code, snapshot, arena_ids=arena_ids)
     names = list(grp_lists)
     missing_grp_ids = prov["names_without_grp_ids"]
     try:
@@ -915,6 +1059,10 @@ def selected_sets(explicit, include_all=False):
     result = []
     for raw in explicit:
         code = str(raw).strip().upper()
+        if code and not SET_CODE_RE.fullmatch(code):
+            raise BundleError(
+                f"invalid set code {raw!r}; expected only ASCII letters and digits"
+            )
         if code and code not in result:
             result.append(code)
     if include_all:
@@ -922,6 +1070,23 @@ def selected_sets(explicit, include_all=False):
             if code not in result:
                 result.append(code)
     return result
+
+
+def invalidate_set_output(out_dir, set_code):
+    """Remove known generated files so a failed rebuild cannot be discovered."""
+    set_dir = Path(out_dir) / set_code
+    errors = []
+    for filename in ("assets.npz", "cards.json", "ratings.json"):
+        path = set_dir / filename
+        try:
+            path.unlink(missing_ok=True)
+        except OSError as err:
+            errors.append(f"{path}: {err}")
+    try:
+        set_dir.rmdir()
+    except (FileNotFoundError, OSError):
+        pass
+    return errors
 
 
 def update_index(out_dir, entries, meta, manifest, snapshot, requested=()):
@@ -979,14 +1144,40 @@ def update_index(out_dir, entries, meta, manifest, snapshot, requested=()):
     return index, sorted(stale)
 
 
+def drop_failed_index_entries(out_dir, failed_sets):
+    """Remove failed requested sets without relabelling the remaining index."""
+    index_path = Path(out_dir) / "index.json"
+    if not index_path.is_file():
+        return []
+    try:
+        payload = json.loads(index_path.read_text())
+    except (json.JSONDecodeError, OSError):
+        return []
+    if not isinstance(payload, dict) or not isinstance(payload.get("sets"), dict):
+        return []
+    removed = [code for code in failed_sets if code in payload["sets"]]
+    if removed:
+        for code in removed:
+            del payload["sets"][code]
+        _write_json(index_path, payload)
+    return removed
+
+
 def build(
-    set_codes, out_dir, snapshot, model_dir, allow_missing_text=False, run_hint=""
+    set_codes,
+    out_dir,
+    snapshot,
+    model_dir,
+    allow_missing_text=False,
+    run_hint="",
+    arena_ids=None,
 ):
     """Build every set (continuing past per-set failures).
 
     Returns (entries, failures, index, stale): entries/failures keyed by set,
     failures holding the message; the index reflects the sets that built.
     """
+    set_codes = selected_sets(set_codes)
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     meta, manifest = load_model(model_dir)
@@ -1005,14 +1196,22 @@ def build(
                 allow_missing_text,
                 run_hint,
                 membership,
+                arena_ids,
             )
         except Exception as err:
-            failures[set_code] = str(err)
+            cleanup_errors = invalidate_set_output(out_dir, set_code)
+            cleanup = (
+                f" Failed to remove stale bundle output: {cleanup_errors}"
+                if cleanup_errors
+                else ""
+            )
+            failures[set_code] = f"{err}{cleanup}"
     if entries:
         index, stale = update_index(
             out_dir, entries, meta, manifest, snapshot, requested=set_codes
         )
     else:
+        drop_failed_index_entries(out_dir, failures)
         # Do not make a pre-existing index look freshly built when every
         # requested set failed. This value exists only for terminal reporting.
         index = {
@@ -1070,15 +1269,16 @@ def main(argv=None):
         )
         os.execve(sys.executable, cmd, env)
 
-    set_codes = selected_sets(args.sets, args.all)
-    if not set_codes:
-        print(
-            "nothing to do: pass --set SET (repeatable) and/or --all", file=sys.stderr
-        )
-        return 2
-
-    run_hint = " ".join(sys.argv[1:] if argv is None else argv)
     try:
+        set_codes = selected_sets(args.sets, args.all)
+        if not set_codes:
+            print(
+                "nothing to do: pass --set SET (repeatable) and/or --all",
+                file=sys.stderr,
+            )
+            return 2
+        arena_ids = load_arena_ids(args.arena_ids) if args.arena_ids else None
+        run_hint = " ".join(sys.argv[1:] if argv is None else argv)
         model_dir = resolve_model_dir(args.model_tag)
         snap_path, updated_at = ensure_snapshot(
             args.scryfall, args.min_date, args.fetch
@@ -1092,6 +1292,7 @@ def main(argv=None):
             model_dir,
             args.allow_missing_text,
             run_hint,
+            arena_ids,
         )
     except Exception as err:
         print(f"FAILED: {err}", file=sys.stderr)

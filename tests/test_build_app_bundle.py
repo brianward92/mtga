@@ -31,6 +31,8 @@ spec.loader.exec_module(bab)
 
 DFC = "Front Face // Back Face"
 NEW_SET = "NEW"
+HOB_CARD = "Hob Card"
+HOB_ROOM = "Locked Room // Open Room"
 
 
 # ---------------------------------------------------------------------------
@@ -172,6 +174,15 @@ def snapshot_rows():
         scry("New Basic", set_="new", type_line="Basic Land — Forest", arena_id=204),
         # A printing in another set is never added to NEW's fallback universe.
         scry("Elsewhere Only", set_="oth", released_at="2020-01-01"),
+        # HOB is Arena-advertised but its Scryfall arena_ids have not landed.
+        scry(HOB_CARD, set_="hob", booster=False, released_at="2026-08-14"),
+        scry(
+            HOB_ROOM,
+            set_="hob",
+            booster=False,
+            type_line="Enchantment — Room // Enchantment — Room",
+            released_at="2026-08-14",
+        ),
     ]
 
 
@@ -215,7 +226,14 @@ def world(data_root, tmp_path):
                 textemb.EMBED_DIM, 0.25, dtype=np.float32
             )
             for n in ALL_NAMES
-            + ["New Common", "New Rare", "New Promo", "New Paper Only"]
+            + [
+                "New Common",
+                "New Rare",
+                "New Promo",
+                "New Paper Only",
+                HOB_CARD,
+                HOB_ROOM,
+            ]
         },
     )
     return {
@@ -422,6 +440,102 @@ def test_malformed_unrelated_vocab_does_not_defeat_per_set_continuation(world):
     assert set(entries) == {SET}
     assert "BAD" in failures
     assert list(index["sets"]) == [SET]
+
+
+@pytest.mark.parametrize(
+    "payload, message",
+    [
+        ("[]", "non-empty JSON object"),
+        ("{}", "non-empty JSON object"),
+        ('{"Card":1}', "non-empty array"),
+        ('{"Card":[]}', "non-empty array"),
+        ('{"Card":[true]}', "positive JSON integers"),
+        ('{"Card":[1.5]}', "positive JSON integers"),
+        ('{"Card":[0]}', "positive JSON integers"),
+        ('{"Card":[1,1]}', "repeats grpId"),
+        ('{"Card":[1],"Other":[1]}', "assigned to both"),
+        ('{" Card":[1]}', "whitespace-padded"),
+        ('{"Card":[1],"Card":[2]}', "repeats JSON key"),
+    ],
+)
+def test_arena_id_overlay_validation_is_strict(tmp_path, payload, message):
+    path = tmp_path / "arena-ids.json"
+    path.write_text(payload)
+    with pytest.raises(bab.BundleError, match=message):
+        bab.load_arena_ids(path)
+
+
+def test_arena_id_overlay_maps_room_front_to_full_model_row(world, tmp_path):
+    path = tmp_path / "hob-arena-ids.json"
+    path.write_text(json.dumps({HOB_CARD: [900], "Locked Room": [901]}))
+    overlay = bab.load_arena_ids(path)
+
+    grp, provenance = bab.universe("HOB", world["snapshot"], arena_ids=overlay)
+    assert grp == {HOB_CARD: [900], HOB_ROOM: [901]}
+    assert provenance["arena_ids_used"] == {HOB_CARD, "Locked Room"}
+    assert provenance["names_without_grp_ids"] == []
+
+    entries, failures, index, _ = _build(world, ["HOB"], arena_ids=overlay)
+    assert failures == {}
+    assert entries["HOB"]["grp_ids"] == 2
+    assert set(index["sets"]) == {"HOB"}
+    with np.load(world["out"] / "HOB" / "assets.npz") as z:
+        assert json.loads(str(z["grp_ids"]))[HOB_ROOM] == [901]
+
+
+def test_hob_overlay_must_be_complete_and_aliases_unambiguous(world):
+    with pytest.raises(bab.BundleError) as err:
+        bab.universe(
+            "HOB", world["snapshot"], arena_ids={HOB_CARD: [900], "Typo": [999]}
+        )
+    message = str(err.value)
+    assert "does not cover 1 model row" in message
+    assert HOB_ROOM in message and "Unresolved overlay names" in message
+    assert "Typo" in message
+
+    with pytest.raises(bab.BundleError, match="ambiguous"):
+        bab.apply_arena_ids("TST", {"A": [], "A // B": []}, {"A": [1]})
+    with pytest.raises(bab.BundleError, match="already maps"):
+        bab.apply_arena_ids("TST", {"A": [1], "B": []}, {"B": [1]})
+
+
+def test_hob_without_overlay_fails_loudly_continues_and_removes_stale_output(world):
+    hob_dir = world["out"] / "HOB"
+    hob_dir.mkdir(parents=True)
+    (hob_dir / "assets.npz").write_bytes(b"stale")
+    (hob_dir / "cards.json").write_text("stale")
+    (hob_dir / "ratings.json").write_text("stale")
+    (hob_dir / "keep.txt").write_text("unrelated")
+
+    entries, failures, index, _ = _build(world, ["HOB", SET])
+    assert set(entries) == {SET}
+    assert "HOB" not in index["sets"]
+    assert (
+        "Scryfall has no arena_id for HOB yet; re-run after Scryfall updates"
+        in failures["HOB"]
+    )
+    assert HOB_CARD in failures["HOB"] and HOB_ROOM in failures["HOB"]
+    assert not (hob_dir / "assets.npz").exists()
+    assert not (hob_dir / "cards.json").exists()
+    assert not (hob_dir / "ratings.json").exists()
+    assert (hob_dir / "keep.txt").read_text() == "unrelated"
+
+
+def test_hob_only_failure_removes_existing_index_entry_without_refreshing_index(
+    world,
+):
+    overlay = {HOB_CARD: [900], "Locked Room": [901]}
+    _build(world, ["HOB"], arena_ids=overlay)
+    index_path = world["out"] / "index.json"
+    before = json.loads(index_path.read_text())
+    assert "HOB" in before["sets"]
+
+    entries, failures, _, _ = _build(world, ["HOB"])
+    assert entries == {} and "HOB" in failures
+    after = json.loads(index_path.read_text())
+    assert "HOB" not in after["sets"]
+    assert after["built_at"] == before["built_at"]
+    assert not (world["out"] / "HOB" / "assets.npz").exists()
 
 
 def test_missing_grp_id_policy_is_localized_and_reports_every_name(
@@ -746,6 +860,27 @@ def test_main_reports_failures_with_nonzero_exit(world, monkeypatch, capsys):
     assert bab.main(["--all", "--out", str(world["out"])]) == 1
 
 
+def test_main_accepts_explicit_arena_ids_file(world, monkeypatch):
+    monkeypatch.setattr(
+        bab, "resolve_model_dir", lambda tag=None, model_root=None: world["model_dir"]
+    )
+    overlay_path = world["out"].parent / "hob-arena-ids.json"
+    overlay_path.write_text(json.dumps({HOB_CARD: [900], "Locked Room": [901]}))
+    assert (
+        bab.main(
+            [
+                "--set",
+                "HOB",
+                "--arena-ids",
+                str(overlay_path),
+                "--out",
+                str(world["out"]),
+            ]
+        )
+        == 0
+    )
+
+
 def test_all_set_selection_includes_hob_once(monkeypatch):
     monkeypatch.setattr(bab, "curated_sets", lambda: ["AAA", "HOB", "ZZZ"])
     assert bab.selected_sets(["hob", "AAA", "aaa"], include_all=True) == [
@@ -753,6 +888,8 @@ def test_all_set_selection_includes_hob_once(monkeypatch):
         "AAA",
         "ZZZ",
     ]
+    with pytest.raises(bab.BundleError, match="invalid set code"):
+        bab.selected_sets(["../HOB"])
 
 
 def test_helpers_normalize_identity_fields():
