@@ -18,7 +18,9 @@ describe('set bundle', () => {
     const identity = readAssetsIdentity(DSK_ASSETS)
     expect(identity.names).toContain('Murder')
     expect(identity.grpIds.Murder).toEqual(expect.arrayContaining([92188, 67900]))
-    expect(identity.grpIds['Funeral Room // Awakening Hall']).toEqual(expect.arrayContaining([92176, 94732]))
+    // The raw Scryfall snapshot publishes the Arena front-face id; legacy
+    // card-store-only aliases are intentionally absent.
+    expect(identity.grpIds['Funeral Room // Awakening Hall']).toEqual([92176])
   })
 
   it.skipIf(!have)('fans name-keyed Scryfall identity across grpIds without ratings or art', () => {

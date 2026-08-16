@@ -7,6 +7,7 @@ import { parseNpz } from '../main/model/npz'
 const ROOT = join(__dirname, '..', 'resources', 'draftfm')
 const MODEL = join(ROOT, 'model', 'v20260809_final_d256')
 const DSK = join(ROOT, 'sets', 'DSK', 'assets.npz')
+const DSK_CARDS = join(ROOT, 'sets', 'DSK', 'cards.json')
 const FIX = join(__dirname, 'fixtures', 'draftfm-reference-DSK.json')
 const have = existsSync(MODEL) && existsSync(DSK) && existsSync(FIX)
 
@@ -41,6 +42,8 @@ describe('DraftFM helpers', () => {
 describe('DraftFM (bundled v1.0 + DSK assets)', () => {
   it.skipIf(!have)('reproduces the python reference scores', async () => {
     const fix = JSON.parse(readFileSync(FIX, 'utf8'))
+    const cards = JSON.parse(readFileSync(DSK_CARDS, 'utf8'))
+    expect(fix.scryfall_updated_at).toBe(cards.scryfall_updated_at)
     const model = await DraftFM.load(MODEL, 'DSK', 'QuickDraft', DSK)
     expect(model.modelId).toBe(fix.model_id)
     for (const c of fix.cases) {
@@ -54,7 +57,8 @@ describe('DraftFM (bundled v1.0 + DSK assets)', () => {
       })
     }
     const curve = Array.from(await model.p1p1Logits()).sort((a, b) => a - b)
-    expect(curve.length).toBeGreaterThan(300)
+    expect(curve.length).toBe(Object.keys(cards.cards).length)
+    expect(curve.length).toBe(286) // curated DSK oracle-name universe
     for (let i = 1; i < curve.length; i++) expect(curve[i]).toBeGreaterThanOrEqual(curve[i - 1])
     await model.release()
   }, 30000)
