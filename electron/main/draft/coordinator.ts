@@ -24,6 +24,8 @@ export class DraftCoordinator extends EventEmitter {
   private lastScores: { pack: number; pick: number; cards: ScoredCard[]; modelId: string } | null = null
   private endTimer: NodeJS.Timeout | null = null
   private replaying = false
+  /** Bumped whenever the draft changes; in-flight backfills check it and abort. */
+  private draftToken = 0
 
   constructor(private models: ModelManager, private history: DraftHistory) {
     super()
@@ -39,6 +41,7 @@ export class DraftCoordinator extends EventEmitter {
 
   onDraftStart(snap: DraftSessionSnapshot): void {
     this.clearEndTimer()
+    this.draftToken++
     this.snapshot = snap
     this.bundle = snap.set ? this.models.bundleFor(snap.set) : null
     this.lastScores = null
@@ -109,7 +112,10 @@ export class DraftCoordinator extends EventEmitter {
     this.endTimer = setTimeout(() => { this.endTimer = null; this.idle() }, COMPLETE_LINGER_MS)
   }
 
-  /** Replay finished: if a draft is mid-flight, score its live pack now. */
+  /**
+   * Replay finished: if a draft is mid-flight, score its live pack now and
+   * backfill model comparisons for picks made while the app was not running.
+   */
   resumeAfterReplay(): void {
     this.replaying = false
     const snap = this.snapshot
@@ -120,6 +126,7 @@ export class DraftCoordinator extends EventEmitter {
       this.publish()
       void this.score(snap)
     }
+    void this.backfillPicks(snap)
   }
 
   /** Surface (or clear) a setup warning without touching draft state. */
@@ -132,6 +139,7 @@ export class DraftCoordinator extends EventEmitter {
   /** User dismissed / timer: back to idle. */
   idle(): void {
     this.clearEndTimer()
+    this.draftToken++
     this.snapshot = null
     this.lastScores = null
     this.state = { ...EMPTY_STATE, model: this.models.status(null, null), warning: this.state.warning, seq: this.state.seq + 1 }
@@ -166,6 +174,50 @@ export class DraftCoordinator extends EventEmitter {
       scoring: false,
       model: this.modelInfo(snap),
       pool: this.rows(snap.pool),
+      seq: this.state.seq + 1
+    }
+    this.publish()
+  }
+
+  /**
+   * Replayed picks carry no model comparison (nothing was scored while the app
+   * was down). Re-score each such pack against the pool as it stood at the
+   * time and fill the in-memory records; the JSONL history is left untouched
+   * since those picks were never appended live. Publishes once at the end.
+   */
+  private async backfillPicks(snap: DraftSessionSnapshot): Promise<void> {
+    if (!snap.set) return
+    const format = snap.format ?? 'PremierDraft'
+    const token = this.draftToken
+    const missing = this.state.picks.filter(p => p.recommendedGrpId === null)
+    if (missing.length === 0) return
+    const filled = new Map<string, PickRecord>()
+    const pool: number[] = []
+    for (const pick of snap.picks) {
+      const key = `${pick.pack}-${pick.pick}`
+      const record = missing.find(p => p.pack === pick.pack && p.pick === pick.pick)
+      if (record && pick.packGrpIds.length) {
+        // Model convention: 0-based pack/pick (parser exposes 1-based).
+        const result = await this.models.score(snap.set, format, pick.packGrpIds, [...pool], pick.pack - 1, pick.pick - 1)
+        if (token !== this.draftToken) return // a newer draft started mid-backfill
+        if (result) {
+          const rec = result.cards.find(c => c.rank === 1) ?? null
+          const taken = result.cards.find(c => c.grpId === record.grpId) ?? null
+          filled.set(key, {
+            ...record,
+            recommendedGrpId: rec?.grpId ?? null,
+            recommendedName: rec ? (this.card(rec.grpId)?.name ?? null) : null,
+            takenRank: taken?.rank ?? null,
+            ev: taken?.ev ?? null
+          })
+        }
+      }
+      pool.push(...pick.grpIds)
+    }
+    if (filled.size === 0) return
+    this.state = {
+      ...this.state,
+      picks: this.state.picks.map(p => filled.get(`${p.pack}-${p.pick}`) ?? p),
       seq: this.state.seq + 1
     }
     this.publish()

@@ -141,4 +141,63 @@ describe('DraftCoordinator', () => {
     expect(models.score).toHaveBeenCalledTimes(1)
     expect(c.current.cards.find(r => r.grpId === 2)!.rank).toBe(1)
   })
+
+  it('backfills model comparisons for replayed picks after resume, without touching history', async () => {
+    const models = stubModels()
+    const history = { append: vi.fn() }
+    const c = new DraftCoordinator(models as never, history as never)
+    c.setReplaying(true)
+    c.onDraftStart(snap({}))
+    const picks = [
+      { pack: 1, pick: 1, grpIds: [1], packGrpIds: [1, 2, 999] },
+      { pack: 1, pick: 2, grpIds: [2], packGrpIds: [2, 999] },
+      { pack: 1, pick: 3, grpIds: [999], packGrpIds: [999, 2] }
+    ]
+    const live = snap({ picks, pool: [1, 2, 999], currentPack: { pack: 1, pick: 4, grpIds: [1] } })
+    for (const p of picks) c.onDraftPick(live, p)
+    expect(c.current.picks).toHaveLength(3)
+    expect(c.current.picks.every(p => p.recommendedGrpId === null && p.takenRank === null)).toBe(true)
+    expect(models.score).not.toHaveBeenCalled()
+
+    const before = c.current.seq
+    c.resumeAfterReplay()
+    await flush(); await flush(); await flush(); await flush()
+
+    // Live pack + three historical packs, each against the pool at the time.
+    expect(models.calls).toContainEqual({ set: 'DSK', format: 'QuickDraft', pack: [1, 2, 999], pool: [], pack0: 0, pick0: 0 })
+    expect(models.calls).toContainEqual({ set: 'DSK', format: 'QuickDraft', pack: [2, 999], pool: [1], pack0: 0, pick0: 1 })
+    expect(models.calls).toContainEqual({ set: 'DSK', format: 'QuickDraft', pack: [999, 2], pool: [1, 2], pack0: 0, pick0: 2 })
+    expect(c.current.picks[0]).toMatchObject({ grpId: 1, recommendedGrpId: 2, recommendedName: 'Funeral Room', takenRank: 2, ev: 0.3 })
+    expect(c.current.picks[1]).toMatchObject({ grpId: 2, recommendedGrpId: 2, recommendedName: 'Funeral Room', takenRank: 1, ev: 2.5 })
+    expect(c.current.picks[2]).toMatchObject({ grpId: 999, recommendedGrpId: 2, recommendedName: 'Funeral Room', takenRank: 3, ev: null })
+    expect(c.current.seq).toBeGreaterThan(before)
+    expect(history.append).not.toHaveBeenCalled()
+  })
+
+  it('abandons a backfill when a newer draft starts mid-way', async () => {
+    const models = stubModels()
+    let release: (() => void) | null = null
+    const inner = models.score
+    models.score = vi.fn(async (...args: Parameters<typeof inner>) => {
+      if (args[2].length === 3) await new Promise<void>(r => { release = r })
+      return inner(...args)
+    }) as never
+    const c = new DraftCoordinator(models as never, { append() {} } as never)
+    c.setReplaying(true)
+    c.onDraftStart(snap({}))
+    const picks = [
+      { pack: 1, pick: 1, grpIds: [1], packGrpIds: [1, 2, 999] },
+      { pack: 1, pick: 2, grpIds: [2], packGrpIds: [2, 999] }
+    ]
+    const old = snap({ picks, pool: [1, 2] })
+    for (const p of picks) c.onDraftPick(old, p)
+    c.resumeAfterReplay()
+    await flush()
+    // A fresh draft lands while the first historical pack is still scoring.
+    c.onDraftStart(snap({ draftId: 'd2' }))
+    release!()
+    await flush(); await flush(); await flush()
+    expect(c.current.picks).toEqual([])
+    expect(models.calls.filter(x => (x as { pack: number[] }).pack.length === 2)).toHaveLength(0) // never reached pick 2
+  })
 })
