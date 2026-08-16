@@ -1,0 +1,174 @@
+[UnityCrossThreadLogger]==> EventJoin {"id":"fixture-join","request":"{\"EventName\":\"TradDraft_DSK_20260811\",\"EntryCurrencyType\":\"Gem\",\"EntryCurrencyPaid\":1500}"}
+<== EventJoin(fixture-join)
+{"Course":{"CourseId":"fixture-course","InternalEventName":"TradDraft_DSK_20260811","CurrentModule":"HumanDraft","ModulePayload":"","CardPool":[]}}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"fixture-p01-01","request":"{\"DraftId\":\"fixture-human-draft\",\"GrpIds\":[92188],\"Pack\":1,\"Pick\":1}"}
+<== EventPlayerDraftMakePick(fixture-p01-01)
+{"Result":"Success","DraftId":"fixture-human-draft"}
+[UnityCrossThreadLogger]==> LogBusinessEvents {"id":"fixture-business-p01-01","request":"{\"PageName\":\"Draft\",\"Payload\":\"{\\\"DraftId\\\":\\\"fixture-human-draft\\\",\\\"EventId\\\":\\\"TradDraft_DSK_20260811\\\",\\\"PackNumber\\\":1,\\\"PickNumber\\\":1,\\\"CardsInPack\\\":[92188,92290,92346,92082,92154,92380,92224,92310,92176,92248,92231,92161,92073,92076],\\\"PickGrpId\\\":92188,\\\"AutoPick\\\":false,\\\"TimeRemainingOnPick\\\":30}\"}"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"fixture-human-draft","SelfPick":2,"SelfPack":1,"PackCards":"92290,92346,92082,92154,92380,92224,92310,92176,92248,92231,92161,92073,92076"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"fixture-p01-02","request":"{\"DraftId\":\"fixture-human-draft\",\"GrpIds\":[92346],\"Pack\":1,\"Pick\":2}"}
+<== EventPlayerDraftMakePick(fixture-p01-02)
+{"Result":"Success","DraftId":"fixture-human-draft"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"fixture-human-draft","SelfPick":3,"SelfPack":1,"PackCards":"92290,92082,92154,92380,92224,92310,92176,92248,92231,92161,92073,92076"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"fixture-p01-03","request":"{\"DraftId\":\"fixture-human-draft\",\"GrpIds\":[92290],\"Pack\":1,\"Pick\":3}"}
+<== EventPlayerDraftMakePick(fixture-p01-03)
+{"Result":"Success","DraftId":"fixture-human-draft"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"fixture-human-draft","SelfPick":4,"SelfPack":1,"PackCards":"92082,92154,92380,92224,92310,92176,92248,92231,92161,92073,92076"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"fixture-p01-04","request":"{\"DraftId\":\"fixture-human-draft\",\"GrpIds\":[92154],\"Pack\":1,\"Pick\":4}"}
+<== EventPlayerDraftMakePick(fixture-p01-04)
+{"Result":"Success","DraftId":"fixture-human-draft"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"fixture-human-draft","SelfPick":5,"SelfPack":1,"PackCards":"92082,92380,92224,92310,92176,92248,92231,92161,92073,92076"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"fixture-p01-05","request":"{\"DraftId\":\"fixture-human-draft\",\"GrpIds\":[92224],\"Pack\":1,\"Pick\":5}"}
+<== EventPlayerDraftMakePick(fixture-p01-05)
+{"Result":"Success","DraftId":"fixture-human-draft"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"fixture-human-draft","SelfPick":6,"SelfPack":1,"PackCards":"92082,92380,92310,92176,92248,92231,92161,92073,92076"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"fixture-p01-06","request":"{\"DraftId\":\"fixture-human-draft\",\"GrpIds\":[92310],\"Pack\":1,\"Pick\":6}"}
+<== EventPlayerDraftMakePick(fixture-p01-06)
+{"Result":"Success","DraftId":"fixture-human-draft"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"fixture-human-draft","SelfPick":7,"SelfPack":1,"PackCards":"92082,92380,92176,92248,92231,92161,92073,92076"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"fixture-p01-07","request":"{\"DraftId\":\"fixture-human-draft\",\"GrpIds\":[92176],\"Pack\":1,\"Pick\":7}"}
+<== EventPlayerDraftMakePick(fixture-p01-07)
+{"Result":"Success","DraftId":"fixture-human-draft"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"fixture-human-draft","SelfPick":8,"SelfPack":1,"PackCards":"92082,92380,92248,92231,92161,92073,92076"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"fixture-p01-08","request":"{\"DraftId\":\"fixture-human-draft\",\"GrpIds\":[92082],\"Pack\":1,\"Pick\":8}"}
+<== EventPlayerDraftMakePick(fixture-p01-08)
+{"Result":"Success","DraftId":"fixture-human-draft"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"fixture-human-draft","SelfPick":9,"SelfPack":1,"PackCards":"92380,92248,92231,92161,92073,92076"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"fixture-p01-09","request":"{\"DraftId\":\"fixture-human-draft\",\"GrpIds\":[92161],\"Pack\":1,\"Pick\":9}"}
+<== EventPlayerDraftMakePick(fixture-p01-09)
+{"Result":"Success","DraftId":"fixture-human-draft"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"fixture-human-draft","SelfPick":10,"SelfPack":1,"PackCards":"92380,92248,92231,92073,92076"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"fixture-p01-10","request":"{\"DraftId\":\"fixture-human-draft\",\"GrpIds\":[92380],\"Pack\":1,\"Pick\":10}"}
+<== EventPlayerDraftMakePick(fixture-p01-10)
+{"Result":"Success","DraftId":"fixture-human-draft"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"fixture-human-draft","SelfPick":11,"SelfPack":1,"PackCards":"92248,92231,92073,92076"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"fixture-p01-11","request":"{\"DraftId\":\"fixture-human-draft\",\"GrpIds\":[92076],\"Pack\":1,\"Pick\":11}"}
+<== EventPlayerDraftMakePick(fixture-p01-11)
+{"Result":"Success","DraftId":"fixture-human-draft"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"fixture-human-draft","SelfPick":12,"SelfPack":1,"PackCards":"92248,92231,92073"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"fixture-p01-12","request":"{\"DraftId\":\"fixture-human-draft\",\"GrpIds\":[92073],\"Pack\":1,\"Pick\":12}"}
+<== EventPlayerDraftMakePick(fixture-p01-12)
+{"Result":"Success","DraftId":"fixture-human-draft"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"fixture-human-draft","SelfPick":13,"SelfPack":1,"PackCards":"92248,92231"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"fixture-p01-13","request":"{\"DraftId\":\"fixture-human-draft\",\"GrpIds\":[92248],\"Pack\":1,\"Pick\":13}"}
+<== EventPlayerDraftMakePick(fixture-p01-13)
+{"Result":"Success","DraftId":"fixture-human-draft"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"fixture-human-draft","SelfPick":14,"SelfPack":1,"PackCards":"92231"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"fixture-p01-14","request":"{\"DraftId\":\"fixture-human-draft\",\"GrpIds\":[92231],\"Pack\":1,\"Pick\":14}"}
+<== EventPlayerDraftMakePick(fixture-p01-14)
+{"Result":"Success","DraftId":"fixture-human-draft"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"fixture-human-draft","SelfPick":1,"SelfPack":2,"PackCards":"92082,92310,92248,92161,92231,92073,92154,92380,92188,92290,92346,92076,92224,92176"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"fixture-p02-01","request":"{\"DraftId\":\"fixture-human-draft\",\"GrpIds\":[92310],\"Pack\":2,\"Pick\":1}"}
+<== EventPlayerDraftMakePick(fixture-p02-01)
+{"Result":"Success","DraftId":"fixture-human-draft"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"fixture-human-draft","SelfPick":2,"SelfPack":2,"PackCards":"92082,92248,92161,92231,92073,92154,92380,92188,92290,92346,92076,92224,92176"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"fixture-p02-02","request":"{\"DraftId\":\"fixture-human-draft\",\"GrpIds\":[92231],\"Pack\":2,\"Pick\":2}"}
+<== EventPlayerDraftMakePick(fixture-p02-02)
+{"Result":"Success","DraftId":"fixture-human-draft"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"fixture-human-draft","SelfPick":3,"SelfPack":2,"PackCards":"92082,92248,92161,92073,92154,92380,92188,92290,92346,92076,92224,92176"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"fixture-p02-03","request":"{\"DraftId\":\"fixture-human-draft\",\"GrpIds\":[92161],\"Pack\":2,\"Pick\":3}"}
+<== EventPlayerDraftMakePick(fixture-p02-03)
+{"Result":"Success","DraftId":"fixture-human-draft"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"fixture-human-draft","SelfPick":4,"SelfPack":2,"PackCards":"92082,92248,92073,92154,92380,92188,92290,92346,92076,92224,92176"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"fixture-p02-04","request":"{\"DraftId\":\"fixture-human-draft\",\"GrpIds\":[92248],\"Pack\":2,\"Pick\":4}"}
+<== EventPlayerDraftMakePick(fixture-p02-04)
+{"Result":"Success","DraftId":"fixture-human-draft"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"fixture-human-draft","SelfPick":5,"SelfPack":2,"PackCards":"92082,92073,92154,92380,92188,92290,92346,92076,92224,92176"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"fixture-p02-05","request":"{\"DraftId\":\"fixture-human-draft\",\"GrpIds\":[92154],\"Pack\":2,\"Pick\":5}"}
+<== EventPlayerDraftMakePick(fixture-p02-05)
+{"Result":"Success","DraftId":"fixture-human-draft"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"fixture-human-draft","SelfPick":6,"SelfPack":2,"PackCards":"92082,92073,92380,92188,92290,92346,92076,92224,92176"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"fixture-p02-06","request":"{\"DraftId\":\"fixture-human-draft\",\"GrpIds\":[92082],\"Pack\":2,\"Pick\":6}"}
+<== EventPlayerDraftMakePick(fixture-p02-06)
+{"Result":"Success","DraftId":"fixture-human-draft"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"fixture-human-draft","SelfPick":7,"SelfPack":2,"PackCards":"92073,92380,92188,92290,92346,92076,92224,92176"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"fixture-p02-07","request":"{\"DraftId\":\"fixture-human-draft\",\"GrpIds\":[92188],\"Pack\":2,\"Pick\":7}"}
+<== EventPlayerDraftMakePick(fixture-p02-07)
+{"Result":"Success","DraftId":"fixture-human-draft"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"fixture-human-draft","SelfPick":8,"SelfPack":2,"PackCards":"92073,92380,92290,92346,92076,92224,92176"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"fixture-p02-08","request":"{\"DraftId\":\"fixture-human-draft\",\"GrpIds\":[92073],\"Pack\":2,\"Pick\":8}"}
+<== EventPlayerDraftMakePick(fixture-p02-08)
+{"Result":"Success","DraftId":"fixture-human-draft"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"fixture-human-draft","SelfPick":9,"SelfPack":2,"PackCards":"92380,92290,92346,92076,92224,92176"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"fixture-p02-09","request":"{\"DraftId\":\"fixture-human-draft\",\"GrpIds\":[92076],\"Pack\":2,\"Pick\":9}"}
+<== EventPlayerDraftMakePick(fixture-p02-09)
+{"Result":"Success","DraftId":"fixture-human-draft"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"fixture-human-draft","SelfPick":10,"SelfPack":2,"PackCards":"92380,92290,92346,92224,92176"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"fixture-p02-10","request":"{\"DraftId\":\"fixture-human-draft\",\"GrpIds\":[92290],\"Pack\":2,\"Pick\":10}"}
+<== EventPlayerDraftMakePick(fixture-p02-10)
+{"Result":"Success","DraftId":"fixture-human-draft"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"fixture-human-draft","SelfPick":11,"SelfPack":2,"PackCards":"92380,92346,92224,92176"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"fixture-p02-11","request":"{\"DraftId\":\"fixture-human-draft\",\"GrpIds\":[92176],\"Pack\":2,\"Pick\":11}"}
+<== EventPlayerDraftMakePick(fixture-p02-11)
+{"Result":"Success","DraftId":"fixture-human-draft"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"fixture-human-draft","SelfPick":12,"SelfPack":2,"PackCards":"92380,92346,92224"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"fixture-p02-12","request":"{\"DraftId\":\"fixture-human-draft\",\"GrpIds\":[92380],\"Pack\":2,\"Pick\":12}"}
+<== EventPlayerDraftMakePick(fixture-p02-12)
+{"Result":"Success","DraftId":"fixture-human-draft"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"fixture-human-draft","SelfPick":13,"SelfPack":2,"PackCards":"92346,92224"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"fixture-p02-13","request":"{\"DraftId\":\"fixture-human-draft\",\"GrpIds\":[92346],\"Pack\":2,\"Pick\":13}"}
+<== EventPlayerDraftMakePick(fixture-p02-13)
+{"Result":"Success","DraftId":"fixture-human-draft"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"fixture-human-draft","SelfPick":14,"SelfPack":2,"PackCards":"92224"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"fixture-p02-14","request":"{\"DraftId\":\"fixture-human-draft\",\"GrpIds\":[92224],\"Pack\":2,\"Pick\":14}"}
+<== EventPlayerDraftMakePick(fixture-p02-14)
+{"Result":"Success","DraftId":"fixture-human-draft"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"fixture-human-draft","SelfPick":1,"SelfPack":3,"PackCards":"92161,92290,92082,92224,92076,92380,92346,92188,92176,92310,92154,92231,92248,92073"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"fixture-p03-01","request":"{\"DraftId\":\"fixture-human-draft\",\"GrpIds\":[92224],\"Pack\":3,\"Pick\":1}"}
+<== EventPlayerDraftMakePick(fixture-p03-01)
+{"Result":"Success","DraftId":"fixture-human-draft"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"fixture-human-draft","SelfPick":2,"SelfPack":3,"PackCards":"92161,92290,92082,92076,92380,92346,92188,92176,92310,92154,92231,92248,92073"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"fixture-p03-02","request":"{\"DraftId\":\"fixture-human-draft\",\"GrpIds\":[92290],\"Pack\":3,\"Pick\":2}"}
+<== EventPlayerDraftMakePick(fixture-p03-02)
+{"Result":"Success","DraftId":"fixture-human-draft"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"fixture-human-draft","SelfPick":3,"SelfPack":3,"PackCards":"92161,92082,92076,92380,92346,92188,92176,92310,92154,92231,92248,92073"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"fixture-p03-03","request":"{\"DraftId\":\"fixture-human-draft\",\"GrpIds\":[92380],\"Pack\":3,\"Pick\":3}"}
+<== EventPlayerDraftMakePick(fixture-p03-03)
+{"Result":"Success","DraftId":"fixture-human-draft"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"fixture-human-draft","SelfPick":4,"SelfPack":3,"PackCards":"92161,92082,92076,92346,92188,92176,92310,92154,92231,92248,92073"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"fixture-p03-04","request":"{\"DraftId\":\"fixture-human-draft\",\"GrpIds\":[92076],\"Pack\":3,\"Pick\":4}"}
+<== EventPlayerDraftMakePick(fixture-p03-04)
+{"Result":"Success","DraftId":"fixture-human-draft"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"fixture-human-draft","SelfPick":5,"SelfPack":3,"PackCards":"92161,92082,92346,92188,92176,92310,92154,92231,92248,92073"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"fixture-p03-05","request":"{\"DraftId\":\"fixture-human-draft\",\"GrpIds\":[92346],\"Pack\":3,\"Pick\":5}"}
+<== EventPlayerDraftMakePick(fixture-p03-05)
+{"Result":"Success","DraftId":"fixture-human-draft"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"fixture-human-draft","SelfPick":6,"SelfPack":3,"PackCards":"92161,92082,92188,92176,92310,92154,92231,92248,92073"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"fixture-p03-06","request":"{\"DraftId\":\"fixture-human-draft\",\"GrpIds\":[92176],\"Pack\":3,\"Pick\":6}"}
+<== EventPlayerDraftMakePick(fixture-p03-06)
+{"Result":"Success","DraftId":"fixture-human-draft"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"fixture-human-draft","SelfPick":7,"SelfPack":3,"PackCards":"92161,92082,92188,92310,92154,92231,92248,92073"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"fixture-p03-07","request":"{\"DraftId\":\"fixture-human-draft\",\"GrpIds\":[92082],\"Pack\":3,\"Pick\":7}"}
+<== EventPlayerDraftMakePick(fixture-p03-07)
+{"Result":"Success","DraftId":"fixture-human-draft"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"fixture-human-draft","SelfPick":8,"SelfPack":3,"PackCards":"92161,92188,92310,92154,92231,92248,92073"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"fixture-p03-08","request":"{\"DraftId\":\"fixture-human-draft\",\"GrpIds\":[92188],\"Pack\":3,\"Pick\":8}"}
+<== EventPlayerDraftMakePick(fixture-p03-08)
+{"Result":"Success","DraftId":"fixture-human-draft"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"fixture-human-draft","SelfPick":9,"SelfPack":3,"PackCards":"92161,92310,92154,92231,92248,92073"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"fixture-p03-09","request":"{\"DraftId\":\"fixture-human-draft\",\"GrpIds\":[92154],\"Pack\":3,\"Pick\":9}"}
+<== EventPlayerDraftMakePick(fixture-p03-09)
+{"Result":"Success","DraftId":"fixture-human-draft"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"fixture-human-draft","SelfPick":10,"SelfPack":3,"PackCards":"92161,92310,92231,92248,92073"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"fixture-p03-10","request":"{\"DraftId\":\"fixture-human-draft\",\"GrpIds\":[92248],\"Pack\":3,\"Pick\":10}"}
+<== EventPlayerDraftMakePick(fixture-p03-10)
+{"Result":"Success","DraftId":"fixture-human-draft"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"fixture-human-draft","SelfPick":11,"SelfPack":3,"PackCards":"92161,92310,92231,92073"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"fixture-p03-11","request":"{\"DraftId\":\"fixture-human-draft\",\"GrpIds\":[92310],\"Pack\":3,\"Pick\":11}"}
+<== EventPlayerDraftMakePick(fixture-p03-11)
+{"Result":"Success","DraftId":"fixture-human-draft"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"fixture-human-draft","SelfPick":12,"SelfPack":3,"PackCards":"92161,92231,92073"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"fixture-p03-12","request":"{\"DraftId\":\"fixture-human-draft\",\"GrpIds\":[92073],\"Pack\":3,\"Pick\":12}"}
+<== EventPlayerDraftMakePick(fixture-p03-12)
+{"Result":"Success","DraftId":"fixture-human-draft"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"fixture-human-draft","SelfPick":13,"SelfPack":3,"PackCards":"92161,92231"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"fixture-p03-13","request":"{\"DraftId\":\"fixture-human-draft\",\"GrpIds\":[92161],\"Pack\":3,\"Pick\":13}"}
+<== EventPlayerDraftMakePick(fixture-p03-13)
+{"Result":"Success","DraftId":"fixture-human-draft"}
+[UnityCrossThreadLogger]Draft.Notify {"draftId":"fixture-human-draft","SelfPick":14,"SelfPack":3,"PackCards":"92231"}
+[UnityCrossThreadLogger]==> EventPlayerDraftMakePick {"id":"fixture-p03-14","request":"{\"DraftId\":\"fixture-human-draft\",\"GrpIds\":[92231],\"Pack\":3,\"Pick\":14}"}
+<== EventPlayerDraftMakePick(fixture-p03-14)
+{"Result":"Success","DraftId":"fixture-human-draft"}
+[UnityCrossThreadLogger]==> DraftCompleteDraft {"id":"fixture-complete","request":"{\"DraftId\":\"fixture-human-draft\"}"}
+<== DraftCompleteDraft(fixture-complete)
+{"CourseId":"fixture-course","InternalEventName":"TradDraft_DSK_20260811","CardPool":[92188,92346,92290,92154,92224,92310,92176,92082,92161,92380,92076,92073,92248,92231,92310,92231,92161,92248,92154,92082,92188,92073,92076,92290,92176,92380,92346,92224,92224,92290,92380,92076,92346,92176,92082,92188,92154,92248,92310,92073,92161,92231],"DraftId":"fixture-human-draft"}

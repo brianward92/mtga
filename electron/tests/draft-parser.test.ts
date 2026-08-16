@@ -387,6 +387,20 @@ describe('DraftParser — legacy event names (with underscores)', () => {
 })
 
 describe('DraftParser — edge cases', () => {
+  function businessPickLine(draftId: string): string {
+    return '[UnityCrossThreadLogger]==> LogBusinessEvents ' + JSON.stringify({
+      id: 'business-pick',
+      request: JSON.stringify({
+        DraftId: draftId,
+        EventId: 'PremierDraft_SOS_20260421',
+        PackNumber: 1,
+        PickNumber: 1,
+        CardsInPack: [1001, 1002],
+        PickGrpId: 1001
+      })
+    })
+  }
+
   it('emits detailed-logs disabled for the sentinel line', () => {
     const parser = new DraftParser()
     const events = capture(parser)
@@ -425,6 +439,31 @@ describe('DraftParser — edge cases', () => {
     const final = parser.getSnapshot()!
     expect(final.picks[0]).toMatchObject({ pack: 1, pick: 1, grpIds: [1001] })
     expect(final.picks[0].packGrpIds).toEqual([1001, 1002])
+  })
+
+  it('does not re-emit a pick when LogBusinessEvents only backfills its pack', () => {
+    const parser = new DraftParser()
+    const events = capture(parser)
+    parser.handleLine(
+      '[UnityCrossThreadLogger]==> EventPlayerDraftMakePick ' +
+        JSON.stringify({
+          id: 'pick-request',
+          request: JSON.stringify({ DraftId: 'request-then-business', GrpIds: [1001], Pack: 1, Pick: 1 })
+        })
+    )
+    parser.handleLine(businessPickLine('request-then-business'))
+
+    expect(events.picks).toHaveLength(1)
+    expect(parser.getSnapshot()!.picks[0].packGrpIds).toEqual([1001, 1002])
+  })
+
+  it('still emits one pick when LogBusinessEvents is the only pick source', () => {
+    const parser = new DraftParser()
+    const events = capture(parser)
+    parser.handleLine(businessPickLine('business-only'))
+
+    expect(events.picks).toHaveLength(1)
+    expect(events.picks[0].pick).toMatchObject({ pack: 1, pick: 1, grpIds: [1001], packGrpIds: [1001, 1002] })
   })
 
   it('handles Pick-Two GrpIds arrays with two cards', () => {

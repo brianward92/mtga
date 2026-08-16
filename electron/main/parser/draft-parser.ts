@@ -362,14 +362,11 @@ export class DraftParser extends EventEmitter {
     const eventName = (payload.EventId as string) || null
 
     const session = this.ensureSession({ draftId, eventName, isBot: false })
-    let changed = false
     if (cardsInPack.length > 0) {
-      changed = session.recordPackContents(pack, pick, cardsInPack) || changed
+      session.recordPackContents(pack, pick, cardsInPack)
     }
-    if (picked.length > 0) {
-      changed = session.recordPick(pack, pick, picked) || changed
-    }
-    if (changed && picked.length > 0) {
+    const pickChanged = picked.length > 0 && session.recordPick(pack, pick, picked)
+    if (pickChanged) {
       const record = session.snapshot().picks.find(p => p.pack === pack && p.pick === pick)!
       this.emit('draft-pick', session.snapshot(), record)
     }
