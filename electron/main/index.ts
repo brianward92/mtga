@@ -26,6 +26,7 @@ import { loadPrefs, savePrefs, type Prefs } from './prefs'
 import { StatusTray } from './status-tray'
 import type { DraftState } from '../shared/state'
 import type { CalibrationOp, Rect } from '../shared/layout'
+import { arenaDisplayOrder } from '../shared/display-order'
 
 // ---------------------------------------------------------------------------
 // Singletons
@@ -171,6 +172,10 @@ function setupGeometry(): void {
   layer = new LayerDetector({
     poller,
     packCount: () => coordinator.current.cards.length,
+    names: () => {
+      const cards = coordinator.current.cards
+      return arenaDisplayOrder(cards).map(i => cards[i].name)
+    },
     config: (rect: ArenaRect) => calibration.configFor(rect),
     active: () => badgesLive() && !calibration.active
   })

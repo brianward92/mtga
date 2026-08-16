@@ -35,6 +35,31 @@ describe('hover pop-out prediction', () => {
     expect(bottom.y + bottom.height).toBeLessThanOrEqual(view.height)
   })
 
+  it('keeps the portrait prediction unchanged when split mode is omitted or false', () => {
+    expect(predictPopout(card, view, { split: false })).toEqual(predictPopout(card, view))
+  })
+
+  it('predicts the landscape preview and rules box for Rooms and split cards', () => {
+    const leftCard = { ...card, x: 100 }
+    const [preview, rulesBox] = predictPopout(leftCard, view, { split: true })
+
+    expect(preview).toEqual({
+      x: leftCard.x + leftCard.width + leftCard.width * 0.5,
+      y: leftCard.y - leftCard.height * 0.35,
+      width: leftCard.width * 5,
+      height: leftCard.height * 2.35
+    })
+    expect(rulesBox.x).toBe(leftCard.x)
+    expect(rulesBox.x + rulesBox.width).toBe(preview.x + preview.width)
+    expect(rulesBox.y).toBeLessThan(preview.y)
+  })
+
+  it('flips a landscape split preview left when it would overflow', () => {
+    const rightCard = { ...card, x: 1300 }
+    const [preview] = predictPopout(rightCard, view, { split: true })
+    expect(preview.x + preview.width).toBe(rightCard.x - rightCard.width * 0.5)
+  })
+
   it('intersects is symmetric and strict on edges', () => {
     const a = { x: 0, y: 0, width: 10, height: 10 }
     expect(intersects(a, { x: 10, y: 0, width: 5, height: 5 })).toBe(false)

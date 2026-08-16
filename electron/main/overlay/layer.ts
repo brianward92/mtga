@@ -27,6 +27,8 @@ export interface LayerDeps {
   poller: ArenaGeometryPoller
   /** Number of cards in the live pack (0 when none). */
   packCount: () => number
+  /** Card names in Arena display order, used to identify split previews. */
+  names?: () => string[]
   config: (rect: ArenaRect) => CalibrationConfig
   /** Whether badges are wanted right now (draft live, enabled, visible). */
   active: () => boolean
@@ -135,7 +137,9 @@ export class LayerDetector extends EventEmitter {
   }
 
   private predict(hoveredIdx: number, cellRects: Rect[], view: { width: number; height: number }): void {
-    const regions = hoveredIdx >= 0 ? predictPopout(cellRects[hoveredIdx], view) : []
+    const name = hoveredIdx >= 0 ? this.deps.names?.()[hoveredIdx] : undefined
+    const split = typeof name === 'string' && name.includes(' // ')
+    const regions = hoveredIdx >= 0 ? predictPopout(cellRects[hoveredIdx], view, { split }) : []
     const hudCovered = !!this.hudRect && regions.some(r => intersects(r, this.hudRect!))
     this.publish({ cells: [], regions, covered: false, hudCovered })
   }
