@@ -841,7 +841,6 @@ body.calibrating .sheet { display: none; }
   opacity: 1;
   pointer-events: auto;
 }
-.draft-rail.open.preview-covered { opacity: 0.22; }  /* a ghost, not gone: Arena's preview reads through it */
 .draft-rail.open > .draft-rail-panel {
   display: flex;
   flex-direction: column;

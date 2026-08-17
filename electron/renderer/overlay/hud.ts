@@ -256,7 +256,7 @@ export class Hud {
     if (!card) {
       this.paintArt(null)
       this.paintGrade(null)
-      setText(this.recName, 'waiting for pack…')
+      setText(this.recName, 'Waiting for pack…')
       this.paintFlames(null)
       setText(this.recBand, '')
       setText(this.recRank, '')

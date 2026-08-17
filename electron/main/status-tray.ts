@@ -19,6 +19,7 @@ interface TrayActions {
   toggleBadges: () => void
   toggleHud: () => void
   toggleLayerDetection: () => void
+  toggleOpenAtLogin: () => void
   calibrate: () => void
   openScreenRecordingSettings: () => void
 }
@@ -85,6 +86,13 @@ export class StatusTray {
         ? [{ label: '   needs Screen Recording — open System Settings…', click: () => this.actions.openScreenRecordingSettings() }]
         : []),
       { label: 'Calibrate Card Grid…', click: () => this.actions.calibrate() },
+      { type: 'separator' },
+      {
+        label: 'Start at Login',
+        type: 'checkbox',
+        checked: s.prefs.openAtLogin,
+        click: () => this.actions.toggleOpenAtLogin()
+      },
       { type: 'separator' },
       { label: 'Quit MTGA Draft Assistant', click: () => app.quit() }
     ])

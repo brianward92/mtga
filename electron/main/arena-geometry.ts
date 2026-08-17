@@ -14,7 +14,7 @@
  * polled instead of spawning the helper (e2e / dev without Arena).
  *
  * Events: 'geometry' (rect), 'lost', 'frontmost' (bool), 'frame' (HelperFrame),
- * 'capture' (bool), 'helper-missing' (once).
+ * 'capture' (bool), 'click' (global point), 'helper-missing' (once).
  */
 import { EventEmitter } from 'events'
 import { spawn, ChildProcess } from 'child_process'
@@ -90,11 +90,19 @@ export function parseFrameLine(line: string): HelperFrame | null {
   return { width, height, data }
 }
 
+/** Parse a helper "M x,y" global mouse-down line; null otherwise. */
+export function parseClickLine(line: string): { x: number; y: number } | null {
+  if (!line.startsWith('M ')) return null
+  const parts = line.slice(2).split(',').map(v => parseInt(v, 10))
+  if (parts.length !== 2 || parts.some(v => !Number.isFinite(v))) return null
+  return { x: parts[0], y: parts[1] }
+}
+
 /** Parse one helper geometry line ("G x,y,w,h,fm" / "G NOWIN"); null otherwise. */
 export function parseWatchLine(line: string): ArenaProbe | null {
   let t = line.trim()
   if (t.startsWith('G ')) t = t.slice(2)
-  if (!t || t.startsWith('F ') || t.startsWith('C ')) return null
+  if (!t || t.startsWith('F ') || t.startsWith('C ') || t.startsWith('M ')) return null
   if (t === 'NOWIN' || t === 'NOPROC') return { status: 'no-window' }
   const parts = t.split(',').map(v => parseInt(v, 10))
   if (parts.length !== 5 || parts.some(v => !Number.isFinite(v))) return null
@@ -189,6 +197,11 @@ export class ArenaGeometryPoller extends EventEmitter {
       if (line.startsWith('F ')) {
         const frame = parseFrameLine(line)
         if (frame) this.emit('frame', frame)
+        return
+      }
+      if (line.startsWith('M ')) {
+        const point = parseClickLine(line)
+        if (point) this.emit('click', point)
         return
       }
       if (line.startsWith('C ')) {

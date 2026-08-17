@@ -132,6 +132,8 @@ export interface Prefs {
   hud: boolean
   hudCorner: HudCorner
   layerDetection: boolean
+  /** Start the assistant at login so it is already waiting when Arena opens. */
+  openAtLogin: boolean
   /** Per aspect-bucket grid calibrations. */
   calibrations: Record<string, CalibrationConfig>
 }

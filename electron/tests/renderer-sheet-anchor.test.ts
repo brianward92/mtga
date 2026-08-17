@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { EMPTY_STATE, type CardRow } from '../shared/state'
-import {
-  previewIntersectsSidebar,
-  sidebarPanelFrame,
-  sidebarPresentation,
-  sidebarShellFrame, previewCoverFraction, SIDEBAR_COVER_THRESHOLD }
-  from '../renderer/overlay/sidebar'
+import { sidebarPanelFrame, sidebarPresentation, sidebarShellFrame } from '../renderer/overlay/sidebar'
 import { Sheet } from '../renderer/overlay/sheet'
 import type { Store } from '../renderer/overlay/types'
 
@@ -35,52 +30,32 @@ describe('full right-column sidebar geometry', () => {
     expect(sidebarPanelFrame({ width: NaN, height: 949 })).toEqual({ x: 0, y: 0, width: 0, height: 0 })
   })
 
-  it('fades only when the predicted preview really lands on the sidebar', () => {
+  it('never yields the column to Arena content behind it', () => {
     const view = { width: 1512, height: 949 }
     const rail = sidebarShellFrame(view)
-    // Arena's preview is ~2 card widths wide; one that reaches well into the
-    // column hides the pool, a sliver over its left edge does not.
-    const covering = { x: rail.x + 20, y: rail.y + 20, width: 300, height: 500 }
-    const sliver = { x: rail.x - 10, y: rail.y + 20, width: 20, height: 100 }
-    const left = { x: 100, y: 200, width: 200, height: 300 }
-    const edgeTouch = { x: rail.x - 20, y: rail.y + 20, width: 20, height: 100 }
-
-    expect(previewIntersectsSidebar(view, [covering])).toBe(true)
-    expect(previewIntersectsSidebar(view, [sliver])).toBe(false)
-    expect(previewIntersectsSidebar(view, [left])).toBe(false)
-    expect(previewIntersectsSidebar(view, [edgeTouch])).toBe(false)
-    expect(previewIntersectsSidebar(view, [])).toBe(false)
-    expect(previewCoverFraction(view, [covering])).toBeGreaterThan(SIDEBAR_COVER_THRESHOLD)
-  })
-
-  it('keeps the sidebar up while the drafter merely hovers a pack card', () => {
-    const view = { width: 1512, height: 949 }
-    // A preview over the pack area (no sidebar overlap) must not blank the pool,
-    // even though a card is being inspected.
+    // A preview squarely over the rail, a modal reported by capture, and a
+    // preview over the pack all leave the pool and top picks fully readable.
+    const overRail = { x: rail.x + 20, y: rail.y + 20, width: 300, height: 500 }
     const overPack = { x: 300, y: 250, width: 380, height: 520 }
+
+    expect(sidebarPresentation('active', true, view, { regions: [overRail], selectedCell: 4, hudCovered: false }))
+      .toEqual({ open: true })
+    expect(sidebarPresentation('active', true, view, { regions: [], selectedCell: null, hudCovered: true }))
+      .toEqual({ open: true })
     expect(sidebarPresentation('active', true, view, { regions: [overPack], selectedCell: 4, hudCovered: false }))
-      .toEqual({ open: true, previewCovered: false })
+      .toEqual({ open: true })
+    expect(sidebarPresentation('complete', true, view, { regions: [overRail], selectedCell: null, hudCovered: false }))
+      .toEqual({ open: true })
   })
 
-  it('ignores modal/capture hudCovered and respects phase/master visibility', () => {
+  it('respects phase and master visibility', () => {
     const view = { width: 1512, height: 949 }
     const region = { x: 1200, y: 200, width: 400, height: 700 }
 
-    expect(sidebarPresentation('active', true, view, { regions: [], selectedCell: null, hudCovered: true }))
-      .toEqual({ open: true, previewCovered: false })
-    expect(sidebarPresentation('active', true, view, { regions: [region], selectedCell: null, hudCovered: false }))
-      .toEqual({ open: true, previewCovered: true })
     expect(sidebarPresentation('active', false, view, { regions: [region], selectedCell: 3, hudCovered: false }))
-      .toEqual({ open: false, previewCovered: false })
+      .toEqual({ open: false })
     expect(sidebarPresentation('idle', true, view, { regions: [region], selectedCell: 3, hudCovered: false }))
-      .toEqual({ open: false, previewCovered: false })
-    // Inspecting a card with no preview over the column keeps the pool up.
-    expect(sidebarPresentation('active', true, view, { regions: [], selectedCell: 3, hudCovered: false }))
-      .toEqual({ open: true, previewCovered: false })
-    expect(sidebarPresentation('complete', true, view, { regions: [], selectedCell: 3, hudCovered: false }))
-      .toEqual({ open: true, previewCovered: false })
-    expect(sidebarPresentation('complete', true, view, { regions: [region], selectedCell: null, hudCovered: false }))
-      .toEqual({ open: true, previewCovered: true })
+      .toEqual({ open: false })
   })
 })
 

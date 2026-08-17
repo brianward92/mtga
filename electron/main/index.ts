@@ -29,7 +29,7 @@ import { badgesAreLive, wantsOverlayContent, type OverlayActivity } from './over
 import { loadPrefs, savePrefs } from './prefs'
 import { StatusTray } from './status-tray'
 import type { DraftState, Prefs } from '../shared/state'
-import type { CalibrationOp, Rect } from '../shared/layout'
+import { sidebarShellFrame, type CalibrationOp, type Rect } from '../shared/layout'
 import { arenaDisplayOrder } from '../shared/display-order'
 
 // ---------------------------------------------------------------------------
@@ -50,6 +50,8 @@ let quitCommitted = false
 let quitTimer: NodeJS.Timeout | null = null
 /** Pool & picks section of the rail: open by default during a draft. */
 let sheetOpen = true
+/** Whether main has claimed the mouse for the sidebar strip. */
+let sidebarPointerOwned = false
 
 // ---------------------------------------------------------------------------
 // Overlay visibility policy
@@ -73,17 +75,56 @@ function currentOverlayActivity(): OverlayActivity {
 }
 
 /**
- * Poll the cursor while the overlay is up: reaching into Arena's top menu bar
- * (Options, Packs, Store…) makes the overlay stand aside until the draft moves
- * on. Arena draws its menus inside its own window, so stepping out of the way
- * is the only way to let them win.
+ * Whether the sidebar is currently painted, and so owns its strip of the
+ * window. Mirrors `sidebarPresentation` in the renderer.
  */
+function sidebarOpen(): boolean {
+  const phase = coordinator.current.phase
+  return loadPrefs().hud && !calibration.active && (phase === 'active' || phase === 'complete')
+}
+
+/**
+ * Claim the mouse the moment the cursor crosses into the sidebar.
+ *
+ * The renderer can also ask for interactivity, but only after a forwarded
+ * mousemove has round-tripped over IPC — by which time Arena has already seen
+ * the same move and popped one of its own pool previews out from under us.
+ * Deciding here, straight off the cursor poll, is what makes the strip opaque
+ * to Arena rather than merely opaque to the eye.
+ */
+function sidebarPointerTick(rect: ArenaRect, cursor: { x: number; y: number }): void {
+  if (!overlay || overlay.isDestroyed()) return
+  const wanted = sidebarOpen() && !standAside.active && poller.isFound() && overlay.isVisible() &&
+    pointInRect(cursor, sidebarShellFrame(rect))
+  if (wanted === sidebarPointerOwned) return
+  sidebarPointerOwned = wanted
+  setOverlayInteractive(overlay, wanted)
+}
+
+function pointInRect(p: { x: number; y: number }, r: Rect): boolean {
+  return r.width > 0 && r.height > 0 &&
+    p.x >= r.x && p.x < r.x + r.width && p.y >= r.y && p.y < r.y + r.height
+}
+
+/** Poll the cursor while the overlay is up, so the sidebar can claim it. */
 function standAsideTick(): void {
   const rect = poller.lastKnown
   if (!rect || calibration.active) return
   const cursor = screen.getCursorScreenPoint()
-  const local = { x: cursor.x - rect.x, y: cursor.y - rect.y }
-  if (standAside.sample(local, rect, Date.now())) syncOverlay()
+  sidebarPointerTick(rect, { x: cursor.x - rect.x, y: cursor.y - rect.y })
+}
+
+/**
+ * A real click into Arena's top menu bar (Options, Packs, Store…) makes the
+ * overlay stand aside: Arena draws those menus inside its own window, so
+ * stepping out of the way is the only way to let them win. Clicking anywhere
+ * else — back on the draft screen — brings us straight back.
+ */
+function noteGlobalClick(point: { x: number; y: number }): void {
+  const rect = poller.lastKnown
+  if (!rect || calibration.active) return
+  const local = { x: point.x - rect.x, y: point.y - rect.y }
+  if (standAside.noteClick(local, rect, Date.now())) syncOverlay()
 }
 
 /** The draft moved on (or the user asked for it back): show the overlay again. */
@@ -206,7 +247,10 @@ function setupGeometry(): void {
   poller.on('lost', () => { syncOverlay(); refreshTray() })
   poller.on('frontmost', () => syncOverlay())
   poller.on('capture', () => refreshTray())
-  standAsideTimer = setInterval(standAsideTick, 120)
+  poller.on('click', (point: { x: number; y: number }) => noteGlobalClick(point))
+  // Fast enough that the strip takes the mouse before Arena's hover preview
+  // has time to open under it.
+  standAsideTimer = setInterval(standAsideTick, 40)
   poller.on('helper-missing', () => coordinator.setWarning('Window helper missing from the app bundle — overlay cannot locate Arena'))
   poller.start()
 
@@ -228,7 +272,12 @@ function setupGeometry(): void {
 function setupIpc(): void {
   ipcMain.handle('overlay:get-state', () => coordinator.current)
   ipcMain.handle('overlay:get-prefs', () => loadPrefs())
-  ipcMain.on('overlay:interactive', (_e, on: boolean) => { if (overlay) setOverlayInteractive(overlay, !!on) })
+  ipcMain.on('overlay:interactive', (_e, on: boolean) => {
+    // While main owns the sidebar strip its cursor poll is authoritative: a
+    // stale renderer "false" here would hand the mouse straight back to Arena.
+    if (sidebarPointerOwned) return
+    if (overlay) setOverlayInteractive(overlay, !!on)
+  })
   ipcMain.on('overlay:hud-rect', (_e, rect: Rect | null) => layer.setHudRect(rect && typeof rect === 'object' ? rect : null))
   ipcMain.on('overlay:action', (_e, msg: { name?: string; data?: unknown }) => {
     switch (msg?.name) {
@@ -256,6 +305,22 @@ function setSheetOpen(open: boolean): void {
   send('overlay:command', { name: 'toggle-sheet', data: { open: sheetOpen } })
 }
 
+/**
+ * Keep the macOS login item in step with the pref. Reapplied on every launch so
+ * a fresh install (or a moved .app) registers the right bundle path — Arena is
+ * usually opened long after login, and the assistant has to already be there.
+ */
+function syncLoginItem(): void {
+  if (process.platform !== 'darwin' || !app.isPackaged) return
+  const want = loadPrefs().openAtLogin
+  try {
+    const current = app.getLoginItemSettings()
+    if (current.openAtLogin !== want) app.setLoginItemSettings({ openAtLogin: want, openAsHidden: true })
+  } catch (err) {
+    console.error('[LoginItem] sync failed:', err)
+  }
+}
+
 function openScreenRecordingSettings(): void {
   void shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture')
 }
@@ -265,6 +330,7 @@ function setupTray(): void {
     toggleBadges: () => pushPrefs(savePrefs({ badges: !loadPrefs().badges })),
     toggleHud: () => pushPrefs(savePrefs({ hud: !loadPrefs().hud })),
     toggleLayerDetection: () => pushPrefs(savePrefs({ layerDetection: !loadPrefs().layerDetection })),
+    toggleOpenAtLogin: () => { pushPrefs(savePrefs({ openAtLogin: !loadPrefs().openAtLogin })); syncLoginItem() },
     calibrate: () => calibration.start(poller.lastKnown),
     openScreenRecordingSettings
   })
@@ -309,6 +375,7 @@ if (!app.requestSingleInstanceLock()) {
 } else {
   app.whenReady().then(async () => {
     if (process.platform === 'darwin') app.dock?.hide() // menu-bar app; the overlay never wants a Dock presence
+    syncLoginItem()
     setupModelAndDraft()
     setupGeometry()
     setupIpc()

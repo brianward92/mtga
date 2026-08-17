@@ -254,6 +254,28 @@ export function arenaContentBox(view: { width: number; height: number }): { x: n
   return { x: (width - contentWidth) / 2, width: contentWidth }
 }
 
+const SIDEBAR_LEFT_FRACTION = 0.74
+const SIDEBAR_TOP_FRACTION = 0.115
+
+/**
+ * The full opaque, pointer-owning right strip of the Arena window, in window
+ * coordinates. Shared because the main process claims the mouse over this rect
+ * directly from the cursor poll — waiting for a forwarded mousemove to reach
+ * the renderer and come back over IPC let Arena see the hover first and pop its
+ * own card preview under our sidebar.
+ */
+export function sidebarShellFrame(view: { width: number; height: number }): Rect {
+  const width = Number.isFinite(view.width) ? Math.max(0, view.width) : 0
+  const height = Number.isFinite(view.height) ? Math.max(0, view.height) : 0
+  if (width === 0 || height === 0) return { x: 0, y: 0, width: 0, height: 0 }
+  // Arena's own right rail sits in its centred, height-scaled content box, so
+  // ours starts there too — and always runs to the window's right/bottom edge.
+  const box = arenaContentBox({ width, height })
+  const x = Math.max(0, Math.min(width, box.x + box.width * SIDEBAR_LEFT_FRACTION))
+  const y = height * SIDEBAR_TOP_FRACTION
+  return { x, y, width: width - x, height: height - y }
+}
+
 export function packLayout(
   view: { width: number; height: number },
   count: number,

@@ -15,6 +15,9 @@ const DEFAULT_PREFS: Prefs = {
   // Opt-in: uses one-shot window captures (macOS Screen Recording). Off by
   // default so the app needs no permission at all out of the box.
   layerDetection: false,
+  // On by default: a menu-bar app that is not running when Arena opens is an
+  // overlay the drafter never sees.
+  openAtLogin: true,
   calibrations: {}
 }
 
@@ -47,6 +50,7 @@ export function loadPrefs(): Prefs {
       ? (raw.hudCorner as HudCorner)
       : DEFAULT_PREFS.hudCorner,
     layerDetection: raw.layerDetection === true ? true : DEFAULT_PREFS.layerDetection,
+    openAtLogin: raw.openAtLogin === false ? false : DEFAULT_PREFS.openAtLogin,
     calibrations
   }
   return cached

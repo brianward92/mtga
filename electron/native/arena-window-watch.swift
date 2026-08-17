@@ -10,6 +10,10 @@
 //                                  changed vs the previously emitted frame
 //   C on|off                       frames flowing (capture enabled AND Screen
 //                                  Recording granted) / not
+//   M x,y                          a mouse button went down anywhere on screen
+//                                  (global point, top-left origin). The overlay
+//                                  steps aside for Arena's menus on a real
+//                                  click, never on a hover.
 // Args:  --capture   start with capture enabled (default: off).
 // Stdin control channel (one command per line):
 //   capture on | capture off       enable / disable the frame feed
@@ -263,6 +267,7 @@ DispatchQueue.global(qos: .userInteractive).async {
   var pids = arenaPids()
   var tick = 0
   var lastCursor = CGPoint(x: -1, y: -1)
+  var mouseWasDown = false
   while true {
     tick += 1
     if tick % 30 == 0 { pids = arenaPids() }
@@ -283,6 +288,16 @@ DispatchQueue.global(qos: .userInteractive).async {
         if lastCursor.x >= 0 { shared.noteActivity() }
         lastCursor = p
       }
+      // Mouse-down edge, sampled rather than monitored: CGEventSource button
+      // state needs no Accessibility grant and no AppKit event loop, unlike
+      // NSEvent's global monitors. The overlay steps aside for Arena's menus
+      // on a real click, never on a hover.
+      let down = CGEventSource.buttonState(.combinedSessionState, button: .left) ||
+        CGEventSource.buttonState(.combinedSessionState, button: .right)
+      if down && !mouseWasDown {
+        emit("M \(Int(p.x.rounded())),\(Int(p.y.rounded()))")
+      }
+      mouseWasDown = down
     }
     // Print on change, plus a 1Hz heartbeat so a consumer that missed the
     // last line (or had it overwritten) converges.

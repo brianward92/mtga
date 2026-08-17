@@ -281,7 +281,7 @@ async function expectDraftSidebarGeometry(page, label) {
     const sheetAlpha = alpha(sheetStyle.backgroundColor)
     const close = (actual, wanted, tolerance = 1) => Math.abs(actual - wanted) <= tolerance
     const opened = rail.classList.contains('open') && rail.classList.contains('interactive') &&
-      !rail.classList.contains('preview-covered') && sheet.classList.contains('open')
+      sheet.classList.contains('open')
     const fixedBounds = close(r.left, expected.left) && close(r.right, expected.right) &&
       close(r.top, expected.top) && close(r.bottom, expected.bottom) &&
       close(p.left, expected.panelLeft) && close(p.right, expected.panelRight) &&
@@ -462,14 +462,14 @@ try {
     if (!rail || !hud || !sheet) return false
     const style = getComputedStyle(rail)
     return rail.classList.contains('open') && rail.classList.contains('interactive') &&
-      !rail.classList.contains('preview-covered') && !hud.classList.contains('yield') &&
+      !hud.classList.contains('yield') &&
       !sheet.classList.contains('yield') && Math.abs(Number.parseFloat(style.opacity) - 1) < 0.005 &&
       style.pointerEvents === 'auto'
   }, '400ms sidebar dwell never fades, yields, or releases pointer ownership')
 
   // Clean test-only injection proves the production predicted-region path.
-  // `hudCovered` alone is explicitly insufficient: only region intersection
-  // may fade the common owner, while badge preview lifting remains intact.
+  // The sidebar owns its column outright: neither an intersecting predicted
+  // preview nor `hudCovered` may fade it, while badge lifting stays intact.
   await page.evaluate(layer => {
     document.dispatchEvent(new CustomEvent('mtga:e2e-layer', { detail: layer }))
   }, { cells: [1], regions: [{ x: 1120, y: 200, width: 160, height: 300 }], covered: false, hudCovered: true })
@@ -478,10 +478,9 @@ try {
     const cells = [...document.querySelectorAll(S.cell)]
     if (!rail || cells.length < 2) return false
     const style = getComputedStyle(rail)
-    return rail.classList.contains('preview-covered') &&
-      Math.abs(Number.parseFloat(style.opacity) - 0.08) < 0.005 && style.pointerEvents === 'auto' &&
+    return Math.abs(Number.parseFloat(style.opacity) - 1) < 0.005 && style.pointerEvents === 'auto' &&
       cells[1].classList.contains('behind')
-  }, 'intersecting predicted preview fades interactive sidebar and lifts covered badge')
+  }, 'sidebar stays opaque under an intersecting preview while the covered badge lifts')
   await page.evaluate(layer => {
     document.dispatchEvent(new CustomEvent('mtga:e2e-layer', { detail: layer }))
   }, { cells: [], regions: [{ x: 100, y: 100, width: 200, height: 200 }], covered: false, hudCovered: true })
@@ -493,9 +492,9 @@ try {
     const colorParts = style.backgroundColor.match(/^rgba?\(([^)]+)\)$/)?.[1]
       .split(',').map(part => Number.parseFloat(part.trim())) ?? []
     const alpha = colorParts.length === 4 ? colorParts[3] : 1
-    return !rail.classList.contains('preview-covered') && !hud.classList.contains('covered') &&
+    return !hud.classList.contains('covered') &&
       Math.abs(Number.parseFloat(style.opacity) - 1) < 0.005 && Math.abs(alpha - 1) < 0.005
-  }, 'nonintersecting region restores the opaque sidebar despite hudCovered')
+  }, 'sidebar remains opaque and pointer-owning despite hudCovered')
   await page.evaluate(() => {
     document.dispatchEvent(new CustomEvent('mtga:e2e-layer', {
       detail: { cells: [], regions: [], covered: false, hudCovered: false }

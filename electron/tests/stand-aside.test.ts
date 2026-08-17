@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
-  CHROME_BAND_FRACTION, CHROME_DWELL_MS, LEAVE_GRACE_MS, WINDOW_MOVE_GRACE_MS,
-  StandAside, inChromeBand
+  CHROME_BAND_FRACTION, WINDOW_MOVE_GRACE_MS, StandAside, inChromeBand
 } from '../main/overlay/stand-aside'
+import { sidebarShellFrame } from '../shared/layout'
 
 const arena = { width: 1512, height: 949 }
 const gear = { x: 1478, y: 100 }
@@ -23,71 +23,60 @@ describe('inChromeBand', () => {
     expect(inChromeBand({ x: 1200, y: 90 }, wide)).toBe(true)
   })
 
+  it('excuses our own sidebar, whose top edge reaches into the band', () => {
+    const sidebar = sidebarShellFrame(arena)
+    // Resting on the top of the pool must never read as reaching for Arena's
+    // menus — that hid the whole overlay until the drafter returned to the pack.
+    expect(inChromeBand({ x: sidebar.x + 40, y: sidebar.y + 2 }, arena)).toBe(false)
+    // Arena's gear sits just above the sidebar and still steps us aside.
+    expect(inChromeBand({ x: sidebar.x + 40, y: sidebar.y - 2 }, arena)).toBe(true)
+  })
+
   it('ignores degenerate rects', () => {
     expect(inChromeBand({ x: 10, y: 10 }, { width: 0, height: 0 })).toBe(false)
   })
 })
 
 describe('StandAside', () => {
-  it('steps aside only after a dwell, and comes back on its own', () => {
+  it('ignores the cursor entirely: only a click steps aside', () => {
     const s = new StandAside()
-    expect(s.sample(pack, arena, 0)).toBe(false)
-    // Sweeping through the band does nothing.
-    expect(s.sample(gear, arena, 10)).toBe(false)
-    expect(s.sample(pack, arena, 120)).toBe(false)
+    // Hovering the gear for any length of time is not leaving the draft screen.
     expect(s.active).toBe(false)
-    // Resting there steps aside.
-    expect(s.sample(gear, arena, 200)).toBe(false)
-    expect(s.sample(gear, arena, 200 + CHROME_DWELL_MS)).toBe(true)
-    expect(s.active).toBe(true)
-    // Coming back down restores after the grace, not instantly (no flicker).
-    const left = 200 + CHROME_DWELL_MS
-    expect(s.sample(pack, arena, left + 100)).toBe(false)
-    expect(s.active).toBe(true)
-    expect(s.sample(pack, arena, left + LEAVE_GRACE_MS + 1)).toBe(true)
+    expect(s.noteClick(pack, arena, 0)).toBe(false)
     expect(s.active).toBe(false)
+    // Clicking the gear opens Arena's own UI over the draft.
+    expect(s.noteClick(gear, arena, 100)).toBe(true)
+    expect(s.active).toBe(true)
   })
 
-  it('never hides for longer than the grace once the cursor leaves', () => {
+  it('stays away until a click lands back on the draft screen', () => {
     const s = new StandAside()
-    s.sample(gear, arena, 0)
-    s.sample(gear, arena, CHROME_DWELL_MS)
+    s.noteClick(gear, arena, 0)
     expect(s.active).toBe(true)
-    s.sample(pack, arena, CHROME_DWELL_MS + LEAVE_GRACE_MS + 1)
+    // Further clicks inside Arena's own menus keep us away.
+    expect(s.noteClick(gear, arena, 5_000)).toBe(false)
+    expect(s.active).toBe(true)
+    // A click back on the draft brings us straight back — no grace, no wait.
+    expect(s.noteClick(pack, arena, 30_000)).toBe(true)
     expect(s.active).toBe(false)
-  })
-
-  it('stays out of the way while the cursor rests in the menu bar', () => {
-    const s = new StandAside()
-    s.sample(gear, arena, 0)
-    s.sample(gear, arena, CHROME_DWELL_MS)
-    for (const t of [1_000, 5_000, 30_000]) {
-      s.sample(gear, arena, t)
-      expect(s.active).toBe(true)
-    }
   })
 
   it('comes back and holds off while the window is dragged or resized', () => {
     const s = new StandAside()
-    s.sample(gear, arena, 0)
-    s.sample(gear, arena, CHROME_DWELL_MS)
+    s.noteClick(gear, arena, 0)
     expect(s.active).toBe(true)
     expect(s.noteWindowMoved(1_000)).toBe(true)
     expect(s.active).toBe(false)
-    // Dragging holds the cursor near the band: it must not latch mid-drag.
-    expect(s.sample(gear, arena, 1_100)).toBe(false)
-    expect(s.sample(gear, arena, 1_100 + CHROME_DWELL_MS)).toBe(false)
+    // Dragging starts with a click near the band: it must not latch mid-drag.
+    expect(s.noteClick(gear, arena, 1_100)).toBe(false)
     expect(s.active).toBe(false)
-    // After the drag, resting there works again.
-    const after = 1_000 + WINDOW_MOVE_GRACE_MS + 10
-    expect(s.sample(gear, arena, after)).toBe(false)
-    expect(s.sample(gear, arena, after + CHROME_DWELL_MS)).toBe(true)
+    // After the drag, clicking the menu bar works again.
+    expect(s.noteClick(gear, arena, 1_000 + WINDOW_MOVE_GRACE_MS + 10)).toBe(true)
   })
 
   it('release brings the overlay straight back', () => {
     const s = new StandAside()
-    s.sample(gear, arena, 0)
-    s.sample(gear, arena, CHROME_DWELL_MS)
+    s.noteClick(gear, arena, 0)
     expect(s.release()).toBe(true)
     expect(s.active).toBe(false)
     expect(s.release()).toBe(false)

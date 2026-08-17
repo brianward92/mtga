@@ -71,7 +71,6 @@ function render(): void {
   const sidebar = sidebarPresentation(store.state.phase, sidebarEnabled, store.view, store.layer)
   railRoot.classList.toggle('open', sidebar.open)
   railRoot.classList.toggle('interactive', sidebar.open)
-  railRoot.classList.toggle('preview-covered', sidebar.previewCovered)
   // Arena letterboxes its UI, so the rail's left edge tracks the content box
   // rather than a fixed window percentage; drive it from the pure geometry.
   if (sidebar.open) {
