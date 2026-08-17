@@ -12,6 +12,9 @@ import { COLOR_NAMES, POOL_COLORS, poolSummary } from './hud-logic'
 import { escapeHtml, renderManaCost } from './shared'
 import type { Store } from './types'
 import { sheetShouldRender } from './visibility'
+import {
+  BASIC_LAND_NAMES, buildDeck, type CardStatus, type DeckEntry, type DeckPlan
+} from './deckbuild'
 
 /** Set-review grade for pool display: the raw set rating (falls back to the pool grade). */
 function reviewGrade(card: Pick<CardRow, 'grade' | 'setGrade'>) {
@@ -95,8 +98,26 @@ export function poolColorCountsHtml(pool: ReadonlyArray<Pick<CardRow, 'colors' |
   }).join('')
 }
 
+/**
+ * Where a pool row landed in the proposed deck. Shown only after the draft,
+ * when a plan exists — during the draft the pool list stays as it was.
+ */
+function statusHtml(status: CardStatus | undefined): string {
+  if (!status) return ''
+  if (status.included >= status.total) return '<span class="s-in" title="In the proposed deck">in</span>'
+  if (status.included > 0) {
+    return `<span class="s-in partial" title="${status.included} of ${status.total} copies in the deck">${status.included}/${status.total}</span>`
+  }
+  if (status.close) return '<span class="s-close" title="Just missed the last slot">close</span>'
+  return '<span class="s-out" title="Not in the proposed deck">cut</span>'
+}
+
 /** Render the grouped best-to-worst pool rows and optional lands section. */
-export function poolHtml(pool: ReadonlyArray<CardRow>, picks: ReadonlyArray<PickRecord> = []): string {
+export function poolHtml(
+  pool: ReadonlyArray<CardRow>,
+  picks: ReadonlyArray<PickRecord> = [],
+  statusByName: Record<string, CardStatus> | null = null
+): string {
   if (pool.length === 0) return '<div class="s-empty">No cards yet</div>'
   const rows = poolDisplayRows(pool, picks)
   let landsStarted = false
@@ -115,15 +136,65 @@ export function poolHtml(pool: ReadonlyArray<CardRow>, picks: ReadonlyArray<Pick
         const pickLabels = picksText
           ? `<span class="s-pick-labels" aria-label="Picked ${row.pickLabels.join(', ')}">${picksText}</span>`
           : ''
+        const status = row.basicLand ? '' : statusHtml(statusByName?.[row.card.name])
         return `${divider}
         <div class="s-card${row.basicLand ? ' basic-land' : ''}">
           ${gradeHtml(row.card)}
           <span class="s-mana">${renderManaCost(row.card.manaCost)}</span>
           <span class="s-name">${escapeHtml(row.card.name)}</span>
           ${copies}
+          ${status}
           ${pickLabels}
         </div>`
       }).join('')}
+    </div>`
+}
+
+function deckLine(entry: DeckEntry): string {
+  const grade = entry.grade
+    ? `<span class="s-grade grade-${gradeTier(entry.grade)}">${entry.grade}</span>`
+    : '<span class="s-grade grade-none">—</span>'
+  return `
+    <div class="s-card deck-line">
+      ${grade}
+      <span class="d-count">${entry.count}×</span>
+      <span class="s-mana">${renderManaCost(entry.manaCost)}</span>
+      <span class="s-name">${escapeHtml(entry.name)}</span>
+    </div>`
+}
+
+/**
+ * The deckbuild panel shown once the draft is over: the verdict first (lane and
+ * dead colours, readable at a glance), then the proposed 40.
+ */
+export function deckHtml(plan: DeckPlan): string {
+  if (plan.lane.length === 0) return ''
+  const cut = plan.cut.length
+    ? `cut ${plan.cut.map(c => `${c.color} ${c.count}`).join(' · ')}`
+    : 'nothing off-colour'
+  const lands = [
+    ...plan.basics.map(b => `${b.count} ${BASIC_LAND_NAMES[b.color]}`),
+    ...plan.nonbasicLands.map(l => `${l.count} ${l.name}`)
+  ].join(' · ')
+  const close = plan.close.length
+    ? `<div class="deck-close">Closest cuts: ${plan.close.map(c => escapeHtml(c.name)).join(' · ')}</div>`
+    : ''
+  const short = plan.short
+    ? `<div class="deck-short">Only ${plan.playable} playables on colour — the deck is ${plan.spellCount} spells, not 23.</div>`
+    : ''
+  return `
+    <div class="s-group deck-plan" data-testid="deck-plan">
+      <h3 class="sheet-h">Proposed deck</h3>
+      <div class="deck-verdict">
+        <span class="deck-lane lane-${plan.lane.join('')}">${plan.laneLabel}</span>
+        <span class="deck-cut">${cut}</span>
+      </div>
+      <div class="deck-meta">${plan.spellCount} spells · ${plan.landCount} lands · ${plan.total} cards · ${plan.playable} playable</div>
+      ${short}
+      ${plan.spells.map(deckLine).join('')}
+      <div class="deck-lands">${escapeHtml(lands)}</div>
+      ${close}
+      <div class="deck-note">Order is the model's. Deck size, land split and the splash rule are ours.</div>
     </div>`
 }
 
@@ -181,6 +252,9 @@ export class Sheet {
     const rating = poolRatingLabel(state.pool)
     this.rating.textContent = state.pool.length === 0 ? '' : `Pool rating ${rating.text}`
     this.rating.className = `sheet-rating ${rating.grade ? `grade-${gradeTier(rating.grade as never)}` : 'grade-none'}`
-    this.pool.innerHTML = poolHtml(state.pool, state.picks)
+    // The draft is over: lead with the deckbuild plan, and tag the pool rows
+    // with where each card landed in it.
+    const plan = state.phase === 'complete' && state.pool.length > 0 ? buildDeck(state.pool) : null
+    this.pool.innerHTML = (plan ? deckHtml(plan) : '') + poolHtml(state.pool, state.picks, plan?.statusByName ?? null)
   }
 }
