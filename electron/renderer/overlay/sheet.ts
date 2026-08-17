@@ -154,8 +154,10 @@ function deckLine(entry: DeckEntry): string {
   const grade = entry.grade
     ? `<span class="s-grade grade-${gradeTier(entry.grade)}">${entry.grade}</span>`
     : '<span class="s-grade grade-none">—</span>'
+  // Deliberately not .s-card: that class means "a row of the drafted pool",
+  // and counting deck lines as pool rows would misreport the pool's size.
   return `
-    <div class="s-card deck-line">
+    <div class="d-line">
       ${grade}
       <span class="d-count">${entry.count}×</span>
       <span class="s-mana">${renderManaCost(entry.manaCost)}</span>
