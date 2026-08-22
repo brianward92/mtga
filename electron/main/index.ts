@@ -29,7 +29,7 @@ import { badgesAreLive, wantsOverlayContent, type OverlayActivity } from './over
 import { loadPrefs, savePrefs } from './prefs'
 import { StatusTray } from './status-tray'
 import type { DraftState, Prefs } from '../shared/state'
-import { sidebarShellFrame, type CalibrationOp, type Rect } from '../shared/layout'
+import { sidebarShellFrame, sidebarSide, type CalibrationOp, type Rect } from '../shared/layout'
 import { arenaDisplayOrder } from '../shared/display-order'
 
 // ---------------------------------------------------------------------------
@@ -95,7 +95,7 @@ function sidebarOpen(): boolean {
 function sidebarPointerTick(rect: ArenaRect, cursor: { x: number; y: number }): void {
   if (!overlay || overlay.isDestroyed()) return
   const wanted = sidebarOpen() && !standAside.active && poller.isFound() && overlay.isVisible() &&
-    pointInRect(cursor, sidebarShellFrame(rect))
+    pointInRect(cursor, sidebarShellFrame(rect, sidebarSide(coordinator.current.phase)))
   if (wanted === sidebarPointerOwned) return
   sidebarPointerOwned = wanted
   setOverlayInteractive(overlay, wanted)
@@ -124,7 +124,7 @@ function noteGlobalClick(point: { x: number; y: number }): void {
   const rect = poller.lastKnown
   if (!rect || calibration.active) return
   const local = { x: point.x - rect.x, y: point.y - rect.y }
-  if (standAside.noteClick(local, rect, Date.now())) syncOverlay()
+  if (standAside.noteClick(local, rect, Date.now(), sidebarSide(coordinator.current.phase))) syncOverlay()
 }
 
 /** The draft moved on (or the user asked for it back): show the overlay again. */

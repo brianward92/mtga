@@ -1,5 +1,5 @@
 /** Geometry and presentation state for the full Arena right-column sidebar. */
-import { sidebarShellFrame, type Rect } from '../../shared/layout'
+import { sidebarShellFrame, sidebarSide, type Rect } from '../../shared/layout'
 import type { DraftState, LayerState } from '../../shared/state'
 
 const SIDEBAR_INSET = 6
@@ -9,7 +9,7 @@ interface ViewSize {
   readonly height: number
 }
 
-export { sidebarShellFrame }
+export { sidebarShellFrame, sidebarSide }
 
 /** Rounded visual panel inside the opaque sidebar's six-pixel ownership gutter. */
 export function sidebarPanelFrame(view: ViewSize): Rect {

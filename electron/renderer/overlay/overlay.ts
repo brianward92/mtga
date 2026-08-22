@@ -17,7 +17,7 @@ import { Sheet } from './sheet'
 import { CalibrateLayer } from './calibrate'
 import { draftStateAdvanced, sameCalibrateState, sameLayerState, sameViewPrefs } from './render-change'
 import { RailInteraction } from './rail-interaction'
-import { sidebarPresentation, sidebarShellFrame } from './sidebar'
+import { sidebarPresentation, sidebarShellFrame, sidebarSide } from './sidebar'
 
 const EMPTY_LAYER: LayerState = { cells: [], regions: [], selectedCell: null, covered: false, hudCovered: false }
 const EMPTY_CALIBRATE: CalibrateState = { active: false, count: 14, config: { ...DEFAULT_CALIBRATION }, arenaFound: false }
@@ -74,13 +74,14 @@ function render(): void {
   // Arena letterboxes its UI, so the rail's left edge tracks the content box
   // rather than a fixed window percentage; drive it from the pure geometry.
   if (sidebar.open) {
-    const shell = sidebarShellFrame(store.view)
-    const style = `${Math.round(shell.x)}px:${Math.round(shell.y)}px`
+    const shell = sidebarShellFrame(store.view, sidebarSide(store.state.phase))
+    const right = Math.round(store.view.width - shell.x - shell.width)
+    const style = `${Math.round(shell.x)}px:${Math.round(shell.y)}px:${right}px`
     if (railStyleKey !== style) {
       railStyleKey = style
       railRoot.style.left = `${Math.round(shell.x)}px`
       railRoot.style.top = `${Math.round(shell.y)}px`
-      railRoot.style.right = '0'
+      railRoot.style.right = `${right}px`
       railRoot.style.bottom = '0'
     }
   } else if (railStyleKey !== '') {
