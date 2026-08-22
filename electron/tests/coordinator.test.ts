@@ -38,7 +38,7 @@ function snap(over: Partial<DraftSessionSnapshot>): DraftSessionSnapshot {
 const flush = () => new Promise(r => setTimeout(r, 0))
 
 describe('DraftCoordinator', () => {
-  it('keeps the completed pool for exactly the 15-second linger, then idles', () => {
+  it('keeps the completed pool for the full linger window, then idles', () => {
     vi.useFakeTimers()
     const c = new DraftCoordinator(stubModels() as never, { append() {} } as never)
     try {
@@ -46,7 +46,7 @@ describe('DraftCoordinator', () => {
       c.onDraftStart(snap({ pool: [1] }))
       c.onDraftEnd(snap({ state: 'complete', pool: [1, 2] }))
 
-      expect(COMPLETE_LINGER_MS).toBe(15_000)
+      expect(COMPLETE_LINGER_MS).toBe(30 * 60_000)
       expect(c.current.phase).toBe('complete')
       expect(c.current.pool.map(card => card.name)).toEqual(['Murder', 'Funeral Room'])
 
