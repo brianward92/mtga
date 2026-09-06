@@ -9,11 +9,22 @@ Consent: Brian approved (2026-08-15) making picks in his live Arena draft based 
 the app's recommendation while developing. Still: only during a draft he asked
 you to run; never click Exit Game / Log Out / Confirm on non-draft dialogs.
 
+Consent was extended 2026-09-06 ("go ham"): clicking, scrolling, capturing,
+relaunching the overlay, and editing the deck in Arena's builder are all
+pre-approved, with no prompts. Done in the deckbuilder commits the deck: leave
+that click to Brian. Every desktop action goes through one entry point,
+`bash scripts/dev/arena.sh <cmd>` (app launch|kill|status, shot, click, scroll,
+key, state, pick, draft, log), so one permission rule covers all of it. Timed
+Premier drafts auto-pick when the clock runs out; never leave a pack waiting on
+a diagnostic.
+
 Procedure (all from `electron/`):
-1. The app must be running with `MTGA_STATE_FILE` set (the dev wrapper does
-   this) so the live DraftState mirrors to disk. Arena must be on the draft
-   screen with a pack showing.
-2. `bash scripts/dev/pick-next-card.sh [top|<grpId>] [--dry-run]`
+1. `bash scripts/dev/arena.sh app status`. The app must be running with the
+   state mirror on (`arena.sh app launch` does this; a plain `open -a` does
+   NOT). Arena must be on the draft screen with a pack showing.
+2. `bash scripts/dev/arena.sh pick [top|<grpId>] [--dry-run]` for one pick, or
+   `bash scripts/dev/arena.sh draft` to loop until the draft completes.
+   Under the hood: `bash scripts/dev/pick-next-card.sh [top|<grpId>] [--dry-run]`
    - prints the ranked pack (rank, pool grade, ev, prob, name) and the target
    - double-clicks the target card twice (Arena: first selects, second confirms)
    - verifies a new line landed in `~/Library/Application Support/mtga-tracker/draft-history.jsonl`
