@@ -411,7 +411,6 @@ body.calibrating .sheet { display: none; }
   gap: 0.35rem;
   opacity: 0.8;
 }
-.hud.idle.idle-min { padding: 0.35rem 0.55rem; }
 .hud-idle {
   display: flex;
   align-items: center;
@@ -421,7 +420,6 @@ body.calibrating .sheet { display: none; }
   white-space: nowrap;
 }
 .hud-glyph { color: var(--accent); font-size: 0.9rem; line-height: 1; }
-.hud.idle-min .hud-idle-text { display: none; }
 
 /* Warning (amber) — every phase */
 .hud-warning {
@@ -434,7 +432,6 @@ body.calibrating .sheet { display: none; }
   line-height: 1.35;
 }
 .hud.idle .hud-warning { max-width: 40vw; white-space: normal; }
-.hud.idle-min .hud-warning { display: none; }
 
 /* Header */
 .hud-head {

@@ -37,8 +37,20 @@ function gradeClass(grade: Grade | null): string {
 }
 
 /** Updates the persistent HUD skeleton without replacing its DOM nodes. */
+
+/** What the idle pill says: proof of life plus the one thing that could be wrong. */
+export function idleLabel(state: { model: { state: string; modelId: string | null; message: string | null }; arena?: unknown }): string {
+  const m = state.model
+  if (m.state === 'ready') return 'DraftFM ready · waiting for a draft'
+  if (m.state === 'loading') return 'DraftFM loading…'
+  if (m.state === 'no-bundle') return 'DraftFM: model bundle missing'
+  if (m.state === 'no-set') return 'DraftFM ready · set not bundled'
+  return `DraftFM error${m.message ? ': ' + m.message : ''}`
+}
+
 export class Hud {
   private readonly idle: HTMLElement
+  private readonly idleText: HTMLElement
   private readonly main: HTMLElement
   private readonly warning: HTMLElement
   private readonly title: HTMLElement
@@ -83,6 +95,7 @@ export class Hud {
   constructor(private root: HTMLElement, private action: OverlayAction) {
     const rail = root.closest<HTMLElement>('.draft-rail') ?? root
     this.idle = $(root, 'hudIdle')
+    this.idleText = $(root, 'hudIdleText')
     this.main = $(root, 'hudMain')
     this.warning = $(root, 'hudWarning')
     this.title = $(root, 'hudTitle')
@@ -157,7 +170,7 @@ export class Hud {
     const classes = ['hud', `hud-${this.corner}`]
     if (!idle) classes.push('interactive')
     if (!prefs.hud) classes.push('hidden')
-    if (idle) classes.push('idle', 'idle-min')
+    if (idle) classes.push('idle')
     if (state.phase === 'complete') classes.push('complete')
     if (state.scoring) classes.push('scoring')
     // Active/complete content belongs to the fixed sidebar, independent of
@@ -174,7 +187,7 @@ export class Hud {
 
     this.idle.hidden = !idle
     this.main.hidden = idle
-    if (idle) return
+    if (idle) { setText(this.idleText, idleLabel(state)); return }
 
     // Header
     setText(this.title, eventTitle(state))
