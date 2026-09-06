@@ -596,3 +596,66 @@ describe('DraftParser — edge cases', () => {
     expect(parser.getSnapshot()!.state).toBe('complete')
   })
 })
+
+describe('DraftParser — course listings name the pod after a log rotation', () => {
+  const notify = '[UnityCrossThreadLogger]Draft.Notify {"draftId":"df80e16a-0000-0000-0000-000000000001","SelfPick":3,"SelfPack":1,"PackCards":"84853,84770,84833"}'
+  const course = (name: string, module: string) => `{"CourseId":"c-${name}","InternalEventName":"${name}","CurrentModule":"${module}","ModulePayload":""}`
+  const listing = (...cs: string[]) => [
+    '<== EventGetCoursesV2(b3542850-b9ff-4d6c-8359-39edd60efcf5)',
+    `{"Courses":[${cs.join(',')}]}`
+  ]
+
+  it('fills a missing event name on a human session from the one human course still in a draft module', () => {
+    const parser = new DraftParser()
+    feed(parser, [notify, ...listing(
+      course('QuickDraft_SOS_20260831', 'BotDraft'),
+      course('PremierDraft_HOB_20260811', 'CreateMatch'),
+      course('PremierDraft_LTR_20260825', 'PlayerDraft'),
+      course('Ladder', 'Complete')
+    )])
+    const s = parser.getSnapshot()!
+    expect(s.eventName).toBe('PremierDraft_LTR_20260825')
+    expect(s.set).toBe('LTR')
+    expect(s.format).toBe('PremierDraft')
+    expect(s.isBotDraft).toBe(false)
+  })
+
+  it('never starts a session from a listing, and stays unnamed when two human drafts are both in a draft module', () => {
+    const parser = new DraftParser()
+    feed(parser, listing(course('PremierDraft_LTR_20260825', 'PlayerDraft')))
+    expect(parser.getSnapshot()).toBeNull()
+
+    feed(parser, [notify, ...listing(
+      course('PremierDraft_LTR_20260825', 'PlayerDraft'),
+      course('TradDraft_LTR_20260825', 'PlayerDraft')
+    )])
+    expect(parser.getSnapshot()!.eventName).toBeNull()
+  })
+
+  it('does not adopt a bot course for a human session or a stale course that left the draft', () => {
+    const parser = new DraftParser()
+    feed(parser, [notify, ...listing(
+      course('QuickDraft_SOS_20260831', 'BotDraft'),
+      course('PremierDraft_HOB_20260811', 'CreateMatch')
+    )])
+    expect(parser.getSnapshot()!.eventName).toBeNull()
+  })
+
+  it('post-draft DeckSelect still names an existing unnamed session', () => {
+    const parser = new DraftParser()
+    feed(parser, [notify, ...listing(course('PremierDraft_LTR_20260825', 'DeckSelect'))])
+    expect(parser.getSnapshot()!.set).toBe('LTR')
+  })
+
+  it('the Event_Join response (single Course) is authoritative and may start the session', () => {
+    const parser = new DraftParser()
+    const events = capture(parser)
+    feed(parser, [
+      '<== EventJoin(14a20f83-6eb8-40a6-a356-7dfaef149f3b)',
+      `{"Course":${course('PremierDraft_LTR_20260825', 'PlayerDraft')}}`
+    ])
+    expect(events.starts.length).toBe(1)
+    expect(events.starts[0].set).toBe('LTR')
+    expect(events.starts[0].isBotDraft).toBe(false)
+  })
+})

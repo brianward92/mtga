@@ -203,3 +203,37 @@ describe('DraftCoordinator', () => {
     expect(models.calls.filter(x => (x as { pack: number[] }).pack.length === 2)).toHaveLength(0) // never reached pick 2
   })
 })
+
+describe('DraftCoordinator — set inference when the log replay lost the event name', () => {
+  it('adopts the set whose bundle knows the pack cards, then names cards and scores', async () => {
+    const models = stubModels()
+    const inferred: number[][] = []
+    ;(models as unknown as { setForGrpIds: (g: number[]) => string | null }).setForGrpIds = g => { inferred.push(g); return g.includes(2) ? 'DSK' : null }
+    const c = new DraftCoordinator(models as never, { append() {} } as never)
+    c.setReplaying(true)
+    // A session reconstructed from Draft.Notify alone: no set, no format, human draft.
+    const nameless = snap({ eventName: null, set: null, format: null, isBotDraft: false, currentPack: { pack: 1, pick: 3, grpIds: [1, 2] } })
+    c.onDraftStart(nameless)
+    c.onDraftPack(nameless)
+    c.setReplaying(false)
+    c.resumeAfterReplay()
+    await flush(); await flush()
+
+    expect(inferred.length).toBeGreaterThan(0)
+    expect(c.current.set).toBe('DSK')
+    expect(c.current.format).toBe('PremierDraft')
+    expect(c.current.cards.map(card => card.name).sort()).toEqual(['Funeral Room', 'Murder'])
+    expect(c.current.cards.find(card => card.grpId === 2)?.rank).toBe(1)
+  })
+
+  it('leaves the state untouched when no bundle matches', () => {
+    const models = stubModels()
+    ;(models as unknown as { setForGrpIds: (g: number[]) => string | null }).setForGrpIds = () => null
+    const c = new DraftCoordinator(models as never, { append() {} } as never)
+    const nameless = snap({ eventName: null, set: null, format: null, isBotDraft: false, currentPack: { pack: 1, pick: 3, grpIds: [99] } })
+    c.onDraftStart(nameless)
+    c.onDraftPack(nameless)
+    expect(c.current.set).toBeNull()
+    expect(c.current.cards.map(card => card.name)).toEqual(['Card #99'])
+  })
+})

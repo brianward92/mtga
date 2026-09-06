@@ -39,7 +39,26 @@ export class DraftCoordinator extends EventEmitter {
 
   // ---- parser events ------------------------------------------------------
 
+  /** Fill in set/format when the replayed log lacked the EventJoin line. */
+  private fill(snap: DraftSessionSnapshot): DraftSessionSnapshot {
+    if (snap.set) return snap
+    const ids = snap.currentPack?.grpIds ?? snap.pool
+    const set = this.models.setForGrpIds(ids)
+    if (!set) return snap
+    const filled = { ...snap, set, format: snap.format ?? (snap.isBotDraft ? 'QuickDraft' : 'PremierDraft') }
+    // Draft start may already have run without a set: adopt the bundle now.
+    if (!this.bundle && this.state.phase === 'active') {
+      this.bundle = this.models.bundleFor(set)
+      const ppp = this.bundle?.picksPerPack ?? 14
+      this.state = { ...this.state, set, format: filled.format, picksPerPack: ppp, totalPicks: 3 * ppp,
+        snapshot: { scryfall: this.bundle?.scryfallUpdatedAt ?? null, model: this.models.modelTag } }
+      if (!this.replaying) void this.models.ensure(set, filled.format!).then(() => this.refreshModelInfo())
+    }
+    return filled
+  }
+
   onDraftStart(snap: DraftSessionSnapshot): void {
+    snap = this.fill(snap)
     this.clearEndTimer()
     this.draftToken++
     this.snapshot = snap
@@ -63,6 +82,7 @@ export class DraftCoordinator extends EventEmitter {
   }
 
   onDraftPack(snap: DraftSessionSnapshot): void {
+    snap = this.fill(snap)
     if (this.state.phase !== 'active' || !this.snapshot) this.onDraftStart(snap)
     this.snapshot = snap
     const cur = snap.currentPack
@@ -80,6 +100,7 @@ export class DraftCoordinator extends EventEmitter {
   }
 
   onDraftPick(snap: DraftSessionSnapshot, pick: DraftPickRecord): void {
+    snap = this.fill(snap)
     this.snapshot = snap
     const takenGrp = pick.grpIds[0]
     const scores = this.lastScores && this.lastScores.pack === pick.pack && this.lastScores.pick === pick.pick ? this.lastScores : null
@@ -104,6 +125,7 @@ export class DraftCoordinator extends EventEmitter {
   }
 
   onDraftEnd(snap: DraftSessionSnapshot): void {
+    snap = this.fill(snap)
     this.snapshot = snap
     this.state = { ...this.state, phase: 'complete', cards: [], scoring: false, pool: this.rows(snap.pool), seq: this.state.seq + 1 }
     this.publish()

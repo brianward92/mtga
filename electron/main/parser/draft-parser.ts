@@ -19,8 +19,14 @@
  *   bot-draft events (BotDraftDraftStatus/BotDraftDraftPick) are 0-indexed.
  * - Draft.Notify PackCards is a comma-separated STRING of ids; bot DraftPack
  *   and CardIds are STRING arrays; everything is normalized to number[].
- * - Human P1P1 never generates a Draft.Notify; the pack contents arrive
- *   retroactively at pick time via a LogBusinessEvents request (CardsInPack).
+ * - Human P1P1 IS pushed as a Draft.Notify by the current client (observed
+ *   2026-09-06, two seconds before the draft scene loads). The pick-time
+ *   LogBusinessEvents request (CardsInPack) remains as a backfill for older
+ *   logs and for replay after a log rotation.
+ * - Arena rotates Player.log when it crashes or restarts. The Event_Join
+ *   request then lives only in a rotated file, so the course listing Arena
+ *   logs on every reconnect (EventGetCoursesV2 / the Event_Join response) is
+ *   the durable source of the event name mid-draft.
  * - Requests wrap their JSON in a string-escaped "request" field, sometimes
  *   with a further string-escaped "Payload" inside; deepFindObjectWithKey
  *   parses through nested string JSON.
@@ -38,6 +44,14 @@ const KEY_MAKE_PICK = 'Event_PlayerDraftMakePick'
 const KEY_BOT_PICK = 'BotDraft_DraftPick'
 const KEY_COMPLETE = 'Draft_CompleteDraft'
 const KEY_EVENT_JOIN = 'Event_Join'
+/**
+ * CurrentModule values of a course whose event is a draft we are (or were
+ * just) in. PlayerDraft/BotDraft = picking; DeckSelect/DeckBuilder = the
+ * post-draft builder. Anything else (CreateMatch, Complete, ...) is a course
+ * that already left the draft and must not start a session.
+ */
+const IN_DRAFT_MODULES = new Set(['PlayerDraft', 'BotDraft', 'Draft'])
+const POST_DRAFT_MODULES = new Set(['DeckSelect', 'DeckBuilder', 'DeckBuild'])
 
 /**
  * Bare response marker line: "[UnityCrossThreadLogger]<== BotDraftDraftStatus(guid)"
@@ -179,7 +193,7 @@ export class DraftParser extends EventEmitter {
     }
 
     try {
-      // Human pack pushed to the client (P1P2+, P2P1, P3P1 — never P1P1)
+      // Human pack pushed to the client (every pick incl. P1P1 on the current client)
       if (line.includes('Draft.Notify') && line.includes('PackCards')) {
         this.handleDraftNotify(line)
         return
@@ -202,6 +216,13 @@ export class DraftParser extends EventEmitter {
           this.handleEventJoin(line)
           return
         }
+      }
+
+      // Course listing (EventGetCoursesV2 response, Event_Join response):
+      // the durable source of the draft event name after a log rotation.
+      if (line.includes('<==') && line.includes('InternalEventName') && line.includes('CurrentModule')) {
+        this.handleCourses(line)
+        return
       }
 
       // Human draft completion (request and/or response carrying CardPool)
@@ -454,6 +475,56 @@ export class DraftParser extends EventEmitter {
 
     this.completeSession(session, cardPool.length > 0 ? cardPool : null)
   }
+
+  /**
+   * <== EventGetCoursesV2 {"Courses":[{"InternalEventName":"PremierDraft_LTR_20260825","CurrentModule":"PlayerDraft",...},...]}
+   * <== EventJoin {"Course":{"InternalEventName":"...","CurrentModule":"PlayerDraft",...}}
+   * Arena logs a course listing on every (re)connect. A draft course whose
+   * module is still in the draft names the pod even when the Event_Join
+   * request was lost to a log rotation. Post-draft modules only fill in a
+   * missing name on an existing session; they never start one.
+   */
+  private handleCourses(line: string): void {
+    const json = parseJsonFromLine(line)
+    if (!json) return
+    const j = json as { Courses?: unknown; Course?: unknown }
+    const single = !Array.isArray(j.Courses) && !!j.Course
+    const list: unknown[] = Array.isArray(j.Courses) ? j.Courses : single ? [j.Course] : []
+    const courses: Array<{ name: string; module: string; bot: boolean }> = []
+    for (const c of list) {
+      if (!c || typeof c !== 'object') continue
+      const { InternalEventName: name, CurrentModule: module } = c as { InternalEventName?: unknown; CurrentModule?: unknown }
+      if (typeof name !== 'string' || typeof module !== 'string') continue
+      const parsed = parseDraftEventName(name)
+      if (!parsed) continue
+      courses.push({ name, module, bot: parsed.format === 'QuickDraft' })
+    }
+    if (courses.length === 0) return
+
+    const s = this.session
+    if (single) {
+      // Event_Join response: one course, authoritative for the pod we joined.
+      const c = courses[0]
+      if (!IN_DRAFT_MODULES.has(c.module) && !POST_DRAFT_MODULES.has(c.module)) return
+      this.pendingEventName = c.name
+      if (s) { if (!s.eventName) s.applyEventName(c.name) }
+      else if (IN_DRAFT_MODULES.has(c.module)) this.ensureSession({ eventName: c.name, isBot: c.bot, reviveIfComplete: false })
+      return
+    }
+
+    // EventGetCoursesV2: every course the account is in, including stale
+    // drafts parked in a draft module. It may only fill in a missing name on
+    // a session we already have, and only when exactly one candidate matches
+    // that session's kind (human vs bot) and is still in a draft module.
+    if (!s || s.eventName) return
+    const candidates = courses.filter(c => c.bot === s.isBotDraft && (IN_DRAFT_MODULES.has(c.module) || POST_DRAFT_MODULES.has(c.module)))
+    const inDraft = candidates.filter(c => IN_DRAFT_MODULES.has(c.module))
+    const pick = inDraft.length === 1 ? inDraft[0] : candidates.length === 1 ? candidates[0] : null
+    if (!pick) return
+    this.pendingEventName = pick.name
+    s.applyEventName(pick.name)
+  }
+
 
   /**
    * ==> EventJoin {"id":"...","request":"{\"EventName\":\"PremierDraft_SOS_20260421\"}"}

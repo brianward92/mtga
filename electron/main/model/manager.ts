@@ -66,6 +66,23 @@ export class ModelManager {
   /** Load static card metadata for a set without loading ONNX sessions. */
   bundleFor(set: string): SetBundle | null { return this.root ? loadSetBundle(this.root, set) : null }
 
+  private identityCache = new Map<string, SetBundle | null>()
+  /**
+   * Infer the set from pack card ids when the log replay missed the event
+   * name (mid-draft relaunch). Picks the bundled set that knows the most ids.
+   */
+  setForGrpIds(grpIds: number[]): string | null {
+    if (!this.root || grpIds.length === 0) return null
+    let best: string | null = null; let bestHits = 0
+    for (const set of this.sets) {
+      if (!this.identityCache.has(set)) this.identityCache.set(set, this.hasSet(set) ? this.bundleFor(set) : null)
+      const b = this.identityCache.get(set); if (!b) continue
+      let hits = 0; for (const g of grpIds) if (b.cards.has(g)) hits++
+      if (hits > bestHits) { bestHits = hits; best = set }
+    }
+    return bestHits * 2 > grpIds.length ? best : null
+  }
+
   /** Report model readiness for a requested set and format. */
   status(set: string | null, format: string | null): ModelStatus {
     const base = { modelId: this.loaded?.model.modelId ?? null, modelTag: this.index?.modelTag ?? null, set, format, sets: this.sets, message: null as string | null }
