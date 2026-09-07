@@ -13,6 +13,9 @@
 #   arena.sh pick [top|<grpId>] [--dry-run]    one pick (wraps pick-next-card.sh)
 #   arena.sh draft [SECONDS]                   pick on a loop until the draft completes
 #   arena.sh log                               tail Player.log for draft events
+#   arena.sh build [--dry-run|--read|--no-lands] build the advisor's deck in Arena's builder (never presses Done)
+#   arena.sh build --verify [SECONDS]          after Done: diff Arena's submitted deck against the plan
+#   arena.sh ocr <image.png>                   Vision OCR of an image, one JSON line per text box
 #
 # Coordinates are screen POINTS (what osascript/System Events report), not
 # retina pixels. A screenshot scaled to 1800 px wide on a 3024 px display is
@@ -78,6 +81,8 @@ case "$cmd" in
   key)      activate; osascript -e "tell application \"System Events\" to key code $1" ;;
   state)    [ -f "$MTGA_STATE_FILE" ] || die "no state mirror at $MTGA_STATE_FILE"; state_py "${1:-pos}" ;;
   pick)     bash scripts/dev/pick-next-card.sh "$@" ;;
+  build)    [ -f "$MTGA_STATE_FILE" ] || die "no state mirror at $MTGA_STATE_FILE"; for t in click move-mouse scroll ocr; do helper $t >/dev/null; done; npx tsx scripts/dev/deckbuild.ts "$MTGA_STATE_FILE" "$@" ;;
+  ocr)      "$(helper ocr)" "$@" ;;
   draft)
     end=$((SECONDS + ${1:-570})); last=""
     while [ $SECONDS -lt $end ]; do
