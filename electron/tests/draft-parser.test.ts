@@ -659,3 +659,32 @@ describe('DraftParser — course listings name the pod after a log rotation', ()
     expect(events.starts[0].isBotDraft).toBe(false)
   })
 })
+
+describe('DraftParser — deck submission and sealed', () => {
+  it('emits the submitted Limited deck from the EventSetDeckV3 request (real 2026-09-06 fixture)', () => {
+    const parser = new DraftParser()
+    const decks: Array<{ eventName: string | null; mainCount: number; main: Array<{ grpId: number; quantity: number }>; sideboard: unknown[] }> = []
+    parser.on('deck-submitted', d => decks.push(d))
+    feed(parser, fixtureLines('limited-deck-submit.log'))
+    expect(decks).toHaveLength(1)
+    expect(decks[0].eventName).toBe('PremierDraft_LTR_20260825')
+    expect(decks[0].mainCount).toBe(41)
+    expect(decks[0].main.find(e => e.grpId === 84919)?.quantity).toBe(1)
+    expect(decks[0].sideboard.length).toBe(15)
+  })
+
+  it('a Sealed join response carries the pool and yields a complete session', () => {
+    const parser = new DraftParser()
+    const events = capture(parser)
+    feed(parser, [
+      '<== EventJoin(aaaa-bbbb)',
+      '{"Course":{"CourseId":"c1","InternalEventName":"Sealed_HOB_20260811","CurrentModule":"DeckSelect","CardPool":[101,102,103,103]}}'
+    ])
+    expect(events.ends).toHaveLength(1)
+    const s = parser.getSnapshot()!
+    expect(s.set).toBe('HOB')
+    expect(s.format).toBe('Sealed')
+    expect(s.state).toBe('complete')
+    expect(s.pool).toEqual([101, 102, 103, 103])
+  })
+})

@@ -64,6 +64,8 @@ export interface ModelInfo {
 /** Complete JSON-plain renderer snapshot for the current draft lifecycle. */
 export interface DraftState {
   phase: 'idle' | 'active' | 'complete'
+  /** Arena's own submitted Limited deck (from EventSetDeck), once Done is pressed. */
+  submittedDeck?: { main: Array<{ grpId: number; quantity: number }>; sideboard: Array<{ grpId: number; quantity: number }>; mainCount: number } | null
   set: string | null
   format: string | null
   eventName: string | null

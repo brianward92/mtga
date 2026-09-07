@@ -18,6 +18,14 @@ export interface DraftPickRecord {
  * Every pack/pick number is 1-based. Human events already use this convention;
  * bot-draft values are shifted by the parser before they reach the session.
  */
+/** Arena's own Limited deck submission (EventSetDeckV2/V3 request). */
+export interface SubmittedDeck {
+  eventName: string | null
+  main: Array<{ grpId: number; quantity: number }>
+  sideboard: Array<{ grpId: number; quantity: number }>
+  mainCount: number
+}
+
 export interface DraftSessionSnapshot {
   draftId: string | null
   eventName: string | null

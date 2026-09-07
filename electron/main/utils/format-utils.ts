@@ -7,12 +7,16 @@ export function parseDraftEventName(eventName: string): { set: string; format: s
 
   // Format_SET_YYYYMMDD (date may carry extra suffixes on special events)
   const match = eventName.match(/^([A-Za-z]+)_([A-Za-z0-9]{2,6})_(\d{6,8})/)
-  if (match && match[1].toLowerCase().includes('draft')) {
+  if (match && /draft|sealed/i.test(match[1])) {
     return { set: match[2].toUpperCase(), format: match[1] }
   }
 
-  // Fallback: any Draft event with a recognizable set code segment
-  if (eventName.toLowerCase().includes('draft')) {
+  // Arena Direct sealed: ArenaDirect_OTJ_Sealed_20240726
+  const direct = eventName.match(/^ArenaDirect_([A-Za-z0-9]{2,6})_(Sealed|Draft)_(\d{6,8})/)
+  if (direct) return { set: direct[1].toUpperCase(), format: `ArenaDirect${direct[2]}` }
+
+  // Fallback: any Draft/Sealed event with a recognizable set code segment
+  if (/draft|sealed/i.test(eventName)) {
     const parts = eventName.split('_')
     const setPart = parts.find(p => /^[A-Z0-9]{3,4}$/.test(p))
     if (setPart) {

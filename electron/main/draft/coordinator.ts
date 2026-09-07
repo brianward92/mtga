@@ -8,7 +8,7 @@
  * and JSONL persistence. It knows nothing about windows.
  */
 import { EventEmitter } from 'events'
-import type { DraftSessionSnapshot, DraftPickRecord } from '../parser/draft-session'
+import type { DraftSessionSnapshot, DraftPickRecord, SubmittedDeck } from '../parser/draft-session'
 import { ModelManager, type ScoredCard } from '../model/manager'
 import { type SetBundle, type CardInfo } from '../data/bundle'
 import { DraftHistory } from '../data/history'
@@ -21,6 +21,7 @@ export class DraftCoordinator extends EventEmitter {
   private snapshot: DraftSessionSnapshot | null = null
   private bundle: SetBundle | null = null
   private scoreToken = 0
+  lastSubmittedDeck: SubmittedDeck | null = null
   private lastScores: { pack: number; pick: number; cards: ScoredCard[]; modelId: string } | null = null
   private endTimer: NodeJS.Timeout | null = null
   private replaying = false
@@ -122,6 +123,18 @@ export class DraftCoordinator extends EventEmitter {
     if (!this.replaying) {
       this.history.append({ at: new Date().toISOString(), type: 'pick', draftId: snap.draftId, eventName: snap.eventName, set: snap.set, format: snap.format, ...record, modelId: scores?.modelId ?? null })
     }
+  }
+
+  /** Arena submitted the Limited deck: record it, and expose it for verification. */
+  onDeckSubmitted(deck: SubmittedDeck): void {
+    this.lastSubmittedDeck = deck
+    if (!this.replaying) {
+      const snap = this.snapshot
+      this.history.append({ at: new Date().toISOString(), type: 'deck-submit', draftId: snap?.draftId ?? null, eventName: deck.eventName ?? snap?.eventName ?? null, set: snap?.set ?? null, format: snap?.format ?? null,
+        mainCount: deck.mainCount, main: deck.main, sideboard: deck.sideboard })
+    }
+    this.state = { ...this.state, submittedDeck: { main: deck.main, sideboard: deck.sideboard, mainCount: deck.mainCount }, seq: this.state.seq + 1 }
+    this.publish()
   }
 
   onDraftEnd(snap: DraftSessionSnapshot): void {

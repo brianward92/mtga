@@ -7,7 +7,7 @@ import { dirname } from 'path'
 
 interface HistoryEvent {
   at: string
-  type: 'draft-start' | 'pick' | 'draft-end'
+  type: 'draft-start' | 'pick' | 'draft-end' | 'deck-submit'
   draftId: string | null
   eventName: string | null
   set: string | null

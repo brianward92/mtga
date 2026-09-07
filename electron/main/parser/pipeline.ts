@@ -1,4 +1,5 @@
 import { DraftParser } from './draft-parser'
+import type { SubmittedDeck } from './draft-session'
 import { LogWatcher } from './watcher'
 import type { DraftPickRecord, DraftSessionSnapshot } from './draft-session'
 
@@ -10,6 +11,7 @@ export interface DraftLogSink {
   onDraftPack: (snapshot: DraftSessionSnapshot) => void
   onDraftPick: (snapshot: DraftSessionSnapshot, pick: DraftPickRecord) => void
   onDraftEnd: (snapshot: DraftSessionSnapshot) => void
+  onDeckSubmitted: (deck: SubmittedDeck) => void
   setWarning: (warning: string | null) => void
   setReplaying: (replaying: boolean) => void
   resumeAfterReplay: () => void
@@ -30,6 +32,7 @@ export function startDraftLogPipeline(sink: DraftLogSink, deps: DraftLogPipeline
   parser.on('draft-pack', snapshot => sink.onDraftPack(snapshot))
   parser.on('draft-pick', (snapshot, pick) => sink.onDraftPick(snapshot, pick))
   parser.on('draft-end', snapshot => sink.onDraftEnd(snapshot))
+  parser.on('deck-submitted', deck => sink.onDeckSubmitted(deck))
   parser.on('detailed-logs', ({ enabled }: { enabled: boolean }) => {
     sink.setWarning(enabled ? null : DETAILED_LOGS_WARNING)
   })

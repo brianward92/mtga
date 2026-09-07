@@ -44,6 +44,7 @@ const KEY_MAKE_PICK = 'Event_PlayerDraftMakePick'
 const KEY_BOT_PICK = 'BotDraft_DraftPick'
 const KEY_COMPLETE = 'Draft_CompleteDraft'
 const KEY_EVENT_JOIN = 'Event_Join'
+const KEY_SET_DECK = 'Event_SetDeck'
 /**
  * CurrentModule values of a course whose event is a draft we are (or were
  * just) in. PlayerDraft/BotDraft = picking; DeckSelect/DeckBuilder = the
@@ -214,6 +215,10 @@ export class DraftParser extends EventEmitter {
         }
         if (hasKey(line, KEY_EVENT_JOIN)) {
           this.handleEventJoin(line)
+          return
+        }
+        if (hasKey(line, KEY_SET_DECK)) {
+          this.handleSetDeck(line)
           return
         }
       }
@@ -477,6 +482,35 @@ export class DraftParser extends EventEmitter {
   }
 
   /**
+   * ==> EventSetDeckV3 {"id":"...","request":"{\"EventName\":\"PremierDraft_LTR_20260825\",\"Summary\":{...},\"Deck\":{\"MainDeck\":[{\"cardId\":84919,\"quantity\":1},...],\"Sideboard\":[...]}}"}
+   * Arena's own submission of the Limited deck (Done in the builder). This is
+   * the ground truth for the final decklist, so an automated build verifies
+   * against it. V2 and V3 share the shape.
+   */
+  private handleSetDeck(line: string): void {
+    const outer = parseJsonFromLine(line)
+    if (!outer) return
+    const req = typeof outer.request === 'string' ? tryParseJson(outer.request) : outer.request
+    const body = (req ?? outer) as { EventName?: unknown; Deck?: { MainDeck?: unknown; Sideboard?: unknown } }
+    const deck = body.Deck
+    if (!deck || typeof deck !== 'object') return
+    const entries = (v: unknown): Array<{ grpId: number; quantity: number }> =>
+      Array.isArray(v)
+        ? v.map(e => ({ grpId: Number((e as { cardId?: unknown }).cardId), quantity: Number((e as { quantity?: unknown }).quantity ?? 1) }))
+            .filter(e => Number.isFinite(e.grpId) && e.grpId > 0)
+        : []
+    const main = entries(deck.MainDeck)
+    if (main.length === 0) return
+    const eventName = typeof body.EventName === 'string' ? body.EventName : null
+    this.emit('deck-submitted', {
+      eventName,
+      main,
+      sideboard: entries(deck.Sideboard),
+      mainCount: main.reduce((n, e) => n + e.quantity, 0)
+    })
+  }
+
+  /**
    * <== EventGetCoursesV2 {"Courses":[{"InternalEventName":"PremierDraft_LTR_20260825","CurrentModule":"PlayerDraft",...},...]}
    * <== EventJoin {"Course":{"InternalEventName":"...","CurrentModule":"PlayerDraft",...}}
    * Arena logs a course listing on every (re)connect. A draft course whose
@@ -507,6 +541,14 @@ export class DraftParser extends EventEmitter {
       const c = courses[0]
       if (!IN_DRAFT_MODULES.has(c.module) && !POST_DRAFT_MODULES.has(c.module)) return
       this.pendingEventName = c.name
+      // Sealed (and any join that already carries a pool): there are no picks,
+      // the course IS the pool, so the session is born complete.
+      const pool = toGrpIds((j.Course as { CardPool?: unknown }).CardPool)
+      if (pool.length > 0 && /sealed/i.test(c.name)) {
+        const session = this.ensureSession({ eventName: c.name, isBot: false, reviveIfComplete: false })
+        this.completeSession(session, pool)
+        return
+      }
       if (s) { if (!s.eventName) s.applyEventName(c.name) }
       else if (IN_DRAFT_MODULES.has(c.module)) this.ensureSession({ eventName: c.name, isBot: c.bot, reviveIfComplete: false })
       return
