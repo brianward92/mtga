@@ -133,7 +133,7 @@ describe('DraftCoordinator', () => {
     expect(c.current.cards[0].ev).toBe(1) // second pack scored
   })
 
-  it('does not score or persist while replaying, then resumes', async () => {
+  it('does not score while replaying, but does persist, then resumes', async () => {
     const models = stubModels()
     const history = { append: vi.fn() }
     const c = new DraftCoordinator(models as never, history as never)
@@ -142,14 +142,17 @@ describe('DraftCoordinator', () => {
     c.onDraftPack(snap({ currentPack: { pack: 1, pick: 1, grpIds: [1, 2] } }))
     await flush()
     expect(models.score).not.toHaveBeenCalled()
-    expect(history.append).not.toHaveBeenCalled()
+    // Persisted even during replay: Arena keeps one backup log, so a draft's
+    // picks survive exactly one restart of the game and this file is where
+    // they live afterwards. DraftHistory rejects duplicates by identity.
+    expect(history.append).toHaveBeenCalled()
     c.resumeAfterReplay()
     await flush(); await flush()
     expect(models.score).toHaveBeenCalledTimes(1)
     expect(c.current.cards.find(r => r.grpId === 2)!.rank).toBe(1)
   })
 
-  it('backfills model comparisons for replayed picks after resume, without touching history', async () => {
+  it('backfills model comparisons for replayed picks after resume', async () => {
     const models = stubModels()
     const history = { append: vi.fn() }
     const c = new DraftCoordinator(models as never, history as never)
@@ -178,7 +181,9 @@ describe('DraftCoordinator', () => {
     expect(c.current.picks[1]).toMatchObject({ grpId: 2, recommendedGrpId: 2, recommendedName: 'Funeral Room', takenRank: 1, ev: 2.5 })
     expect(c.current.picks[2]).toMatchObject({ grpId: 999, recommendedGrpId: 2, recommendedName: 'Funeral Room', takenRank: 3, ev: null })
     expect(c.current.seq).toBeGreaterThan(before)
-    expect(history.append).not.toHaveBeenCalled()
+    // The three replayed picks were persisted as they arrived; the backfill
+    // itself writes nothing further, since those rows already exist.
+    expect(history.append.mock.calls.filter(c => c[0].type === 'pick')).toHaveLength(3)
   })
 
   it('abandons a backfill when a newer draft starts mid-way', async () => {

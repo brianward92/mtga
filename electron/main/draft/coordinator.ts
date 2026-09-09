@@ -79,7 +79,7 @@ export class DraftCoordinator extends EventEmitter {
       snapshot: { scryfall: this.bundle?.scryfallUpdatedAt ?? null, model: this.models.modelTag },
       seq: this.state.seq + 1
     }
-    if (!this.replaying) this.history.append({ at: new Date().toISOString(), type: 'draft-start', draftId: snap.draftId, eventName: snap.eventName, set: snap.set, format: snap.format })
+    this.history.append({ at: new Date().toISOString(), type: 'draft-start', draftId: snap.draftId, eventName: snap.eventName, set: snap.set, format: snap.format })
     this.publish()
     if (!this.replaying && snap.set && snap.format) void this.models.ensure(snap.set, snap.format).then(() => this.refreshModelInfo())
   }
@@ -139,9 +139,10 @@ export class DraftCoordinator extends EventEmitter {
     // The pack is stale once picked: drop its rows until the next pack lands.
     this.state = { ...this.state, picks, pool: this.rows(snap.pool), cards: [], scoring: false, seq: this.state.seq + 1 }
     this.publish()
-    if (!this.replaying) {
-      this.history.append({ at: new Date().toISOString(), type: 'pick', draftId: snap.draftId, eventName: snap.eventName, set: snap.set, format: snap.format, ...record, modelId: scores?.modelId ?? null })
-    }
+    // Recorded during replay too. Arena keeps one backup log, so a draft's
+    // picks survive exactly one restart of the game; this file is where they
+    // live afterwards. Duplicates are rejected by identity in DraftHistory.
+    this.history.append({ at: new Date().toISOString(), type: 'pick', draftId: snap.draftId, eventName: snap.eventName, set: snap.set, format: snap.format, ...record, modelId: scores?.modelId ?? null })
   }
 
   /**
@@ -158,11 +159,9 @@ export class DraftCoordinator extends EventEmitter {
   /** Arena submitted the Limited deck: record it, and expose it for verification. */
   onDeckSubmitted(deck: SubmittedDeck): void {
     this.lastSubmittedDeck = deck
-    if (!this.replaying) {
-      const snap = this.snapshot
-      this.history.append({ at: new Date().toISOString(), type: 'deck-submit', draftId: snap?.draftId ?? null, eventName: deck.eventName ?? snap?.eventName ?? null, set: snap?.set ?? null, format: snap?.format ?? null,
-        mainCount: deck.mainCount, main: deck.main, sideboard: deck.sideboard })
-    }
+    const submitSnap = this.snapshot
+    this.history.append({ at: new Date().toISOString(), type: 'deck-submit', draftId: submitSnap?.draftId ?? null, eventName: deck.eventName ?? submitSnap?.eventName ?? null, set: submitSnap?.set ?? null, format: submitSnap?.format ?? null,
+      mainCount: deck.mainCount, main: deck.main, sideboard: deck.sideboard })
     this.state = { ...this.state, submittedDeck: { main: deck.main, sideboard: deck.sideboard, mainCount: deck.mainCount }, seq: this.state.seq + 1 }
     this.publish()
   }
@@ -172,7 +171,14 @@ export class DraftCoordinator extends EventEmitter {
     this.snapshot = snap
     this.state = { ...this.state, phase: 'complete', cards: [], scoring: false, pool: this.rows(snap.pool), seq: this.state.seq + 1 }
     this.publish()
-    if (!this.replaying) this.history.append({ at: new Date().toISOString(), type: 'draft-end', draftId: snap.draftId, eventName: snap.eventName, set: snap.set, format: snap.format, picks: this.state.picks.length })
+    const at = new Date().toISOString()
+    this.history.append({ at, type: 'draft-end', draftId: snap.draftId, eventName: snap.eventName, set: snap.set, format: snap.format, picks: this.state.picks.length })
+    // The finished pool, recorded separately. Arena's servers re-send it only
+    // while the deck is unsubmitted, so once Done is pressed this is the last
+    // copy that exists anywhere.
+    if (snap.pool.length > 0) {
+      this.history.append({ at, type: 'draft-pool', draftId: snap.draftId, eventName: snap.eventName, set: snap.set, format: snap.format, pool: snap.pool })
+    }
     this.clearEndTimer()
     this.endTimer = setTimeout(() => { this.endTimer = null; this.idle() }, COMPLETE_LINGER_MS)
   }
