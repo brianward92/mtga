@@ -11,6 +11,7 @@ import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { findBundleRoot, loadSetBundle } from '../main/data/bundle'
 import { loadArenaCards } from '../main/data/arena-cards'
+import { resolveFromArenaDb } from '../main/data/arena-card-db'
 import { arenaDisplayOrder, hasArenaOrder } from '../shared/display-order'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', 'resources', 'draftfm')
@@ -37,6 +38,26 @@ describe('Arena is the authority for card identity', () => {
     const arena = loadArenaCards(ROOT)
     expect(arena.size).toBeGreaterThan(20000)
     expect(arena.name(87453)).toBe('Plains')
+  })
+})
+
+describe('live fallback to Arena for ids nothing else knows', () => {
+  const arenaInstalled = existsSync(
+    join(process.env.HOME ?? '', 'Library', 'Application Support', 'com.wizards.mtga', 'Downloads', 'Raw')
+  )
+
+  it.skipIf(!arenaInstalled)('reads a card straight out of the client database', () => {
+    // Day zero: a set released after the shipped arena-cards.json was built.
+    // The client always knows its own cards, so this is what keeps a brand-new
+    // set draftable instead of refused.
+    const card = resolveFromArenaDb(87455)
+    expect(card?.name).toBe('Island')
+    expect(card?.rarity).toBe('land')
+    expect(card?.order?.length).toBe(3)
+  })
+
+  it.skipIf(!arenaInstalled)('returns null for an id Arena does not have, without throwing', () => {
+    expect(resolveFromArenaDb(1)).toBeNull()
   })
 })
 

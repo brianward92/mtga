@@ -11,6 +11,7 @@ import { EventEmitter } from 'events'
 import type { DraftSessionSnapshot, DraftPickRecord, SubmittedDeck } from '../parser/draft-session'
 import { ModelManager, type ScoredCard } from '../model/manager'
 import { type SetBundle, type CardInfo } from '../data/bundle'
+import { resolveFromArenaDb } from '../data/arena-card-db'
 import { DraftHistory } from '../data/history'
 import { EMPTY_STATE, type CardRow, type DraftState, type PickRecord } from '../../shared/state'
 import { COMPLETE_LINGER_MS } from './completion'
@@ -270,7 +271,29 @@ export class DraftCoordinator extends EventEmitter {
     return { state: s.state, modelId: s.modelId, message: s.message }
   }
 
-  private card(grpId: number): CardInfo | undefined { return this.bundle?.cards.get(grpId) }
+  private card(grpId: number): CardInfo | undefined {
+    const known = this.bundle?.cards.get(grpId)
+    if (known) return known
+    // Day zero: the client knows a set our bundle predates. Ask Arena's own
+    // database before giving up, so a brand-new set is drafted with real card
+    // names and Arena's ordering rather than refused as unidentifiable.
+    const live = resolveFromArenaDb(grpId)
+    if (!live) return undefined
+    return {
+      grpId,
+      name: live.name,
+      rarity: live.rarity,
+      colors: live.colors,
+      colorIdentity: live.colorIdentity,
+      // Arena stores mana as its own "o2oUoU" text and has no Scryfall id;
+      // those stay empty until the set is bundled properly.
+      manaCost: '',
+      manaValue: null,
+      type: live.type,
+      scryfallId: '',
+      order: live.order
+    }
+  }
 
   private rows(grpIds: number[]): CardRow[] {
     return grpIds.map(grpId => {
