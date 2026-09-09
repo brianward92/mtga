@@ -383,7 +383,7 @@ if (!app.requestSingleInstanceLock()) {
     await createOverlay()
     setupTray()
     setupShortcuts()
-    logWatcher = startDraftLogPipeline(coordinator)
+    logWatcher = startDraftLogPipeline(coordinator, { archiveDir: join(app.getPath('userData'), 'arena-logs') })
   })
 }
 

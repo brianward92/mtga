@@ -52,11 +52,77 @@ export function historyKey(ev: HistoryEvent): string {
   }
 }
 
+/** One draft, reassembled from the history file. */
+export interface RecordedDraft {
+  eventName: string | null
+  draftId: string | null
+  set: string | null
+  format: string | null
+  /** Every card drafted, in pick order where known. */
+  pool: number[]
+  picks: Array<{ pack: number; pick: number; grpId: number; name: string | null }>
+  /** The draft reached its end event, rather than being cut off mid-way. */
+  complete: boolean
+  /** Timestamp of the latest event belonging to this draft. */
+  at: string
+}
+
 /** Appends draft lifecycle events to a best-effort JSONL history file. */
 export class DraftHistory {
   private seen: Set<string> | null = null
 
   constructor(private file: string) {}
+
+  /**
+   * The most recently recorded draft, reassembled from its events.
+   *
+   * This is the fallback when nothing else can supply a draft: Arena's log has
+   * rotated past it and its servers have stopped offering the pool because the
+   * deck was submitted. Prefers the recorded pool when there is one, and
+   * otherwise reconstructs it from the picks, which is what a draft cut off
+   * part-way leaves behind.
+   */
+  lastDraft(): RecordedDraft | null {
+    let lines: string[]
+    try {
+      lines = readFileSync(this.file, 'utf8').split('\n')
+    } catch { return null }
+
+    const byDraft = new Map<string, RecordedDraft & { recordedPool: number[] | null }>()
+    let latest: string | null = null
+    for (const line of lines) {
+      if (!line.trim()) continue
+      let ev: HistoryEvent
+      try { ev = JSON.parse(line) as HistoryEvent } catch { continue }
+      if (!ev.type || typeof ev.at !== 'string') continue
+      // Drafts are keyed the way events are, so rows from one draft group even
+      // when the id is null, which it is for every bot draft.
+      const key = `${ev.draftId ?? ''}|${ev.eventName ?? ''}`
+      if (!key.replace('|', '')) continue
+      let d = byDraft.get(key)
+      if (!d) {
+        d = { eventName: ev.eventName, draftId: ev.draftId, set: ev.set, format: ev.format, pool: [], picks: [], complete: false, at: ev.at, recordedPool: null }
+        byDraft.set(key, d)
+      }
+      if (ev.at > d.at) d.at = ev.at
+      if (ev.set && !d.set) d.set = ev.set
+      if (ev.format && !d.format) d.format = ev.format
+      if (ev.type === 'pick' && typeof ev.grpId === 'number') {
+        d.picks.push({ pack: Number(ev.pack), pick: Number(ev.pick), grpId: ev.grpId, name: typeof ev.name === 'string' ? ev.name : null })
+      } else if (ev.type === 'draft-pool' && Array.isArray(ev.pool)) {
+        d.recordedPool = (ev.pool as unknown[]).filter((n): n is number => typeof n === 'number')
+      } else if (ev.type === 'draft-end') {
+        d.complete = true
+      }
+      if (!latest || d.at > (byDraft.get(latest)?.at ?? '')) latest = key
+    }
+    if (!latest) return null
+    const d = byDraft.get(latest)!
+    d.picks.sort((a, b) => a.pack - b.pack || a.pick - b.pick)
+    const { recordedPool, ...draft } = d
+    draft.pool = recordedPool ?? draft.picks.map(p => p.grpId)
+    return draft.pool.length > 0 ? draft : null
+  }
 
   /** Identity of every event already on disk; read once, lazily. */
   private keys(): Set<string> {

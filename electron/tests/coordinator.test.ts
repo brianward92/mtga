@@ -274,3 +274,67 @@ describe('picks per pack is learned from the pack Arena dealt', () => {
     }
   })
 })
+
+describe('restoring a draft from our own history', () => {
+  const recorded = {
+    eventName: 'QuickDraft_DSK_20260811', draftId: null, set: 'DSK', format: 'QuickDraft',
+    pool: [1, 2], picks: [{ pack: 1, pick: 1, grpId: 1, name: 'Murder' }],
+    complete: true, at: '2026-09-09T10:00:00Z'
+  }
+  const historyWith = (draft: unknown) => ({ append: vi.fn(), lastDraft: vi.fn(() => draft) })
+
+  it('rebuilds the pool when replay found nothing at all', () => {
+    // Arena has rotated past the draft and its servers no longer serve the pool
+    // because the deck was submitted. This file is all that is left.
+    const history = historyWith(recorded)
+    const c = new DraftCoordinator(stubModels() as never, history as never)
+    try {
+      c.setReplaying(true)
+      c.resumeAfterReplay()
+      expect(c.current.phase).toBe('complete')
+      expect(c.current.set).toBe('DSK')
+      expect(c.current.pool.map(r => r.name)).toEqual(['Murder', 'Funeral Room'])
+      expect(c.current.picks).toHaveLength(1)
+      expect(c.current.restoredFromHistory).toBe(true)
+    } finally { c.idle() }
+  })
+
+  it('grades a restored pool once the model loads', async () => {
+    // There is no parser snapshot behind a restored draft, and the model
+    // refresh used to require one: the model stayed on "loading" forever and
+    // the pool stayed ungraded, so the deckbuild advisor fell back to
+    // heuristics and cut the best card in the pool.
+    const history = historyWith(recorded)
+    const c = new DraftCoordinator(stubModels() as never, history as never)
+    try {
+      c.setReplaying(true)
+      c.resumeAfterReplay()
+      await flush(); await flush()
+      expect(c.current.model.state).toBe('ready')
+      expect(c.current.pool.find(r => r.grpId === 2)!.grade).toBe('A')
+    } finally { c.idle() }
+  })
+
+  it('never overwrites a draft the log already supplied', () => {
+    const history = historyWith(recorded)
+    const c = new DraftCoordinator(stubModels() as never, history as never)
+    try {
+      c.setReplaying(true)
+      c.onDraftStart(snap({ pool: [2] }))
+      c.resumeAfterReplay()
+      expect(history.lastDraft).not.toHaveBeenCalled()
+      expect(c.current.restoredFromHistory).toBeFalsy()
+    } finally { c.idle() }
+  })
+
+  it('stays idle when there is nothing recorded, or no set to score it with', () => {
+    for (const draft of [null, { ...recorded, set: null }]) {
+      const c = new DraftCoordinator(stubModels() as never, historyWith(draft) as never)
+      try {
+        c.setReplaying(true)
+        c.resumeAfterReplay()
+        expect(c.current.phase).toBe('idle')
+      } finally { c.idle() }
+    }
+  })
+})

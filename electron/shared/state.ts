@@ -85,6 +85,12 @@ export interface DraftState {
    * Home, so this is what stops the overlay drawing a pack over the menus.
    */
   arenaScene?: string | null
+  /**
+   * This draft was rebuilt from the app's own history file rather than seen
+   * live or replayed from Arena's log. Its picks carry no model comparison,
+   * because scoring happened, if at all, in an earlier run.
+   */
+  restoredFromHistory?: boolean
   /** Arena's own submitted Limited deck (from EventSetDeck), once Done is pressed. */
   submittedDeck?: { main: Array<{ grpId: number; quantity: number }>; sideboard: Array<{ grpId: number; quantity: number }>; mainCount: number } | null
   set: string | null

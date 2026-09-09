@@ -12,7 +12,7 @@ import type { DraftSessionSnapshot, DraftPickRecord, SubmittedDeck } from '../pa
 import { ModelManager, type ScoredCard } from '../model/manager'
 import { type SetBundle, type CardInfo } from '../data/bundle'
 import { resolveFromArenaDb } from '../data/arena-card-db'
-import { DraftHistory } from '../data/history'
+import { DraftHistory, type RecordedDraft } from '../data/history'
 import { EMPTY_STATE, type CardRow, type DraftState, type PickRecord } from '../../shared/state'
 import { COMPLETE_LINGER_MS } from './completion'
 
@@ -190,7 +190,9 @@ export class DraftCoordinator extends EventEmitter {
   resumeAfterReplay(): void {
     this.replaying = false
     const snap = this.snapshot
-    if (!snap) return
+    // Nothing in the logs, and nothing from Arena's servers. Fall back to what
+    // we recorded ourselves.
+    if (!snap) { this.restoreFromHistory(); return }
     // Load the model for any draft we replayed into, not just a live one. A
     // completed draft still needs it: the pool carries the grades the deckbuild
     // advisor ranks by, so restarting the app during deckbuilding used to leave
@@ -203,6 +205,44 @@ export class DraftCoordinator extends EventEmitter {
       void this.score(snap)
     }
     void this.backfillPicks(snap)
+  }
+
+  /**
+   * Rebuild the last recorded draft from our own history file.
+   *
+   * The last line of defence, and the only one that still works once every
+   * other source is gone: Arena recreates Player.log on launch keeping one
+   * backup, and its servers stop serving a finished pool once the deck is
+   * submitted. Restored state is marked complete and carries no live pack,
+   * because there is nothing left to pick — it exists so the deckbuild advisor
+   * still has a pool to work from.
+   */
+  private restoreFromHistory(): void {
+    if (this.state.phase !== 'idle') return
+    let draft: RecordedDraft | null = null
+    try { draft = this.history.lastDraft() } catch { return }
+    if (!draft || !draft.set) return
+
+    this.bundle = this.models.bundleFor(draft.set)
+    const ppp = this.bundle?.picksPerPack ?? 14
+    this.state = {
+      ...EMPTY_STATE,
+      phase: 'complete',
+      arenaScene: this.state.arenaScene,
+      set: draft.set, format: draft.format, eventName: draft.eventName,
+      isBotDraft: draft.format === 'QuickDraft',
+      picksPerPack: ppp, totalPicks: 3 * ppp,
+      pool: this.rows(draft.pool),
+      picks: draft.picks.map(p => ({ pack: p.pack, pick: p.pick, grpId: p.grpId, name: p.name ?? this.card(p.grpId)?.name ?? `#${p.grpId}`,
+        recommendedGrpId: null, recommendedName: null, takenRank: null, ev: null })),
+      restoredFromHistory: true,
+      snapshot: { scryfall: this.bundle?.scryfallUpdatedAt ?? null, model: this.models.modelTag },
+      seq: this.state.seq + 1
+    }
+    this.publish()
+    if (draft.format) void this.models.ensure(draft.set, draft.format).then(() => this.refreshModelInfo())
+    this.clearEndTimer()
+    this.endTimer = setTimeout(() => { this.endTimer = null; this.idle() }, COMPLETE_LINGER_MS)
   }
 
   /** Surface (or clear) a setup warning without touching draft state. */
@@ -300,9 +340,23 @@ export class DraftCoordinator extends EventEmitter {
   }
 
   /** Model (re)loaded: refresh model info and re-grade the pool rows (built before load). */
+  /**
+   * Re-read the model's status and re-grade the pool.
+   *
+   * A draft restored from history has no parser snapshot, so this used to
+   * return early for it: the model stayed on "loading" forever, the pool rows
+   * never got their grades, and the deckbuild advisor silently fell back to
+   * heuristics — it cut the best card in the pool. Take the set, format and
+   * pool from whichever source the draft actually came from.
+   */
   private refreshModelInfo(): void {
-    if (!this.snapshot) return
-    this.state = { ...this.state, model: this.modelInfo(this.snapshot), pool: this.rows(this.snapshot.pool), seq: this.state.seq + 1 }
+    const snap = this.snapshot
+    const set = snap?.set ?? this.state.set
+    const format = snap?.format ?? this.state.format
+    if (!set && !format && !snap) return
+    const pool = snap ? snap.pool : this.state.pool.map(r => r.grpId)
+    const status = this.models.status(set, format)
+    this.state = { ...this.state, model: { state: status.state, modelId: status.modelId, message: status.message }, pool: this.rows(pool), seq: this.state.seq + 1 }
     this.publish()
   }
 

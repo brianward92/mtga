@@ -1,4 +1,5 @@
 import { DraftParser } from './draft-parser'
+import { archiveLogs } from '../data/log-archive'
 import type { SubmittedDeck } from './draft-session'
 import { LogWatcher } from './watcher'
 import type { DraftPickRecord, DraftSessionSnapshot } from './draft-session'
@@ -23,6 +24,8 @@ export interface DraftLogSink {
 export interface DraftLogPipelineDeps {
   parser?: DraftParser
   watcher?: LogWatcher
+  /** Where to keep copies of Arena's logs; omitted disables archiving. */
+  archiveDir?: string
 }
 
 /** Wire and start the draft-only Player.log pipeline. */
@@ -40,8 +43,19 @@ export function startDraftLogPipeline(sink: DraftLogSink, deps: DraftLogPipeline
     sink.setWarning(enabled ? null : DETAILED_LOGS_WARNING)
   })
 
+  // Copy Arena's logs aside before it can roll past them. Unity keeps exactly
+  // one backup, so a draft's raw log survives one restart of the game and the
+  // next one destroys it. Done at startup and again whenever the log rotates
+  // under us, which is Arena restarting while we are running.
+  const archive = () => {
+    if (!deps.archiveDir) return
+    const added = archiveLogs(watcher.logFiles(), deps.archiveDir)
+    if (added.length > 0) console.log(`[LogArchive] kept ${added.length} Arena log(s): ${added.join(', ')}`)
+  }
+  watcher.on('rotated', archive)
+
   watcher.on('line', (line: string) => parser.handleLine(line))
-  watcher.on('replay-start', () => sink.setReplaying(true))
+  watcher.on('replay-start', () => { archive(); sink.setReplaying(true) })
   watcher.on('replay-complete', () => {
     console.log('[Watcher] replay complete, tailing live')
     sink.resumeAfterReplay()

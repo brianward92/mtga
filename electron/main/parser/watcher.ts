@@ -161,6 +161,17 @@ export class LogWatcher extends EventEmitter {
     )
   }
 
+  /**
+   * The Arena logs on disk right now: the live one and Unity's single backup.
+   * Exposed so they can be archived before Arena's next launch overwrites the
+   * backup and takes a draft's raw log with it.
+   */
+  logFiles(): string[] {
+    const files = [this.logPath]
+    if (!this.usingOverride) files.push(join(this.logDirectory, 'Player-prev.log'))
+    return files.filter(f => existsSync(f))
+  }
+
   /** Replay existing logs, then start filesystem and polling live tails. */
   async start(): Promise<void> {
     this.stopped = false
