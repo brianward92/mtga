@@ -300,3 +300,64 @@ helper was retired into a TypeScript CLI sharing the app's own card rules.
    null draft id for bot drafts. Behaviour under that collision is reasoned
    about but not tested against a real occurrence.
 5. **No CI.** `install-local.sh` running typecheck and tests is the only gate.
+
+---
+
+## 8. Cross-review findings and what came of them
+
+Three independent reviewers went over the work afterwards, split by area. They
+found real defects in code that had already been tested and shipped. Ranked by
+what they would have cost:
+
+**Arena's sort keys were keyed by card name, not by printing.** They are a
+property of the printing. LCI's Sorcerous Spyglass is uncommon; the shipped
+table gave it XLN's rare tier, so it sorted into the wrong block and dragged
+every badge after it. **106 grpIds across 25 sets** were affected — the same
+class of bug the whole card-identity effort was meant to eliminate, reintroduced
+one layer down by the generator.
+
+**The live-database fallback returned nothing for any card whose sort columns
+were null.** In SQLite `NULL || 'x'` is NULL, so a single null column collapsed
+the entire concatenated row to an empty string, the card was recorded as
+unresolvable, and the whole pack refused to draw — over two ordering columns,
+while the name, type, rarity and colours sat right there. 1118 names in the
+current database have null order columns. This was the day-zero path failing in
+exactly the situation it exists for.
+
+**Nothing kept rail clicks away from Done.** Done sits in the same x column as
+every deck-rail row, 25pt below the bottom of the OCR region — **less than one
+row pitch** — and row y came straight from OCR with no upper bound at all. The
+only thing preventing automation from clicking the button that commits the deck
+was that two fractions happened not to overlap. It is now asserted, and refused
+outright on any window shape nobody has measured, where the clearance is unknown
+rather than approximate.
+
+**`arena.sh key` and `type` pasted their arguments into AppleScript source.**
+The single allow-listed entry point was therefore a route to arbitrary
+AppleScript, including the menu items automation must never touch. A card name
+containing a quote was enough to break out of the string.
+
+**Two Quick Drafts of the same event collided in history.** Bot drafts carry no
+draft id, and the event name is shared for the week or two the event runs, so
+the second draft's pool was dropped as a duplicate and its picks merged into the
+first draft's record. A restored draft could be a chimera of both.
+
+**The log archive counted a login as a draft.** `EventGetCoursesV2` fires on
+every login, so "only keep logs that mention a draft" kept every log, and
+prefixes of the current session evicted the one file that actually held picks.
+
+Also fixed: a **sixth** basic-land predicate hiding in the pool sheet, filing
+every common cycle land under basic lands; a null sort tuple that passed
+validation and sorted ahead of every mythic; a retry path that clicked without
+re-verifying; an overlay kill that was assumed rather than confirmed; a torn
+history line that welded itself to the next event; and pack size being read as
+picks-per-pack in events where more than one card leaves per pick.
+
+### What that says
+
+Every one of these lived in code that typechecked, passed its tests, and had
+been verified live. The pattern is consistent with the rest of the session:
+**these bugs do not throw.** They produce plausible output — a pack that looks
+sorted, a deck that looks built, a history file that looks complete — which is
+why they need adversarial review or a check against an independent source, not
+more unit tests of the same assumptions.

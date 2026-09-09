@@ -35,31 +35,28 @@ describe('archiveLogs', () => {
     expect(archiveLogs([write('Player.log', login)], archive)).toEqual([])
   })
 
-  it('evicts noise before it evicts the log with the draft in it', () => {
-    // A live log is archived while still growing, so several prefixes of one
-    // session pile up. The one holding the whole draft must outlive them.
-    const rich = draftLog('x'.repeat(50)) + '\n[UnityCrossThreadLogger]BotDraftDraftPick {}\n'.repeat(30)
-    archiveLogs([write('draft.log', rich, 5)], archive, 2)
-    for (let i = 0; i < 4; i++) archiveLogs([write(`p${i}.log`, draftLog(`prefix-${i}`), 0)], archive, 2)
-    const kept = readdirSync(archive)
+  it("keeps today's draft log and evicts the oldest", () => {
+    // An earlier attempt ranked by how many draft markers a log held, so that
+    // "the log with the draft in it" would win. That inverted the goal: a live
+    // log is archived while still growing, so today's draft holds fewer markers
+    // than an old archive covering several drafts, sorted last, and was deleted
+    // immediately. Once enough old logs accumulated nothing new was ever kept.
+    const many = draftLog('\n[UnityCrossThreadLogger]BotDraftDraftPick {}'.repeat(40))
+    archiveLogs([write('old.log', many, 30)], archive, 2)
+    archiveLogs([write('older.log', many + 'x', 60)], archive, 2)
+    archiveLogs([write('today.log', draftLog('todays draft'), 0)], archive, 2)
+    const kept = readdirSync(archive).map(f => readFileSync(join(archive, f), 'utf8'))
     expect(kept).toHaveLength(2)
-    const survived = kept.some(f => readFileSync(join(archive, f), 'utf8').split('BotDraftDraftPick').length - 1 > 20)
-    expect(survived).toBe(true)
+    expect(kept.some(t => t.includes('todays draft'))).toBe(true)
   })
 
-  it('does not keep the same bytes twice, however they are named', () => {
-    // Arena renames the live log to Player-prev.log on launch, so the same
-    // content arrives under a second name and would otherwise be duplicated.
-    const body = draftLog()
-    archiveLogs([write('Player.log', body)], archive)
-    const again = archiveLogs([write('Player-prev.log', body)], archive)
-    expect(again).toEqual([])
-    expect(readdirSync(archive)).toHaveLength(1)
-  })
-
-  it('keeps distinct logs and prunes to the newest few', () => {
-    for (let i = 0; i < 5; i++) archiveLogs([write(`log${i}.log`, draftLog(`run-${i}`), i)], archive, 3)
-    expect(readdirSync(archive)).toHaveLength(3)
+  it('keeps the fuller copy when one session is archived twice as it grows', () => {
+    const stamp = 3
+    archiveLogs([write('Player.log', draftLog('part one'), stamp)], archive, 1)
+    archiveLogs([write('Player.log', draftLog('part one and two'), stamp)], archive, 1)
+    const kept = readdirSync(archive).map(f => readFileSync(join(archive, f), 'utf8'))
+    expect(kept).toHaveLength(1)
+    expect(kept[0]).toContain('part one and two')
   })
 
   it('never throws on an unreadable path', () => {

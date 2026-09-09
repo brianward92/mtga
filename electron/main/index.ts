@@ -3,7 +3,12 @@
  *
  * A menu-bar app with ONE overlay window glued to Arena. During a draft the
  * overlay draws per-card badges on the pack grid and a corner HUD; the pack is
- * scored locally by the bundled DraftFM model. Nothing here talks to a server.
+ * scored locally by the bundled DraftFM model.
+ *
+ * The main process talks to no server. The renderer does make one outbound
+ * request: card art for the top recommendation is an <img> from Scryfall's CDN
+ * (renderer/overlay/card-art.ts), which tells that CDN the user's address, the
+ * card and the time — enough to follow a draft as it happens.
  *
  * Wiring: LogWatcher → DraftParser (draft events) → DraftCoordinator (state)
  *         ArenaGeometryPoller (native helper) → overlay bounds + LayerDetector
@@ -226,13 +231,13 @@ function setupModelAndDraft(): void {
     previousPhase = state.phase
     if (completionSheetOpen !== sheetOpen) setSheetOpen(completionSheetOpen)
     pushState(state)
-    if (state.phase !== 'active') layer.resetBaseline()
+    if (state.phase !== 'active') layer?.resetBaseline()
   })
   coordinator.on('state', (() => {
     let lastPackKey = ''
     return (state: DraftState) => {
       const key = `${state.pack}-${state.pick}-${state.cards.length}`
-      if (key !== lastPackKey) { lastPackKey = key; layer.resetBaseline() }
+      if (key !== lastPackKey) { lastPackKey = key; layer?.resetBaseline() }
     }
   })())
 }
@@ -253,8 +258,6 @@ function setupGeometry(): void {
   // has time to open under it.
   standAsideTimer = setInterval(standAsideTick, 40)
   poller.on('helper-missing', () => coordinator.setWarning('Window helper missing from the app bundle — overlay cannot locate Arena'))
-  poller.start()
-
   layer = new LayerDetector({
     poller,
     packCount: () => coordinator.current.cards.length,
@@ -267,6 +270,14 @@ function setupGeometry(): void {
   })
   layer.on('change', state => send('overlay:layer', state))
   layer.syncActivity()
+
+  // Only now. start() emits 'helper-missing' SYNCHRONOUSLY when the native
+  // helper is absent, and that warning publishes state, which reaches listeners
+  // above that use `layer`. Starting the poller before this point threw inside
+  // app.whenReady() with nothing to catch it, so the app died silently — no
+  // tray, no overlay, and not even the warning — on exactly the checkout that
+  // needed the warning most.
+  poller.start()
   calibration.on('change', () => pushCalibrate())
 }
 

@@ -22,6 +22,7 @@ import { readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import * as ort from 'onnxruntime-node'
 import { parseNpz, halfArrayToFloat32, type NpyData } from './npz'
+import { loadArenaCards } from '../data/arena-cards'
 
 const POOL_COUNT_CAP = 8
 const FORMAT_IDS: Record<string, number> = { PremierDraft: 0, TradDraft: 1 }
@@ -155,6 +156,7 @@ export class DraftFM {
   private setSummary: Float32Array | null = null
   private poolNull!: Float32Array
   private grpToRow = new Map<number, number>()
+  private bundleRoot: string | undefined
   private wrId = 33
   private gamesId = 6
   private formatId = OTHER_FORMAT_ID
@@ -162,7 +164,7 @@ export class DraftFM {
   private setScalars!: Float32Array
   private ready: Promise<void>
 
-  private constructor(versionDir: string, setCode: string, format: string, private assets: SetAssets) {
+  private constructor(versionDir: string, private setCode: string, format: string, private assets: SetAssets) {
     this.meta = JSON.parse(readFileSync(join(versionDir, 'meta.json'), 'utf8')) as DraftFMMeta
     this.modelId = this.meta.model_id
     this.format = format
@@ -173,10 +175,20 @@ export class DraftFM {
     this.ready = this.init(versionDir)
   }
 
-  /** Construct + warm (card table encoded once). */
-  static async load(versionDir: string, setCode: string, format: string, assetsPath: string): Promise<DraftFM> {
+  /**
+   * Construct + warm (card table encoded once).
+   *
+   * `bundleRoot` supplies Arena's own grpId -> name table. Without it the model
+   * maps grpIds through the same Scryfall-derived aliases the display layer was
+   * corrected away from, so a corrected id shows the right name in the overlay
+   * and is scored as whichever card the old mapping thought it was, and an id
+   * Arena supplied that the aliases never had is scored not at all — dropped
+   * from the softmax, so the rest of the pack is judged as if it were smaller.
+   */
+  static async load(versionDir: string, setCode: string, format: string, assetsPath: string, bundleRoot?: string): Promise<DraftFM> {
     const assets = loadSetAssets(assetsPath)
     const m = new DraftFM(versionDir, setCode, format, assets)
+    m.bundleRoot = bundleRoot
     await m.ready
     return m
   }
@@ -218,6 +230,27 @@ export class DraftFM {
     a.names.forEach((name, row) => {
       for (const g of a.grpIds[name] ?? []) if (!this.grpToRow.has(g)) this.grpToRow.set(g, row)
     })
+    // Arena is the authority on which card a grpId is, here as well as in the
+    // display layer. Rows are indexed by card NAME, so Arena's id -> name table
+    // maps straight onto them: it corrects ids the aliases got wrong and adds
+    // ids they never had.
+    if (this.bundleRoot) {
+      const rowOfName = new Map(a.names.map((name, row) => [name, row] as const))
+      const arena = loadArenaCards(this.bundleRoot)
+      let corrected = 0
+      let adopted = 0
+      for (const [grpId, name] of arena.entries()) {
+        const row = rowOfName.get(name)
+        if (row === undefined) continue
+        const current = this.grpToRow.get(grpId)
+        if (current === row) continue
+        if (current === undefined) adopted++; else corrected++
+        this.grpToRow.set(grpId, row)
+      }
+      if (corrected || adopted) {
+        console.log(`[Model] ${this.setCode}: Arena corrected ${corrected} scored ids and supplied ${adopted} missing ones`)
+      }
+    }
     this.wrId = Number(this.meta.serving?.wr_id ?? 33)
     this.gamesId = Number(this.meta.serving?.games_id ?? 6)
     this.formatId = FORMAT_IDS[this.format] ?? OTHER_FORMAT_ID
@@ -263,18 +296,23 @@ export class DraftFM {
   }
 
   /** Score one pack at a 0-based draft position, inferring position if omitted. */
-  async scorePack(packGrpIds: number[], poolGrpIds: number[], pack0?: number, pick0?: number): Promise<CardScore[]> {
+  async scorePack(packGrpIds: number[], poolGrpIds: number[], pack0?: number, pick0?: number, picksPerPack?: number): Promise<CardScore[]> {
     const rows = packGrpIds.map(g => this.grpToRow.get(g) ?? null)
     const known = [...new Set(rows.filter((r): r is number => r !== null))].sort((x, y) => x - y)
     if (!known.length) return rankScores(packGrpIds, packGrpIds.map(() => null))
 
     const pool = this.poolInputs(poolGrpIds)
+    // The caller may know the real pack size, learned from the pack Arena dealt.
+    // The assets' value is a build-time guess and was wrong for LCI, which deals
+    // 15: at P1p15 the position feature became pick/ppp = 14/14 = 1.0, so the
+    // last two picks of every pack looked identical and saturated to the model.
+    const ppp = picksPerPack && picksPerPack > 0 ? picksPerPack : this.picksPerPack
     if (pack0 === undefined || pick0 === undefined) {
       const poolSize = poolGrpIds.length
-      pack0 = Math.floor(poolSize / this.picksPerPack)
-      pick0 = poolSize % this.picksPerPack
+      pack0 = Math.floor(poolSize / ppp)
+      pick0 = poolSize % ppp
     }
-    const out = await this.scorer.run(this.feedsFor(pool, known, positionFeatures(pack0, pick0, this.picksPerPack)))
+    const out = await this.scorer.run(this.feedsFor(pool, known, positionFeatures(pack0, pick0, ppp)))
     const logits = out.logits.data as Float32Array
     const byRow = new Map<number, number>()
     known.forEach((r, i) => byRow.set(r, logits[i]))
@@ -293,6 +331,9 @@ export class DraftFM {
     const res = await this.scorer.run(this.feedsFor(this.poolInputs(poolGrpIds), rows, positionFeatures(pack0, pick0, this.picksPerPack)))
     return new Float32Array(res.logits.data as Float32Array)
   }
+
+  /** The assets build this model is scoring against; part of any cache key. */
+  get manifestHash(): string | null { return this.assets.manifestHash ?? null }
 
   /** Number of asset rows (unique card names). */
   get setSize(): number { return this.assets.n }

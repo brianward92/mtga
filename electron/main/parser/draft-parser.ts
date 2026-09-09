@@ -615,7 +615,14 @@ export class DraftParser extends EventEmitter {
     // per-message — so two Quick Drafts of the same event share an identity in
     // the history file and the second one's rows are dropped as duplicates.
     // The course listing has a real per-draft CourseId; adopt it.
-    if (s && !s.draftId && s.eventName) {
+    //
+    // Only before the first pack. Identity feeds the history file's dedupe key,
+    // so changing it mid-draft files the picks made before the course listing
+    // under one id and everything after under another: the restored draft then
+    // has the right pool and is missing its first pack, and replaying the same
+    // log re-appends every pick under the new key. Once a draft is under way its
+    // earliest pack already identifies it, stably and across replays.
+    if (s && !s.draftId && s.eventName && s.packs.size === 0) {
       for (const c of list) {
         const raw = c as { InternalEventName?: unknown; CourseId?: unknown }
         if (raw.InternalEventName === s.eventName && typeof raw.CourseId === 'string') { s.draftId = raw.CourseId; break }

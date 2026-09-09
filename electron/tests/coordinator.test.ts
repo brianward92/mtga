@@ -380,3 +380,43 @@ describe('restore is bounded in age', () => {
     } finally { c.idle() }
   })
 })
+
+describe('what the model is told, and what it is credited with', () => {
+  it('scores at the learned pack size, not the bundle guess', async () => {
+    // The display fix learned that LCI deals 15 and left scoring on the
+    // bundle's 14, so at P1p15 the position feature was pick/ppp = 14/14 = 1.0
+    // and the last two picks of every pack looked identical to the model.
+    const models = stubModels()
+    const c = new DraftCoordinator(models as never, { append() {} } as never)
+    try {
+      c.onDraftStart(snap({ pool: [] }))
+      c.onDraftPack(snap({ currentPack: { pack: 1, pick: 1, grpIds: Array.from({ length: 15 }, (_, i) => i + 1) }, pool: [] }))
+      await flush(); await flush()
+      expect(c.current.picksPerPack).toBe(15)
+      expect(models.score).toHaveBeenCalledWith('DSK', 'QuickDraft', expect.anything(), [], 0, 0, 15)
+    } finally { c.idle() }
+  })
+
+  it('records no recommendation for a pack the model could not score', async () => {
+    // An unscored pack still ranks its cards, in log order. Taking rank 1
+    // regardless recorded the pack's first card as "what the model wanted" and
+    // wrote it to history, permanently polluting the agreement stats.
+    const models = stubModels()
+    models.score = vi.fn(async (_s: string, _f: string, pack: number[]) => ({
+      modelId: 'm',
+      cards: pack.map((g, i) => ({ grpId: g, ev: null, prob: null, rank: i + 1, percentile: null, grade: null }))
+    })) as never
+    const history = { append: vi.fn() }
+    const c = new DraftCoordinator(models as never, history as never)
+    try {
+      c.onDraftStart(snap({ pool: [] }))
+      const live = snap({ currentPack: { pack: 1, pick: 1, grpIds: [1, 2] }, pool: [] })
+      c.onDraftPack(live)
+      await flush(); await flush()
+      c.onDraftPick(live, { pack: 1, pick: 1, grpIds: [1], packGrpIds: [1, 2] })
+      expect(c.current.picks[0].recommendedGrpId).toBeNull()
+      const row = history.append.mock.calls.map(a => a[0]).find(e => e.type === 'pick')
+      expect(row.recommendedGrpId).toBeNull()
+    } finally { c.idle() }
+  })
+})

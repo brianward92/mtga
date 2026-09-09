@@ -46,13 +46,7 @@ function inspect(file: string): { hash: string; draft: boolean } | null {
   } catch { return null }
 }
 
-/** How many picks a log holds, used to decide what to evict last. */
-function pickCount(file: string): number {
-  try {
-    const text = readFileSync(file, 'utf8')
-    return DRAFT_MARKERS.reduce((n, m) => n + text.split(m).length - 1, 0)
-  } catch { return 0 }
-}
+
 
 /**
  * Copy any of `logs` that carries draft data into `dir`, skipping content
@@ -80,13 +74,19 @@ export function archiveLogs(logs: string[], dir: string, keep = KEEP_ARCHIVES): 
       held.add(seen.hash)
       added.push(name)
     }
-    // Keep the logs with the most draft content first, then the newest. A live
-    // log is archived while it is still growing, so several prefixes of one
-    // session can pile up; the one with the whole draft in it must outlive them.
+    // Newest first, and for one session's several prefixes the largest first.
+    //
+    // An earlier attempt ranked by how many picks a log held, so that "the log
+    // with the draft in it" would outlive the noise. That inverted the goal: a
+    // live log is archived while still growing, so today's draft holds fewer
+    // markers than an old archive covering several drafts, sorted last, and was
+    // deleted immediately. Once enough multi-draft logs accumulated, nothing new
+    // was ever kept. Recency is the property actually wanted, and the marker
+    // filter above already excludes logs with no draft at all.
     const files = readdirSync(dir)
       .filter(f => f.endsWith('.log'))
-      .map(f => ({ f, picks: pickCount(join(dir, f)), at: statSync(join(dir, f)).mtimeMs }))
-      .sort((a, b) => b.picks - a.picks || b.at - a.at)
+      .map(f => { const st = statSync(join(dir, f)); return { f, at: st.mtimeMs, size: st.size } })
+      .sort((a, b) => b.at - a.at || b.size - a.size)
     for (const { f } of files.slice(keep)) unlinkSync(join(dir, f))
   } catch (err) {
     console.error('[LogArchive] failed:', err)

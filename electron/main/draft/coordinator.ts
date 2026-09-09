@@ -68,6 +68,9 @@ export class DraftCoordinator extends EventEmitter {
     this.snapshot = snap
     this.bundle = snap.set ? this.models.bundleFor(snap.set) : null
     this.lastScores = null
+    // Per draft, not per session: one Pick-Two event otherwise pinned every
+    // later draft to the bundle's guess for picks per pack.
+    this.cardsPerPick = 1
     const ppp = this.bundle?.picksPerPack ?? 14
     this.state = {
       ...EMPTY_STATE,
@@ -132,7 +135,10 @@ export class DraftCoordinator extends EventEmitter {
     if (pick.grpIds.length > 0) this.cardsPerPick = pick.grpIds.length
     const takenGrp = pick.grpIds[0]
     const scores = this.lastScores && this.lastScores.pack === pick.pack && this.lastScores.pick === pick.pick ? this.lastScores : null
-    const rec = scores?.cards.find(c => c.rank === 1) ?? null
+    // Rank alone is not enough: an unscored pack still ranks its cards, in log
+    // order, so a pack the model could not score would otherwise record its
+    // first card as "what the model wanted" and pollute the agreement stats.
+    const rec = scores?.cards.find(c => c.rank === 1 && c.ev !== null) ?? null
     const taken = scores?.cards.find(c => c.grpId === takenGrp) ?? null
     const record: PickRecord = {
       pack: pick.pack, pick: pick.pick,
@@ -283,7 +289,7 @@ export class DraftCoordinator extends EventEmitter {
     const token = ++this.scoreToken
     const format = snap.format ?? 'PremierDraft'
     // Model convention: 0-based pack/pick (parser exposes 1-based).
-    const result = await this.models.score(snap.set, format, cur.grpIds, snap.pool, cur.pack - 1, cur.pick - 1)
+    const result = await this.models.score(snap.set, format, cur.grpIds, snap.pool, cur.pack - 1, cur.pick - 1, this.state.picksPerPack)
     if (token !== this.scoreToken) return // a newer pack superseded this one
     const live = this.snapshot?.currentPack
     if (!live || live.pack !== cur.pack || live.pick !== cur.pick) return

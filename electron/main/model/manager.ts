@@ -105,7 +105,7 @@ export class ModelManager {
     this.loading = (async () => {
       try {
         const old = this.loaded
-        const model = await DraftFM.load(this.index!.modelDir, set, format, bundle.assetsPath)
+        const model = await DraftFM.load(this.index!.modelDir, set, format, bundle.assetsPath, this.root!)
         const curveInfo = await this.curveFor(model, set, format)
         this.loaded = { key, model, curve: curveInfo.curve, p1p1ByGrp: curveInfo.byGrp, rowByGrp: new Map(model.grpRows()) }
         this.lastError = null
@@ -128,7 +128,12 @@ export class ModelManager {
    */
   private async curveFor(model: DraftFM, set: string, format: string): Promise<{ curve: Float32Array; byGrp: Map<number, number> }> {
     const tag = this.index!.modelTag
-    const file = join(this.cacheDir, `p1p1-${tag}-${set}-${format}.json`)
+    // The assets' manifest hash belongs in the key. Rebuilding a set's assets
+    // reorders its rows, and the only check below is on row COUNT — so a
+    // rebuild with the same number of cards silently regraded every card in
+    // the set from the previous build's row order, with no error.
+    const build = (model.manifestHash ?? 'nohash').slice(0, 12)
+    const file = join(this.cacheDir, `p1p1-${tag}-${set}-${format}-${build}.json`)
     let logits: number[] | null = null
     if (existsSync(file)) {
       try { logits = JSON.parse(readFileSync(file, 'utf8')) as number[] } catch { logits = null }
@@ -144,10 +149,10 @@ export class ModelManager {
   }
 
   /** Score a pack; pack/pick numbers are 0-based (model convention). */
-  async score(set: string, format: string, pack: number[], pool: number[], pack0: number, pick0: number): Promise<{ modelId: string; cards: ScoredCard[] } | null> {
+  async score(set: string, format: string, pack: number[], pool: number[], pack0: number, pick0: number, picksPerPack?: number): Promise<{ modelId: string; cards: ScoredCard[] } | null> {
     const l = await this.ensure(set, format)
     if (!l) return null
-    const scores = await l.model.scorePack(pack, pool, pack0, pick0)
+    const scores = await l.model.scorePack(pack, pool, pack0, pick0, picksPerPack)
     // "For your pool": the whole set scored under the live pool/position, so a
     // card's letter reflects what it is worth to THIS draft; the raw set
     // grade (empty pool, P1P1) is kept alongside for reference.
