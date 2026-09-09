@@ -64,6 +64,24 @@ export const LAND_PICKER = {
   } as Record<'W' | 'U' | 'B' | 'R' | 'G', { x: number; y: number }>
 }
 
+/**
+ * The card pool on the left of the builder, and its search field.
+ *
+ * Searching for a card by name is far steadier than indexing into the pool
+ * grid: one query leaves a single result in the first cell, so nothing depends
+ * on the pool's sort order, its scroll position, or how many cards are left.
+ *
+ * The overlay's own deckbuild sidebar is mirrored to the left and covers the
+ * first two columns, so whatever drives these must hide the overlay first.
+ */
+export const POOL = {
+  search: { x: 0.0844, y: 0.1626 },
+  /** The X inside the search field. */
+  clearSearch: { x: 0.1311, y: 0.1626 },
+  /** Centre of the first (top-left) pool card. */
+  firstCell: { x: 0.0906, y: 0.4183 }
+}
+
 export interface Rect { x: number; y: number; width: number; height: number }
 
 /** Window-relative fraction → screen point. */

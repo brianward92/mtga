@@ -14,7 +14,7 @@ import { tmpdir } from 'os'
 import { join } from 'path'
 import { buildDeck } from '../../renderer/overlay/deckbuild'
 import type { CardRow } from '../../shared/state'
-import { DECK_RAIL, LAND_PICKER, at, railRegion, deckRows, parseRailLine, parseDeckCount, namesMatch, type Rect } from '../../shared/deck-layout'
+import { DECK_RAIL, LAND_PICKER, POOL, at, railRegion, deckRows, parseRailLine, parseDeckCount, namesMatch, type Rect } from '../../shared/deck-layout'
 
 const [stateFile, ...flags] = process.argv.slice(2)
 if (!stateFile) { console.error('usage: deckbuild.ts <stateFile> [--dry-run] [--read] [--no-lands] [--verify [seconds]]'); process.exit(2) }
@@ -43,6 +43,26 @@ function click(p: { x: number; y: number }): void { run(join(BIN, 'click'), [Str
 function move(p: { x: number; y: number }): void { run(join(BIN, 'move-mouse'), [String(p.x), String(p.y)]) }
 function scroll(p: { x: number; y: number }, lines: number): void { run(join(BIN, 'scroll'), [String(p.x), String(p.y), String(lines)]) }
 function park(rect: Rect): void { move(at(rect, 0.55, 0.985)) }
+function keystroke(text: string): void {
+  run('osascript', ['-e', `tell application "System Events" to keystroke ${JSON.stringify(text)}`])
+}
+/**
+ * The overlay's deckbuild sidebar is mirrored to the left, directly over the
+ * card pool, so adding a card back means taking the overlay down first. The
+ * plan was already read from the mirrored state, so nothing here needs it.
+ */
+function overlayApp(action: 'kill' | 'launch'): void {
+  try { run('bash', ['scripts/dev/arena.sh', 'app', action]) } catch { /* best effort */ }
+}
+/** Put one card name in the pool's search box, leaving it alone in cell one. */
+function searchPool(rect: Rect, name: string): void {
+  click(at(rect, POOL.search.x, POOL.search.y))
+  run('osascript', ['-e', 'tell application "System Events" to keystroke "a" using command down'])
+  keystroke(name)
+}
+function clearSearch(rect: Rect): void {
+  click(at(rect, POOL.clearSearch.x, POOL.clearSearch.y))
+}
 
 interface RailRow { count: number; name: string; y: number }
 interface RailRead { rows: RailRow[]; deckCount: number | null; raw: string[] }
@@ -73,6 +93,18 @@ function readRail(rect: Rect): RailRead {
     if (r) rows.push({ ...r, y: Math.round(region.y + l.y * region.height) })
   })
   return { rows, deckCount, raw }
+}
+
+/** Scroll the rail top and bottom and merge both reads into name -> count. */
+async function readWholeRail(rect: Rect, railPoint: { x: number; y: number }): Promise<{ counts: Map<string, number>; deckCount: number | null }> {
+  const sleepMs = (ms: number) => new Promise(r => setTimeout(r, ms))
+  scroll(railPoint, 40); await sleepMs(700); park(rect); await sleepMs(300)
+  const top = readRail(rect)
+  scroll(railPoint, -40); await sleepMs(700); park(rect); await sleepMs(300)
+  const bottom = readRail(rect)
+  const counts = new Map<string, number>()
+  for (const r of [...top.rows, ...bottom.rows]) counts.set(r.name, r.count)
+  return { counts, deckCount: bottom.deckCount ?? top.deckCount }
 }
 
 // ---- the plan ---------------------------------------------------------------
@@ -126,7 +158,18 @@ async function main(): Promise<void> {
   }
 
   // 2. Lands: remove excess basics from the rail, add deficits via the land filter.
+  //    The overlay's deckbuild sidebar is mirrored to the left, over the filter
+  //    bar and the first pool columns, and it swallows the clicks: the land
+  //    tiles read as pressed but nothing was added. Take it down for the rest
+  //    of the run and put it back at the end.
+  let overlayDown = false
+  const hideOverlay = async () => {
+    if (overlayDown) return
+    overlayApp('kill'); overlayDown = true
+    await sleep(1500); activate(); await sleep(600)
+  }
   if (!NO_LANDS) {
+    await hideOverlay()
     scroll(railPoint, -40); await sleep(700); park(rect); await sleep(300)
     let read = readRail(rect)
     const have: Record<string, number> = { W: 0, U: 0, B: 0, R: 0, G: 0 }
@@ -154,20 +197,49 @@ async function main(): Promise<void> {
     console.log(`deck ${read.deckCount ?? '?'}/40 after lands: ` + read.rows.map(r => `${r.count}x ${r.name}`).join(' | '))
   }
 
-  // 3. Final checkpoint against the plan, from the rail (top + bottom).
-  scroll(railPoint, 40); await sleep(700); park(rect); await sleep(300)
-  const top = readRail(rect)
-  scroll(railPoint, -40); await sleep(700); park(rect); await sleep(300)
-  const bottom = readRail(rect)
-  const seen = new Map<string, number>()
-  for (const r of [...top.rows, ...bottom.rows]) seen.set(r.name, r.count)
+  // 3. Add back anything the deck is short of. A pack can be over-cut (and was:
+  //    a mis-read row once cost three copies of a wanted card), and Arena also
+  //    drops the deck back to the raw pool after a reconnect.
+  let seen = (await readWholeRail(rect, railPoint)).counts
+  const deficits: Array<[string, number]> = []
+  for (const [name, want] of target) {
+    const have = seen.get(matchKey(seen, name)) ?? 0
+    if (have < want) deficits.push([name, want - have])
+  }
+  if (deficits.length > 0) {
+    console.log(`adding back: ${deficits.map(([n, c]) => `${c}x ${n}`).join(' | ')}`)
+    await hideOverlay()
+    for (const [name, count] of deficits) {
+      searchPool(rect, name); await sleep(1400)
+      for (let i = 0; i < count; i++) { click(at(rect, POOL.firstCell.x, POOL.firstCell.y)); await sleep(700) }
+      park(rect); await sleep(400)
+    }
+    clearSearch(rect); await sleep(800); park(rect); await sleep(400)
+  }
+
+  // 4. Final checkpoint against the plan, from the rail (top + bottom).
+  const final = await readWholeRail(rect, railPoint)
+  seen = final.counts
+  const top = { deckCount: final.deckCount }
+  const bottom = { deckCount: final.deckCount }
   const problems: string[] = []
   for (const [name, n] of target) if ((seen.get(matchKey(seen, name)) ?? 0) !== n) problems.push(`${name}: want ${n}, rail shows ${seen.get(matchKey(seen, name)) ?? 0}`)
   for (const [name, n] of seen) if (!isBasicName(name) && wanted(matchTarget(name)) === 0) problems.push(`${name}: still in deck`)
+  // Basics are not in `target` (they come from the land picker, not the pool),
+  // so check them separately or a deck short on lands reports as clean.
+  if (!NO_LANDS) {
+    for (const [name, col] of Object.entries(BASIC_COLOR)) {
+      const want = basicsTarget[col]
+      const have = seen.get(name) ?? 0
+      if (have !== want) problems.push(`${name}: want ${want}, rail shows ${have}`)
+    }
+  }
   if (unmatched.size > 0) {
     console.log(`NOTE ${unmatched.size} rail row(s) were left alone because the OCR text matched no known card: ${[...unmatched].join(' | ')}`)
   }
   console.log(`RESULT deck ${bottom.deckCount ?? top.deckCount ?? '?'}/40 · ${problems.length === 0 ? 'matches the plan' : 'MISMATCH: ' + problems.join('; ')}`)
+  // Put the overlay back if any phase took it down.
+  if (overlayDown) overlayApp('launch')
   console.log('Done is yours to press. Then: arena.sh build --verify')
 
   /**
