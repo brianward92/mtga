@@ -9,12 +9,11 @@
 // disables Arena's Suggest Lands. Done is never clicked: pressing it is the
 // player's act, and the EventSetDeckV3 it logs is what --verify compares to.
 import { readFileSync } from 'fs'
-import { execFileSync } from 'child_process'
-import { tmpdir } from 'os'
-import { join } from 'path'
-import { buildDeck } from '../../renderer/overlay/deckbuild'
+import { buildDeck } from '../../shared/deck-plan'
 import type { CardRow } from '../../shared/state'
-import { DECK_RAIL, LAND_PICKER, POOL, at, railRegion, deckRows, parseRailLine, parseDeckCount, namesMatch, type Rect } from '../../shared/deck-layout'
+import { BASIC_LAND_COLOR as BASIC_COLOR, isBasicLandName } from '../../shared/cards'
+import { activate, click, move, scroll, park, keystroke, selectAll, overlayApp, readTextLines, sleep } from './lib/desktop'
+import { builderCalibrationFor, at, railRegion, deckRows, parseRailLine, parseDeckCount, namesMatch, type Rect } from '../../shared/deck-layout'
 
 const [stateFile, ...flags] = process.argv.slice(2)
 if (!stateFile) { console.error('usage: deckbuild.ts <stateFile> [--dry-run] [--read] [--no-lands] [--verify [seconds]]'); process.exit(2) }
@@ -24,9 +23,6 @@ const NO_LANDS = flags.includes('--no-lands')
 const VERIFY = flags.includes('--verify')
 const VERIFY_SECONDS = Number(flags[flags.indexOf('--verify') + 1]) || 600
 
-const BIN = join(process.cwd(), 'build', 'dev')
-const BASIC_COLOR: Record<string, 'W' | 'U' | 'B' | 'R' | 'G'> = { Plains: 'W', Island: 'U', Swamp: 'B', Mountain: 'R', Forest: 'G' }
-const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
 function loadState(): { pool: CardRow[]; rect: Rect; phase: string; submittedDeck?: { main: Array<{ grpId: number; quantity: number }>; mainCount: number } | null } {
   const s = JSON.parse(readFileSync(stateFile, 'utf8'))
@@ -34,30 +30,11 @@ function loadState(): { pool: CardRow[]; rect: Rect; phase: string; submittedDec
   return { pool: s.pool, rect: s.arena ?? { x: 0, y: 0, width: 1280, height: 748 }, phase: s.phase, submittedDeck: s.submittedDeck }
 }
 
-// ---- desktop primitives -----------------------------------------------------
-function run(cmd: string, args: string[]): string {
-  return execFileSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] })
-}
-function activate(): void { run('osascript', ['-e', 'tell application "MTGA" to activate']) }
-function click(p: { x: number; y: number }): void { run(join(BIN, 'click'), [String(p.x), String(p.y)]) }
-function move(p: { x: number; y: number }): void { run(join(BIN, 'move-mouse'), [String(p.x), String(p.y)]) }
-function scroll(p: { x: number; y: number }, lines: number): void { run(join(BIN, 'scroll'), [String(p.x), String(p.y), String(lines)]) }
-function park(rect: Rect): void { move(at(rect, 0.55, 0.985)) }
-function keystroke(text: string): void {
-  run('osascript', ['-e', `tell application "System Events" to keystroke ${JSON.stringify(text)}`])
-}
-/**
- * The overlay's deckbuild sidebar is mirrored to the left, directly over the
- * card pool, so adding a card back means taking the overlay down first. The
- * plan was already read from the mirrored state, so nothing here needs it.
- */
-function overlayApp(action: 'kill' | 'launch'): void {
-  try { run('bash', ['scripts/dev/arena.sh', 'app', action]) } catch { /* best effort */ }
-}
+// ---- desktop primitives (shared/dev lib: scripts/dev/lib/desktop.ts) --------
 /** Put one card name in the pool's search box, leaving it alone in cell one. */
 function searchPool(rect: Rect, name: string): void {
   click(at(rect, POOL.search.x, POOL.search.y))
-  run('osascript', ['-e', 'tell application "System Events" to keystroke "a" using command down'])
+  selectAll()
   keystroke(name)
 }
 function clearSearch(rect: Rect): void {
@@ -69,35 +46,23 @@ interface RailRead { rows: RailRow[]; deckCount: number | null; raw: string[] }
 
 /** Screenshot the rail region and OCR it into rows with screen-point y centres. */
 function readRail(rect: Rect): RailRead {
-  const region = railRegion(rect, { ...DECK_RAIL, railTop: 0.165 })
-  const png = join(tmpdir(), `arena-rail-${process.pid}.png`)
-  run('screencapture', ['-x', '-tpng', `-R${region.x},${region.y},${region.width},${region.height}`, png])
-  const out = run(join(BIN, 'ocr'), [png])
-  const tokens = out.split('\n').filter(Boolean).map(l => JSON.parse(l) as { text: string; x: number; y: number; w: number; h: number })
-  // Vision returns "3x" and the name as separate boxes on the same line: merge by y.
-  tokens.sort((a, b) => a.y - b.y || a.x - b.x)
-  const lines: Array<{ y: number; parts: Array<{ x: number; text: string }> }> = []
-  for (const t of tokens) {
-    const cy = t.y + t.h / 2
-    const line = lines.find(l => Math.abs(l.y - cy) < 0.012)
-    if (line) line.parts.push({ x: t.x, text: t.text }); else lines.push({ y: cy, parts: [{ x: t.x, text: t.text }] })
-  }
-  const raw = lines.map(l => l.parts.sort((a, b) => a.x - b.x).map(p => p.text).join(' '))
+  const region = railRegion(rect, DECK_RAIL)
+  const lines = readTextLines(region)
+  const raw = lines.map(l => l.text)
   const rows: RailRow[] = []
   let deckCount: number | null = null
-  lines.forEach((l, i) => {
-    const text = raw[i]
-    const dc = parseDeckCount(text)
-    if (dc !== null) { deckCount = dc; return }
-    const r = parseRailLine(text.replace(/^\(/, ''))
-    if (r) rows.push({ ...r, y: Math.round(region.y + l.y * region.height) })
-  })
+  for (const l of lines) {
+    const dc = parseDeckCount(l.text)
+    if (dc !== null) { deckCount = dc; continue }
+    const r = parseRailLine(l.text.replace(/^\(/, ''))
+    if (r) rows.push({ ...r, y: l.y })
+  }
   return { rows, deckCount, raw }
 }
 
 /** Scroll the rail top and bottom and merge both reads into name -> count. */
 async function readWholeRail(rect: Rect, railPoint: { x: number; y: number }): Promise<{ counts: Map<string, number>; deckCount: number | null }> {
-  const sleepMs = (ms: number) => new Promise(r => setTimeout(r, ms))
+  const sleepMs = sleep
   scroll(railPoint, 40); await sleepMs(700); park(rect); await sleepMs(300)
   const top = readRail(rect)
   scroll(railPoint, -40); await sleepMs(700); park(rect); await sleepMs(300)
@@ -109,13 +74,21 @@ async function readWholeRail(rect: Rect, railPoint: { x: number; y: number }): P
 
 // ---- the plan ---------------------------------------------------------------
 const { pool, rect, phase } = loadState()
+// Geometry for THIS window shape. An unmeasured shape is announced rather than
+// silently used: clicks that land on nothing still read as successful, which is
+// how a land phase once "added" two Plains that never arrived.
+const { calibration: BUILDER, bucket: BUCKET, measured: MEASURED } = builderCalibrationFor(rect)
+const { rail: DECK_RAIL, landPicker: LAND_PICKER, pool: POOL } = BUILDER
+if (!MEASURED) {
+  console.log(`WARNING: no builder geometry measured for a ${rect.width}x${rect.height} window; using ${BUCKET}. Check every click with: arena.sh shot`)
+}
 const plan = buildDeck(pool)
 const target = new Map<string, number>()
 for (const e of plan.spells) target.set(e.name, e.count)
 for (const e of plan.nonbasicLands) target.set(e.name, e.count)
 const basicsTarget: Record<string, number> = { W: 0, U: 0, B: 0, R: 0, G: 0 }
 for (const b of plan.basics) basicsTarget[b.color] = b.count
-const isBasicName = (n: string) => n in BASIC_COLOR
+const isBasicName = isBasicLandName
 const wanted = (name: string) => isBasicName(name) ? basicsTarget[BASIC_COLOR[name]] : (target.get(name) ?? 0)
 
 console.log(`plan: ${plan.laneLabel} · ${plan.spellCount} spells + ${plan.landCount} lands = ${plan.total} · basics ${plan.basics.map(b => `${b.count}${b.color}`).join(' ')}`)
@@ -224,7 +197,14 @@ async function main(): Promise<void> {
   const bottom = { deckCount: final.deckCount }
   const problems: string[] = []
   for (const [name, n] of target) if ((seen.get(matchKey(seen, name)) ?? 0) !== n) problems.push(`${name}: want ${n}, rail shows ${seen.get(matchKey(seen, name)) ?? 0}`)
-  for (const [name, n] of seen) if (!isBasicName(name) && wanted(matchTarget(name)) === 0) problems.push(`${name}: still in deck`)
+  for (const [name] of seen) {
+    if (isBasicName(name)) continue
+    // A row we cannot identify is reported, never acted on: `unmatched` below
+    // already carries it, and treating unknown text as "not in the plan" is
+    // what once cut three copies of a wanted card.
+    const known = matchTarget(name)
+    if (known !== null && wanted(known) === 0) problems.push(`${name}: still in deck`)
+  }
   // Basics are not in `target` (they come from the land picker, not the pool),
   // so check them separately or a deck short on lands reports as clean.
   if (!NO_LANDS) {

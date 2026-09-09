@@ -9,7 +9,8 @@
 #   arena.sh front                             name of the frontmost app
 #   arena.sh shot [name]                       capture Arena's window region only
 #   arena.sh click X Y | move X Y | scroll X Y LINES | key CODE
-#   arena.sh state [pos|cards|pool|json]       mirrored DraftState summary
+#   arena.sh state [pos|cards|pool|json|rect]  mirrored DraftState summary
+#   arena.sh read X Y W H                      OCR an arbitrary screen region
 #   arena.sh pick [top|<grpId>] [--dry-run]    one pick (wraps pick-next-card.sh)
 #   arena.sh draft [SECONDS]                   pick on a loop until the draft completes
 #   arena.sh log                               tail Player.log for draft events
@@ -40,22 +41,10 @@ helper() {  # build a Swift helper on first use
 }
 activate() { osascript -e 'tell application "MTGA" to activate' >/dev/null; sleep 0.4; }
 front() { osascript -e 'tell application "System Events" to get name of first application process whose frontmost is true'; }
-state_py() { python3 - "$MTGA_STATE_FILE" "$@" <<'EOF'
-import json, sys
-s = json.load(open(sys.argv[1])); what = sys.argv[2] if len(sys.argv) > 2 else "pos"
-if what == "json": print(json.dumps(s)); sys.exit()
-if what == "rect":
-    a = s.get("arena")
-    if not a: sys.exit(1)
-    print(f"{a['x']},{a['y']},{a['width']},{a['height']}"); sys.exit()
-if what == "pos": print(f"P{s.get('pack')}P{s.get('pick')} phase={s.get('phase')} set={s.get('set')} fmt={s.get('format')} cards={len(s.get('cards',[]))} pool={len(s.get('pool',[]))} model={s.get('model',{}).get('state')}"); sys.exit()
-rows = s.get("cards", []) if what == "cards" else s.get("pool", [])
-key = (lambda c: (c.get("rank") or 99)) if what == "cards" else (lambda c: c.get("name") or "")
-for c in sorted(rows, key=key):
-    p = c.get("prob"); p = f"{p*100:3.0f}%" if isinstance(p, (int, float)) else "  - "
-    print(f"{str(c.get('rank') or '-'):>2} {(c.get('grade') or '-'):<2} {p} {c.get('name')} [{c.get('colors','')}]")
-EOF
-}
+# All state queries go through one TypeScript CLI, which shares the app's own
+# card rules. The Python helper this replaced had its own basic-land test and
+# quietly disagreed with the overlay about the same card.
+state_py() { ./node_modules/.bin/tsx scripts/dev/state.ts "$MTGA_STATE_FILE" "$@"; }
 
 cmd="${1:-}"; shift || true
 case "$cmd" in
@@ -107,6 +96,13 @@ case "$cmd" in
   pick)     bash scripts/dev/pick-next-card.sh "$@" ;;
   build)    [ -f "$MTGA_STATE_FILE" ] || die "no state mirror at $MTGA_STATE_FILE"; for t in click move-mouse scroll ocr; do helper $t >/dev/null; done; npx tsx scripts/dev/deckbuild.ts "$MTGA_STATE_FILE" "$@" ;;
   ocr)      "$(helper ocr)" "$@" ;;
+  read)
+    # Read the text in an arbitrary screen region (points). The general form of
+    # "what does the screen actually say here?", which is how a click is
+    # verified before it is committed.
+    [ $# -ge 4 ] || die "read X Y W H"
+    helper ocr >/dev/null
+    ./node_modules/.bin/tsx scripts/dev/read-region.ts "$1" "$2" "$3" "$4" ;;
   draft)
     end=$((SECONDS + ${1:-570})); maxpack="${2:-99}"; last=""
     while [ $SECONDS -lt $end ]; do

@@ -24,26 +24,38 @@ BIN=build/dev; mkdir -p "$BIN"
 for t in move-mouse click; do [ -x "$BIN/$t" ] || swiftc -O -o "$BIN/$t" "scripts/dev/$t.swift"; done
 
 osascript -e 'tell application "MTGA" to activate' >/dev/null; sleep 0.8
-R=$(osascript -e 'tell application "System Events" to tell process "MTGA" to get {position, size} of window 1' | tr -d ' ')
-IFS=, read -r x y w h <<< "$R"
+# Geometry comes from the app's mirrored rect (CGWindowList, no Accessibility).
+# The AX rect reports nonsense while Arena is full screen, and this script used
+# to trust it. arena.sh rect falls back to AX only when the mirror is missing.
+IFS=, read -r x y w h <<< "$(bash scripts/dev/arena.sh rect)"
 RECT="{\"x\":$x,\"y\":$y,\"width\":$w,\"height\":$h}"
 
-pos() { python3 scripts/dev/statecheck.py "$STATE" pos; }
+st() { "$TSX" scripts/dev/state.ts "$STATE" "$@"; }
+pos() { st packpick; }
 POS0=$(pos)
 "$TSX" scripts/dev/pick.ts "$STATE" "$RECT" list
 P=$("$TSX" scripts/dev/pick.ts "$STATE" "$RECT" "$WHAT")
 echo "target: $P  (at pack-pick $POS0)"
 read -r TX TY TGRP TNAME <<< "$P"
-is_land() { python3 scripts/dev/statecheck.py "$STATE" island "$TGRP"; }
+is_land() { st basic "$TGRP"; }
 # The last card of a pack is forced, and a pack can be all basics: refusing
 # there is not a safeguard, it just stalls the draft.
-is_forced() { python3 scripts/dev/statecheck.py "$STATE" forced; }
+is_forced() { st forced; }
 if [ "$ALLOW_LAND" = 0 ] && is_land && ! is_forced; then
   echo "REFUSING to pick a basic land ($TNAME); pass --allow-land if you really mean it" >&2; exit 3
 fi
 if [ "$ALLOW_LAND" = 0 ] && is_land; then echo "taking $TNAME: forced (no non-land left)"; fi
 [ "$DRY" = 1 ] && exit 0
 if [ "$(pos)" != "$POS0" ]; then echo "pack advanced before clicking; aborting" >&2; exit 4; fi
+
+# Confirm the screen agrees before committing. Cells are matched to cards by
+# position, so any ordering error clicks the neighbour; reading the card's title
+# band back catches that whatever caused it.
+if ! V=$("$TSX" scripts/dev/pick.ts "$STATE" "$RECT" verify "$TGRP"); then
+  echo "$V" >&2
+  echo "ABORTING: the target cell does not hold $TNAME; not clicking" >&2; exit 6
+fi
+echo "verified: $V"
 
 BEFORE=$(grep -c '"type":"pick"' "$HIST" 2>/dev/null || echo 0)
 picked() { [ "$(grep -c '"type":"pick"' "$HIST" 2>/dev/null || echo 0)" -gt "$BEFORE" ]; }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { deckListOrder, deckRows, parseRailLine, parseDeckCount, namesMatch, railRowTop, railRowBottom, DECK_RAIL } from '../shared/deck-layout'
+import { deckListOrder, deckRows, parseRailLine, parseDeckCount, namesMatch, railRowTop, railRowBottom, DECK_RAIL, visibleRows, builderCalibrationFor } from '../shared/deck-layout'
 
 const c = (name: string, mv: number, colors: string, type = 'Creature', rarity = 'common', colorIdentity = colors) =>
   ({ name, manaValue: mv, colors, type, rarity, colorIdentity })
@@ -78,6 +78,6 @@ describe('rail geometry', () => {
     expect(railRowTop(rect, 0)).toEqual({ x: 1361, y: 205 })
     expect(railRowTop(rect, 1).y - railRowTop(rect, 0).y).toBe(32)
     expect(railRowBottom(rect, 29, 30).y).toBe(598)
-    expect(DECK_RAIL.visibleRows).toBe(16)
+    expect(visibleRows()).toBe(13)
   })
 })

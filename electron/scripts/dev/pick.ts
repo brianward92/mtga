@@ -1,10 +1,12 @@
-// Usage: npx tsx pick.ts <stateFile> <arenaRectJson> [grpId|top|list|confirm]
+// Usage: npx tsx pick.ts <stateFile> <arenaRectJson> [grpId|top|list|confirm|verify GRPID]
 // Prints screen-point coordinates for a card's cell centre (and the pack table).
 import { readFileSync } from 'fs'
 import { arenaContentBox, calibrationFor, packLayout } from '../../shared/layout'
 import { arenaDisplayOrder } from '../../shared/display-order'
 import { loadPrefs } from '../../main/prefs'
 import type { CardRow } from '../../shared/state'
+import { namesMatch } from '../../shared/cards'
+import { readTextLines } from './lib/desktop'
 
 const [stateFile, rectJson, what = 'top'] = process.argv.slice(2)
 const state = JSON.parse(readFileSync(stateFile, 'utf8'))
@@ -24,6 +26,30 @@ if (what === 'confirm') {
   // x 65.3% of the box, y 94% of the window height (safely above the Dock).
   const box = arenaContentBox({ width: rect.width, height: rect.height })
   console.log(`${Math.round(rect.x + box.x + box.width * 0.6528)} ${Math.round(rect.y + rect.height * 0.94)} confirm`)
+} else if (what === 'verify') {
+  // Read the card Arena is actually drawing in the target cell, and compare it
+  // to the card we mean to take.
+  //
+  // Cells are matched to cards positionally, so every ordering bug in this
+  // codebase has the same symptom: the click lands on the neighbour and the
+  // draft records a card the model never recommended. That happened for real
+  // on P1P10. Checking the screen costs one capture and catches the whole
+  // class, including causes we have not found yet.
+  const target = cards.find(c => c.grpId === Number(process.argv[5]))
+  if (!target) { console.error('verify: no such card in this pack'); process.exit(2) }
+  const cell = cellOf.get(target.grpId)!
+  const r = layout.cards[cell].card
+  // Arena prints the title in a band across the top of the card frame.
+  const band = {
+    x: Math.round(rect.x + r.x),
+    y: Math.round(rect.y + r.y + r.height * 0.04),
+    width: Math.round(r.width),
+    height: Math.round(r.height * 0.14)
+  }
+  const seen = readTextLines(band).map(l => l.text).filter(Boolean)
+  const ok = seen.some(t => namesMatch(t, target.name))
+  console.log(`${ok ? 'MATCH' : 'MISMATCH'} expected="${target.name}" saw="${seen.join(' / ') || '(nothing)'}"`)
+  process.exit(ok ? 0 : 6)
 } else if (what === 'list') {
   for (const c of [...cards].sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99))) {
     const mark = c.unresolved ? ' UNRESOLVED' : ''
