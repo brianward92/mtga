@@ -4,7 +4,7 @@
  */
 import { EventEmitter } from 'events'
 import {
-  applyCalibrationOp, aspectBucketOf, nearestCalibrationBucket, normalizeCalibration,
+  applyCalibrationOp, aspectBucketOf, calibrationFor, normalizeCalibration,
   type CalibrationConfig, type CalibrationOp
 } from '../../shared/layout'
 import { loadPrefs, savePrefs } from '../prefs'
@@ -21,10 +21,7 @@ export class Calibration extends EventEmitter {
   /** Config for the current Arena size: working (while calibrating) → persisted bucket → nearest → default. */
   configFor(rect: ArenaRect | null): CalibrationConfig {
     if (this.active && this.working) return this.working
-    const configs = loadPrefs().calibrations
-    if (!rect) return normalizeCalibration(configs['default'] ?? {})
-    const bucket = nearestCalibrationBucket(Object.keys(configs), rect.width, rect.height) ?? aspectBucketOf(rect.width, rect.height)
-    return normalizeCalibration(configs[bucket] ?? configs['default'] ?? {})
+    return calibrationFor(loadPrefs().calibrations, rect)
   }
 
   /** Start editing a copy of the best calibration for the current bounds. */

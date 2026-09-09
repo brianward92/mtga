@@ -69,6 +69,13 @@ CORPUS = {  # release order — this ordering IS the scaling-curve ordering
     "WOE": SetSpec(
         "WOE", ("PremierDraft", "TradDraft"), "modern", bonus_sheets=("WOT",)
     ),
+    # LCI is empirically 15 picks per pack, not the 14 default: a live Quick
+    # Draft on 2026-09-08 ran P1P1 through P1P15. The shipped index.json now
+    # says 15 so the HUD's progress dots read x/45, but this stays 14 on
+    # purpose. picks_per_pack also lands in assets.npz, where it feeds two
+    # model inputs (positionFeatures, and the 13/14/15 one-hot in setScalars),
+    # and the shipped model was trained with 14 for LCI. Correcting it here
+    # without retraining would hand the model a value it never saw in training.
     "LCI": SetSpec("LCI", ("PremierDraft", "TradDraft"), "modern"),
     "KTK": SetSpec(
         "KTK",

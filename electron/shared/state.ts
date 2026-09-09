@@ -23,6 +23,13 @@ export interface CardRow {
   scryfallId: string
   /** Arena's own sort keys when known; see shared/display-order.ts. */
   order?: readonly [number, number, string]
+  /**
+   * No bundle entry for this grpId, so every field above is a placeholder.
+   * The pack grid is matched to cards positionally, so a single unresolved card
+   * reorders everything after it: callers must refuse to draw or click rather
+   * than render a grid that looks right and is not.
+   */
+  unresolved?: boolean
   imageUrl: string | null
   /** Model logit for THIS pick (pool-conditioned); null until scored / unknown. */
   ev: number | null

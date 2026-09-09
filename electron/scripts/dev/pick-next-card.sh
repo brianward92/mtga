@@ -21,7 +21,7 @@ for a in "$@"; do
   esac
 done
 BIN=build/dev; mkdir -p "$BIN"
-for t in dblclick move-mouse click; do [ -x "$BIN/$t" ] || swiftc -O -o "$BIN/$t" "scripts/dev/$t.swift"; done
+for t in move-mouse click; do [ -x "$BIN/$t" ] || swiftc -O -o "$BIN/$t" "scripts/dev/$t.swift"; done
 
 osascript -e 'tell application "MTGA" to activate' >/dev/null; sleep 0.8
 R=$(osascript -e 'tell application "System Events" to tell process "MTGA" to get {position, size} of window 1' | tr -d ' ')
@@ -35,9 +35,13 @@ P=$("$TSX" scripts/dev/pick.ts "$STATE" "$RECT" "$WHAT")
 echo "target: $P  (at pack-pick $POS0)"
 read -r TX TY TGRP TNAME <<< "$P"
 is_land() { python3 scripts/dev/statecheck.py "$STATE" island "$TGRP"; }
-if [ "$ALLOW_LAND" = 0 ] && is_land; then
+# The last card of a pack is forced, and a pack can be all basics: refusing
+# there is not a safeguard, it just stalls the draft.
+is_forced() { python3 scripts/dev/statecheck.py "$STATE" forced; }
+if [ "$ALLOW_LAND" = 0 ] && is_land && ! is_forced; then
   echo "REFUSING to pick a basic land ($TNAME); pass --allow-land if you really mean it" >&2; exit 3
 fi
+if [ "$ALLOW_LAND" = 0 ] && is_land; then echo "taking $TNAME: forced (no non-land left)"; fi
 [ "$DRY" = 1 ] && exit 0
 if [ "$(pos)" != "$POS0" ]; then echo "pack advanced before clicking; aborting" >&2; exit 4; fi
 

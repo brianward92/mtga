@@ -287,6 +287,7 @@ export class DraftCoordinator extends EventEmitter {
         type: c?.type ?? '',
         scryfallId: c?.scryfallId ?? '',
         order: c?.order,
+        unresolved: c ? undefined : true,
         imageUrl: null,
         ev: null, prob: null, rank: null,
         percentile: intrinsic?.percentile ?? null,

@@ -61,6 +61,11 @@ export class BadgeLayer {
     this.setCovered(layer.covered)
 
     const cards = state.cards
+    // Cells are matched to cards by position, so one card we cannot identify
+    // shifts every badge after it onto the wrong card. A grid that is silently
+    // one cell out looks correct and mis-picks; draw nothing instead. The
+    // sidebar keeps showing whatever is known.
+    if (cards.some(c => c.unresolved)) { this.setVisible(false); this.detachFrom(0); return }
     const chips = buildChips(cards, state.scoring)
     const order = arenaDisplayOrder(cards)
     const coveredCells = new Set(layer.cells)

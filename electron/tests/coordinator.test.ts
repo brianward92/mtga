@@ -89,6 +89,11 @@ describe('DraftCoordinator', () => {
     expect(fr.scryfallId).toBe('scry-funeral-room')
     expect(fr.imageUrl).toBeNull()
     expect(c.current.cards.find(r => r.grpId === 999)?.scryfallId).toBe('')
+    // A card with no bundle entry must be flagged, not just given placeholder
+    // fields: the badge grid and the picker both refuse on it, because one
+    // unidentified card shifts every cell after it.
+    expect(c.current.cards.find(r => r.grpId === 999)?.unresolved).toBe(true)
+    expect(c.current.cards.find(r => r.grpId === 2)?.unresolved).toBeUndefined()
 
     c.onDraftPick(snap({ currentPack: { pack: 1, pick: 1, grpIds: [1, 2, 999] }, pool: [1] }), { pack: 1, pick: 1, grpIds: [1], packGrpIds: [1, 2, 999] })
     expect(c.current.picks).toHaveLength(1)

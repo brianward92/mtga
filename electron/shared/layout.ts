@@ -204,6 +204,26 @@ export function nearestCalibrationBucket(
  * Row-major arrangement for a pack of `count` cards: full rows of `maxCols`,
  * the remainder in the last row. rowsForCount(14, 8) -> [8, 6].
  */
+/**
+ * Best stored calibration for a window: exact aspect bucket, else the nearest
+ * stored one, else the defaults.
+ *
+ * Shared so the overlay and the automated picker cannot disagree about where a
+ * card is. They previously resolved geometry by different routes — the overlay
+ * through the user's saved buckets, the picker through DEFAULT_CALIBRATION —
+ * which agrees only until someone calibrates, and then the picker clicks where
+ * the badge is not.
+ */
+export function calibrationFor(
+  configs: Record<string, Partial<CalibrationConfig>>,
+  view: { width: number; height: number } | null
+): CalibrationConfig {
+  if (!view) return normalizeCalibration(configs['default'] ?? {})
+  const bucket = nearestCalibrationBucket(Object.keys(configs), view.width, view.height)
+    ?? aspectBucketOf(view.width, view.height)
+  return normalizeCalibration(configs[bucket] ?? configs['default'] ?? {})
+}
+
 export function rowsForCount(count: number, maxCols: number): number[] {
   const n = Math.max(0, Math.floor(count))
   const cols = Math.max(1, Math.floor(maxCols))

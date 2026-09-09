@@ -7,8 +7,8 @@
 #   arena.sh activate                          bring Arena to the front
 #   arena.sh rect                              Arena window rect in screen points
 #   arena.sh front                             name of the frontmost app
-#   arena.sh shot [name]                       screenshot only if Arena is frontmost
-#   arena.sh click X Y | dblclick X Y | move X Y | scroll X Y LINES | key CODE
+#   arena.sh shot [name]                       capture Arena's window region only
+#   arena.sh click X Y | move X Y | scroll X Y LINES | key CODE
 #   arena.sh state [pos|cards|pool|json]       mirrored DraftState summary
 #   arena.sh pick [top|<grpId>] [--dry-run]    one pick (wraps pick-next-card.sh)
 #   arena.sh draft [SECONDS]                   pick on a loop until the draft completes
@@ -25,7 +25,12 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 cd "$here/../.."   # electron/
 APP="/Applications/MTGA Draft Assistant.app"
 export MTGA_STATE_FILE="${MTGA_STATE_FILE:-$HOME/.mtga-tracker/state.json}"
-SHOTS="${MTGA_SHOT_DIR:-${TMPDIR:-/tmp}/arena-shots}"
+# Under build/dev/, which .gitignore covers. Note build/ itself is a tracked
+# source directory (icons, tray images), so generated artefacts must not land
+# there. Inside the repo rather than $TMPDIR because a screenshot is only
+# useful if the tool that asked for it can read it back, and agent sandboxes
+# are scoped to the working directory.
+SHOTS="${MTGA_SHOT_DIR:-$PWD/build/dev/shots}"
 BIN=build/dev
 
 die() { echo "arena: $*" >&2; exit 1; }
@@ -39,6 +44,10 @@ state_py() { python3 - "$MTGA_STATE_FILE" "$@" <<'EOF'
 import json, sys
 s = json.load(open(sys.argv[1])); what = sys.argv[2] if len(sys.argv) > 2 else "pos"
 if what == "json": print(json.dumps(s)); sys.exit()
+if what == "rect":
+    a = s.get("arena")
+    if not a: sys.exit(1)
+    print(f"{a['x']},{a['y']},{a['width']},{a['height']}"); sys.exit()
 if what == "pos": print(f"P{s.get('pack')}P{s.get('pick')} phase={s.get('phase')} set={s.get('set')} fmt={s.get('format')} cards={len(s.get('cards',[]))} pool={len(s.get('pool',[]))} model={s.get('model',{}).get('state')}"); sys.exit()
 rows = s.get("cards", []) if what == "cards" else s.get("pool", [])
 key = (lambda c: (c.get("rank") or 99)) if what == "cards" else (lambda c: c.get("name") or "")
@@ -69,13 +78,21 @@ case "$cmd" in
     esac ;;
   activate) activate; echo "Arena frontmost" ;;
   front) front ;;
-  rect) osascript -e 'tell application "System Events" to tell process "MTGA" to get {position, size} of window 1' | tr -d ' ' ;;
+  rect)
+    # The app publishes the rect it is actually drawing against, taken from the
+    # bundled CGWindowList helper, which needs no Accessibility permission.
+    # Prefer it: the AX rect below reports nonsense while Arena is full screen,
+    # and the app deliberately avoids AX (see main/arena-geometry.ts).
+    if [ -f "$MTGA_STATE_FILE" ] && state_py rect 2>/dev/null; then :
+    else osascript -e 'tell application "System Events" to tell process "MTGA" to get {position, size} of window 1' | tr -d ' '; fi ;;
   shot)
-    f="$(front)"; [ "$f" = "MTGA" ] || die "Arena is not frontmost ($f); not capturing"
-    mkdir -p "$SHOTS"; out="$SHOTS/${1:-shot-$(date +%H%M%S)}.png"
-    screencapture -x "$out" && sips -Z "${MTGA_SHOT_WIDTH:-1800}" "$out" >/dev/null && echo "$out" ;;
+    mkdir -p "$SHOTS"; out="$SHOTS/${1:-shot-$(date +%H%M%S)}.png"; rm -f "$out"
+    # Capture only Arena's own rect. A bare `screencapture -x` takes the whole
+    # desktop, which sweeps up every other window that happens to be open.
+    # screenshot-arena.sh gets the region from the native helper.
+    bash scripts/dev/screenshot-arena.sh "$out" >/dev/null
+    sips -Z "${MTGA_SHOT_WIDTH:-1800}" "$out" >/dev/null && echo "$out" ;;
   click)    activate; "$(helper click)" "$1" "$2" ;;
-  dblclick) activate; "$(helper dblclick)" "$1" "$2" ;;
   move)     "$(helper move-mouse)" "$1" "$2" ;;
   scroll)   activate; "$(helper scroll)" "$1" "$2" "$3" ;;
   key)      activate; osascript -e "tell application \"System Events\" to key code $1" ;;
@@ -84,11 +101,15 @@ case "$cmd" in
   build)    [ -f "$MTGA_STATE_FILE" ] || die "no state mirror at $MTGA_STATE_FILE"; for t in click move-mouse scroll ocr; do helper $t >/dev/null; done; npx tsx scripts/dev/deckbuild.ts "$MTGA_STATE_FILE" "$@" ;;
   ocr)      "$(helper ocr)" "$@" ;;
   draft)
-    end=$((SECONDS + ${1:-570})); last=""
+    end=$((SECONDS + ${1:-570})); maxpack="${2:-99}"; last=""
     while [ $SECONDS -lt $end ]; do
       info="$(state_py pos 2>/dev/null || true)"
       case "$info" in *"phase=complete"*) echo "DRAFT COMPLETE"; exit 0 ;; esac
       pos="${info%% *}"; n="${info##*cards=}"; n="${n%% *}"
+      pack="${pos#P}"; pack="${pack%%P*}"
+      if [ -n "$pack" ] && [ "$pack" != "None" ] && [ "$pack" -gt "$maxpack" ] 2>/dev/null; then
+        echo "reached pack $pack (stop after $maxpack)"; exit 0
+      fi
       if [ -n "$pos" ] && [ "$pos" != "$last" ] && [ "${n:-0}" -gt 0 ] 2>/dev/null; then
         sleep 1.5
         bash scripts/dev/pick-next-card.sh top 2>&1 | grep -E '^PICKED|abort|REFUS|not picked' | tail -1 || true
