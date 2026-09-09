@@ -17,6 +17,10 @@
  */
 
 import { colorOrder, type DisplayOrderCard } from './display-order'
+import { isLand, isBasicLand, titleKey, namesMatch } from './cards'
+import { aspectBucketOf, nearestCalibrationBucket } from './layout'
+
+export { namesMatch }
 
 export interface DeckRailCalibration {
   /** Row centre x, as a fraction of window width. */
@@ -27,15 +31,51 @@ export interface DeckRailCalibration {
   lastRowY: number
   /** Row pitch as a fraction of window height. */
   rowPitch: number
-  /** Rows fully visible above the Done button. */
-  visibleRows: number
   /** The Done button centre (never clicked by automation; here to avoid it). */
   done: { x: number; y: number }
   /** The rail's left edge, for OCR regions. */
   railLeft: number
-  /** Top of the first row's box and bottom of the last visible row's box. */
+  /**
+   * The OCR region's top and bottom.
+   *
+   * `railTop` is deliberately ABOVE the first row: the "40/40 Cards" header
+   * sits there and is the only on-screen source of the deck size, which is the
+   * checkpoint every edit is verified against. The deckbuilder used to pass its
+   * own 0.165 here and silently disagree with this file.
+   */
   railTop: number
   railBottom: number
+}
+
+/**
+ * The builder's geometry for one window shape.
+ *
+ * Bucketed by aspect ratio, the same way the pack grid's calibration is: these
+ * are fractions of the window, and a window of a different SHAPE moves the
+ * panels relative to each other, not just their size. The numbers below were
+ * measured to four decimals on exactly one window on one afternoon and were
+ * then applied to every window, which is how the land tiles came to be clicked
+ * where the land tiles are not.
+ */
+export interface BuilderCalibration {
+  rail: DeckRailCalibration
+  landPicker: LandPickerCalibration
+  pool: PoolCalibration
+}
+
+export interface LandPickerCalibration {
+  /** Land filter icon in the pool filter bar. */
+  filter: { x: number; y: number }
+  /** Basic-land tile centres in the filtered pool grid, by colour. */
+  tiles: Record<'W' | 'U' | 'B' | 'R' | 'G', { x: number; y: number }>
+}
+
+export interface PoolCalibration {
+  search: { x: number; y: number }
+  /** The X inside the search field. */
+  clearSearch: { x: number; y: number }
+  /** Centre of the first (top-left) pool card. */
+  firstCell: { x: number; y: number }
 }
 
 export const DECK_RAIL: DeckRailCalibration = {
@@ -43,25 +83,22 @@ export const DECK_RAIL: DeckRailCalibration = {
   firstRowY: 0.2219,
   lastRowY: 0.7473,
   rowPitch: 0.04269,
-  visibleRows: 16,
   done: { x: 0.902, y: 0.934 },
   railLeft: 0.775,
-  railTop: 0.195,
+  railTop: 0.165,
   railBottom: 0.90
 }
 
 /** The filter bar's land toggle and the basic-land tiles it reveals. */
-export const LAND_PICKER = {
-  /** Land filter icon in the pool filter bar. */
+export const LAND_PICKER: LandPickerCalibration = {
   filter: { x: 0.327, y: 0.1618 },
-  /** Basic-land tile centres in the filtered pool grid, by colour. */
   tiles: {
     W: { x: 0.240, y: 0.416 },
     U: { x: 0.390, y: 0.416 },
     B: { x: 0.540, y: 0.416 },
     R: { x: 0.689, y: 0.416 },
     G: { x: 0.090, y: 0.779 }
-  } as Record<'W' | 'U' | 'B' | 'R' | 'G', { x: number; y: number }>
+  }
 }
 
 /**
@@ -74,12 +111,45 @@ export const LAND_PICKER = {
  * The overlay's own deckbuild sidebar is mirrored to the left and covers the
  * first two columns, so whatever drives these must hide the overlay first.
  */
-export const POOL = {
+export const POOL: PoolCalibration = {
   search: { x: 0.0844, y: 0.1626 },
-  /** The X inside the search field. */
   clearSearch: { x: 0.1311, y: 0.1626 },
-  /** Centre of the first (top-left) pool card. */
   firstCell: { x: 0.0906, y: 0.4183 }
+}
+
+/** The one window shape anyone has actually measured: 1280x748, aspect 1.7. */
+export const MEASURED_ASPECT = 'aspect-1.7'
+
+const BUILDER_BY_ASPECT: Readonly<Record<string, BuilderCalibration>> = {
+  [MEASURED_ASPECT]: { rail: DECK_RAIL, landPicker: LAND_PICKER, pool: POOL }
+}
+
+/** Aspect buckets with measured builder geometry. */
+export function builderBuckets(): string[] {
+  return Object.keys(BUILDER_BY_ASPECT)
+}
+
+/**
+ * Builder geometry for a window, and whether it was actually measured for it.
+ *
+ * `measured` is false when the nearest bucket is a guess. Callers should say so
+ * out loud rather than click confidently: an unmeasured shape is exactly the
+ * situation where a click lands on nothing and the run reports success.
+ */
+export function builderCalibrationFor(rect: { width: number; height: number }): { calibration: BuilderCalibration; bucket: string; measured: boolean } {
+  const bucket = nearestCalibrationBucket(builderBuckets(), rect.width, rect.height) ?? MEASURED_ASPECT
+  return { calibration: BUILDER_BY_ASPECT[bucket] ?? BUILDER_BY_ASPECT[MEASURED_ASPECT], bucket, measured: aspectBucketOf(rect.width, rect.height) === bucket }
+}
+
+/**
+ * How many rail rows are fully visible above the Done button.
+ *
+ * Derived from the geometry rather than stored: a stored count of 16 cannot
+ * survive a window resize, and it is the kind of constant that stays right
+ * until the day it is silently wrong.
+ */
+export function visibleRows(cal: DeckRailCalibration = DECK_RAIL): number {
+  return Math.floor((cal.lastRowY - cal.firstRowY) / cal.rowPitch) + 1
 }
 
 export interface Rect { x: number; y: number; width: number; height: number }
@@ -115,15 +185,6 @@ export interface DeckListCard extends DisplayOrderCard {
   type?: string | null
 }
 
-function isLand(card: DeckListCard): boolean {
-  return /\bland\b/i.test(card.type ?? '') || (card.rarity ?? '').toLowerCase() === 'land'
-}
-function isBasic(card: DeckListCard): boolean {
-  return /\bbasic land\b/i.test(card.type ?? '')
-}
-function titleKey(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9/]/g, '')
-}
 
 /** Arena's deck-list sort. Stable, so equal keys keep input order. */
 export function deckListOrder<T extends DeckListCard>(cards: ReadonlyArray<T>): T[] {
@@ -133,7 +194,7 @@ export function deckListOrder<T extends DeckListCard>(cards: ReadonlyArray<T>): 
       const la = isLand(a.card), lb = isLand(b.card)
       if (la !== lb) return la ? 1 : -1
       if (la && lb) {
-        const ba = isBasic(a.card), bb = isBasic(b.card)
+        const ba = isBasicLand(a.card), bb = isBasicLand(b.card)
         if (ba !== bb) return ba ? -1 : 1
       } else {
         const mv = (a.card.manaValue ?? 0) - (b.card.manaValue ?? 0)
@@ -173,22 +234,18 @@ export function parseRailLine(text: string): { count: number; name: string } | n
   return { count, name: m[2].trim() }
 }
 
-/** "41/40 Cards" → 41. */
+/**
+ * Arena's deck-size header: "41/40 Cards" → 41.
+ *
+ * The denominator is whatever the format asks for — 40 in Limited, 60 in a
+ * constructed deck — so it is read, not assumed. `deckSize` reports it for
+ * callers that want to check they are looking at the format they expect.
+ */
 export function parseDeckCount(text: string): number | null {
-  const m = text.match(/(\d{1,3})\s*\/\s*40/)
-  return m ? Number(m[1]) : null
+  return parseDeckHeader(text)?.count ?? null
+}
+export function parseDeckHeader(text: string): { count: number; deckSize: number } | null {
+  const m = text.match(/(\d{1,3})\s*\/\s*(\d{1,3})/)
+  return m ? { count: Number(m[1]), deckSize: Number(m[2]) } : null
 }
 
-/** Loose name match for OCR output: case, punctuation, and truncation ("Faramir, Field Comma…") tolerant. */
-export function namesMatch(ocr: string, name: string): boolean {
-  const a = titleKey(ocr.replace(/[….]+$/, ''))
-  const b = titleKey(name)
-  if (!a || !b) return false
-  if (a === b) return true
-  // Arena truncates a long name to fit the rail: "Faramir, Field Comma…".
-  if (a.length >= 8 && b.startsWith(a)) return true
-  // OCR runs the next row's count onto the end of this one, so the recognised
-  // text is the real name plus a stray digit: "Volatile Wanderglyph 1".
-  if (b.length >= 8 && a.startsWith(b)) return true
-  return false
-}

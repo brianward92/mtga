@@ -15,6 +15,8 @@
  * log's. Ties keep log order (stable sort).
  */
 
+import { isLand, titleKey } from './cards'
+
 export interface DisplayOrderCard {
   name: string | null
   rarity: string | null
@@ -41,16 +43,12 @@ const MULTI: Record<string, number> = {
 }
 const COLORLESS = 31
 
+
 function letters(s: string | null | undefined): string {
   const set = new Set((s ?? '').toUpperCase().split('').filter(c => c in MONO))
   return 'WUBRG'.split('').filter(c => set.has(c)).join('')
 }
 
-/** Any land (basic or not): Arena files them in the land tier after commons. */
-function isLand(card: DisplayOrderCard): boolean {
-  const r = (card.rarity ?? '').toLowerCase()
-  return /\bland\b/i.test(card.type ?? '') || r === 'land' || r === 'basic'
-}
 
 /**
  * Arena files lands in its bottom tier only when they carry its "land" rarity:
@@ -80,10 +78,6 @@ export function colorOrder(card: DisplayOrderCard): number {
   return MULTI[cols] ?? COLORLESS
 }
 
-/** Arena's Order_Title: lowercase, letters/digits only (Rooms keep "//"). */
-function titleKey(name: string | null | undefined): string {
-  return (name ?? '').toLowerCase().replace(/[^a-z0-9/]/g, '')
-}
 
 /**
  * Whether Arena's own sort keys cover every card here.

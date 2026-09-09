@@ -13,6 +13,7 @@
 //   * Arena wraps hyphenated names in <nobr> markup ("<nobr>Cat-Gator</nobr>").
 //   * Back faces of DFCs/Adventures ("Squeak By") carry their own grpId and
 //     never appear in a pack list; only primary, draftable cards matter.
+import { cleanArenaTitle, titleKey, isBasicLandName } from '../../shared/cards'
 import { readFileSync } from 'fs'
 import { findBundleRoot, readBundleIndex, loadSetBundle } from '../../main/data/bundle'
 
@@ -21,16 +22,11 @@ const LIST = args.includes('--list')
 const [tsv, ...only] = args.filter(a => a !== '--list')
 if (!tsv) { console.error('usage: verify-ids.ts <arena-cards.tsv> [--list] [SET ...]'); process.exit(2) }
 
-const BASICS = new Set(['plains', 'island', 'swamp', 'mountain', 'forest', 'wastes'])
+
 interface Arena { name: string; set: string; token: boolean; primary: boolean; face: number; draftable: boolean; rebalanced: boolean }
 
-/** Arena's localized titles carry presentation markup; the name is the text. */
-function clean(s: string): string {
-  return s.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim()
-}
-function key(s: string): string {
-  return clean(s).toLowerCase().replace(/[^a-z0-9/]/g, '')
-}
+const clean = cleanArenaTitle
+const key = (s: string) => titleKey(cleanArenaTitle(s))
 
 const arena = new Map<number, Arena>()
 for (const line of readFileSync(tsv, 'utf8').split('\n')) {
@@ -68,7 +64,7 @@ for (const set of sets) {
     if (!a) continue
     checked++
     if (same(card.name, a.name)) continue
-    const isBasic = BASICS.has(key(card.name)) || BASICS.has(key(a.name))
+    const isBasic = isBasicLandName(key(card.name)) || isBasicLandName(key(a.name))
     if (isBasic) { setBasic++; basicIds.set(grpId, `${grpId}: we say "${card.name}", Arena says "${a.name}"`) }
     else { setOther++; otherRows.push(`${set} ${grpId}: we say "${card.name}", Arena says "${a.name}"`) }
   }

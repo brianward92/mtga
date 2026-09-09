@@ -17,6 +17,7 @@
  * the live fallback for ids newer than the shipped file.
  */
 
+import { crossSourceTitleKey } from '../../shared/cards'
 import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 
@@ -50,13 +51,7 @@ const EMPTY: ArenaCards = {
  * holding any of those loses Arena's ordering entirely, because the keys are
  * all-or-nothing per pack.
  */
-function orderKey(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/^a-/, '')
-    .replace(/\/{2,}/g, '/')
-    .replace(/[^a-z0-9/]/g, '')
-}
+const orderKey = crossSourceTitleKey
 
 interface RawArenaCards {
   ids?: Record<string, string>

@@ -1,0 +1,85 @@
+import { describe, it, expect } from 'vitest'
+import {
+  titleKey, crossSourceTitleKey, cleanArenaTitle, namesMatch,
+  isLand, isBasicLand, isBasicLandName, poolSummary, BASIC_LAND_COLOR
+} from '../shared/cards'
+
+describe('title keys', () => {
+  it("reproduces Arena's Order_Title: lowercase, letters and digits, // kept", () => {
+    expect(titleKey("Anim Pakal, Thousandth Moon")).toBe('animpakalthousandthmoon')
+    expect(titleKey('Bake // Bloom')).toBe('bake//bloom')
+    expect(titleKey(null)).toBe('')
+  })
+
+  it('reconciles the same card spelled by Arena and by Scryfall', () => {
+    // Alchemy rebalances, split separators, and a meld card named from the
+    // other face. A pack holding any of these lost Arena's ordering entirely,
+    // because the sort keys are all-or-nothing per pack.
+    expect(crossSourceTitleKey('A-Sarkhan, Soul Aflame')).toBe(crossSourceTitleKey('Sarkhan, Soul Aflame'))
+    expect(crossSourceTitleKey('Bake /// Bloom')).toBe(crossSourceTitleKey('Bake // Bloom'))
+  })
+
+  it("strips Arena's presentation markup from a localized title", () => {
+    expect(cleanArenaTitle('<nobr>Cat-Gator</nobr>')).toBe('Cat-Gator')
+    expect(cleanArenaTitle('Hidden   Courtyard ')).toBe('Hidden Courtyard')
+  })
+})
+
+describe('namesMatch', () => {
+  it('accepts a name Arena truncated to fit the rail', () => {
+    expect(namesMatch('Faramir, Field Comma...', 'Faramir, Field Commander')).toBe(true)
+    expect(namesMatch('Anim Pakal, Thousa…', 'Anim Pakal, Thousandth Moon')).toBe(true)
+  })
+
+  it("accepts a name with the next row's count run onto the end", () => {
+    // Vision groups rail rows by vertical position and the neighbouring row's
+    // "1x" lands inside this row's box. That failed to match, the row read as
+    // "not in the plan", and the builder cut all three copies of a wanted card.
+    expect(namesMatch('Volatile Wanderglyph 1', 'Volatile Wanderglyph')).toBe(true)
+  })
+
+  it('still refuses two genuinely different cards', () => {
+    expect(namesMatch('Plains', 'Mountain')).toBe(false)
+    expect(namesMatch('Abrade', 'Abrade Extra')).toBe(false)
+    expect(namesMatch('', 'Plains')).toBe(false)
+  })
+})
+
+describe('land classification — one answer for the whole codebase', () => {
+  it('classifies basics, nonbasic lands, and spells', () => {
+    expect(isBasicLand({ name: 'Plains', type: 'Basic Land — Plains', rarity: 'land' })).toBe(true)
+    expect(isLand({ name: 'Hidden Courtyard', type: 'Land', rarity: 'common' })).toBe(true)
+    expect(isBasicLand({ name: 'Hidden Courtyard', type: 'Land', rarity: 'common' })).toBe(false)
+    expect(isLand({ name: 'Abrade', type: 'Instant', rarity: 'common' })).toBe(false)
+  })
+
+  it('treats a rare land as its rarity, not as a land tier', () => {
+    // Thornspire Verge leads its pack. Filing it in the bottom land tier
+    // shifted every badge after it by one cell.
+    expect(isLand({ name: 'Thornspire Verge', type: 'Land', rarity: 'rare' })).toBe(true)
+  })
+
+  it('handles the type text that split the old Python and TypeScript rules', () => {
+    // statecheck.py tested `type.startswith("Basic Land")`, everything else
+    // used a word-boundary regex. Arena's own type line puts a supertype first.
+    expect(isBasicLand({ name: 'Snow-Covered Plains', type: 'Snow Basic Land — Plains', rarity: 'land' })).toBe(true)
+    expect(isBasicLandName('Wastes')).toBe(true)
+    expect(isBasicLandName('Wasteland')).toBe(false)
+  })
+
+  it('maps every basic to its colour', () => {
+    expect(BASIC_LAND_COLOR).toEqual({ Plains: 'W', Island: 'U', Swamp: 'B', Mountain: 'R', Forest: 'G' })
+  })
+})
+
+describe('poolSummary', () => {
+  it('counts pips per colour, excludes lands, and counts multicolour once per colour', () => {
+    const s = poolSummary([
+      { name: 'Abrade', colors: 'R', type: 'Instant', rarity: 'common' },
+      { name: 'Anim Pakal', colors: 'WR', type: 'Creature', rarity: 'rare' },
+      { name: 'Compass Gnome', colors: '', type: 'Artifact Creature', rarity: 'common' },
+      { name: 'Plains', colors: '', type: 'Basic Land — Plains', rarity: 'land' }
+    ])
+    expect(s).toEqual({ counts: { W: 1, U: 0, B: 0, R: 2, G: 0 }, colorless: 1, cards: 3, lands: 1 })
+  })
+})

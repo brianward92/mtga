@@ -9,49 +9,10 @@ import type { CardRow, DraftState, Grade, HudCorner, PickRecord } from '../../sh
 import { bandConviction, dominanceFromEvs, formatDominancePct, type Conviction } from './conviction'
 import { isFiniteNumber } from './shared'
 import { rankOrder } from './chips'
+import { POOL_COLORS, COLOR_NAMES, poolSummary, type PoolColor, type PoolSummary } from '../../shared/cards'
 
-/** WUBRG in the stable order used by pool summaries and UI chips. */
-export const POOL_COLORS = ['W', 'U', 'B', 'R', 'G'] as const
+export { POOL_COLORS, COLOR_NAMES, poolSummary, type PoolColor, type PoolSummary }
 
-/** One canonical Magic color letter. */
-export type PoolColor = (typeof POOL_COLORS)[number]
-
-/** Human-readable names for canonical color and colorless labels. */
-export const COLOR_NAMES: Readonly<Record<PoolColor | 'C', string>> = {
-  W: 'White', U: 'Blue', B: 'Black', R: 'Red', G: 'Green', C: 'Colorless'
-}
-
-/** Color and land counts derived from a drafted pool. */
-export interface PoolSummary {
-  /** Colour pips per colour (multicolour cards count once per colour). */
-  counts: Record<PoolColor, number>
-  /** Non-land cards with no colour. */
-  colorless: number
-  /** Non-land cards in the pool. */
-  cards: number
-  /** Land cards in the pool. */
-  lands: number
-}
-
-function isLandCard(card: Pick<CardRow, 'type'>): boolean {
-  return /\bland\b/i.test(card.type || '')
-}
-
-/** Colour distribution of the pool (lands excluded — they don't reveal a lane). */
-export function poolSummary(pool: ReadonlyArray<Pick<CardRow, 'colors' | 'type'>>): PoolSummary {
-  const counts: Record<PoolColor, number> = { W: 0, U: 0, B: 0, R: 0, G: 0 }
-  let colorless = 0
-  let cards = 0
-  let lands = 0
-  for (const card of pool) {
-    if (isLandCard(card)) { lands++; continue }
-    cards++
-    const letters = new Set((card.colors || '').toUpperCase().split('').filter((c): c is PoolColor => c in counts))
-    if (letters.size === 0) { colorless++; continue }
-    for (const c of letters) counts[c]++
-  }
-  return { counts, colorless, cards, lands }
-}
 
 /** Dominant one- or two-color lane inferred from pool color pips. */
 export interface LaneLean {
