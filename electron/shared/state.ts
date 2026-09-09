@@ -73,6 +73,12 @@ export interface ModelInfo {
 /** Complete JSON-plain renderer snapshot for the current draft lifecycle. */
 export interface DraftState {
   phase: 'idle' | 'active' | 'complete'
+  /**
+   * The Arena screen currently showing (Client.SceneChange's toSceneName), or
+   * null before one is seen. A draft stays active while the drafter wanders to
+   * Home, so this is what stops the overlay drawing a pack over the menus.
+   */
+  arenaScene?: string | null
   /** Arena's own submitted Limited deck (from EventSetDeck), once Done is pressed. */
   submittedDeck?: { main: Array<{ grpId: number; quantity: number }>; sideboard: Array<{ grpId: number; quantity: number }>; mainCount: number } | null
   set: string | null
@@ -100,7 +106,7 @@ export interface DraftState {
 
 /** Initial snapshot used before a draft is discovered. */
 export const EMPTY_STATE: DraftState = {
-  phase: 'idle', set: null, format: null, eventName: null, isBotDraft: false,
+  phase: 'idle', arenaScene: null, set: null, format: null, eventName: null, isBotDraft: false,
   pack: null, pick: null, picksPerPack: 14, totalPicks: 42, cards: [], scoring: false,
   pool: [], picks: [], model: { state: 'loading', modelId: null, message: null },
   snapshot: { scryfall: null, model: null }, warning: null, seq: 0

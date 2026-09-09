@@ -194,6 +194,14 @@ export class DraftParser extends EventEmitter {
     }
 
     try {
+      // Which Arena screen the drafter is looking at. A draft stays "active"
+      // while they wander off to Home or the store, so without this the overlay
+      // draws a pack over whatever else Arena is showing.
+      if (line.includes('Client.SceneChange')) {
+        this.handleSceneChange(line)
+        return
+      }
+
       // Human pack pushed to the client (every pick incl. P1P1 on the current client)
       if (line.includes('Draft.Notify') && line.includes('PackCards')) {
         this.handleDraftNotify(line)
@@ -508,6 +516,19 @@ export class DraftParser extends EventEmitter {
       sideboard: entries(deck.Sideboard),
       mainCount: main.reduce((n, e) => n + e.quantity, 0)
     })
+  }
+
+  /**
+   * [UnityCrossThreadLogger]Client.SceneChange {"fromSceneName":"Home","toSceneName":"Draft","initiator":"System","context":"HumanDraft"}
+   * Emits the scene being entered. Parsed as JSON rather than pattern-matched:
+   * `context` carries values with spaces ("deck builder") that a bare label
+   * regex splits in the wrong place.
+   */
+  private handleSceneChange(line: string): void {
+    const json = parseJsonFromLine(line)
+    if (!json) return
+    const scene = deepFindValue(json, 'toSceneName')
+    if (typeof scene === 'string' && scene) this.emit('scene', scene)
   }
 
   /**

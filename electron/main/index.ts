@@ -25,7 +25,7 @@ import { Calibration } from './overlay/calibration'
 import { StandAside } from './overlay/stand-aside'
 import { screenCaptureGranted } from './overlay/occlusion'
 import { OverlayGeometrySync } from './overlay/geometry-sync'
-import { badgesAreLive, wantsOverlayContent, type OverlayActivity } from './overlay/activity-policy'
+import { badgesAreLive, isDraftScene, wantsOverlayContent, type OverlayActivity } from './overlay/activity-policy'
 import { loadPrefs, savePrefs } from './prefs'
 import { StatusTray } from './status-tray'
 import type { DraftState, Prefs } from '../shared/state'
@@ -70,7 +70,8 @@ function currentOverlayActivity(): OverlayActivity {
     cardCount: draft.cards.length,
     badgesEnabled: prefs.badges,
     hudEnabled: prefs.hud,
-    standAside: standAside.active
+    standAside: standAside.active,
+    inDraftScene: isDraftScene(draft.arenaScene)
   }
 }
 

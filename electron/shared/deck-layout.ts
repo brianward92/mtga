@@ -166,5 +166,11 @@ export function namesMatch(ocr: string, name: string): boolean {
   const a = titleKey(ocr.replace(/[….]+$/, ''))
   const b = titleKey(name)
   if (!a || !b) return false
-  return a === b || (a.length >= 8 && b.startsWith(a))
+  if (a === b) return true
+  // Arena truncates a long name to fit the rail: "Faramir, Field Comma…".
+  if (a.length >= 8 && b.startsWith(a)) return true
+  // OCR runs the next row's count onto the end of this one, so the recognised
+  // text is the real name plus a stray digit: "Volatile Wanderglyph 1".
+  if (b.length >= 8 && a.startsWith(b)) return true
+  return false
 }

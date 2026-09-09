@@ -70,6 +70,7 @@ export class DraftCoordinator extends EventEmitter {
     this.state = {
       ...EMPTY_STATE,
       phase: 'active',
+      arenaScene: this.state.arenaScene,
       set: snap.set, format: snap.format, eventName: snap.eventName, isBotDraft: snap.isBotDraft,
       picksPerPack: ppp, totalPicks: 3 * ppp,
       pool: this.rows(snap.pool),
@@ -124,6 +125,17 @@ export class DraftCoordinator extends EventEmitter {
     if (!this.replaying) {
       this.history.append({ at: new Date().toISOString(), type: 'pick', draftId: snap.draftId, eventName: snap.eventName, set: snap.set, format: snap.format, ...record, modelId: scores?.modelId ?? null })
     }
+  }
+
+  /**
+   * Arena changed screens. A draft stays active while the drafter goes to Home
+   * or the store, so this is what tells the overlay to get out of the way — and
+   * to come back the moment the draft screen returns.
+   */
+  onScene(scene: string): void {
+    if (this.state.arenaScene === scene) return
+    this.state = { ...this.state, arenaScene: scene, seq: this.state.seq + 1 }
+    if (!this.replaying) this.publish()
   }
 
   /** Arena submitted the Limited deck: record it, and expose it for verification. */

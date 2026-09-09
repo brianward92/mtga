@@ -12,6 +12,8 @@ export interface DraftLogSink {
   onDraftPick: (snapshot: DraftSessionSnapshot, pick: DraftPickRecord) => void
   onDraftEnd: (snapshot: DraftSessionSnapshot) => void
   onDeckSubmitted: (deck: SubmittedDeck) => void
+  /** Which Arena screen is showing, so the overlay can stay out of the way. */
+  onScene: (scene: string) => void
   setWarning: (warning: string | null) => void
   setReplaying: (replaying: boolean) => void
   resumeAfterReplay: () => void
@@ -33,6 +35,7 @@ export function startDraftLogPipeline(sink: DraftLogSink, deps: DraftLogPipeline
   parser.on('draft-pick', (snapshot, pick) => sink.onDraftPick(snapshot, pick))
   parser.on('draft-end', snapshot => sink.onDraftEnd(snapshot))
   parser.on('deck-submitted', deck => sink.onDeckSubmitted(deck))
+  parser.on('scene', (scene: string) => sink.onScene(scene))
   parser.on('detailed-logs', ({ enabled }: { enabled: boolean }) => {
     sink.setWarning(enabled ? null : DETAILED_LOGS_WARNING)
   })

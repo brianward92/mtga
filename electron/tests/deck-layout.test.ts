@@ -58,6 +58,18 @@ describe('rail OCR parsing', () => {
     expect(namesMatch('Esquire of the King', 'Esquire of the King')).toBe(true)
     expect(namesMatch('Plains', 'Mountain')).toBe(false)
   })
+
+  it('matches a name with the next row\'s count run onto the end', () => {
+    // OCR groups rail rows by vertical position, and the adjacent row's "1x"
+    // can land inside this row's box: the recognised text is the real name plus
+    // a stray digit. That failed to match, the row read as "not in the plan",
+    // and the builder cut all three copies of a card the plan wanted.
+    expect(namesMatch('Volatile Wanderglyph 1', 'Volatile Wanderglyph')).toBe(true)
+    expect(namesMatch('Geological Appraiser 2', 'Geological Appraiser')).toBe(true)
+    expect(namesMatch('Dauntless Dismantler 1', 'Dauntless Dismantler')).toBe(true)
+    // Still must not collapse two genuinely different cards.
+    expect(namesMatch('Abrade', 'Abrade Extra')).toBe(false)
+  })
 })
 
 describe('rail geometry', () => {

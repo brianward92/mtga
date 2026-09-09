@@ -99,6 +99,7 @@ async function main(): Promise<void> {
     console.log(`would set basics to: ${JSON.stringify(basicsTarget)}`)
     return
   }
+  const unmatched = new Set<string>()
   activate(); await sleep(400); park(rect); await sleep(300)
   if (READ_ONLY) { const r = readRail(rect); console.log(`deck ${r.deckCount}/40`); for (const row of r.rows) console.log(`${row.y} ${row.count}x ${row.name}`); return }
 
@@ -163,14 +164,30 @@ async function main(): Promise<void> {
   const problems: string[] = []
   for (const [name, n] of target) if ((seen.get(matchKey(seen, name)) ?? 0) !== n) problems.push(`${name}: want ${n}, rail shows ${seen.get(matchKey(seen, name)) ?? 0}`)
   for (const [name, n] of seen) if (!isBasicName(name) && wanted(matchTarget(name)) === 0) problems.push(`${name}: still in deck`)
+  if (unmatched.size > 0) {
+    console.log(`NOTE ${unmatched.size} rail row(s) were left alone because the OCR text matched no known card: ${[...unmatched].join(' | ')}`)
+  }
   console.log(`RESULT deck ${bottom.deckCount ?? top.deckCount ?? '?'}/40 · ${problems.length === 0 ? 'matches the plan' : 'MISMATCH: ' + problems.join('; ')}`)
   console.log('Done is yours to press. Then: arena.sh build --verify')
 
-  function excess(r: RailRow): number { return r.count - wanted(matchTarget(r.name)) }
-  function matchTarget(ocrName: string): string {
+  /**
+   * How many copies of this row to cut. Zero for anything we cannot identify.
+   *
+   * This used to fall back to the raw OCR text, which resolved to "not in the
+   * plan" and therefore "cut every copy". One mis-read row — OCR had merged the
+   * next row's count onto the name, giving "Volatile Wanderglyph 1" — silently
+   * cut all three copies of a card the plan wanted. Never remove a card on the
+   * strength of text we failed to match.
+   */
+  function excess(r: RailRow): number {
+    const name = matchTarget(r.name)
+    if (name === null) { unmatched.add(r.name); return 0 }
+    return r.count - wanted(name)
+  }
+  function matchTarget(ocrName: string): string | null {
     for (const name of target.keys()) if (namesMatch(ocrName, name)) return name
     for (const row of modelRows) if (namesMatch(ocrName, row.name)) return row.name
-    return ocrName
+    return null
   }
   function matchKey(m: Map<string, number>, name: string): string {
     for (const k of m.keys()) if (namesMatch(k, name)) return k
