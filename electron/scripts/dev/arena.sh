@@ -57,13 +57,19 @@ case "$cmd" in
       status)
         if pgrep -f "$APP/Contents/MacOS" >/dev/null; then echo "overlay app: running (since $(ps -o lstart= -p "$(pgrep -f "$APP/Contents/MacOS" | head -1)"))"; else echo "overlay app: NOT running"; fi
         # The installed build can lag the repo: that is how a two-week-old
-        # overlay ended up driving the 2026-09-06 draft. Say so loudly.
-        if [ -f "$APP/Contents/Info.plist" ]; then
-          # Compare against the last commit that touched shipped app code, not
-          # against HEAD: a docs-only commit does not make the install stale.
-          built=$(stat -f %m "$APP/Contents/Info.plist")
-          head_at=$(git log -1 --format=%ct -- main shared renderer native resources package.json 2>/dev/null || echo 0)
-          if [ "$built" -lt "$head_at" ]; then echo "WARNING: installed app ($(date -r "$built" '+%b %d %H:%M')) is OLDER than repo HEAD ($(git log -1 --format='%h %s' | cut -c1-60)); run: npm run install:local"; else echo "installed app: $(date -r "$built" '+%b %d %H:%M'), current with HEAD"; fi
+        # overlay ended up driving the 2026-09-06 draft. Compare CONTENT, not
+        # timestamps — committing after an install used to report the current
+        # build as stale, and editing without committing reported a stale build
+        # as current.
+        stamp="$APP/Contents/Resources/.source-hash"
+        if [ -f "$stamp" ]; then
+          if [ "$(cat "$stamp")" = "$(bash scripts/dev/app-source-hash.sh)" ]; then
+            echo "installed app: $(date -r "$(stat -f %m "$APP/Contents/Info.plist")" '+%b %d %H:%M'), matches the working tree"
+          else
+            echo "WARNING: installed app does not match the current app sources; run: npm run install:local"
+          fi
+        elif [ -f "$APP/Contents/Info.plist" ]; then
+          echo "installed app: $(date -r "$(stat -f %m "$APP/Contents/Info.plist")" '+%b %d %H:%M'), built before content stamping; run: npm run install:local"
         fi
         [ -f "$MTGA_STATE_FILE" ] && state_py pos || echo "no state mirror at $MTGA_STATE_FILE (launch via arena.sh app launch)" ;;
       *) die "app launch|kill|restart|status" ;;

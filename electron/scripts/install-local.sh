@@ -18,5 +18,8 @@ test -f "${OUT}/Contents/Resources/draftfm/sets/index.json" || echo "warning: no
 test -f "${OUT}/Contents/Resources/app.asar.unpacked/node_modules/onnxruntime-node/bin/napi-v6/darwin/arm64/onnxruntime_binding.node"
 rm -rf "/Applications/${APP_NAME}.app"
 cp -R "${OUT}" /Applications/
+# Stamp what was built, so the staleness check can compare content instead of
+# timestamps (see scripts/dev/app-source-hash.sh).
+bash scripts/dev/app-source-hash.sh > "/Applications/${APP_NAME}.app/Contents/Resources/.source-hash"
 echo "Installed /Applications/${APP_NAME}.app"
 if [ "${1:-}" = "--launch" ]; then open "/Applications/${APP_NAME}.app"; fi
