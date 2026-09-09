@@ -288,7 +288,14 @@ helper was retired into a TypeScript CLI sharing the app's own card rules.
 
 ---
 
-## 7. Known gaps
+## 7. Open decisions and known gaps
+
+**One decision left to Brian.** The overlay fetches card art for the top
+recommendation from Scryfall's CDN. That tells the CDN the viewer's address, the
+card and the time — enough to follow a draft as it happens. The main process
+header claimed nothing talks to a server; the claim is corrected, the fetch is
+still there. Removing it changes what the overlay looks like, so it is a product
+call, not a bug fix.
 
 1. **Unknown whether Arena's server still serves the pool after Done is
    pressed.** Everything about post-submission recovery is untested.
@@ -300,6 +307,13 @@ helper was retired into a TypeScript CLI sharing the app's own card rules.
    null draft id for bot drafts. Behaviour under that collision is reasoned
    about but not tested against a real occurrence.
 5. **No CI.** `install-local.sh` running typecheck and tests is the only gate.
+6. **83 cards still borrow a sort tier from another printing** — down from 202
+   once the fallback was keyed by rarity as well as name. The remainder are
+   names that exist at no matching rarity anywhere in Arena's database.
+7. **The rail-click safety margin is measured for one window aspect.** Any other
+   shape now refuses to build rather than proceeding, which is safe but means an
+   unmeasured window cannot use the deck builder at all until someone measures
+   it.
 
 ---
 
