@@ -87,7 +87,18 @@ export function colorOrder(card: DisplayOrderCard): number {
  * produce a grid that matches neither.
  */
 export function hasArenaOrder(cards: ReadonlyArray<DisplayOrderCard>): boolean {
-  return cards.length > 0 && cards.every(c => Array.isArray(c.order) && c.order.length === 3)
+  return cards.length > 0 && cards.every(isArenaOrder)
+}
+
+/**
+ * A usable set of Arena keys: both ranks must be real numbers.
+ *
+ * A `[null, null, title]` tuple passed a bare length check, and `null - 4` is
+ * -4, so a card carrying one sorted ahead of every mythic in the pack.
+ */
+function isArenaOrder(card: DisplayOrderCard): boolean {
+  const o = card.order
+  return Array.isArray(o) && o.length === 3 && Number.isFinite(o[0]) && Number.isFinite(o[1]) && typeof o[2] === 'string'
 }
 
 /** Indices into `cards`, in Arena's display order. */

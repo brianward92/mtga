@@ -199,7 +199,7 @@ export function loadSetBundle(root: string, set: string): SetBundle | null {
       manaValue: Number.isFinite(manaValue) ? manaValue : null,
       type: String(raw.type ?? ''),
       scryfallId: String(raw.scryfallId ?? ''),
-      order: arena.order(name)
+      order: arena.order(grpId, name)
     }
   }
 

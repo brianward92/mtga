@@ -129,10 +129,33 @@ export class DraftSession {
     return pool
   }
 
+  /**
+   * A stable identity for this draft, even when Arena gives it none.
+   *
+   * Bot drafts carry no draft id: every BotDraftDraftPick id is per-message,
+   * and the event name is shared by every Quick Draft of that event for the
+   * week or two it runs. Two drafts of one event therefore collided in the
+   * history file, and the second one's pool was dropped as a duplicate while
+   * its picks merged into the first one's record.
+   *
+   * Arena's CourseId is preferred and is set when a course listing arrives.
+   * Failing that, the earliest pack this session saw identifies it: a pack of
+   * fifteen specific cards is not going to repeat, and replaying the same log
+   * reproduces the same value, which is what keeps history appends idempotent.
+   */
+  identity(): string | null {
+    if (this.draftId) return this.draftId
+    const first = [...this.packs.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))[0]
+    if (!first) return null
+    const [key, grpIds] = first
+    if (grpIds.length === 0) return null
+    return `pack:${key}:${[...grpIds].sort((a, b) => a - b).join('.')}`
+  }
+
   /** Return a detached, immutable-by-convention view of the current session. */
   snapshot(): DraftSessionSnapshot {
     return {
-      draftId: this.draftId,
+      draftId: this.identity(),
       eventName: this.eventName,
       set: this.set,
       format: this.format,

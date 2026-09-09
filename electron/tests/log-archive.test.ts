@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, writeFileSync, readdirSync, utimesSync } from 'fs'
+import { mkdtempSync, rmSync, writeFileSync, readdirSync, readFileSync, utimesSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { archiveLogs } from '../main/data/log-archive'
@@ -27,9 +27,24 @@ describe('archiveLogs', () => {
     expect(readdirSync(archive)).toHaveLength(1)
   })
 
-  it('ignores a log with no draft in it', () => {
-    // Arena's logs are large and mostly noise; only the ones worth keeping are.
-    expect(archiveLogs([write('Player.log', 'just unity chatter\n')], archive)).toEqual([])
+  it('ignores a login-only log, which is what most Arena logs are', () => {
+    // EventGetCoursesV2 fires on every login, draft or not. Treating it as a
+    // draft marker meant "only logs that mention a draft" kept every log, and
+    // the noise evicted the one file holding a draft's picks.
+    const login = 'noise\n[UnityCrossThreadLogger]<== EventGetCoursesV2(abc)\n{"Courses":[]}\n'
+    expect(archiveLogs([write('Player.log', login)], archive)).toEqual([])
+  })
+
+  it('evicts noise before it evicts the log with the draft in it', () => {
+    // A live log is archived while still growing, so several prefixes of one
+    // session pile up. The one holding the whole draft must outlive them.
+    const rich = draftLog('x'.repeat(50)) + '\n[UnityCrossThreadLogger]BotDraftDraftPick {}\n'.repeat(30)
+    archiveLogs([write('draft.log', rich, 5)], archive, 2)
+    for (let i = 0; i < 4; i++) archiveLogs([write(`p${i}.log`, draftLog(`prefix-${i}`), 0)], archive, 2)
+    const kept = readdirSync(archive)
+    expect(kept).toHaveLength(2)
+    const survived = kept.some(f => readFileSync(join(archive, f), 'utf8').split('BotDraftDraftPick').length - 1 > 20)
+    expect(survived).toBe(true)
   })
 
   it('does not keep the same bytes twice, however they are named', () => {

@@ -12,8 +12,8 @@ import { readFileSync } from 'fs'
 import { buildDeck } from '../../shared/deck-plan'
 import type { CardRow } from '../../shared/state'
 import { BASIC_LAND_COLOR as BASIC_COLOR, isBasicLandName } from '../../shared/cards'
-import { activate, click, move, scroll, park, keystroke, selectAll, overlayApp, readTextLines, sleep } from './lib/desktop'
-import { builderCalibrationFor, at, railRegion, deckRows, parseRailLine, parseDeckCount, namesMatch, type Rect } from '../../shared/deck-layout'
+import { activate, click, move, scroll, park, keystroke, selectAll, overlayApp, hideOverlayAndConfirm, readTextLines, sleep } from './lib/desktop'
+import { builderCalibrationFor, assertSafeRailClick, at, railRegion, deckRows, parseRailLine, parseDeckCount, namesMatch, type Rect } from '../../shared/deck-layout'
 
 const [stateFile, ...flags] = process.argv.slice(2)
 if (!stateFile) { console.error('usage: deckbuild.ts <stateFile> [--dry-run] [--read] [--no-lands] [--verify [seconds]]'); process.exit(2) }
@@ -80,7 +80,11 @@ const { pool, rect, phase } = loadState()
 const { calibration: BUILDER, bucket: BUCKET, measured: MEASURED } = builderCalibrationFor(rect)
 const { rail: DECK_RAIL, landPicker: LAND_PICKER, pool: POOL } = BUILDER
 if (!MEASURED) {
-  console.log(`WARNING: no builder geometry measured for a ${rect.width}x${rect.height} window; using ${BUCKET}. Check every click with: arena.sh shot`)
+  // Not a warning any more: the clearance below Done is a property of the
+  // measured fractions, and on an unmeasured shape it is unknown.
+  console.log(`REFUSING: no builder geometry measured for a ${rect.width}x${rect.height} window (nearest bucket ${BUCKET}).`)
+  console.log('Measure this window before building: arena.sh build --read, then compare against arena.sh shot.')
+  process.exit(4)
 }
 const plan = buildDeck(pool)
 const target = new Map<string, number>()
@@ -126,6 +130,7 @@ async function main(): Promise<void> {
     const row = cut[0]
     const n = excess(row)
     console.log(`cut ${n}x ${row.name} (y=${row.y}, deck ${read.deckCount ?? '?'}/40)`)
+    assertSafeRailClick(rect, row.y, DECK_RAIL, MEASURED)
     for (let i = 0; i < n; i++) { click({ x: railPoint.x, y: row.y }); await sleep(650) }
     park(rect); await sleep(350)
   }
@@ -138,8 +143,9 @@ async function main(): Promise<void> {
   let overlayDown = false
   const hideOverlay = async () => {
     if (overlayDown) return
-    overlayApp('kill'); overlayDown = true
-    await sleep(1500); activate(); await sleep(600)
+    await hideOverlayAndConfirm()
+    overlayDown = true
+    activate(); await sleep(600)
   }
   if (!NO_LANDS) {
     await hideOverlay()
@@ -151,6 +157,7 @@ async function main(): Promise<void> {
       const over = r.count - basicsTarget[col]
       if (over > 0) {
         console.log(`remove ${over}x ${r.name}`)
+        assertSafeRailClick(rect, r.y, DECK_RAIL, MEASURED)
         for (let i = 0; i < over; i++) { click({ x: railPoint.x, y: r.y }); await sleep(650) }
         have[col] = basicsTarget[col]; park(rect); await sleep(350)
       }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { deckListOrder, deckRows, parseRailLine, parseDeckCount, namesMatch, railRowTop, railRowBottom, DECK_RAIL, visibleRows, builderCalibrationFor } from '../shared/deck-layout'
+import { deckListOrder, deckRows, parseRailLine, parseDeckCount, namesMatch, railRowTop, railRowBottom, DECK_RAIL, visibleRows, builderCalibrationFor, assertSafeRailClick, UnsafeRailClick, DONE_CLEARANCE_PITCHES } from '../shared/deck-layout'
 
 const c = (name: string, mv: number, colors: string, type = 'Creature', rarity = 'common', colorIdentity = colors) =>
   ({ name, manaValue: mv, colors, type, rarity, colorIdentity })
@@ -79,5 +79,44 @@ describe('rail geometry', () => {
     expect(railRowTop(rect, 1).y - railRowTop(rect, 0).y).toBe(32)
     expect(railRowBottom(rect, 29, 30).y).toBe(598)
     expect(visibleRows()).toBe(13)
+  })
+})
+
+describe('rail clicks keep clear of Done', () => {
+  const rect = { x: 208, y: 39, width: 1280, height: 748 }
+  const doneY = rect.y + DECK_RAIL.done.y * rect.height
+
+  it('refuses a click at Done, and anywhere within 1.5 row pitches of it', () => {
+    // Done shares the rail's x column and sits only ~25pt below the bottom of
+    // the OCR region — less than one row pitch. Row y came straight from OCR
+    // with no upper bound, so the only thing keeping automation off the button
+    // was two fractions happening not to overlap. Done commits the deck.
+    expect(() => assertSafeRailClick(rect, doneY)).toThrow(UnsafeRailClick)
+    expect(() => assertSafeRailClick(rect, doneY - 1)).toThrow(UnsafeRailClick)
+    expect(() => assertSafeRailClick(rect, doneY - DECK_RAIL.rowPitch * rect.height)).toThrow(UnsafeRailClick)
+  })
+
+  it('allows every row the rail can actually show', () => {
+    for (let i = 0; i < visibleRows(); i++) {
+      expect(() => assertSafeRailClick(rect, railRowTop(rect, i).y)).not.toThrow()
+      expect(() => assertSafeRailClick(rect, railRowBottom(rect, i, visibleRows()).y)).not.toThrow()
+    }
+  })
+
+  it('refuses every rail click on a window shape nobody has measured', () => {
+    // The clearance is a property of the measured fractions. On another aspect
+    // they are a guess, so the distance to Done is unknown, not merely approximate.
+    expect(() => assertSafeRailClick(rect, railRowTop(rect, 0).y, DECK_RAIL, false)).toThrow(UnsafeRailClick)
+  })
+
+  it('refuses a click above the window', () => {
+    expect(() => assertSafeRailClick(rect, rect.y - 5)).toThrow(UnsafeRailClick)
+  })
+
+  it('keeps the last visible row clear of Done by a real margin', () => {
+    // A property, not a spot check: if anyone retunes the fractions, this fails
+    // rather than quietly moving the rail closer to the button.
+    const last = railRowBottom(rect, visibleRows() - 1, visibleRows()).y
+    expect((doneY - last) / (DECK_RAIL.rowPitch * rect.height)).toBeGreaterThan(DONE_CLEARANCE_PITCHES)
   })
 })

@@ -65,6 +65,35 @@ export function overlayApp(action: 'kill' | 'launch'): void {
   try { run('bash', ['scripts/dev/arena.sh', 'app', action]) } catch { /* best effort */ }
 }
 
+/** Whether the overlay's process is currently running. */
+export function overlayRunning(): boolean {
+  try {
+    return run('pgrep', ['-f', '/Applications/MTGA Draft Assistant.app/Contents/MacOS']).trim().length > 0
+  } catch {
+    return false   // pgrep exits 1 when nothing matches
+  }
+}
+
+/**
+ * Take the overlay down and CONFIRM it went.
+ *
+ * `overlayApp('kill')` is best-effort and swallows its own failure, and the
+ * caller then slept a fixed 1500ms and clicked regardless. If the kill failed,
+ * or Electron was slow to release the window, every click underneath the
+ * sidebar was swallowed in silence — which is exactly how a deck ended up two
+ * lands short while the run reported success.
+ */
+export async function hideOverlayAndConfirm(timeoutMs = 8000): Promise<void> {
+  if (!overlayRunning()) return
+  overlayApp('kill')
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    await sleep(400)
+    if (!overlayRunning()) { await sleep(600); return }
+  }
+  throw new Error('the overlay is still running after a kill; it covers the pool and the land filter, and clicks there would be silently swallowed')
+}
+
 export interface OcrLine { text: string; x: number; y: number; w: number; h: number }
 
 /** Capture one screen region and hand the PNG path to `use`, then delete it. */

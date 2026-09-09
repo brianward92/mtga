@@ -12,25 +12,46 @@
  * same bytes is not already held. Arena's logs are large and mostly noise, so
  * only logs that actually mention a draft are kept, and only the newest few.
  */
-import { copyFileSync, mkdirSync, readdirSync, readFileSync, statSync, unlinkSync } from 'fs'
+import { copyFileSync, mkdirSync, readdirSync, readFileSync, statSync, unlinkSync, utimesSync } from 'fs'
 import { createHash } from 'crypto'
 import { join } from 'path'
 
 /** How many archived logs to keep, newest first. */
 export const KEEP_ARCHIVES = 8
 
-/** Lines that mean this log is worth keeping. */
-const DRAFT_MARKERS = ['BotDraftDraftPick', 'EventPlayerDraftMakePick', 'Draft.Notify', 'EventGetCoursesV2']
+/**
+ * Lines that mean this log is worth keeping.
+ *
+ * Deliberately NOT EventGetCoursesV2: Arena emits it on every login, draft or
+ * not, so including it made "only logs that mention a draft" mean "every log",
+ * and the eight slots filled with noise that evicted the one file holding a
+ * draft's picks.
+ */
+const DRAFT_MARKERS = ['BotDraftDraftPick', 'EventPlayerDraftMakePick', 'Draft.Notify']
 
-function mentionsDraft(file: string): boolean {
+/**
+ * Read the file once, returning both its content hash and whether it mentions a
+ * draft. Arena's logs run to several megabytes and this happens on the main
+ * process at startup, so reading them twice — once decoded as UTF-8 for the
+ * marker scan and once as bytes for the hash — was pure waste.
+ */
+function inspect(file: string): { hash: string; draft: boolean } | null {
   try {
-    const text = readFileSync(file, 'utf8')
-    return DRAFT_MARKERS.some(m => text.includes(m))
-  } catch { return false }
+    const bytes = readFileSync(file)
+    const text = bytes.toString('utf8')
+    return {
+      hash: createHash('sha256').update(bytes).digest('hex').slice(0, 16),
+      draft: DRAFT_MARKERS.some(m => text.includes(m))
+    }
+  } catch { return null }
 }
 
-function digest(file: string): string | null {
-  try { return createHash('sha256').update(readFileSync(file)).digest('hex').slice(0, 16) } catch { return null }
+/** How many picks a log holds, used to decide what to evict last. */
+function pickCount(file: string): number {
+  try {
+    const text = readFileSync(file, 'utf8')
+    return DRAFT_MARKERS.reduce((n, m) => n + text.split(m).length - 1, 0)
+  } catch { return 0 }
 }
 
 /**
@@ -47,18 +68,25 @@ export function archiveLogs(logs: string[], dir: string, keep = KEEP_ARCHIVES): 
     for (const log of logs) {
       let stamp: Date
       try { stamp = statSync(log).mtime } catch { continue }
-      if (!mentionsDraft(log)) continue
-      const hash = digest(log)
-      if (!hash || held.has(hash)) continue
-      const name = `${hash}.${stamp.toISOString().slice(0, 19).replace(/[:T]/g, '-')}.log`
+      const seen = inspect(log)
+      if (!seen || !seen.draft || held.has(seen.hash)) continue
+      const name = `${seen.hash}.${stamp.toISOString().slice(0, 19).replace(/[:T]/g, '-')}.log`
       copyFileSync(log, join(dir, name))
-      held.add(hash)
+      // copyFileSync does not carry the source's mtime, and pruning sorts by it.
+      // Without this every copy looked equally new and the ordering was
+      // arbitrary, so a fresh copy of today's noise could evict an older log
+      // that actually held a draft.
+      try { utimesSync(join(dir, name), stamp, stamp) } catch { /* best effort */ }
+      held.add(seen.hash)
       added.push(name)
     }
+    // Keep the logs with the most draft content first, then the newest. A live
+    // log is archived while it is still growing, so several prefixes of one
+    // session can pile up; the one with the whole draft in it must outlive them.
     const files = readdirSync(dir)
       .filter(f => f.endsWith('.log'))
-      .map(f => ({ f, at: statSync(join(dir, f)).mtimeMs }))
-      .sort((a, b) => b.at - a.at)
+      .map(f => ({ f, picks: pickCount(join(dir, f)), at: statSync(join(dir, f)).mtimeMs }))
+      .sort((a, b) => b.picks - a.picks || b.at - a.at)
     for (const { f } of files.slice(keep)) unlinkSync(join(dir, f))
   } catch (err) {
     console.error('[LogArchive] failed:', err)

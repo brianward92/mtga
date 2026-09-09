@@ -154,6 +154,45 @@ export function visibleRows(cal: DeckRailCalibration = DECK_RAIL): number {
 
 export interface Rect { x: number; y: number; width: number; height: number }
 
+/**
+ * How close to Done a rail click may land, in row pitches.
+ *
+ * Done sits in the SAME x column as every rail row, and on the measured window
+ * its centre is only 25pt below the bottom of the OCR region — less than one
+ * row pitch. Nothing stopped a click there: row y came straight from OCR with
+ * no upper bound, and the only thing keeping automation off the button was that
+ * two fractions happened not to overlap. Done commits the deck and is the
+ * player's to press, so the distance is asserted rather than assumed.
+ */
+export const DONE_CLEARANCE_PITCHES = 1.5
+
+/** Thrown rather than clicking somewhere that might be Done. */
+export class UnsafeRailClick extends Error {}
+
+/**
+ * Screen y values a rail click may use, given the window.
+ *
+ * `measured` false means this window shape has never been measured, so the
+ * fractions are a guess from another aspect and the clearance below Done cannot
+ * be trusted at all: refuse every rail click rather than warn and continue.
+ */
+export function assertSafeRailClick(
+  rect: Rect,
+  y: number,
+  cal: DeckRailCalibration = DECK_RAIL,
+  measured = true
+): void {
+  if (!measured) {
+    throw new UnsafeRailClick(`no rail geometry measured for a ${rect.width}x${rect.height} window; refusing to click near Done`)
+  }
+  const doneY = rect.y + cal.done.y * rect.height
+  const limit = doneY - DONE_CLEARANCE_PITCHES * cal.rowPitch * rect.height
+  if (y >= limit) {
+    throw new UnsafeRailClick(`rail click at y=${Math.round(y)} is within ${DONE_CLEARANCE_PITCHES} row pitches of Done (y=${Math.round(doneY)}); refusing`)
+  }
+  if (y <= rect.y) throw new UnsafeRailClick(`rail click at y=${Math.round(y)} is above the window`)
+}
+
 /** Window-relative fraction → screen point. */
 export function at(rect: Rect, fx: number, fy: number): { x: number; y: number } {
   return { x: Math.round(rect.x + fx * rect.width), y: Math.round(rect.y + fy * rect.height) }

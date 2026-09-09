@@ -21,7 +21,12 @@ for a in "$@"; do
   esac
 done
 BIN=build/dev; mkdir -p "$BIN"
-for t in move-mouse click; do [ -x "$BIN/$t" ] || swiftc -O -o "$BIN/$t" "scripts/dev/$t.swift"; done
+# ocr is needed by the verify step below. Omitting it made every pick on a clean
+# checkout fail with "the target cell does not hold X", which blames the screen
+# for a missing binary.
+for t in move-mouse click ocr; do
+  [ -x "$BIN/$t" ] && [ "$BIN/$t" -nt "scripts/dev/$t.swift" ] || swiftc -O -o "$BIN/$t" "scripts/dev/$t.swift"
+done
 
 osascript -e 'tell application "MTGA" to activate' >/dev/null; sleep 0.8
 # Geometry comes from the app's mirrored rect (CGWindowList, no Accessibility).
@@ -29,6 +34,10 @@ osascript -e 'tell application "MTGA" to activate' >/dev/null; sleep 0.8
 # to trust it. arena.sh rect falls back to AX only when the mirror is missing.
 IFS=, read -r x y w h <<< "$(bash scripts/dev/arena.sh rect)"
 RECT="{\"x\":$x,\"y\":$y,\"width\":$w,\"height\":$h}"
+# Park the cursor relative to the WINDOW. A hardcoded screen point lands on a
+# card on a differently placed window, and Arena's preview then covers exactly
+# the title band the verify step reads.
+PARKX=$(( x + w * 55 / 100 )); PARKY=$(( y + h * 985 / 1000 ))
 
 st() { "$TSX" scripts/dev/state.ts "$STATE" "$@"; }
 pos() { st packpick; }
@@ -51,7 +60,8 @@ if [ "$(pos)" != "$POS0" ]; then echo "pack advanced before clicking; aborting" 
 # Confirm the screen agrees before committing. Cells are matched to cards by
 # position, so any ordering error clicks the neighbour; reading the card's title
 # band back catches that whatever caused it.
-if ! V=$("$TSX" scripts/dev/pick.ts "$STATE" "$RECT" verify "$TGRP"); then
+verify() { "$TSX" scripts/dev/pick.ts "$STATE" "$RECT" verify "$TGRP"; }
+if ! V=$(verify 2>&1); then
   echo "$V" >&2
   echo "ABORTING: the target cell does not hold $TNAME; not clicking" >&2; exit 6
 fi
@@ -68,11 +78,20 @@ read -r CX CY _ <<< "$(npx tsx scripts/dev/pick.ts "$STATE" "$RECT" confirm)"
 "$BIN/click" "$CX" "$CY"
 for i in $(seq 1 12); do sleep 0.5; picked && break; done
 if ! picked && [ "$(pos)" = "$POS0" ]; then
-  # One retry: re-select and confirm again.
+  # Re-verify against the SCREEN before retrying, not just against the mirrored
+  # position. Both `picked` and `pos` are fed by the same Player.log watcher, so
+  # if the log lags more than the wait above, they can agree that nothing has
+  # happened while Arena has already moved on — and the retry would then click
+  # coordinates computed for the previous pack into the new one.
+  "$BIN/move-mouse" "$PARKX" "$PARKY"; sleep 0.5
+  if ! V=$(verify 2>&1); then
+    echo "$V" >&2
+    echo "NOT RETRYING: the pack on screen is no longer the one this pick was computed for" >&2; exit 7
+  fi
   "$BIN/click" "$TX" "$TY"; sleep 1; "$BIN/click" "$CX" "$CY"
   for i in $(seq 1 12); do sleep 0.5; picked && break; done
 fi
-"$BIN/move-mouse" 1300 900
+"$BIN/move-mouse" "$PARKX" "$PARKY"
 if picked; then
   tail -1 "$HIST" | python3 -c 'import sys,json;d=json.loads(sys.stdin.readline());print("PICKED P%sP%s: %s (model rank %s, model wanted %s)"%(d["pack"],d["pick"],d["name"],d["takenRank"],d["recommendedName"]))'
 else

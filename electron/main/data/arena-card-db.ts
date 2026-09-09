@@ -30,6 +30,12 @@ const TIMEOUT_MS = 2000
 // or type line contains this sequence.
 const SEP = '|~|'
 
+/** Arena's Order_Title: lowercase, alphanumerics only, truncated to 17. */
+const ARENA_TITLE_KEY_LENGTH = 17
+function arenaTitleKey(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, ARENA_TITLE_KEY_LENGTH)
+}
+
 /** Arena's colour enum; Colors/ColorIdentity are numeric code lists, not letters. */
 const COLOR: Record<string, string> = { '1': 'W', '2': 'U', '3': 'B', '4': 'R', '5': 'G' }
 const RARITY: Record<string, string> = {
@@ -42,7 +48,8 @@ export interface ArenaDbCard {
   rarity: string
   colors: string
   colorIdentity: string
-  order: readonly [number, number, string]
+  /** Arena's sort keys, or null when this printing carries none. */
+  order: readonly [number, number, string] | null
 }
 
 interface Snapshot { path: string; key: string }
@@ -87,7 +94,12 @@ export function resolveFromArenaDb(grpId: number): ArenaDbCard | null {
   try {
     const sql = `SELECT t.Loc || '|~|' || IFNULL(ty.Loc,'') || '|~|' || c.Rarity || '|~|'`
       + ` || IFNULL(c.Colors,'') || '|~|' || IFNULL(c.ColorIdentity,'') || '|~|'`
-      + ` || c.Order_MythicToCommon || '|~|' || c.Order_ColorOrder || '|~|' || IFNULL(c.Order_Title,'')`
+      // Every column needs IFNULL: in SQLite `NULL || 'x'` is NULL, so one null
+      // sort column collapsed the WHOLE row to an empty string. The card was
+      // then recorded as a miss and the entire pack refused to draw, over two
+      // ordering columns, while its name, type, rarity and colours sat right
+      // there. 1118 names in the shipped database have null order columns.
+      + ` || IFNULL(c.Order_MythicToCommon,'') || '|~|' || IFNULL(c.Order_ColorOrder,'') || '|~|' || IFNULL(c.Order_Title,'')`
       + ` FROM Cards c`
       + ` JOIN Localizations_enUS t ON t.LocId = c.TitleId AND t.Formatted = 1`
       + ` LEFT JOIN Localizations_enUS ty ON ty.LocId = c.TypeTextId AND ty.Formatted = 1`
@@ -109,7 +121,12 @@ export function resolveFromArenaDb(grpId: number): ArenaDbCard | null {
       rarity: RARITY[rarity] ?? 'common',
       colors: letters(colors || ''),
       colorIdentity: letters(identity || ''),
-      order: [Number(oRarity), Number(oColor), oTitle || name.toLowerCase()]
+      // Only a complete pair of ranks is usable; a partial tuple would sort
+      // ahead of every mythic. The title is normalised the way Arena's own
+      // Order_Title is, or it is not comparable with the shipped keys.
+      order: Number.isFinite(Number(oRarity)) && oRarity !== '' && Number.isFinite(Number(oColor)) && oColor !== ''
+        ? [Number(oRarity), Number(oColor), oTitle || arenaTitleKey(name)]
+        : null
     }
     hits.set(grpId, card)
     return card

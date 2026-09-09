@@ -273,6 +273,21 @@ describe('picks per pack is learned from the pack Arena dealt', () => {
       c.idle()
     }
   })
+
+  it('does not mistake pack size for picks per pack in a Pick-Two event', () => {
+    // Two cards leave the pack per pick, so a 14-card pack is 7 picks. Adopting
+    // the pack size would reproduce the very defect this replaced: a HUD
+    // counting to 42 for a 21-pick draft.
+    const c = new DraftCoordinator(stubModels() as never, { append() {} } as never)
+    try {
+      c.setReplaying(true)
+      c.onDraftStart(snap({ pool: [] }))
+      const live = snap({ currentPack: { pack: 1, pick: 1, grpIds: [1, 2] }, pool: [] })
+      c.onDraftPick(live, { pack: 1, pick: 1, grpIds: [1, 2], packGrpIds: [1, 2] })
+      c.onDraftPack(snap({ currentPack: { pack: 1, pick: 2, grpIds: Array.from({ length: 12 }, (_, i) => i + 1) }, pool: [] }))
+      expect(c.current.picksPerPack).toBe(14)   // the bundle's value, not 13
+    } finally { c.idle() }
+  })
 })
 
 describe('restoring a draft from our own history', () => {
@@ -336,5 +351,32 @@ describe('restoring a draft from our own history', () => {
         expect(c.current.phase).toBe('idle')
       } finally { c.idle() }
     }
+  })
+})
+
+describe('restore is bounded in age', () => {
+  const old = {
+    eventName: 'QuickDraft_DSK_20260811', draftId: 'c1', set: 'DSK', format: 'QuickDraft',
+    pool: [1, 2], picks: [], complete: true, at: new Date(Date.now() - 30 * 86400_000).toISOString()
+  }
+  it('does not resurrect a draft from months ago', () => {
+    // A restored draft is published as complete with a live pool. Unbounded,
+    // opening the app long after the last draft handed the deckbuild advisor a
+    // stale pool to build, confidently, for half an hour.
+    const c = new DraftCoordinator(stubModels() as never, { append: vi.fn(), lastDraft: () => old } as never)
+    try {
+      c.setReplaying(true)
+      c.resumeAfterReplay()
+      expect(c.current.phase).toBe('idle')
+    } finally { c.idle() }
+  })
+  it('still restores one from this evening', () => {
+    const fresh = { ...old, at: new Date().toISOString() }
+    const c = new DraftCoordinator(stubModels() as never, { append: vi.fn(), lastDraft: () => fresh } as never)
+    try {
+      c.setReplaying(true)
+      c.resumeAfterReplay()
+      expect(c.current.phase).toBe('complete')
+    } finally { c.idle() }
   })
 })

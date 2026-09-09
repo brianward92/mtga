@@ -67,6 +67,19 @@ def find_arena_db() -> Path | None:
 HTML_TAG = re.compile(r"<[^>]+>")
 
 
+ARENA_TITLE_KEY_LENGTH = 17
+
+
+def arena_title_key(name: str) -> str:
+    """Arena's Order_Title: lowercased, alphanumerics only, truncated.
+
+    Measured against the shipped database: values are cut at 17 characters
+    ('bofurreliableguar'). A raw name sorts differently from these — a '.' sorts
+    before letters, so 'a.i.m. bot' jumps ahead of everything it should follow.
+    """
+    return re.sub(r"[^a-z0-9]", "", name.lower())[:ARENA_TITLE_KEY_LENGTH]
+
+
 def clean_name(raw: str) -> str:
     """Arena's localized titles carry presentation markup.
 
@@ -168,6 +181,7 @@ def build_app_cards(db_path: Path) -> dict[str, Any]:
 
     ids: dict[str, str] = {}
     order: dict[str, list[Any]] = {}
+    by_name: dict[str, list[Any]] = {}
     for grp_id, title_id, set_code, is_token, is_primary, o_rarity, o_color, o_title in cur.fetchall():
         if is_token:
             continue
@@ -175,10 +189,29 @@ def build_app_cards(db_path: Path) -> dict[str, Any]:
         if not name:
             continue
         ids[str(grp_id)] = name
-        # Sort keys are a property of the card, not the printing; a pack holds
-        # one printing per name. Prefer a primary card's values.
-        if name not in order or is_primary:
-            order[name] = [o_rarity, o_color, o_title or name.lower()]
+        # Keyed by grpId, because Arena's sort keys are a property of the
+        # PRINTING, not of the card. Keying by name gave a card whichever
+        # printing's row happened to be read last: LCI's Sorcerous Spyglass
+        # (uncommon, tier 2) inherited XLN's rare tier 1 and sorted into the
+        # wrong block, taking every badge after it along. 106 grpIds across 25
+        # shipped sets were affected.
+        #
+        # Arena's Order_Title is normalised and truncated; a raw name is not
+        # comparable with it, so a missing one is normalised the same way here
+        # rather than shipped as a spaced, punctuated string.
+        if o_rarity is None or o_color is None:
+            # Without both numeric keys the tuple cannot participate in Arena's
+            # ordering at all, and a null would sort ahead of every mythic.
+            continue
+        entry = [o_rarity, o_color, o_title or arena_title_key(name)]
+        order[str(grp_id)] = entry
+        # Last-resort fallback for a printing whose own columns are NULL, which
+        # is common for Alchemy and non-primary rows. Using another printing's
+        # keys is what the old name-keyed table did for EVERY card and is wrong
+        # in general, but one card with no keys at all makes the whole pack fall
+        # back to the reconstruction, which is worse.
+        if name not in by_name or is_primary:
+            by_name[name] = entry
 
     conn.close()
     return {
@@ -188,6 +221,7 @@ def build_app_cards(db_path: Path) -> dict[str, Any]:
             "names": len(order),
         },
         "ids": ids,
+        "orderByName": by_name,
         "order": order,
     }
 

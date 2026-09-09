@@ -53,6 +53,10 @@ export function startDraftLogPipeline(sink: DraftLogSink, deps: DraftLogPipeline
     if (added.length > 0) console.log(`[LogArchive] kept ${added.length} Arena log(s): ${added.join(', ')}`)
   }
   watcher.on('rotated', archive)
+  // And when a draft finishes: archiving only at startup and on rotation meant
+  // the session that CONTAINED the draft was never copied — the archive held
+  // the pre-draft prefix, and Arena's next two launches destroyed the rest.
+  parser.on('draft-end', () => archive())
 
   watcher.on('line', (line: string) => parser.handleLine(line))
   watcher.on('replay-start', () => { archive(); sink.setReplaying(true) })

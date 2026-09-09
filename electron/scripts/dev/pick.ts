@@ -40,15 +40,27 @@ if (what === 'confirm') {
   const cell = cellOf.get(target.grpId)!
   const r = layout.cards[cell].card
   // Arena prints the title in a band across the top of the card frame.
+  //
+  // Inset from the card's edges. An ordering error moves a card by exactly ONE
+  // cell, into a band that touches this one, so a full-width read plus "does any
+  // line match" would happily accept the neighbour's title bleeding in. The
+  // inset keeps the read inside this card, and the decision below uses only the
+  // line closest to the card's centre rather than any line in the region.
+  const inset = r.width * 0.12
   const band = {
-    x: Math.round(rect.x + r.x),
+    x: Math.round(rect.x + r.x + inset),
     y: Math.round(rect.y + r.y + r.height * 0.04),
-    width: Math.round(r.width),
+    width: Math.round(r.width - 2 * inset),
     height: Math.round(r.height * 0.14)
   }
-  const seen = readTextLines(band).map(l => l.text).filter(Boolean)
-  const ok = seen.some(t => namesMatch(t, target.name))
-  console.log(`${ok ? 'MATCH' : 'MISMATCH'} expected="${target.name}" saw="${seen.join(' / ') || '(nothing)'}"`)
+  const lines = readTextLines(band).filter(l => l.text.trim())
+  const seen = lines.map(l => l.text)
+  const centre = rect.y + r.y + r.height * 0.04 + r.height * 0.07
+  const nearest = lines.length > 0
+    ? lines.reduce((best, l) => Math.abs(l.y - centre) < Math.abs(best.y - centre) ? l : best)
+    : null
+  const ok = nearest !== null && namesMatch(nearest.text, target.name)
+  console.log(`${ok ? 'MATCH' : 'MISMATCH'} expected="${target.name}" read="${nearest?.text ?? '(nothing)'}" all="${seen.join(' / ') || '(nothing)'}"`)
   process.exit(ok ? 0 : 6)
 } else if (what === 'list') {
   for (const c of [...cards].sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99))) {

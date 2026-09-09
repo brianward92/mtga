@@ -14,7 +14,7 @@ import { type SetBundle, type CardInfo } from '../data/bundle'
 import { resolveFromArenaDb } from '../data/arena-card-db'
 import { DraftHistory, type RecordedDraft } from '../data/history'
 import { EMPTY_STATE, type CardRow, type DraftState, type PickRecord } from '../../shared/state'
-import { COMPLETE_LINGER_MS } from './completion'
+import { COMPLETE_LINGER_MS, RESTORE_MAX_AGE_MS } from './completion'
 
 /** Converts parser snapshots into renderer-ready draft state and history. */
 export class DraftCoordinator extends EventEmitter {
@@ -28,6 +28,8 @@ export class DraftCoordinator extends EventEmitter {
   private replaying = false
   /** Bumped whenever the draft changes; in-flight backfills check it and abort. */
   private draftToken = 0
+  /** Cards taken per pick — more than one in a Pick-Two event. */
+  private cardsPerPick = 1
 
   constructor(private models: ModelManager, private history: DraftHistory) {
     super()
@@ -102,8 +104,13 @@ export class DraftCoordinator extends EventEmitter {
     // At pick 1 the pack is complete, so its size IS the answer and replaces
     // the guess in both directions. Later picks only ever raise it: cards
     // already taken are gone, so the count is a lower bound, not a measurement.
-    const size = cur.grpIds.length + cur.pick - 1
-    const ppp = size > 0
+    //
+    // Only when one card is taken per pick. In a Pick-Two event a 14-card pack
+    // yields 7 picks, so pack size is not picks per pack, and adopting it would
+    // reproduce the exact defect this replaced — a HUD counting to 42 for a
+    // 21-pick draft. Until a pick proves otherwise the bundle's value stands.
+    const size = cur.grpIds.length + (cur.pick - 1) * this.cardsPerPick
+    const ppp = size > 0 && this.cardsPerPick === 1
       ? (cur.pick === 1 ? size : Math.max(this.state.picksPerPack, size))
       : this.state.picksPerPack
     this.state = {
@@ -122,6 +129,7 @@ export class DraftCoordinator extends EventEmitter {
   onDraftPick(snap: DraftSessionSnapshot, pick: DraftPickRecord): void {
     snap = this.fill(snap)
     this.snapshot = snap
+    if (pick.grpIds.length > 0) this.cardsPerPick = pick.grpIds.length
     const takenGrp = pick.grpIds[0]
     const scores = this.lastScores && this.lastScores.pack === pick.pack && this.lastScores.pick === pick.pick ? this.lastScores : null
     const rec = scores?.cards.find(c => c.rank === 1) ?? null
@@ -222,6 +230,11 @@ export class DraftCoordinator extends EventEmitter {
     let draft: RecordedDraft | null = null
     try { draft = this.history.lastDraft() } catch { return }
     if (!draft || !draft.set) return
+    // Only a recent draft. Without a bound, opening the app months after the
+    // last draft resurrected it: a stale pool published as "complete" with a
+    // deckbuild advisor confidently building it, for half an hour.
+    const age = Date.now() - Date.parse(draft.at)
+    if (!Number.isFinite(age) || age > RESTORE_MAX_AGE_MS) return
 
     this.bundle = this.models.bundleFor(draft.set)
     const ppp = this.bundle?.picksPerPack ?? 14
@@ -385,7 +398,7 @@ export class DraftCoordinator extends EventEmitter {
       manaValue: null,
       type: live.type,
       scryfallId: '',
-      order: live.order
+      order: live.order ?? undefined
     }
   }
 

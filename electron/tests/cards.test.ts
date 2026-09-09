@@ -83,3 +83,14 @@ describe('poolSummary', () => {
     expect(s).toEqual({ counts: { W: 1, U: 0, B: 0, R: 2, G: 0 }, colorless: 1, cards: 3, lands: 1 })
   })
 })
+
+describe('the pool sheet uses the shared land rule', () => {
+  it('does not file a common cycle land under basic lands', () => {
+    // The sheet carried a sixth copy of this rule testing only
+    // `rarity === 'land'`, which Arena also gives the common cycle lands. Every
+    // Hidden Courtyard and Murky Sewer was filed under "basic lands".
+    expect(isBasicLand({ name: 'Hidden Courtyard', type: 'Land', rarity: 'land' })).toBe(false)
+    expect(isBasicLand({ name: 'Murky Sewer', type: 'Land', rarity: 'land' })).toBe(false)
+    expect(isBasicLand({ name: 'Plains', type: 'Basic Land — Plains', rarity: 'land' })).toBe(true)
+  })
+})

@@ -13,7 +13,7 @@
  * identity rather than appended blindly, or the file would grow by a whole
  * draft each time the app launched.
  */
-import { appendFileSync, mkdirSync, readFileSync } from 'fs'
+import { appendFileSync, closeSync, mkdirSync, openSync, readFileSync, readSync, statSync } from 'fs'
 import { dirname } from 'path'
 
 export interface HistoryEvent {
@@ -70,6 +70,7 @@ export interface RecordedDraft {
 /** Appends draft lifecycle events to a best-effort JSONL history file. */
 export class DraftHistory {
   private seen: Set<string> | null = null
+  private repaired = false
 
   constructor(private file: string) {}
 
@@ -89,7 +90,6 @@ export class DraftHistory {
     } catch { return null }
 
     const byDraft = new Map<string, RecordedDraft & { recordedPool: number[] | null }>()
-    let latest: string | null = null
     for (const line of lines) {
       if (!line.trim()) continue
       let ev: HistoryEvent
@@ -98,7 +98,7 @@ export class DraftHistory {
       // Drafts are keyed the way events are, so rows from one draft group even
       // when the id is null, which it is for every bot draft.
       const key = `${ev.draftId ?? ''}|${ev.eventName ?? ''}`
-      if (!key.replace('|', '')) continue
+      if (!ev.draftId && !ev.eventName) continue
       let d = byDraft.get(key)
       if (!d) {
         d = { eventName: ev.eventName, draftId: ev.draftId, set: ev.set, format: ev.format, pool: [], picks: [], complete: false, at: ev.at, recordedPool: null }
@@ -114,14 +114,33 @@ export class DraftHistory {
       } else if (ev.type === 'draft-end') {
         d.complete = true
       }
-      if (!latest || d.at > (byDraft.get(latest)?.at ?? '')) latest = key
     }
-    if (!latest) return null
-    const d = byDraft.get(latest)!
-    d.picks.sort((a, b) => a.pack - b.pack || a.pick - b.pick)
-    const { recordedPool, ...draft } = d
-    draft.pool = recordedPool ?? draft.picks.map(p => p.grpId)
-    return draft.pool.length > 0 ? draft : null
+    // Newest first, but skip any draft with nothing to restore. Joining an
+    // event and quitting before the first pick writes a draft-start and nothing
+    // else; returning null there hid a perfectly recoverable earlier draft,
+    // which is exactly the abort-and-restart case this exists for.
+    const ordered = [...byDraft.values()].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))
+    for (const d of ordered) {
+      d.picks.sort((a, b) => a.pack - b.pack || a.pick - b.pick)
+      const { recordedPool, ...draft } = d
+      draft.pool = recordedPool ?? draft.picks.map(p => p.grpId)
+      if (draft.pool.length > 0) return draft
+    }
+    return null
+  }
+
+  /** If the file does not end in a newline, add one before appending. */
+  private closeTornLine(): void {
+    if (this.repaired) return
+    this.repaired = true
+    try {
+      const size = statSync(this.file).size
+      if (size === 0) return
+      const fd = openSync(this.file, 'r')
+      const tail = Buffer.alloc(1)
+      try { readSync(fd, tail, 0, 1, size - 1) } finally { closeSync(fd) }
+      if (tail[0] !== 0x0a) appendFileSync(this.file, '\n')
+    } catch { /* no file yet, or unreadable: the append below will report it */ }
   }
 
   /** Identity of every event already on disk; read once, lazily. */
@@ -150,6 +169,10 @@ export class DraftHistory {
     if (seen.has(key)) return false
     try {
       mkdirSync(dirname(this.file), { recursive: true })
+      // A crash mid-write leaves a partial line. Appending straight onto it
+      // would weld the fragment to a good event, making ONE unparseable line
+      // and losing both. Close the torn line first.
+      this.closeTornLine()
       appendFileSync(this.file, JSON.stringify(ev) + '\n')
       seen.add(key)
       return true

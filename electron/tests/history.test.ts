@@ -119,6 +119,46 @@ describe('DraftHistory.lastDraft — the last line of defence', () => {
     expect(new DraftHistory(file).lastDraft()!.picks.map(p => p.grpId)).toEqual([10, 20, 30])
   })
 
+  it('skips a newer draft with nothing in it and restores the one that has something', () => {
+    // Joining an event and quitting before the first pick writes a draft-start
+    // and nothing else. Returning null there hid a perfectly recoverable
+    // earlier draft — the abort-and-restart case this exists for.
+    const h = new DraftHistory(file)
+    h.append(ev({ at: '2026-09-09T10:00:00Z', grpId: 11 }))
+    h.append(ev({ type: 'draft-end', at: '2026-09-09T10:05:00Z', picks: 1 }))
+    h.append(ev({ type: 'draft-start', draftId: 'later', at: '2026-09-09T12:00:00Z' }))
+    const d = new DraftHistory(file).lastDraft()!
+    expect(d.pool).toEqual([11])
+  })
+
+  it('keeps two drafts of the same bot event apart when they carry distinct ids', () => {
+    // Bot drafts have no draft id of their own and the event name is shared by
+    // every Quick Draft of that event for a week or more. Without a per-draft
+    // id the second draft's pool was dropped as a duplicate and its picks
+    // merged into the first one's record.
+    const h = new DraftHistory(file)
+    h.append(ev({ draftId: 'course-1', at: '2026-09-09T10:00:00Z', grpId: 11 }))
+    h.append(ev({ type: 'draft-pool', draftId: 'course-1', at: '2026-09-09T10:05:00Z', pool: [11, 12] }))
+    expect(h.append(ev({ draftId: 'course-2', at: '2026-09-09T14:00:00Z', grpId: 11 }))).toBe(true)
+    expect(h.append(ev({ type: 'draft-pool', draftId: 'course-2', at: '2026-09-09T14:05:00Z', pool: [21, 22] }))).toBe(true)
+
+    const d = new DraftHistory(file).lastDraft()!
+    expect(d.draftId).toBe('course-2')
+    expect(d.pool).toEqual([21, 22])
+    expect(d.picks).toHaveLength(1)
+  })
+
+  it('closes a torn line instead of welding the next event onto it', () => {
+    // A crash mid-write leaves a partial line. Appending onto it made ONE
+    // unparseable line and lost the good event too.
+    writeFileSync(file, JSON.stringify(pick()) + '\n{"at":"2026-09-09","ty')
+    const h = new DraftHistory(file)
+    h.append(pick({ pick: 2, grpId: 99 }))
+    const parsed = lines().map(l => { try { return JSON.parse(l) } catch { return null } })
+    expect(parsed.filter(Boolean)).toHaveLength(2)
+    expect(new DraftHistory(file).lastDraft()!.picks.map(p => p.grpId)).toEqual([87285, 99])
+  })
+
   it('is null when there is nothing to restore', () => {
     expect(new DraftHistory(file).lastDraft()).toBeNull()
     const h = new DraftHistory(file)

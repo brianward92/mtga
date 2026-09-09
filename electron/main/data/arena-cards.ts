@@ -17,7 +17,7 @@
  * the live fallback for ids newer than the shipped file.
  */
 
-import { crossSourceTitleKey } from '../../shared/cards'
+import { crossSourceTitleKey as orderKey } from '../../shared/cards'
 import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 
@@ -27,8 +27,14 @@ export type ArenaOrder = readonly [number, number, string]
 export interface ArenaCards {
   /** grpId -> card name, verbatim from Arena. */
   name(grpId: number): string | undefined
-  /** Card name -> Arena's sort keys. */
-  order(name: string): ArenaOrder | undefined
+  /**
+   * grpId -> Arena's sort keys.
+   *
+   * Keyed by grpId, not by name: the keys are a property of the PRINTING. Keyed
+   * by name, LCI's Sorcerous Spyglass (uncommon) inherited XLN's rare tier and
+   * sorted into the wrong block, shifting every badge after it.
+   */
+  order(grpId: number, name?: string): ArenaOrder | undefined
   /** Every (grpId, name) pair, for correcting a set bundle. */
   entries(): IterableIterator<[number, string]>
   readonly size: number
@@ -41,21 +47,13 @@ const EMPTY: ArenaCards = {
   size: 0
 }
 
-/**
- * Bridge the naming conventions between our bundles and Arena for the sole
- * purpose of finding a card's sort keys.
- *
- * The same physical card is spelled differently on each side: Scryfall prefixes
- * Alchemy rebalances with "A-", writes split cards with "//" where Arena writes
- * "///", and names a meld card from the other face. Without this, a pack
- * holding any of those loses Arena's ordering entirely, because the keys are
- * all-or-nothing per pack.
- */
-const orderKey = crossSourceTitleKey
 
 interface RawArenaCards {
   ids?: Record<string, string>
+  /** grpId -> [Order_MythicToCommon, Order_ColorOrder, Order_Title]. */
   order?: Record<string, [number, number, string]>
+  /** Card name -> the primary printing's keys, for printings that carry none. */
+  orderByName?: Record<string, [number, number, string]>
 }
 
 const cache = new Map<string, ArenaCards>()
@@ -75,13 +73,28 @@ export function loadArenaCards(bundleRoot: string): ArenaCards {
         const grpId = Number(key)
         if (Number.isFinite(grpId) && typeof value === 'string' && value) ids.set(grpId, value)
       }
-      const orders = new Map<string, ArenaOrder>()
-      for (const [name, value] of Object.entries(raw.order ?? {})) {
-        if (Array.isArray(value) && value.length === 3) orders.set(orderKey(name), value as ArenaOrder)
+      const orders = new Map<number, ArenaOrder>()
+      for (const [key, value] of Object.entries(raw.order ?? {})) {
+        const grpId = Number(key)
+        // Both ranks must be real numbers. A [null, null, title] tuple used to
+        // pass the length check, and `null - 4` is -4, so such a card sorted
+        // ahead of every mythic in the pack.
+        if (!Number.isFinite(grpId) || !Array.isArray(value) || value.length !== 3) continue
+        if (!Number.isFinite(value[0]) || !Number.isFinite(value[1]) || typeof value[2] !== 'string') continue
+        orders.set(grpId, value as ArenaOrder)
+      }
+      const byName = new Map<string, ArenaOrder>()
+      for (const [name, value] of Object.entries(raw.orderByName ?? {})) {
+        if (!Array.isArray(value) || value.length !== 3) continue
+        if (!Number.isFinite(value[0]) || !Number.isFinite(value[1]) || typeof value[2] !== 'string') continue
+        byName.set(orderKey(name), value as ArenaOrder)
       }
       table = {
         name: g => ids.get(g),
-        order: n => orders.get(orderKey(n)),
+        // The printing's own keys, then any printing of the same card. Alchemy
+        // and other non-primary rows often carry no keys at all, and one such
+        // card drops the whole pack to the reconstruction.
+        order: (g, n) => orders.get(g) ?? (n === undefined ? undefined : nameOrder(byName, n)),
         entries: () => ids.entries(),
         size: ids.size
       }
@@ -94,6 +107,21 @@ export function loadArenaCards(bundleRoot: string): ArenaCards {
   }
   cache.set(bundleRoot, table)
   return table
+}
+
+/**
+ * Look up a name's keys, trying the front face when the whole name misses.
+ *
+ * Our bundles name a modal or split card by both faces
+ * ("Bofur, Reliable Guardian // Concerted Care") where Arena stores only the
+ * front. Seventeen HOB cards missed for exactly that reason, and every HOB pack
+ * containing one lost Arena's ordering entirely.
+ */
+function nameOrder(byName: Map<string, ArenaOrder>, name: string): ArenaOrder | undefined {
+  const exact = byName.get(orderKey(name))
+  if (exact) return exact
+  const front = name.split(/\s*\/\/+\s*/)[0]
+  return front && front !== name ? byName.get(orderKey(front)) : undefined
 }
 
 /** Test seam: drop the memoised table so a regenerated file is picked up. */

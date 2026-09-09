@@ -8,6 +8,7 @@
  */
 import type { CardRow, PickRecord } from '../../shared/state'
 import { gradeTier, gradeOrdinal, poolRating } from '../../shared/grades'
+import { isBasicLand as isBasicLandCard } from '../../shared/cards'
 import { COLOR_NAMES, POOL_COLORS, poolSummary } from './hud-logic'
 import { escapeHtml, renderManaCost } from './shared'
 import type { Store } from './types'
@@ -28,10 +29,6 @@ function gradeHtml(card: Pick<CardRow, 'grade' | 'setGrade'>): string {
     : '<span class="s-grade grade-none">—</span>'
 }
 
-/** Basic lands form the final, separately labelled section of the pool. */
-function isBasicLandCard(card: Pick<CardRow, 'type' | 'rarity'>): boolean {
-  return /\bbasic land\b/i.test(card.type) || card.rarity.toLowerCase() === 'land'
-}
 
 /** Pool sorted best → worst on the set-review ladder (A+ … F), basic lands last, ties by name. */
 function sortPoolByGrade(pool: ReadonlyArray<CardRow>): CardRow[] {

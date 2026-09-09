@@ -82,7 +82,14 @@ case "$cmd" in
     # Prefer it: the AX rect below reports nonsense while Arena is full screen,
     # and the app deliberately avoids AX (see main/arena-geometry.ts).
     if [ -f "$MTGA_STATE_FILE" ] && state_py rect 2>/dev/null; then :
-    else osascript -e 'tell application "System Events" to tell process "MTGA" to get {position, size} of window 1' | tr -d ' '; fi ;;
+    else
+      # AppleScript reports {x, y}, {w, h}; every consumer here expects four
+      # bare comma-separated numbers, and the braces produced unparseable JSON
+      # downstream. Normalise, so the fallback is a fallback rather than a
+      # different, broken format.
+      osascript -e 'tell application "System Events" to tell process "MTGA" to get {position, size} of window 1' \
+        | tr -d ' {}' || die "no state mirror and Accessibility could not report Arena's window"
+    fi ;;
   shot)
     mkdir -p "$SHOTS"; out="$SHOTS/${1:-shot-$(date +%H%M%S)}.png"; rm -f "$out"
     # Capture only Arena's own rect. A bare `screencapture -x` takes the whole
@@ -93,12 +100,29 @@ case "$cmd" in
   click)    activate; "$(helper click)" "$1" "$2" ;;
   move)     "$(helper move-mouse)" "$1" "$2" ;;
   scroll)   activate; "$(helper scroll)" "$1" "$2" "$3" ;;
-  key)      activate; osascript -e "tell application \"System Events\" to key code $1" ;;
-  type)     # Type literal text into whatever Arena field has focus (card search).
-            activate; osascript -e "tell application \"System Events\" to keystroke \"$*\"" ;;
+  key)
+    # A key CODE only. This used to paste $1 straight into AppleScript source,
+    # which made the one allow-listed command a route to arbitrary AppleScript —
+    # including menu items this must never touch, like Log Out and Exit Game.
+    case "${1:-}" in
+      ''|*[!0-9]*) die "key CODE (digits only)" ;;
+    esac
+    [ "$1" -le 255 ] || die "key code out of range: $1"
+    activate; osascript -e "tell application \"System Events\" to key code $1" ;;
+  type)
+    # Type literal text into whatever Arena field has focus (card search). The
+    # text is passed as an argument, never interpolated into the script source,
+    # so quotes and backslashes in a card name cannot break out of the string.
+    [ $# -ge 1 ] || die "type TEXT"
+    activate
+    osascript -e 'on run argv
+  tell application "System Events" to keystroke (item 1 of argv)
+end run' -- "$*" ;;
   clear)    # Select-all then delete: empties a focused text field.
             activate; osascript -e 'tell application "System Events" to keystroke "a" using command down' -e 'tell application "System Events" to key code 51' ;;
-  state)    [ -f "$MTGA_STATE_FILE" ] || die "no state mirror at $MTGA_STATE_FILE"; state_py "${1:-pos}" ;;
+  state)    # Forward every argument: "state basic 12345" needs both, and passing
+            # only the first silently answered "not a basic land".
+            [ -f "$MTGA_STATE_FILE" ] || die "no state mirror at $MTGA_STATE_FILE"; state_py "${@:-pos}" ;;
   pick)     bash scripts/dev/pick-next-card.sh "$@" ;;
   build)    [ -f "$MTGA_STATE_FILE" ] || die "no state mirror at $MTGA_STATE_FILE"; for t in click move-mouse scroll ocr; do helper $t >/dev/null; done; npx tsx scripts/dev/deckbuild.ts "$MTGA_STATE_FILE" "$@" ;;
   ocr)      "$(helper ocr)" "$@" ;;
@@ -121,7 +145,10 @@ case "$cmd" in
       fi
       if [ -n "$pos" ] && [ "$pos" != "$last" ] && [ "${n:-0}" -gt 0 ] 2>/dev/null; then
         sleep 1.5
-        bash scripts/dev/pick-next-card.sh top 2>&1 | grep -E '^PICKED|abort|REFUS|not picked' | tail -1 || true
+        # Match what pick-next-card.sh actually prints. The old pattern missed
+        # "WARNING: pick not confirmed", so a failed pick printed NOTHING and the
+        # loop spun silently with the pack still open until the timer ran out.
+        bash scripts/dev/pick-next-card.sh top 2>&1 | grep -E '^PICKED|^ABORTING|^NOT RETRYING|^WARNING|REFUS|abort' | tail -1 || true
         last="$pos"
       fi
       sleep 1

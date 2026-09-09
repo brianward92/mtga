@@ -589,7 +589,7 @@ export class DraftParser extends EventEmitter {
     // progress owns its own pool, and this listing is stale by comparison.
     if (!s || s.state === 'complete') {
       const withPool = list
-        .map(c => c as { InternalEventName?: unknown; CurrentModule?: unknown; CardPool?: unknown })
+        .map(c => c as { InternalEventName?: unknown; CurrentModule?: unknown; CardPool?: unknown; CourseId?: unknown })
         .filter(c => typeof c.InternalEventName === 'string' && typeof c.CurrentModule === 'string'
           && POST_DRAFT_MODULES.has(c.CurrentModule) && parseDraftEventName(c.InternalEventName)
           && toGrpIds(c.CardPool).length > 0)
@@ -598,15 +598,27 @@ export class DraftParser extends EventEmitter {
         const c = withPool[0]
         const name = c.InternalEventName as string
         const pool = toGrpIds(c.CardPool)
+        const courseId = typeof c.CourseId === 'string' ? c.CourseId : null
         const existing = s && s.eventName === name ? s : null
         if (existing) {
+          if (courseId && !existing.draftId) existing.draftId = courseId
           this.completeSession(existing, pool)
         } else if (!s) {
-          this.pendingEventName = name
-          const session = this.ensureSession({ eventName: name, isBot: parseDraftEventName(name)!.format === 'QuickDraft', reviveIfComplete: false })
+          const session = this.ensureSession({ draftId: courseId, eventName: name, isBot: parseDraftEventName(name)!.format === 'QuickDraft', reviveIfComplete: false })
+          if (courseId && !session.draftId) session.draftId = courseId
           this.completeSession(session, pool)
         }
         return
+      }
+    }
+    // Bot drafts carry no draft id of their own — every BotDraftDraftPick id is
+    // per-message — so two Quick Drafts of the same event share an identity in
+    // the history file and the second one's rows are dropped as duplicates.
+    // The course listing has a real per-draft CourseId; adopt it.
+    if (s && !s.draftId && s.eventName) {
+      for (const c of list) {
+        const raw = c as { InternalEventName?: unknown; CourseId?: unknown }
+        if (raw.InternalEventName === s.eventName && typeof raw.CourseId === 'string') { s.draftId = raw.CourseId; break }
       }
     }
     if (!s || s.eventName) return
