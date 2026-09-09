@@ -23,6 +23,12 @@ export interface DisplayOrderCard {
   type?: string | null
   /** Colour identity (basic lands sort by it). */
   colorIdentity?: string | null
+  /**
+   * Arena's own [Order_MythicToCommon, Order_ColorOrder, Order_Title], supplied
+   * by arena-cards.json. When every card in the pack has these, they are used
+   * verbatim and the reconstruction below is skipped.
+   */
+  order?: readonly [number, number, string] | null
 }
 
 const RARITY_RANK: Record<string, number> = { mythic: 0, rare: 1, uncommon: 2, common: 3, land: 4, basic: 4, token: 5 }
@@ -79,11 +85,31 @@ function titleKey(name: string | null | undefined): string {
   return (name ?? '').toLowerCase().replace(/[^a-z0-9/]/g, '')
 }
 
+/**
+ * Whether Arena's own sort keys cover every card here.
+ *
+ * All-or-nothing on purpose: interleaving Arena's exact keys with the
+ * reconstruction below would order the two groups against different rules and
+ * produce a grid that matches neither.
+ */
+export function hasArenaOrder(cards: ReadonlyArray<DisplayOrderCard>): boolean {
+  return cards.length > 0 && cards.every(c => Array.isArray(c.order) && c.order.length === 3)
+}
+
 /** Indices into `cards`, in Arena's display order. */
 export function arenaDisplayOrder(cards: ReadonlyArray<DisplayOrderCard>): number[] {
+  const exact = hasArenaOrder(cards)
   return cards
     .map((card, index) => ({ card, index }))
     .sort((a, b) => {
+      if (exact) {
+        const [ar, ac, at] = a.card.order!
+        const [br, bc, bt] = b.card.order!
+        if (ar !== br) return ar - br
+        if (ac !== bc) return ac - bc
+        if (at !== bt) return at < bt ? -1 : 1
+        return a.index - b.index
+      }
       const r = rarityRank(a.card) - rarityRank(b.card)
       if (r !== 0) return r
       const c = colorOrder(a.card) - colorOrder(b.card)

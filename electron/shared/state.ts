@@ -21,6 +21,8 @@ export interface CardRow {
   type: string
   /** Raw Scryfall printing id carried through from the offline bundle. */
   scryfallId: string
+  /** Arena's own sort keys when known; see shared/display-order.ts. */
+  order?: readonly [number, number, string]
   imageUrl: string | null
   /** Model logit for THIS pick (pool-conditioned); null until scored / unknown. */
   ev: number | null

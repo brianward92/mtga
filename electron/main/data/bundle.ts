@@ -15,6 +15,7 @@
 import { existsSync, readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
 import { parseNpz } from '../model/npz'
+import { loadArenaCards } from './arena-cards'
 
 /** Static card identity and display metadata keyed by Arena grpId. */
 export interface CardInfo {
@@ -30,6 +31,13 @@ export interface CardInfo {
   type: string
   /** Raw Scryfall id of the printing supplying this display metadata. */
   scryfallId: string
+  /**
+   * Arena's own sort keys (rarity tier, colour slot, normalised title) when
+   * arena-cards.json covers this card. `display-order.ts` prefers these over
+   * its reconstruction of the same rules — Arena sorts a colourless card with a
+   * coloured identity under that identity, and 175 cards differ on that alone.
+   */
+  order?: readonly [number, number, string]
 }
 
 /** One shipped set's assets, card metadata, and draft constants. */
@@ -175,25 +183,51 @@ export function loadSetBundle(root: string, set: string): SetBundle | null {
     console.warn(`[Bundle] ${set} cards.json is missing the name-keyed cards object; rebuild the shipped set bundles`)
   }
   const byName = cardsFile?.cards ?? {}
+  const arena = loadArenaCards(root)
   const cards = new Map<number, CardInfo>()
-  for (const [name, ids] of Object.entries(grpIds)) {
+
+  const info = (grpId: number, name: string): CardInfo => {
     const raw = byName[name] ?? {}
+    const manaValue = raw.manaValue === null || raw.manaValue === undefined ? null : Number(raw.manaValue)
+    return {
+      grpId,
+      name,
+      rarity: String(raw.rarity || 'common'),
+      colors: String(raw.colors ?? ''),
+      colorIdentity: String(raw.colorIdentity ?? ''),
+      manaCost: String(raw.manaCost ?? ''),
+      manaValue: Number.isFinite(manaValue) ? manaValue : null,
+      type: String(raw.type ?? ''),
+      scryfallId: String(raw.scryfallId ?? ''),
+      order: arena.order(name)
+    }
+  }
+
+  for (const [name, ids] of Object.entries(grpIds)) {
     for (const value of ids) {
       const grpId = Number(value)
       if (!Number.isFinite(grpId) || cards.has(grpId)) continue
-      const manaValue = raw.manaValue === null || raw.manaValue === undefined ? null : Number(raw.manaValue)
-      cards.set(grpId, {
-        grpId,
-        name,
-        rarity: String(raw.rarity || 'common'),
-        colors: String(raw.colors ?? ''),
-        colorIdentity: String(raw.colorIdentity ?? ''),
-        manaCost: String(raw.manaCost ?? ''),
-        manaValue: Number.isFinite(manaValue) ? manaValue : null,
-        type: String(raw.type ?? ''),
-        scryfallId: String(raw.scryfallId ?? '')
-      })
+      cards.set(grpId, info(grpId, name))
     }
+  }
+
+  // Arena is the authority on which card a grpId is. Correct any id it names
+  // differently, and adopt ids the Scryfall-derived map never had, as long as
+  // the card belongs to this set's universe. Both cases were live defects:
+  // 87455 resolved to Plains when Arena calls it an Island, and 87453 (an LCI
+  // Plains that appears in real packs) resolved to nothing at all.
+  let corrected = 0
+  let adopted = 0
+  for (const [grpId, arenaName] of arena.entries()) {
+    if (!(arenaName in byName)) continue
+    const current = cards.get(grpId)
+    if (current?.name === arenaName) continue
+    if (current) corrected++
+    else adopted++
+    cards.set(grpId, info(grpId, arenaName))
+  }
+  if (corrected || adopted) {
+    console.log(`[Bundle] ${set}: Arena corrected ${corrected} card ids and supplied ${adopted} missing ones`)
   }
 
   let picksPerPack = 14

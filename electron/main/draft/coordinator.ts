@@ -286,6 +286,7 @@ export class DraftCoordinator extends EventEmitter {
         manaValue: c?.manaValue ?? null,
         type: c?.type ?? '',
         scryfallId: c?.scryfallId ?? '',
+        order: c?.order,
         imageUrl: null,
         ev: null, prob: null, rank: null,
         percentile: intrinsic?.percentile ?? null,

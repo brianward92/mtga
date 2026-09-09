@@ -30,9 +30,15 @@ ARENA_DB_GLOB = (
     Path.home() / "Library/Application Support/com.wizards.mtga/Downloads/Raw"
 )
 
-# Output path
+# Output paths
 OUTPUT_DIR = Path(__file__).parent.parent / "data"
 OUTPUT_FILE = OUTPUT_DIR / "arena_mapping.json"
+# Ships inside the app bundle next to the set assets (electron-builder copies
+# resources/draftfm wholesale), so the overlay can correct card identity
+# without Arena being installed on the machine that built it.
+APP_CARDS_FILE = (
+    Path(__file__).parent.parent / "electron" / "resources" / "draftfm" / "arena-cards.json"
+)
 
 COLOR_MAP = {1: "W", 2: "U", 3: "B", 4: "R", 5: "G"}
 # Arena's Rarity enum (per the 17Lands/Draftmancer reference extractors):
@@ -41,13 +47,44 @@ RARITY_MAP = {0: "token", 1: "land", 2: "common", 3: "uncommon", 4: "rare", 5: "
 
 
 def find_arena_db() -> Path | None:
-    """Find the Arena CardDatabase file."""
+    """Newest Arena CardDatabase file, or None.
+
+    Arena leaves older databases behind after a client patch, so take the most
+    recently modified rather than whichever the directory lists first.
+    """
     if not ARENA_DB_GLOB.exists():
         return None
-    for f in ARENA_DB_GLOB.iterdir():
-        if f.name.startswith("Raw_CardDatabase") and f.suffix == ".mtga":
-            return f
-    return None
+    candidates = [
+        f
+        for f in ARENA_DB_GLOB.iterdir()
+        if f.name.startswith("Raw_CardDatabase") and f.suffix == ".mtga"
+    ]
+    if not candidates:
+        return None
+    return max(candidates, key=lambda f: f.stat().st_mtime)
+
+
+HTML_TAG = re.compile(r"<[^>]+>")
+
+
+def clean_name(raw: str) -> str:
+    """Arena's localized titles carry presentation markup.
+
+    Hyphenated names arrive as "<nobr>Cat-Gator</nobr>"; the card's name is the
+    text, not the markup.
+    """
+    return HTML_TAG.sub("", raw or "").strip()
+
+
+def load_localizations(cur: sqlite3.Cursor) -> dict[int, str]:
+    """LocId -> English text.
+
+    Localizations_enUS is keyed on (LocId, Formatted) and carries up to three
+    rows per LocId. Card titles and type lines live at Formatted = 1; selecting
+    without that filter lets an arbitrary row win.
+    """
+    cur.execute("SELECT LocId, Loc FROM Localizations_enUS WHERE Formatted = 1")
+    return {row[0]: row[1] for row in cur.fetchall()}
 
 
 def build_mapping_arena_db(db_path: Path) -> dict[int, dict[str, Any]]:
@@ -56,11 +93,7 @@ def build_mapping_arena_db(db_path: Path) -> dict[int, dict[str, Any]]:
     conn = sqlite3.connect(str(db_path))
     cur = conn.cursor()
 
-    # Build localization lookup: LocId -> English text
-    loc = {}
-    cur.execute("SELECT LocId, Loc FROM Localizations_enUS")
-    for row in cur.fetchall():
-        loc[row[0]] = row[1]
+    loc = load_localizations(cur)
 
     # Build card mapping
     cur.execute("""
@@ -102,6 +135,61 @@ def build_mapping_arena_db(db_path: Path) -> dict[int, dict[str, Any]]:
 
     conn.close()
     return mapping
+
+
+def build_app_cards(db_path: Path) -> dict[str, Any]:
+    """The overlay's card-identity correction, straight from Arena.
+
+    The set bundles get grpId -> card identity from Scryfall's `arena_id`, a
+    third-party mapping onto Arena's ids. Measured against this database on
+    2026-09-08 it had eight basic-land ids pointing at the wrong land and 30
+    draftable ids it did not know at all, and a wrong or missing id silently
+    reorders the on-card badge grid (see electron/shared/display-order.ts).
+
+    Emits two tables:
+      ids   grpId -> name, so identity never depends on Scryfall again.
+      order name  -> Arena's own three sort keys, so the pack grid is ordered
+            the way Arena orders it rather than by our reconstruction. The
+            colour key is the one that matters: Arena sorts a colourless card
+            with a coloured identity (Brothers' War prototypes, Inverted
+            Iceberg) under its identity, and 175 cards differ on that rule.
+    """
+    conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    cur = conn.cursor()
+    loc = load_localizations(cur)
+
+    cur.execute(
+        """
+        SELECT GrpId, TitleId, ExpansionCode, IsToken, IsPrimaryCard,
+               Order_MythicToCommon, Order_ColorOrder, Order_Title
+        FROM Cards
+        """
+    )
+
+    ids: dict[str, str] = {}
+    order: dict[str, list[Any]] = {}
+    for grp_id, title_id, set_code, is_token, is_primary, o_rarity, o_color, o_title in cur.fetchall():
+        if is_token:
+            continue
+        name = clean_name(loc.get(title_id, ""))
+        if not name:
+            continue
+        ids[str(grp_id)] = name
+        # Sort keys are a property of the card, not the printing; a pack holds
+        # one printing per name. Prefer a primary card's values.
+        if name not in order or is_primary:
+            order[name] = [o_rarity, o_color, o_title or name.lower()]
+
+    conn.close()
+    return {
+        "source": {
+            "database": db_path.name,
+            "cards": len(ids),
+            "names": len(order),
+        },
+        "ids": ids,
+        "order": order,
+    }
 
 
 def download_json(url: str) -> dict[str, Any]:
@@ -203,7 +291,37 @@ def main():
         default=None,
         help="Path to Scryfall all_cards JSON (supplemental)",
     )
+    parser.add_argument(
+        "--emit-app-cards",
+        type=Path,
+        nargs="?",
+        const=APP_CARDS_FILE,
+        default=None,
+        help=(
+            "Write the overlay's card-identity correction (grpId -> name plus "
+            f"Arena's sort keys) and exit. Defaults to {APP_CARDS_FILE}."
+        ),
+    )
     args = parser.parse_args()
+
+    if args.emit_app_cards is not None:
+        arena_db = args.arena_db or find_arena_db()
+        if not arena_db or not arena_db.exists():
+            raise SystemExit(
+                "Arena's card database was not found. It ships with the client at "
+                f"{ARENA_DB_GLOB} and is the only authority for grpId -> card."
+            )
+        payload = build_app_cards(arena_db)
+        out = args.emit_app_cards
+        out.parent.mkdir(parents=True, exist_ok=True)
+        with open(out, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+        src = payload["source"]
+        print(
+            f"Wrote {out} from {src['database']}: "
+            f"{src['cards']} ids, {src['names']} names"
+        )
+        return
 
     print("Building Arena card mapping...")
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
