@@ -167,8 +167,13 @@ export class DraftCoordinator extends EventEmitter {
   resumeAfterReplay(): void {
     this.replaying = false
     const snap = this.snapshot
-    if (!snap || snap.state !== 'active') return
+    if (!snap) return
+    // Load the model for any draft we replayed into, not just a live one. A
+    // completed draft still needs it: the pool carries the grades the deckbuild
+    // advisor ranks by, so restarting the app during deckbuilding used to leave
+    // every card ungraded and the model stuck reporting "loading" forever.
     if (snap.set && snap.format) void this.models.ensure(snap.set, snap.format).then(() => this.refreshModelInfo())
+    if (snap.state !== 'active') return
     if (snap.currentPack) {
       this.state = { ...this.state, scoring: true, seq: this.state.seq + 1 }
       this.publish()
