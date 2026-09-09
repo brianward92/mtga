@@ -242,3 +242,30 @@ describe('DraftCoordinator — set inference when the log replay lost the event 
     expect(c.current.cards.map(card => card.name)).toEqual(['Card #99'])
   })
 })
+
+describe('picks per pack is learned from the pack Arena dealt', () => {
+  it('replaces the bundle guess with the size of a complete pack, and never shrinks mid-pack', () => {
+    // LCI ships picks_per_pack 14 and deals 15. Nothing caught that: the HUD
+    // drew 14 dots and read x/42 for a 45-pick draft, start to finish. The
+    // pack on screen is the truth, and it is there on the very first pick.
+    const c = new DraftCoordinator(stubModels() as never, { append() {} } as never)
+    try {
+      c.setReplaying(true)
+      const pack = (pick: number, n: number) =>
+        snap({ currentPack: { pack: 1, pick, grpIds: Array.from({ length: n }, (_, i) => i + 1) }, pool: [] })
+
+      c.onDraftStart(snap({ pool: [] }))
+      expect(c.current.picksPerPack).toBe(14)   // the bundle's guess, before any pack
+
+      c.onDraftPack(pack(1, 15))
+      expect(c.current.picksPerPack).toBe(15)
+      expect(c.current.totalPicks).toBe(45)
+
+      // Mid-pack the count is only a lower bound: taken cards are gone.
+      c.onDraftPack(pack(8, 8))
+      expect(c.current.picksPerPack).toBe(15)
+    } finally {
+      c.idle()
+    }
+  })
+})

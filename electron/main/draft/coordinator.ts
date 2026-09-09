@@ -90,8 +90,25 @@ export class DraftCoordinator extends EventEmitter {
     this.snapshot = snap
     const cur = snap.currentPack
     if (!cur) return
+    // Learn the pack size from the pack Arena actually dealt, rather than
+    // trusting the shipped constant.
+    //
+    // The bundle's picks_per_pack is a build-time guess that defaults to 14,
+    // and it was wrong for LCI, which deals 15. Nothing detected that: the HUD
+    // simply drew 14 dots for a 15-card pack, and the progress read x/42 for a
+    // 45-pick draft all the way to the end. The pack on screen is the truth and
+    // is available on the very first pick, so use it and let the constant be a
+    // fallback for the moment before a pack arrives.
+    // At pick 1 the pack is complete, so its size IS the answer and replaces
+    // the guess in both directions. Later picks only ever raise it: cards
+    // already taken are gone, so the count is a lower bound, not a measurement.
+    const size = cur.grpIds.length + cur.pick - 1
+    const ppp = size > 0
+      ? (cur.pick === 1 ? size : Math.max(this.state.picksPerPack, size))
+      : this.state.picksPerPack
     this.state = {
       ...this.state,
+      picksPerPack: ppp, totalPicks: 3 * ppp,
       pack: cur.pack, pick: cur.pick,
       cards: this.rows(cur.grpIds),
       pool: this.rows(snap.pool),
