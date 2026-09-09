@@ -20,6 +20,16 @@ import { join } from 'path'
 export const KEEP_ARCHIVES = 8
 
 /**
+ * How long an archived log may be kept.
+ *
+ * These are verbatim copies of the user's Player.log — account identifiers and
+ * full match traffic, not just draft events. Keeping them until a count-based
+ * limit happens to evict them means a light user keeps months of it. Anything
+ * older than this is dropped whether or not the shelf is full.
+ */
+export const ARCHIVE_MAX_AGE_MS = 30 * 24 * 60 * 60_000
+
+/**
  * Lines that mean this log is worth keeping.
  *
  * Deliberately NOT EventGetCoursesV2: Arena emits it on every login, draft or
@@ -54,7 +64,7 @@ function inspect(file: string): { hash: string; draft: boolean } | null {
  *
  * Best effort throughout: failing to archive a log must never stop the app.
  */
-export function archiveLogs(logs: string[], dir: string, keep = KEEP_ARCHIVES): string[] {
+export function archiveLogs(logs: string[], dir: string, keep = KEEP_ARCHIVES, maxAgeMs = ARCHIVE_MAX_AGE_MS): string[] {
   const added: string[] = []
   try {
     mkdirSync(dir, { recursive: true })
@@ -83,11 +93,15 @@ export function archiveLogs(logs: string[], dir: string, keep = KEEP_ARCHIVES): 
     // deleted immediately. Once enough multi-draft logs accumulated, nothing new
     // was ever kept. Recency is the property actually wanted, and the marker
     // filter above already excludes logs with no draft at all.
+    const cutoff = Date.now() - maxAgeMs
     const files = readdirSync(dir)
       .filter(f => f.endsWith('.log'))
       .map(f => { const st = statSync(join(dir, f)); return { f, at: st.mtimeMs, size: st.size } })
       .sort((a, b) => b.at - a.at || b.size - a.size)
     for (const { f } of files.slice(keep)) unlinkSync(join(dir, f))
+    for (const { f, at } of files.slice(0, keep)) {
+      if (at < cutoff) unlinkSync(join(dir, f))
+    }
   } catch (err) {
     console.error('[LogArchive] failed:', err)
   }

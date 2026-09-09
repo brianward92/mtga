@@ -176,7 +176,7 @@ function onPrefs(raw: unknown): void {
     badges: p.badges !== false,
     hud: p.hud !== false,
     hudCorner: p.hudCorner === 'tl' || p.hudCorner === 'tr' || p.hudCorner === 'bl' || p.hudCorner === 'br' ? p.hudCorner : 'tr',
-    layerDetection: p.layerDetection !== false
+    layerDetection: p.layerDetection === true
   }
   if (sameViewPrefs(store.prefs, next)) return
   store.prefs = next

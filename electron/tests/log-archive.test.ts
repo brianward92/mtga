@@ -42,8 +42,8 @@ describe('archiveLogs', () => {
     // than an old archive covering several drafts, sorted last, and was deleted
     // immediately. Once enough old logs accumulated nothing new was ever kept.
     const many = draftLog('\n[UnityCrossThreadLogger]BotDraftDraftPick {}'.repeat(40))
-    archiveLogs([write('old.log', many, 30)], archive, 2)
-    archiveLogs([write('older.log', many + 'x', 60)], archive, 2)
+    archiveLogs([write('old.log', many, 3)], archive, 2)
+    archiveLogs([write('older.log', many + 'x', 6)], archive, 2)
     archiveLogs([write('today.log', draftLog('todays draft'), 0)], archive, 2)
     const kept = readdirSync(archive).map(f => readFileSync(join(archive, f), 'utf8'))
     expect(kept).toHaveLength(2)
@@ -62,5 +62,23 @@ describe('archiveLogs', () => {
   it('never throws on an unreadable path', () => {
     expect(() => archiveLogs([join(dir, 'nope.log')], archive)).not.toThrow()
     expect(archiveLogs([join(dir, 'nope.log')], archive)).toEqual([])
+  })
+})
+
+describe('archive retention', () => {
+  const DAY = 86400_000
+
+  it('drops a log past the age cap even when the shelf is not full', () => {
+    // These are verbatim copies of the user's Player.log, account identifiers
+    // and match traffic included. A count-only limit means a light user keeps
+    // months of it.
+    archiveLogs([write('old.log', draftLog('ancient'), 40)], archive, 8, 30 * DAY)
+    expect(readdirSync(archive)).toHaveLength(0)
+  })
+
+  it('keeps one inside the cap', () => {
+    archiveLogs([write('new.log', draftLog('recent'), 1)], archive, 8, 30 * DAY)
+    archiveLogs([], archive, 8, 30 * DAY)
+    expect(readdirSync(archive)).toHaveLength(1)
   })
 })

@@ -236,6 +236,12 @@ export function loadSetBundle(root: string, set: string): SetBundle | null {
   const entry = index?.sets?.[set]
   if (entry?.picks_per_pack) picksPerPack = entry.picks_per_pack
   if (entry?.manifest_hash) manifestHash = entry.manifest_hash
+  // Recorded by the asset builder and, until now, read by nobody: a set built
+  // without text embeddings for some of its cards scores them from zeroed text
+  // features and grades them confidently. Say so at least once.
+  if (entry?.text_missing) {
+    console.warn(`[Bundle] ${set}: ${entry.text_missing} card(s) shipped without text embeddings; their grades are from structure alone`)
+  }
   const scryfallUpdatedAt = cardsFile?.scryfall_updated_at
     ?? entry?.scryfall_updated_at
     ?? index?.scryfall_updated_at

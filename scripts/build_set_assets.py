@@ -135,6 +135,14 @@ def feature_table(set_code, names, allow_missing_text=False):
     if fresh:
         prefer = {n: [set_code] for n in fresh}
         matrix, _ = featurize.featurize(fresh, manifest, prefer_sets_by_name=prefer)
+        # zip() stops at the shorter side, so a featurizer that returned fewer
+        # rows than it was asked for used to leave the remaining cards as
+        # all-zero feature rows — a silently mis-scored set with no error.
+        if len(matrix) != len(fresh):
+            raise RuntimeError(
+                f"{set_code}: featurizer returned {len(matrix)} rows for {len(fresh)} cards; "
+                f"first missing: {fresh[len(matrix)] if len(matrix) < len(fresh) else '(extra rows)'}"
+            )
         for row, name in zip(matrix, fresh):
             struct[names.index(name)] = row
 
