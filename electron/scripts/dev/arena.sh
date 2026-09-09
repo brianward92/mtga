@@ -70,7 +70,10 @@ case "$cmd" in
         # The installed build can lag the repo: that is how a two-week-old
         # overlay ended up driving the 2026-09-06 draft. Say so loudly.
         if [ -f "$APP/Contents/Info.plist" ]; then
-          built=$(stat -f %m "$APP/Contents/Info.plist"); head_at=$(git log -1 --format=%ct 2>/dev/null || echo 0)
+          # Compare against the last commit that touched shipped app code, not
+          # against HEAD: a docs-only commit does not make the install stale.
+          built=$(stat -f %m "$APP/Contents/Info.plist")
+          head_at=$(git log -1 --format=%ct -- main shared renderer native resources package.json 2>/dev/null || echo 0)
           if [ "$built" -lt "$head_at" ]; then echo "WARNING: installed app ($(date -r "$built" '+%b %d %H:%M')) is OLDER than repo HEAD ($(git log -1 --format='%h %s' | cut -c1-60)); run: npm run install:local"; else echo "installed app: $(date -r "$built" '+%b %d %H:%M'), current with HEAD"; fi
         fi
         [ -f "$MTGA_STATE_FILE" ] && state_py pos || echo "no state mirror at $MTGA_STATE_FILE (launch via arena.sh app launch)" ;;
