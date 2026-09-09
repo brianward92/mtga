@@ -353,6 +353,48 @@ re-verifying; an overlay kill that was assumed rather than confirmed; a torn
 history line that welded itself to the next event; and pack size being read as
 picks-per-pack in events where more than one card leaves per pick.
 
+### The fourth review, and two fixes of mine that were wrong
+
+A fourth pass reviewed the fixes themselves and looked where nobody had: the
+Electron main process, the model scoring path, and privacy. It found that **two
+of the fixes above were broken and one was incomplete**.
+
+- **The archive prune inverted its own goal.** Ranking by how many draft markers
+  a log held was meant to protect "the log with the draft in it". But a live log
+  is archived while still growing, so today's draft holds fewer markers than an
+  old archive covering several drafts, sorted last, and was deleted immediately.
+  Once eight old logs accumulated, nothing new would ever be kept again.
+- **Adopting Arena's CourseId mid-draft split a live draft in two.** Identity
+  feeds the history dedupe key, so picks made before the course listing arrived
+  were filed under one id and everything after under another. The restored draft
+  would have the right pool and be missing its first pack.
+- **`cardsPerPick` was never reset**, so one Pick-Two event pinned every later
+  draft in the session to the bundle's guess — reintroducing the exact defect
+  the learning was written for.
+
+And beyond those:
+
+- **A missing native helper killed startup entirely**, because the geometry
+  poller emits its warning synchronously before the layer detector exists. The
+  app died with no tray, no overlay, and not even the warning written for that
+  case.
+- **Arena's identity corrections stopped at the display layer.** The scorer
+  built its own grpId map from the same Scryfall aliases, so a corrected id
+  showed the right name and was scored as a different card, and an adopted id
+  was dropped from the softmax entirely — the rest of the pack judged as if it
+  were smaller. The same theme as the session's central bug, one layer down.
+- **The learned pack size never reached the model.** LCI deals 15, the assets
+  say 14, so at P1p15 the position feature saturated and the last two picks of
+  every pack looked identical.
+- **The pick recorder credited the model for packs it never scored**, because an
+  unscored pack still ranks its cards in log order.
+- **The grade cache keyed on the model tag alone**, so rebuilding a set's assets
+  with the same card count silently regraded every card from the old row order.
+- **The main process header claimed nothing talks to a server**, while the
+  renderer fetches card art from a CDN — enough for that CDN to follow a draft
+  live. The claim is corrected; the fetch is still there and is a decision to
+  make deliberately.
+
 ### What that says
 
 Every one of these lived in code that typechecked, passed its tests, and had
