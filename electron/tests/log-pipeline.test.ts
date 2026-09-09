@@ -27,7 +27,9 @@ describe('draft log pipeline wiring', () => {
       onDraftEnd: vi.fn(() => order.push('draft-end')),
       setWarning: vi.fn(warning => order.push(`warning:${warning ?? 'none'}`)),
       setReplaying: vi.fn(replaying => order.push(`replaying:${replaying}`)),
-      resumeAfterReplay: vi.fn(() => order.push('replay-complete'))
+      resumeAfterReplay: vi.fn(() => order.push('replay-complete')),
+      onDeckSubmitted: vi.fn(() => order.push('deck-submitted')),
+      onScene: vi.fn(scene => order.push(`scene:${scene}`))
     }
     const snapshot = { draftId: 'd1' } as DraftSessionSnapshot
     const pick = { pack: 1, pick: 1, grpIds: [7], packGrpIds: [7, 8] } as DraftPickRecord

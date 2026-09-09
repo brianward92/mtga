@@ -14,10 +14,23 @@
     "rootDir": ".",
     "baseUrl": ".",
     "paths": {
-      "@main/*": ["main/*"],
-      "@renderer/*": ["renderer/*"]
+      "@main/*": [
+        "main/*"
+      ],
+      "@renderer/*": [
+        "renderer/*"
+      ]
     }
   },
-  "include": ["main/**/*", "renderer/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "include": [
+    "main/**/*",
+    "renderer/**/*",
+    "shared/**/*",
+    "scripts/**/*",
+    "tests/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
 }

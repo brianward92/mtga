@@ -19,8 +19,14 @@ export interface CardRow {
   manaCost: string
   manaValue: number | null
   type: string
-  /** Raw Scryfall printing id carried through from the offline bundle. */
-  scryfallId: string
+  /**
+   * Raw Scryfall printing id carried through from the offline bundle.
+   *
+   * Optional because identity now comes from Arena's own card database, which
+   * has no Scryfall ids: a card resolved through the live-database fallback has
+   * a name, a type and sort keys but no printing.
+   */
+  scryfallId?: string
   /** Arena's own sort keys when known; see shared/display-order.ts. */
   order?: readonly [number, number, string]
   /**

@@ -14,7 +14,7 @@ import { sigmoid, formatDominancePct } from '../renderer/overlay/conviction'
 function card(over: Partial<CardRow> & { grpId: number }): CardRow {
   return {
     name: `Card ${over.grpId}`, rarity: 'common', colors: '', colorIdentity: '', manaCost: '', manaValue: null, type: 'Creature',
-    imageUrl: null, ev: null, prob: null, rank: null, percentile: null, grade: null,
+    imageUrl: null, ev: null, prob: null, rank: null, percentile: null, grade: null, setPercentile: null, setGrade: null,
     ...over
   }
 }

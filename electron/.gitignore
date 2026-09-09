@@ -1,5 +1,11 @@
+# build/ is a TRACKED source directory (icons, tray images), so it cannot be
+# ignored wholesale — but everything generated under it must be, or a 15 MB
+# pile of live-draft screenshots sits there committable and invisible.
 build/native/
 build/dev/
+build/shots/
+build/*.tsv
+build/*.txt
 release/
 dist/
 node_modules/
