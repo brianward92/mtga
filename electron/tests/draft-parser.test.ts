@@ -688,3 +688,65 @@ describe('DraftParser — deck submission and sealed', () => {
     expect(s.pool).toEqual([101, 102, 103, 103])
   })
 })
+
+describe('DraftParser — adopting a pool from a course parked in the deckbuilder', () => {
+  // Shape taken verbatim from a real EventGetCoursesV2 response on 2026-09-09,
+  // in a log with no pick events at all: Arena had just been restarted, and the
+  // server handed the whole pool back at login. This is the only durable copy
+  // of a finished draft's pool — Arena rotates Player.log on launch, so the
+  // pick events survive exactly one restart — and it is what lets someone who
+  // drafted without the app running still get a deck out of it.
+  const course = (over: Record<string, unknown> = {}) => ({
+    CourseId: 'd6112364-465c-4498-9f81-8753a9a917fd',
+    InternalEventName: 'QuickDraft_LCI_20260908',
+    CurrentModule: 'DeckSelect',
+    ModulePayload: '',
+    CardPool: Array.from({ length: 45 }, (_, i) => 87140 + i),
+    ...over
+  })
+  const coursesLine = (...courses: unknown[]) =>
+    `[UnityCrossThreadLogger]<== EventGetCoursesV2(abc)\n${JSON.stringify({ Courses: courses })}`
+  const feedCourses = (parser: DraftParser, ...courses: unknown[]) => {
+    for (const line of coursesLine(...courses).split('\n')) parser.handleLine(line)
+  }
+
+  it('adopts the pool and reports a completed draft', () => {
+    const parser = new DraftParser()
+    const captured = capture(parser)
+    feedCourses(parser, course())
+
+    expect(captured.ends).toHaveLength(1)
+    const end = captured.ends[0]
+    expect(end.state).toBe('complete')
+    expect(end.set).toBe('LCI')
+    expect(end.format).toBe('QuickDraft')
+    expect(end.pool).toHaveLength(45)
+  })
+
+  it('ignores a course still being drafted, which carries no pool anyway', () => {
+    // Verified in the same log: while the module is BotDraft the reply's
+    // CardPool is empty, and only fills in once the draft finishes.
+    const parser = new DraftParser()
+    const captured = capture(parser)
+    feedCourses(parser, course({ CurrentModule: 'BotDraft', CardPool: [] }))
+    expect(captured.ends).toHaveLength(0)
+  })
+
+  it('refuses when two drafts are parked in the deckbuilder at once', () => {
+    // Nothing in the listing says which one the player is looking at, and
+    // guessing would build a deck out of the wrong pool.
+    const parser = new DraftParser()
+    const captured = capture(parser)
+    feedCourses(parser, course(), course({ InternalEventName: 'PremierDraft_LCI_20260901' }))
+    expect(captured.ends).toHaveLength(0)
+  })
+
+  it('is idempotent: the server re-sends the same listing on every login', () => {
+    const parser = new DraftParser()
+    const captured = capture(parser)
+    feedCourses(parser, course())
+    feedCourses(parser, course())
+    expect(captured.ends).toHaveLength(1)
+    expect(captured.ends[0].pool).toHaveLength(45)
+  })
+})

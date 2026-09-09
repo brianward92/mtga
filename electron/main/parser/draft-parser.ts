@@ -575,10 +575,40 @@ export class DraftParser extends EventEmitter {
       return
     }
 
-    // EventGetCoursesV2: every course the account is in, including stale
-    // drafts parked in a draft module. It may only fill in a missing name on
-    // a session we already have, and only when exactly one candidate matches
-    // that session's kind (human vs bot) and is still in a draft module.
+    // EventGetCoursesV2: every course the account is in, including drafts
+    // parked in a deckbuilding module.
+    //
+    // A course that has finished drafting carries its whole CardPool, and the
+    // server re-sends it on every login for as long as the deck is unsubmitted.
+    // That is the only durable copy: Arena rotates Player.log on launch, so the
+    // pick events that would otherwise rebuild the pool survive exactly one
+    // restart. It is also what makes the app useful to someone who drafted
+    // without it running — install, open the deckbuilder, get a build.
+    //
+    // Only adopt when there is no live session to contradict it. A draft in
+    // progress owns its own pool, and this listing is stale by comparison.
+    if (!s || s.state === 'complete') {
+      const withPool = list
+        .map(c => c as { InternalEventName?: unknown; CurrentModule?: unknown; CardPool?: unknown })
+        .filter(c => typeof c.InternalEventName === 'string' && typeof c.CurrentModule === 'string'
+          && POST_DRAFT_MODULES.has(c.CurrentModule) && parseDraftEventName(c.InternalEventName)
+          && toGrpIds(c.CardPool).length > 0)
+      // Exactly one, or we cannot tell which deck the player is building.
+      if (withPool.length === 1) {
+        const c = withPool[0]
+        const name = c.InternalEventName as string
+        const pool = toGrpIds(c.CardPool)
+        const existing = s && s.eventName === name ? s : null
+        if (existing) {
+          this.completeSession(existing, pool)
+        } else if (!s) {
+          this.pendingEventName = name
+          const session = this.ensureSession({ eventName: name, isBot: parseDraftEventName(name)!.format === 'QuickDraft', reviveIfComplete: false })
+          this.completeSession(session, pool)
+        }
+        return
+      }
+    }
     if (!s || s.eventName) return
     const candidates = courses.filter(c => c.bot === s.isBotDraft && (IN_DRAFT_MODULES.has(c.module) || POST_DRAFT_MODULES.has(c.module)))
     const inDraft = candidates.filter(c => IN_DRAFT_MODULES.has(c.module))
