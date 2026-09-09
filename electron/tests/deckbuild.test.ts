@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   BASIC_LAND_NAMES, CLOSE_COUNT, TARGET_LANDS, TARGET_SPELLS,
   basicSplit, buildDeck, chooseLane
-} from '../renderer/overlay/deckbuild'
+} from '../shared/deck-plan'
 import { deckHtml } from '../renderer/overlay/sheet'
 import type { CardRow } from '../shared/state'
 

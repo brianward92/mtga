@@ -4,8 +4,8 @@ import { tmpdir } from 'os'
 import { join } from 'path'
 import { ModelManager } from '../main/model/manager'
 import { parseNpz } from '../main/model/npz'
-import { buildDeck } from '../renderer/overlay/deckbuild'
-import { BASIC_LAND_NAMES } from '../renderer/overlay/deckbuild'
+import { buildDeck } from '../shared/deck-plan'
+import { BASIC_LAND_NAMES } from '../shared/deck-plan'
 import type { CardRow } from '../shared/state'
 
 const ROOT = join(__dirname, '..', 'resources', 'draftfm')

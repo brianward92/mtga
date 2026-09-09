@@ -11,9 +11,11 @@
  * no notion of deck size, land counts, or splashing. Those constants live here,
  * named, so the seam between "the model said" and "we assumed" stays visible.
  */
-import type { CardRow, Grade } from '../../shared/state'
-import { gradeOrdinal } from '../../shared/grades'
-import { POOL_COLORS, poolSummary, type PoolColor, type PoolSummary } from './hud-logic'
+import type { CardRow, Grade } from './state'
+import { gradeOrdinal } from './grades'
+
+import { isLand, isBasicLand, BASIC_LAND_NAMES, POOL_COLORS, poolSummary, type PoolColor, type PoolSummary } from './cards'
+export { BASIC_LAND_NAMES }
 
 /** Limited decks are 40 cards. Not a model output — a rule of the format. */
 export const DECK_SIZE = 40
@@ -41,18 +43,8 @@ export const MIN_SOURCES_SUPPORTING = 4
 /** Below this many pips a colour is a light touch and takes what's left. */
 export const SUPPORTING_PIP_MIN = 3
 
-/** The basic land each lane colour runs. */
-export const BASIC_LAND_NAMES: Readonly<Record<PoolColor, string>> = {
-  W: 'Plains', U: 'Island', B: 'Swamp', R: 'Mountain', G: 'Forest'
-}
 
-function isLand(card: Pick<CardRow, 'type'>): boolean {
-  return /\bland\b/i.test(card.type || '')
-}
 
-function isBasicLand(card: Pick<CardRow, 'type' | 'rarity'>): boolean {
-  return /\bbasic land\b/i.test(card.type || '') || (card.rarity || '').toLowerCase() === 'land'
-}
 
 /** Colour letters a card actually costs (multicolour yields several). */
 function colorsOf(card: Pick<CardRow, 'colors'>): PoolColor[] {

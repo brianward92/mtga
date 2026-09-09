@@ -14,7 +14,7 @@ import type { Store } from './types'
 import { sheetShouldRender } from './visibility'
 import {
   BASIC_LAND_NAMES, buildDeck, type CardStatus, type DeckEntry, type DeckPlan
-} from './deckbuild'
+} from '../../shared/deck-plan'
 
 /** Set-review grade for pool display: the raw set rating (falls back to the pool grade). */
 function reviewGrade(card: Pick<CardRow, 'grade' | 'setGrade'>) {
