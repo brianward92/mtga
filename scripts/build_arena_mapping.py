@@ -173,7 +173,7 @@ def build_app_cards(db_path: Path) -> dict[str, Any]:
 
     cur.execute(
         """
-        SELECT GrpId, TitleId, ExpansionCode, IsToken, IsPrimaryCard,
+        SELECT GrpId, TitleId, ExpansionCode, IsToken, IsPrimaryCard, Rarity,
                Order_MythicToCommon, Order_ColorOrder, Order_Title
         FROM Cards
         """
@@ -182,7 +182,7 @@ def build_app_cards(db_path: Path) -> dict[str, Any]:
     ids: dict[str, str] = {}
     order: dict[str, list[Any]] = {}
     by_name: dict[str, list[Any]] = {}
-    for grp_id, title_id, set_code, is_token, is_primary, o_rarity, o_color, o_title in cur.fetchall():
+    for grp_id, title_id, set_code, is_token, is_primary, rarity, o_rarity, o_color, o_title in cur.fetchall():
         if is_token:
             continue
         name = clean_name(loc.get(title_id, ""))
@@ -207,9 +207,20 @@ def build_app_cards(db_path: Path) -> dict[str, Any]:
         order[str(grp_id)] = entry
         # Last-resort fallback for a printing whose own columns are NULL, which
         # is common for Alchemy and non-primary rows. Using another printing's
-        # keys is what the old name-keyed table did for EVERY card and is wrong
-        # in general, but one card with no keys at all makes the whole pack fall
-        # back to the reconstruction, which is worse.
+        # keys is wrong in general — that is the bug this file just fixed — but
+        # one card with no keys at all drops a whole pack to the reconstruction,
+        # which is worse.
+        #
+        # Keyed by name AND rarity, so the borrowed tier at least matches the
+        # card's own rarity. Keyed by name alone, 202 grpIds took a tier that
+        # contradicted their rarity: a mythic filed as an uncommon sorts into
+        # the wrong block exactly like the bug this replaced.
+        fallback_key = f"{name}|{rarity}"
+        if fallback_key not in by_name or is_primary:
+            by_name[fallback_key] = entry
+        # And a rarity-agnostic key, so a card whose rarity differs from every
+        # other printing of the same name still gets keys rather than dropping
+        # its whole pack to the reconstruction.
         if name not in by_name or is_primary:
             by_name[name] = entry
 

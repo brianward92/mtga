@@ -34,7 +34,7 @@ export interface ArenaCards {
    * by name, LCI's Sorcerous Spyglass (uncommon) inherited XLN's rare tier and
    * sorted into the wrong block, shifting every badge after it.
    */
-  order(grpId: number, name?: string): ArenaOrder | undefined
+  order(grpId: number, name?: string, rarity?: string): ArenaOrder | undefined
   /** Every (grpId, name) pair, for correcting a set bundle. */
   entries(): IterableIterator<[number, string]>
   readonly size: number
@@ -87,14 +87,16 @@ export function loadArenaCards(bundleRoot: string): ArenaCards {
       for (const [name, value] of Object.entries(raw.orderByName ?? {})) {
         if (!Array.isArray(value) || value.length !== 3) continue
         if (!Number.isFinite(value[0]) || !Number.isFinite(value[1]) || typeof value[2] !== 'string') continue
-        byName.set(orderKey(name), value as ArenaOrder)
+        const bar = name.lastIndexOf('|')
+        const key = bar === -1 ? orderKey(name) : `${orderKey(name.slice(0, bar))}|${name.slice(bar + 1)}`
+        byName.set(key, value as ArenaOrder)
       }
       table = {
         name: g => ids.get(g),
         // The printing's own keys, then any printing of the same card. Alchemy
         // and other non-primary rows often carry no keys at all, and one such
         // card drops the whole pack to the reconstruction.
-        order: (g, n) => orders.get(g) ?? (n === undefined ? undefined : nameOrder(byName, n)),
+        order: (g, n, r) => orders.get(g) ?? (n === undefined ? undefined : nameOrder(byName, n, r)),
         entries: () => ids.entries(),
         size: ids.size
       }
@@ -117,11 +119,27 @@ export function loadArenaCards(bundleRoot: string): ArenaCards {
  * front. Seventeen HOB cards missed for exactly that reason, and every HOB pack
  * containing one lost Arena's ordering entirely.
  */
-function nameOrder(byName: Map<string, ArenaOrder>, name: string): ArenaOrder | undefined {
-  const exact = byName.get(orderKey(name))
-  if (exact) return exact
+function nameOrder(byName: Map<string, ArenaOrder>, name: string, rarity?: string): ArenaOrder | undefined {
+  // Rarity first, so a borrowed tier at least matches this card's own rarity.
+  // Without it, 202 cards took a tier that contradicted their rarity — a mythic
+  // filed as an uncommon sorts into the wrong block, which is the very bug the
+  // grpId keying was introduced to fix.
+  const names = [name]
   const front = name.split(/\s*\/\/+\s*/)[0]
-  return front && front !== name ? byName.get(orderKey(front)) : undefined
+  if (front && front !== name) names.push(front)
+  const tiers = rarity ? [RARITY_CODE[rarity.toLowerCase()], undefined] : [undefined]
+  for (const tier of tiers) {
+    for (const n of names) {
+      const hit = byName.get(tier === undefined ? orderKey(n) : `${orderKey(n)}|${tier}`)
+      if (hit) return hit
+    }
+  }
+  return undefined
+}
+
+/** Arena's Rarity enum, as build_arena_mapping.py writes the fallback keys. */
+const RARITY_CODE: Readonly<Record<string, number>> = {
+  token: 0, land: 1, basic: 1, common: 2, uncommon: 3, rare: 4, mythic: 5
 }
 
 /** Test seam: drop the memoised table so a regenerated file is picked up. */

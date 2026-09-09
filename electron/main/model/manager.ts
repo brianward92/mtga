@@ -51,6 +51,10 @@ export class ModelManager {
   private loaded: Loaded | null = null
   private loading: Promise<Loaded | null> | null = null
   private lastError: string | null = null
+  /** A key whose load failed permanently; retrying it costs a full reload. */
+  private failedKey: string | null = null
+  /** Resolves when the most recent scorePack has settled. */
+  private inFlight: Promise<void> = Promise.resolve()
 
   constructor(private cacheDir: string, rootOverride?: string) {
     this.root = rootOverride ?? findBundleRoot()
@@ -94,11 +98,28 @@ export class ModelManager {
     return { ...base, state: 'loading' }
   }
 
-  /** Load (or reuse) the scorer for a set/format. Null when not scoreable. */
+  /**
+   * Load (or reuse) the scorer for a set/format. Null when not scoreable.
+   *
+   * A load that fails is not retried for the same key. The failures here are
+   * permanent — a manifest-hash mismatch, a corrupt npz — and retrying meant
+   * re-running the full asset decode and card-encoder forward pass on EVERY
+   * pack, for the rest of the draft, each attempt leaking another native
+   * session. The error is reported once and stands until the key changes.
+   */
   async ensure(set: string, format: string): Promise<Loaded | null> {
     const key = `${set}:${format}`
     if (this.loaded?.key === key) return this.loaded
-    if (this.loading) { const l = await this.loading; if (l?.key === key) return l }
+    if (this.failedKey === key) return null
+    // Await an in-flight load whatever its key: starting a second concurrent
+    // load let the winner release a model the loser (or a live scorePack) was
+    // still using, and onnxruntime does not survive that.
+    if (this.loading) {
+      const l = await this.loading
+      if (l?.key === key) return l
+      if (this.loaded?.key === key) return this.loaded
+      if (this.failedKey === key) return null
+    }
     if (!this.root || !this.index || !this.hasSet(set)) return null
     const bundle = loadSetBundle(this.root, set)
     if (!bundle) return null
@@ -109,10 +130,14 @@ export class ModelManager {
         const curveInfo = await this.curveFor(model, set, format)
         this.loaded = { key, model, curve: curveInfo.curve, p1p1ByGrp: curveInfo.byGrp, rowByGrp: new Map(model.grpRows()) }
         this.lastError = null
-        if (old) void old.model.release()
+        this.failedKey = null
+        // Retire the previous model only after the new one is in place, and
+        // only once nothing is still scoring against it.
+        if (old && old !== this.loaded) void this.retire(old)
         return this.loaded
       } catch (err) {
         this.lastError = err instanceof Error ? err.message : String(err)
+        this.failedKey = key
         console.error('[Model] load failed:', this.lastError)
         return null
       } finally {
@@ -120,6 +145,12 @@ export class ModelManager {
       }
     })()
     return this.loading
+  }
+
+  /** Release a superseded model once its in-flight scores have finished. */
+  private async retire(old: Loaded): Promise<void> {
+    try { await this.inFlight } catch { /* a failed score still frees the model */ }
+    try { await old.model.release() } catch (err) { console.error('[Model] release failed:', err) }
   }
 
   /**
@@ -152,7 +183,10 @@ export class ModelManager {
   async score(set: string, format: string, pack: number[], pool: number[], pack0: number, pick0: number, picksPerPack?: number): Promise<{ modelId: string; cards: ScoredCard[] } | null> {
     const l = await this.ensure(set, format)
     if (!l) return null
-    const scores = await l.model.scorePack(pack, pool, pack0, pick0, picksPerPack)
+    // Tracked so a model is never released out from under a running score.
+    const running = l.model.scorePack(pack, pool, pack0, pick0, picksPerPack)
+    this.inFlight = running.then(() => undefined, () => undefined)
+    const scores = await running
     // "For your pool": the whole set scored under the live pool/position, so a
     // card's letter reflects what it is worth to THIS draft; the raw set
     // grade (empty pool, P1P1) is kept alongside for reference.

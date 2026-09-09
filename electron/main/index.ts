@@ -129,6 +129,13 @@ function standAsideTick(): void {
 function noteGlobalClick(point: { x: number; y: number }): void {
   const rect = poller.lastKnown
   if (!rect || calibration.active) return
+  // The helper reports every mouse-down on the machine, whatever owns it. Only
+  // Arena's own clicks mean anything here: a click in another app that happened
+  // to land inside Arena's remembered rectangle used to hide the overlay until
+  // the next pack arrived, and one outside the menu band released stand-aside
+  // while Arena's own Options panel was still open.
+  if (!poller.arenaFrontmost) return
+  if (point.x < rect.x || point.y < rect.y || point.x > rect.x + rect.width || point.y > rect.y + rect.height) return
   const local = { x: point.x - rect.x, y: point.y - rect.y }
   if (standAside.noteClick(local, rect, Date.now(), sidebarSide(coordinator.current.phase))) syncOverlay()
 }
@@ -373,11 +380,51 @@ async function createOverlay(): Promise<void> {
     layer?.syncActivity()
     poller.setCapture(false)
   })
+
+  // A renderer that dies leaves a transparent, always-on-top, click-through
+  // window sitting over Arena for the rest of the session, while the tray
+  // reports that everything is fine. Nothing watched for it. Rebuild it once;
+  // repeating that on a crash loop would be worse than staying down.
+  overlay.webContents.on('render-process-gone', (_e, details) => {
+    console.error('[Overlay] renderer gone:', details.reason)
+    coordinator.setWarning('The overlay crashed and is restarting')
+    void rebuildOverlay()
+  })
+  overlay.webContents.on('did-fail-load', (_e, code, description, url, isMainFrame) => {
+    if (!isMainFrame || code === -3) return   // -3 is an aborted navigation
+    console.error(`[Overlay] failed to load (${code} ${description}) ${url}`)
+    coordinator.setWarning(`The overlay failed to load: ${description}`)
+  })
+}
+
+/** Tear the overlay down and build it again, at most once per crash. */
+let rebuilding = false
+async function rebuildOverlay(): Promise<void> {
+  if (rebuilding) return
+  rebuilding = true
+  try {
+    const dead = overlay
+    overlay = null
+    overlayGeometrySync.reset()
+    if (dead && !dead.isDestroyed()) dead.destroy()
+    await createOverlay()
+    coordinator.setWarning(null)
+    syncOverlay()
+  } catch (err) {
+    console.error('[Overlay] could not be rebuilt:', err)
+  } finally {
+    rebuilding = false
+  }
 }
 
 // ---------------------------------------------------------------------------
 // App lifecycle
 // ---------------------------------------------------------------------------
+
+// Nothing else catches these. An unhandled rejection during startup used to
+// take the whole app down silently: no tray, no overlay, no message anywhere.
+process.on('unhandledRejection', reason => console.error('[Main] unhandled rejection:', reason))
+process.on('uncaughtException', err => console.error('[Main] uncaught exception:', err))
 
 // Test seam: an isolated userData (the single-instance lock lives there too).
 if (process.env.MTGA_USER_DATA) app.setPath('userData', process.env.MTGA_USER_DATA)

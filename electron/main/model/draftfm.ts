@@ -116,6 +116,11 @@ function loadSetAssets(path: string): SetAssets {
 }
 
 /** Shared ranking helper: mirrors mtga.models.base.rank_scores. */
+/** Session options: CPU, fully optimised, two intra-op threads. */
+function opts(): ort.InferenceSession.SessionOptions {
+  return { executionProviders: ['cpu'], graphOptimizationLevel: 'all', intraOpNumThreads: 2 }
+}
+
 export function rankScores(grpIds: number[], evs: Array<number | null>): CardScore[] {
   const known = grpIds.map((g, i) => [g, evs[i]] as const).filter(([, e]) => e !== null) as Array<[number, number]>
   // Softmax over known EVs keyed by grpId (a duplicated grpId contributes
@@ -204,24 +209,45 @@ export class DraftFM {
       for (let r = 0; r < a.n; r++) features.set(a.features.subarray(r * a.featDim, r * a.featDim + featDim), r * featDim)
       width = featDim
     }
-    const opts: ort.InferenceSession.SessionOptions = { executionProviders: ['cpu'], graphOptimizationLevel: 'all', intraOpNumThreads: 2 }
-    const encoder = await ort.InferenceSession.create(join(versionDir, 'card_encoder.onnx'), opts)
-    const enc = await encoder.run({ features: new ort.Tensor('float32', features, [a.n, width]) })
-    const emb = enc.card_emb
-    this.d = emb.dims[1]
-    this.table = new Float32Array(emb.data as Float32Array)
-    await encoder.release()
+    // Each session is a native handle. Released in `finally`, or a failure
+    // anywhere below leaked one per attempt — and a load that fails is likely
+    // to be attempted again.
+    const encoder = await ort.InferenceSession.create(join(versionDir, 'card_encoder.onnx'), opts())
+    try {
+      const enc = await encoder.run({ features: new ort.Tensor('float32', features, [a.n, width]) })
+      const emb = enc.card_emb
+      this.d = emb.dims[1]
+      this.table = new Float32Array(emb.data as Float32Array)
+    } finally {
+      await encoder.release()
+    }
 
-    this.scorer = await ort.InferenceSession.create(join(versionDir, 'scorer.onnx'), opts)
+    this.scorer = await ort.InferenceSession.create(join(versionDir, 'scorer.onnx'), opts())
+    try {
+      await this.initFromAssets(versionDir)
+    } catch (err) {
+      // The scorer is this object's own field, so nothing else frees it if the
+      // rest of init throws.
+      await this.scorer.release()
+      throw err
+    }
+  }
+
+  /** Everything after the sessions exist; separated so init can clean up. */
+  private async initFromAssets(versionDir: string): Promise<void> {
+    const a = this.assets
     const setEncPath = join(versionDir, 'set_encoder.onnx')
     if (existsSync(setEncPath)) {
-      const setEnc = await ort.InferenceSession.create(setEncPath, opts)
-      const out = await setEnc.run({
-        card_emb: new ort.Tensor('float32', this.table, [a.n, this.d]),
-        rarity_ids: new ort.Tensor('int64', BigInt64Array.from(Array.from(a.rarityIds, v => BigInt(v))), [a.n])
-      })
-      this.setSummary = new Float32Array(out.set_summary.data as Float32Array)
-      await setEnc.release()
+      const setEnc = await ort.InferenceSession.create(setEncPath, opts())
+      try {
+        const out = await setEnc.run({
+          card_emb: new ort.Tensor('float32', this.table, [a.n, this.d]),
+          rarity_ids: new ort.Tensor('int64', BigInt64Array.from(Array.from(a.rarityIds, v => BigInt(v))), [a.n])
+        })
+        this.setSummary = new Float32Array(out.set_summary.data as Float32Array)
+      } finally {
+        await setEnc.release()
+      }
     }
     const consts = parseNpz(readFileSync(join(versionDir, 'constants.npz')))
     const pn = consts.pool_null_input
