@@ -8,7 +8,7 @@
 // rows above the click stay put; lands are set last because touching them
 // disables Arena's Suggest Lands. Done is never clicked: pressing it is the
 // player's act, and the EventSetDeckV3 it logs is what --verify compares to.
-import { readFileSync } from 'fs'
+import { readFileSync, statSync } from 'fs'
 import { buildDeck } from '../../shared/deck-plan'
 import type { CardRow } from '../../shared/state'
 import { BASIC_LAND_COLOR as BASIC_COLOR, isBasicLandName } from '../../shared/cards'
@@ -20,6 +20,7 @@ if (!stateFile) { console.error('usage: deckbuild.ts <stateFile> [--dry-run] [--
 const DRY = flags.includes('--dry-run')
 const READ_ONLY = flags.includes('--read')
 const NO_LANDS = flags.includes('--no-lands')
+const FORCE = process.argv.includes('--force')
 const VERIFY = flags.includes('--verify')
 const VERIFY_SECONDS = Number(flags[flags.indexOf('--verify') + 1]) || 600
 
@@ -102,6 +103,18 @@ console.log(`initial rail model (${modelRows.length} rows, from the pool + Arena
 async function main(): Promise<void> {
   if (VERIFY) return verify()
   if (phase !== 'complete' && !DRY) { console.error(`phase is ${phase}, not complete: nothing to build`); process.exit(3) }
+  // A completed phase is not on its own evidence that it is THIS draft's. The
+  // mirror keeps the last finished draft until a new one starts, so a build run
+  // the morning after would drive Arena's builder from yesterday's plan and cut
+  // cards the pool no longer contains. An hour is well past any real
+  // draft-then-build gap, so treat it as the wrong draft rather than a slow one.
+  const ageMinutes = (Date.now() - statSync(stateFile).mtimeMs) / 60_000
+  if (ageMinutes > 60 && !DRY && !FORCE) {
+    console.error(`state mirror last changed ${Math.round(ageMinutes)} minutes ago; this is almost certainly a previous draft.`)
+    console.error('Re-run with --force if it really is the current one.')
+    process.exit(3)
+  }
+  if (ageMinutes > 10) console.error(`note: state mirror is ${Math.round(ageMinutes)} minutes old`)
   if (DRY) {
     const cuts = modelRows.filter(r => !isBasicName(r.name) && wanted(r.name) < r.count).map(r => `${r.count - wanted(r.name)}x ${r.name}`)
     console.log(`would cut: ${cuts.join(' | ')}`)

@@ -36,7 +36,14 @@ export function run(cmd: string, args: string[]): string {
 /** One macctl call, returning its JSON line. */
 function macctl(...args: Array<string | number>): Record<string, unknown> {
   try {
-    const out = execFileSync('macctl', args.map(String), { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+    // A hard timeout, because a hung macctl used to hang everything above it:
+    // execFileSync blocks pick.ts, which blocks pick-next-card.sh inside a
+    // command substitution, which blocks arena.sh's draft loop so its own
+    // deadline never fires. The draft stops dead, mid-event, with no output and
+    // no error. macctl now has its own watchdog; this is the second line of it.
+    const out = execFileSync('macctl', args.map(String), {
+      encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 20_000, killSignal: 'SIGKILL',
+    })
     const lines = out.trim().split('\n').filter(Boolean)
     return lines.length ? JSON.parse(lines[lines.length - 1]) : {}
   } catch (err) {
@@ -137,17 +144,37 @@ export interface OcrLine { text: string; x: number; y: number; w: number; h: num
 /**
  * OCR a screen region into text lines with screen-point y centres.
  *
- * `macctl read` already merges Vision's boxes into visual lines — Vision
- * returns "3x" and the name beside it as separate boxes, so anything reading a
- * list has to group them or every row parses as a name with no count.
+ * `macctl read` merges Vision's boxes into visual lines, which is wanted —
+ * Vision returns "3x" and the name beside it as separate boxes, so anything
+ * reading a list has to group them or every row parses as a name with no count.
+ *
+ * But the merge has no horizontal limit: every box within about 1.2% of the
+ * capture height joins one line. Read the whole 748pt window and all five card
+ * titles in a pack row weld into one string, which matches no card, so the pick
+ * verify fails closed on nearly every cell and the deck builder reads a rail row
+ * as absent and adds cards that are already there.
+ *
+ * So the region is cropped BEFORE the OCR, not filtered after. The merge happens
+ * inside Vision's output and cannot be undone downstream — an earlier version of
+ * this function filtered the returned lines by y and discarded the caller's x
+ * and width entirely, which is exactly the bug.
+ *
+ * The rect is read live immediately before the call so the fractions cannot be
+ * computed against a window that has since moved.
  */
 export function readTextLines(region: Rect, _tolerance = 0.012): Array<{ y: number; text: string }> {
-  const lines = macctl('read', APP).lines as Array<{ text: string; at: [number, number] }> | undefined
+  const win = windowRect()
+  const fractions = [
+    (region.x - win.x) / win.width,
+    (region.y - win.y) / win.height,
+    region.width / win.width,
+    region.height / win.height,
+  ]
+  if (fractions.some(f => !Number.isFinite(f)) || fractions[2] <= 0 || fractions[3] <= 0) {
+    throw new Error(`region ${JSON.stringify(region)} is not inside Arena's window ${JSON.stringify(win)}`)
+  }
+  const lines = macctl('read', APP, '--region', fractions.map(f => f.toFixed(5)).join(','))
+    .lines as Array<{ text: string; at: [number, number] }> | undefined
   if (!lines) return []
-  return lines
-    .filter(l => {
-      const [, y] = l.at
-      return y >= region.y && y <= region.y + region.height
-    })
-    .map(l => ({ y: Math.round(l.at[1]), text: l.text }))
+  return lines.map(l => ({ y: Math.round(l.at[1]), text: l.text }))
 }
