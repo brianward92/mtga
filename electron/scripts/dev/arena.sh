@@ -18,6 +18,7 @@
 #   arena.sh read X Y W H                      OCR an arbitrary screen region
 #   arena.sh pick [top|<grpId>] [--dry-run]    one pick (wraps pick-next-card.sh)
 #   arena.sh draft [SECONDS]                   pick on a loop until the draft completes
+#   arena.sh awake                             hold the display awake for this shell's lifetime
 #   arena.sh log                               tail Player.log for draft events
 #   arena.sh build [--dry-run|--read|--no-lands] build the advisor's deck in Arena's builder (never presses Done)
 #   arena.sh build --verify [SECONDS]          after Done: diff Arena's submitted deck against the plan
@@ -40,6 +41,15 @@ SHOTS="${MTGA_SHOT_DIR:-$PWD/build/dev/shots}"
 BIN=build/dev
 
 die() { echo "arena: $*" >&2; exit 1; }
+
+# Hold the display awake for as long as this script runs.
+#
+# Not a nicety. A display that sleeps unattended comes back LOCKED, and a lock
+# is the one failure nothing here can recover from: synthetic input goes to the
+# password prompt and only a person at the machine can clear it. Losing a draft
+# at pick 23 that way is far worse than losing it at pick 1. The assertion is
+# tied to this shell's pid, so it is released however the script ends.
+stay_awake() { macctl awake --while-pid $$ >/dev/null 2>&1 || true; }
 # All state queries go through one TypeScript CLI, which shares the app's own
 # card rules. The Python helper this replaced had its own basic-land test and
 # quietly disagreed with the overlay about the same card.
@@ -108,10 +118,12 @@ print(','.join(str(int(v)) for v in b))
             # only the first silently answered "not a basic land".
             [ -f "$MTGA_STATE_FILE" ] || die "no state mirror at $MTGA_STATE_FILE"; state_py "${@:-pos}" ;;
   pick)     bash scripts/dev/pick-next-card.sh "$@" ;;
-  build)    [ -f "$MTGA_STATE_FILE" ] || die "no state mirror at $MTGA_STATE_FILE"; npx tsx scripts/dev/deckbuild.ts "$MTGA_STATE_FILE" "$@" ;;
+  awake)    macctl awake --while-pid "${1:-$PPID}" ;;
+  build)    stay_awake; [ -f "$MTGA_STATE_FILE" ] || die "no state mirror at $MTGA_STATE_FILE"; npx tsx scripts/dev/deckbuild.ts "$MTGA_STATE_FILE" "$@" ;;
   ocr)      die "removed: use \`macctl read\` or \`macctl find\`" ;;
   read)     macctl read MTGA ;;
   draft)
+    stay_awake
     end=$((SECONDS + ${1:-570})); maxpack="${2:-99}"; last=""
     while [ $SECONDS -lt $end ]; do
       info="$(state_py pos 2>/dev/null || true)"
