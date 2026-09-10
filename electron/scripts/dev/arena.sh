@@ -9,6 +9,7 @@
 #   arena.sh front                             name of the frontmost app
 #   arena.sh shot [name]                       capture Arena's window region only
 #   arena.sh click X Y | move X Y | scroll X Y LINES | key CODE
+#   arena.sh drag X1 Y1 X2 Y2 [STEPS]        press, move, release (play a card)
 #   arena.sh state [pos|cards|pool|json|rect]  mirrored DraftState summary
 #   arena.sh read X Y W H                      OCR an arbitrary screen region
 #   arena.sh pick [top|<grpId>] [--dry-run]    one pick (wraps pick-next-card.sh)
@@ -98,6 +99,11 @@ case "$cmd" in
     bash scripts/dev/screenshot-arena.sh "$out" >/dev/null
     sips -Z "${MTGA_SHOT_WIDTH:-1800}" "$out" >/dev/null && echo "$out" ;;
   click)    activate; "$(helper click)" "$1" "$2" ;;
+  drag)     # Press at one point, move, release at another. Arena's hand cards
+            # cannot be played with a click — a click only opens the card's
+            # zoom preview — so anything that plays a card needs this.
+            [ $# -ge 4 ] || die "drag fromX fromY toX toY [steps]"
+            activate; "$(helper drag)" "$1" "$2" "$3" "$4" "${5:-24}" ;;
   move)     "$(helper move-mouse)" "$1" "$2" ;;
   scroll)   activate; "$(helper scroll)" "$1" "$2" "$3" ;;
   key)
