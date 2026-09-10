@@ -78,18 +78,16 @@ case "$cmd" in
   activate) activate; echo "Arena frontmost" ;;
   front) front ;;
   rect)
-    # The app publishes the rect it is actually drawing against, taken from the
-    # bundled CGWindowList helper, which needs no Accessibility permission.
-    # Prefer it: the AX rect below reports nonsense while Arena is full screen,
-    # and the app deliberately avoids AX (see main/arena-geometry.ts).
-    if [ -f "$MTGA_STATE_FILE" ] && state_py rect 2>/dev/null; then :
-    else
-      # AppleScript reports {x, y}, {w, h}; every consumer here expects four
-      # bare comma-separated numbers, and the braces produced unparseable JSON
-      # downstream. Normalise, so the fallback is a fallback rather than a
-      # different, broken format.
-      osascript -e 'tell application "System Events" to tell process "MTGA" to get {position, size} of window 1' \
-        | tr -d ' {}' || die "no state mirror and Accessibility could not report Arena's window"
+    # Ask the native helper, which is live. The overlay's state mirror carries a
+    # rect too and it CAN GO STALE: on 2026-09-09 it said 113,112 while Arena's
+    # window was at 152,33, so every coordinate derived from it was off by
+    # 39x79 points — blocks that never registered, spells that dropped back into
+    # hand, a land that would not play. Silent, because a click that misses
+    # reports success. The mirror is only a fallback now.
+    if r=$(bash scripts/dev/arena-rect.sh 2>/dev/null); then echo "$r"
+    elif [ -f "$MTGA_STATE_FILE" ] && state_py rect 2>/dev/null; then
+      echo "arena: WARNING: used the state mirror's rect; it can be stale" >&2
+    else die "no Arena window from the native helper and no state mirror"
     fi ;;
   shot)
     mkdir -p "$SHOTS"; out="$SHOTS/${1:-shot-$(date +%H%M%S)}.png"; rm -f "$out"

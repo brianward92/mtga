@@ -14,7 +14,7 @@
 import type { CardRow, Grade } from './state'
 import { gradeOrdinal } from './grades'
 
-import { isLand, isBasicLand, BASIC_LAND_NAMES, POOL_COLORS, poolSummary, type PoolColor, type PoolSummary } from './cards'
+import { isLand, isBasicLand, BASIC_LAND_NAMES, POOL_COLORS, poolSummary, castingColors, type PoolColor, type PoolSummary } from './cards'
 export { BASIC_LAND_NAMES }
 
 /** Limited decks are 40 cards. Not a model output — a rule of the format. */
@@ -57,8 +57,12 @@ function colorsOf(card: Pick<CardRow, 'colors'>): PoolColor[] {
  * IDENTITY, not cost — a dual land costs nothing but only serves its colours,
  * and reading `colors` alone lets an off-lane land into the deck.
  */
-function inLane(card: Pick<CardRow, 'colors' | 'colorIdentity' | 'type'>, lane: ReadonlyArray<PoolColor>): boolean {
-  const letters = isLand(card) ? colorsOf({ colors: card.colorIdentity }) : colorsOf(card)
+function inLane(card: Pick<CardRow, 'colors' | 'colorIdentity' | 'type' | 'manaCost' | 'rarity' | 'name'>, lane: ReadonlyArray<PoolColor>): boolean {
+  const letters = isLand(card) ? colorsOf({ colors: card.colorIdentity }) : castingColors(card)
+  // `[].every()` is true, so anything we cannot read a colour for counts as
+  // castable everywhere. That is right for a genuinely colourless card and
+  // wrong for one whose colour we simply failed to find, so the cost is
+  // consulted before giving up.
   return letters.every(c => lane.includes(c))
 }
 

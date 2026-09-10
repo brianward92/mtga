@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   titleKey, crossSourceTitleKey, cleanArenaTitle, namesMatch,
-  isLand, isBasicLand, isBasicLandName, poolSummary, BASIC_LAND_COLOR
+  isLand, isBasicLand, isBasicLandName, poolSummary, castingColors, BASIC_LAND_COLOR
 } from '../shared/cards'
 
 describe('title keys', () => {
@@ -92,5 +92,28 @@ describe('the pool sheet uses the shared land rule', () => {
     expect(isBasicLand({ name: 'Hidden Courtyard', type: 'Land', rarity: 'land' })).toBe(false)
     expect(isBasicLand({ name: 'Murky Sewer', type: 'Land', rarity: 'land' })).toBe(false)
     expect(isBasicLand({ name: 'Plains', type: 'Basic Land — Plains', rarity: 'land' })).toBe(true)
+  })
+})
+
+describe('castingColors — what a card COSTS, not what it is', () => {
+  it('reads the mana cost when the printed colours are empty', () => {
+    // Waterlogged Hulk is a double-faced artifact whose bundle entry carries
+    // colors "" and manaCost "{U}". A lane check reading colors alone judged it
+    // colourless, so the advisor built a blue card into a Red/White deck. It sat
+    // in hand, uncastable, for an entire game.
+    expect(castingColors({ name: 'Waterlogged Hulk', colors: '', manaCost: '{U}', colorIdentity: 'U', type: 'Artifact // Artifact — Vehicle' })).toEqual(['U'])
+  })
+
+  it('prefers the printed colours when they are there', () => {
+    expect(castingColors({ name: 'Abrade', colors: 'R', manaCost: '{1}{R}', type: 'Instant' })).toEqual(['R'])
+    expect(castingColors({ name: 'Anim Pakal', colors: 'RW', manaCost: '{1}{R}{W}', type: 'Creature' })).toEqual(['W', 'R'])
+  })
+
+  it('keeps a genuinely colourless card colourless', () => {
+    expect(castingColors({ name: 'Compass Gnome', colors: '', manaCost: '{2}', type: 'Artifact Creature' })).toEqual([])
+  })
+
+  it('falls back to identity for a land, which prints no cost', () => {
+    expect(castingColors({ name: 'Hidden Courtyard', colors: '', manaCost: '', colorIdentity: 'W', type: 'Land', rarity: 'common' })).toEqual(['W'])
   })
 })

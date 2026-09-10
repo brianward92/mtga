@@ -149,3 +149,30 @@ export function poolSummary(pool: ReadonlyArray<CardIdentity & { colors?: string
   }
   return { counts, colorless, cards, lands }
 }
+
+/**
+ * The colours a card actually needs to be cast.
+ *
+ * Prefers the printed `colors`, but falls back to the mana cost when that is
+ * empty. Some cards have neither field agreeing: Waterlogged Hulk is a
+ * double-faced artifact whose bundle entry carries `colors: ""` and
+ * `manaCost: "{U}"`, so a lane check reading `colors` alone judged it
+ * colourless and castable in any deck. It was built into a Red/White deck and
+ * sat in hand all game, uncastable.
+ *
+ * The same distinction — what a card COSTS versus what it is — caused the
+ * P1P10 mis-pick, where colour identity and printed colour disagreed.
+ */
+export function castingColors(card: CardIdentity & { colors?: string | null; manaCost?: string | null; colorIdentity?: string | null }): PoolColor[] {
+  const fromColors = letters(card.colors)
+  if (fromColors.length > 0) return fromColors
+  const fromCost = letters((card.manaCost ?? '').replace(/[^WUBRG]/gi, ''))
+  if (fromCost.length > 0) return fromCost
+  // Lands print no cost at all; only their identity says what they serve.
+  return isLand(card) ? letters(card.colorIdentity) : []
+}
+
+function letters(s: string | null | undefined): PoolColor[] {
+  const seen = new Set((s ?? '').toUpperCase().split(''))
+  return POOL_COLORS.filter(c => seen.has(c))
+}
