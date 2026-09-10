@@ -54,6 +54,15 @@ describe('rail OCR parsing', () => {
   })
   it('parses the deck count header and matches truncated names', () => {
     expect(parseDeckCount('41/40 Cards')).toBe(41)
+    expect(parseDeckCount('40/40 Cards')).toBe(40)
+    // A creature's printed power and toughness is the same shape as a deck
+    // header. Reading one as a deck count told the builder it was 38 cards
+    // short, and it started adding cards to a finished deck.
+    expect(parseDeckCount('2x Cavern Stomper 2/4')).toBeNull()
+    expect(parseDeckCount('1x Bonehoard Dracosaur 3/4')).toBeNull()
+    expect(parseDeckCount('12/12')).toBeNull()
+    // Not a deck size, so not a header, even though the shape fits.
+    expect(parseDeckCount('7/15')).toBeNull()
     expect(namesMatch('Faramir, Field Comma...', 'Faramir, Field Commander')).toBe(true)
     expect(namesMatch('Esquire of the King', 'Esquire of the King')).toBe(true)
     expect(namesMatch('Plains', 'Mountain')).toBe(false)

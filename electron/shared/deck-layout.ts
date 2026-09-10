@@ -283,8 +283,22 @@ export function parseRailLine(text: string): { count: number; name: string } | n
 export function parseDeckCount(text: string): number | null {
   return parseDeckHeader(text)?.count ?? null
 }
+/** Deck sizes Arena's builder can show. Anything else is not a deck header. */
+const DECK_SIZES = [40, 60, 100]
+
 export function parseDeckHeader(text: string): { count: number; deckSize: number } | null {
-  const m = text.match(/(\d{1,3})\s*\/\s*(\d{1,3})/)
-  return m ? { count: Number(m[1]), deckSize: Number(m[2]) } : null
+  // Anchored on a real deck size, and on digit boundaries.
+  //
+  // The previous pattern was `(\d{1,3})\/(\d{1,3})` with nothing around it, so
+  // it matched any "N/M" anywhere in the line. A creature's printed power and
+  // toughness is exactly that shape: a rail row reading "2x Cavern Stomper 2/4"
+  // parsed as a two-card deck, and the builder then believed it was 38 cards
+  // short and started adding. The header is the only place a plausible deck size
+  // appears, so require one.
+  const m = text.match(/(?<!\d)(\d{1,3})\s*\/\s*(\d{2,3})(?!\d)/)
+  if (!m) return null
+  const deckSize = Number(m[2])
+  if (!DECK_SIZES.includes(deckSize)) return null
+  return { count: Number(m[1]), deckSize }
 }
 
