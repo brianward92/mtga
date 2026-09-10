@@ -1,88 +1,126 @@
 /**
- * Driving the Mac from a script: pointer, keyboard, screen capture, and OCR.
+ * Adapter onto `macctl`, the standalone macOS control tool.
  *
- * Every dev tool that touches the desktop goes through here, because the
- * mistakes are the same every time and are worth making once:
+ * This file used to BE the control layer: it spawned locally compiled Swift
+ * helpers, shelled out to `screencapture`, and drove AppleScript. None of that
+ * belongs in a Magic repo, and all of it now lives in
+ * ~/src/macOS-computer-control, installed as `macctl` on PATH.
  *
- *  - **Points, not pixels.** Every coordinate is a screen POINT, what
- *    CGWindowList and System Events report. A screenshot of a 1280pt window
- *    scaled to 1800px on a Retina display is 1.19 px/pt, and mixing the two
- *    puts the click a fifth of the way across the screen from the target.
- *  - **Park the cursor before capturing.** Arena pops a full-size card preview
- *    under the pointer, which covers whatever the shot was meant to read.
- *  - **Capture a region, never the screen.** A bare `screencapture -x` sweeps
- *    up every other window that happens to be open, including the overlay.
- *  - **The overlay covers the left of the deckbuilder.** Its sidebar is
- *    mirrored over the filter bar and the first pool columns, and it swallows
- *    clicks silently: the control reads as pressed and nothing happens.
+ * What is left here is a translation layer, kept so the Arena-specific tools
+ * above it did not all have to change at once. It is deliberately thin: every
+ * function is one `macctl` invocation.
+ *
+ * Two behaviours that came from `macctl` and are worth knowing about here:
+ *
+ *  - Geometry is read live inside the tool on every call. There is no rect to
+ *    pass in and none to cache. A cached rect once said Arena's window was at
+ *    113,112 while it was really at 152,33, and every coordinate derived from
+ *    it was off by 39 by 79 points for an evening.
+ *  - Coordinates below are still screen points, because the callers here work
+ *    in points against a rect they fetched. `macctl` itself prefers fractions.
  */
 import { execFileSync } from 'child_process'
-import { mkdtempSync, rmSync } from 'fs'
-import { tmpdir } from 'os'
-import { join } from 'path'
 
 export interface Point { x: number; y: number }
 export interface Rect { x: number; y: number; width: number; height: number }
 
-const BIN = join(process.cwd(), 'build', 'dev')
+/** The app these helpers drive. */
+const APP = 'MTGA'
+
+export const sleep = (ms: number): Promise<void> => new Promise(r => setTimeout(r, ms))
 
 export function run(cmd: string, args: string[]): string {
   return execFileSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] })
 }
-const osa = (script: string) => run('osascript', ['-e', script])
 
-export const sleep = (ms: number): Promise<void> => new Promise(r => setTimeout(r, ms))
-
-export function activate(): void { osa('tell application "MTGA" to activate') }
-export function frontmost(): string {
-  return osa('tell application "System Events" to get name of first application process whose frontmost is true').trim()
+/** One macctl call, returning its JSON line. */
+function macctl(...args: Array<string | number>): Record<string, unknown> {
+  try {
+    const out = execFileSync('macctl', args.map(String), { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+    const lines = out.trim().split('\n').filter(Boolean)
+    return lines.length ? JSON.parse(lines[lines.length - 1]) : {}
+  } catch (err) {
+    const e = err as { stdout?: string; status?: number }
+    const lines = (e.stdout ?? '').trim().split('\n').filter(Boolean)
+    if (lines.length) {
+      try { return JSON.parse(lines[lines.length - 1]) } catch { /* fall through */ }
+    }
+    throw new Error(`macctl ${args.join(' ')} failed (exit ${e.status})`)
+  }
 }
-export function click(p: Point): void { run(join(BIN, 'click'), [String(p.x), String(p.y)]) }
-export function move(p: Point): void { run(join(BIN, 'move-mouse'), [String(p.x), String(p.y)]) }
-export function scroll(p: Point, lines: number): void { run(join(BIN, 'scroll'), [String(p.x), String(p.y), String(lines)]) }
-export function keystroke(text: string): void {
-  osa(`tell application "System Events" to keystroke ${JSON.stringify(text)}`)
-}
-export function selectAll(): void { osa('tell application "System Events" to keystroke "a" using command down') }
-export function keyCode(code: number): void { osa(`tell application "System Events" to key code ${code}`) }
 
-/** Window-relative fraction → screen point. */
+/** Arena's window, read live. */
+export function windowRect(): Rect {
+  const w = macctl('window', APP).window as { bounds: number[] } | undefined
+  if (!w) throw new Error('macctl could not find Arena\'s window')
+  const [x, y, width, height] = w.bounds
+  return { x, y, width, height }
+}
+
+/** Window-relative fraction to a screen point. */
 export function at(rect: Rect, fx: number, fy: number): Point {
   return { x: Math.round(rect.x + fx * rect.width), y: Math.round(rect.y + fy * rect.height) }
 }
 
-/** Move the pointer out of the way, low and centre, where nothing hovers. */
+/** Screen point back to a fraction of the window, which is what macctl takes. */
+function fraction(p: Point, rect: Rect): [number, number] {
+  return [(p.x - rect.x) / rect.width, (p.y - rect.y) / rect.height]
+}
+
+export function activate(): void { macctl('window', APP) }
+
+export function frontmost(): string {
+  const w = macctl('window', APP).window as { frontmost?: boolean } | undefined
+  return w?.frontmost ? APP : 'other'
+}
+
+export function click(p: Point): void {
+  const rect = windowRect()
+  const [fx, fy] = fraction(p, rect)
+  macctl('click', APP, fx, fy)
+}
+
+export function move(p: Point): void {
+  const rect = windowRect()
+  const [fx, fy] = fraction(p, rect)
+  macctl('move', APP, fx, fy)
+}
+
+export function scroll(p: Point, lines: number): void {
+  const rect = windowRect()
+  const [fx, fy] = fraction(p, rect)
+  macctl('scroll', APP, fx, fy, lines)
+}
+
+export function keystroke(text: string): void { macctl('type', text) }
+export function selectAll(): void { macctl('key', 'cmd+a') }
+export function keyCode(code: number): void {
+  // The two codes these tools actually use.
+  macctl('key', code === 36 ? 'return' : code === 51 ? 'delete' : String(code))
+}
+
+/** Park the pointer low and centre, where nothing hovers. */
 export function park(rect: Rect): void { move(at(rect, 0.55, 0.985)) }
 
 /**
  * Take the overlay down and put it back.
  *
- * The deckbuilder needs this: the overlay's sidebar sits over the pool and the
- * land filter, and clicks that land on it do nothing at all. Callers read the
- * plan from the mirrored state first, so nothing is lost while it is down.
+ * The overlay's deckbuild sidebar is mirrored over the card pool and swallows
+ * clicks in silence — a land tile reads as pressed and nothing is added.
  */
 export function overlayApp(action: 'kill' | 'launch'): void {
   try { run('bash', ['scripts/dev/arena.sh', 'app', action]) } catch { /* best effort */ }
 }
 
-/** Whether the overlay's process is currently running. */
 export function overlayRunning(): boolean {
   try {
     return run('pgrep', ['-f', '/Applications/MTGA Draft Assistant.app/Contents/MacOS']).trim().length > 0
   } catch {
-    return false   // pgrep exits 1 when nothing matches
+    return false
   }
 }
 
-/**
- * Take the overlay down and CONFIRM it went.
- *
- * `overlayApp('kill')` is best-effort and swallows its own failure, and the
- * caller then slept a fixed 1500ms and clicked regardless. If the kill failed,
- * or Electron was slow to release the window, every click underneath the
- * sidebar was swallowed in silence — which is exactly how a deck ended up two
- * lands short while the run reported success.
- */
+/** Take the overlay down and CONFIRM it went, rather than sleeping and hoping. */
 export async function hideOverlayAndConfirm(timeoutMs = 8000): Promise<void> {
   if (!overlayRunning()) return
   overlayApp('kill')
@@ -96,45 +134,20 @@ export async function hideOverlayAndConfirm(timeoutMs = 8000): Promise<void> {
 
 export interface OcrLine { text: string; x: number; y: number; w: number; h: number }
 
-/** Capture one screen region and hand the PNG path to `use`, then delete it. */
-export function withRegionCapture<T>(region: Rect, use: (png: string) => T): T {
-  const dir = mkdtempSync(join(tmpdir(), 'arena-region-'))
-  const png = join(dir, 'region.png')
-  try {
-    run('screencapture', ['-x', '-tpng', `-R${region.x},${region.y},${region.width},${region.height}`, png])
-    return use(png)
-  } finally {
-    rmSync(dir, { recursive: true, force: true })
-  }
-}
-
-/** Apple Vision text boxes for a screen region, normalised to the region. */
-export function ocrRegion(region: Rect, minHeightFraction?: number): OcrLine[] {
-  return withRegionCapture(region, png => {
-    const args = [png]
-    if (minHeightFraction !== undefined) args.push(String(minHeightFraction))
-    return run(join(BIN, 'ocr'), args).split('\n').filter(Boolean).map(l => JSON.parse(l) as OcrLine)
-  })
-}
-
 /**
- * OCR a region and merge the boxes into text lines by vertical position.
+ * OCR a screen region into text lines with screen-point y centres.
  *
- * Vision returns "3x" and the card name as separate boxes on the same visual
- * line, so anything that reads a list has to group them or every row parses as
- * a name with no count.
+ * `macctl read` already merges Vision's boxes into visual lines — Vision
+ * returns "3x" and the name beside it as separate boxes, so anything reading a
+ * list has to group them or every row parses as a name with no count.
  */
-export function readTextLines(region: Rect, tolerance = 0.012): Array<{ y: number; text: string }> {
-  const tokens = ocrRegion(region).sort((a, b) => a.y - b.y || a.x - b.x)
-  const lines: Array<{ y: number; parts: Array<{ x: number; text: string }> }> = []
-  for (const t of tokens) {
-    const cy = t.y + t.h / 2
-    const line = lines.find(l => Math.abs(l.y - cy) < tolerance)
-    if (line) line.parts.push({ x: t.x, text: t.text })
-    else lines.push({ y: cy, parts: [{ x: t.x, text: t.text }] })
-  }
-  return lines.map(l => ({
-    y: Math.round(region.y + l.y * region.height),
-    text: l.parts.sort((a, b) => a.x - b.x).map(p => p.text).join(' ')
-  }))
+export function readTextLines(region: Rect, _tolerance = 0.012): Array<{ y: number; text: string }> {
+  const lines = macctl('read', APP).lines as Array<{ text: string; at: [number, number] }> | undefined
+  if (!lines) return []
+  return lines
+    .filter(l => {
+      const [, y] = l.at
+      return y >= region.y && y <= region.y + region.height
+    })
+    .map(l => ({ y: Math.round(l.at[1]), text: l.text }))
 }

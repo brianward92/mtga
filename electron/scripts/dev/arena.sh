@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
-# arena.sh — one entry point for driving MTG Arena and the overlay from a
-# terminal (or an agent). Every desktop action goes through here so a single
-# permission rule covers all of it.
+# arena.sh — Arena-flavoured wrapper over `macctl`.
+#
+# The generic macOS control that used to live here — the Swift helpers, the
+# screenshot handshake, the AppleScript keystrokes — moved out to
+# ~/src/macOS-computer-control and is installed as `macctl` on PATH. What is
+# left is only the part that knows about Arena: the overlay app, the state
+# mirror, picking, drafting and deck building.
 #
 #   arena.sh app launch|kill|restart|status   overlay app, with the state mirror on
 #   arena.sh activate                          bring Arena to the front
@@ -19,9 +23,9 @@
 #   arena.sh build --verify [SECONDS]          after Done: diff Arena's submitted deck against the plan
 #   arena.sh ocr <image.png>                   Vision OCR of an image, one JSON line per text box
 #
-# Coordinates are screen POINTS (what osascript/System Events report), not
-# retina pixels. A screenshot scaled to 1800 px wide on a 3024 px display is
-# 1.19 px/pt.
+# Coordinates here are screen POINTS, not Retina pixels. They are converted to
+# fractions of Arena's window before reaching macctl, which reads the rect live
+# on every call — there is deliberately no rect to cache.
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 cd "$here/../.."   # electron/
@@ -36,12 +40,6 @@ SHOTS="${MTGA_SHOT_DIR:-$PWD/build/dev/shots}"
 BIN=build/dev
 
 die() { echo "arena: $*" >&2; exit 1; }
-helper() {  # build a Swift helper on first use
-  [ -x "$BIN/$1" ] || { mkdir -p "$BIN"; swiftc -O -o "$BIN/$1" "scripts/dev/$1.swift"; }
-  echo "$BIN/$1"
-}
-activate() { osascript -e 'tell application "MTGA" to activate' >/dev/null; sleep 0.4; }
-front() { osascript -e 'tell application "System Events" to get name of first application process whose frontmost is true'; }
 # All state queries go through one TypeScript CLI, which shares the app's own
 # card rules. The Python helper this replaced had its own basic-land test and
 # quietly disagreed with the overlay about the same card.
@@ -75,68 +73,44 @@ case "$cmd" in
         [ -f "$MTGA_STATE_FILE" ] && state_py pos || echo "no state mirror at $MTGA_STATE_FILE (launch via arena.sh app launch)" ;;
       *) die "app launch|kill|restart|status" ;;
     esac ;;
-  activate) activate; echo "Arena frontmost" ;;
-  front) front ;;
-  rect)
-    # Ask the native helper, which is live. The overlay's state mirror carries a
-    # rect too and it CAN GO STALE: on 2026-09-09 it said 113,112 while Arena's
-    # window was at 152,33, so every coordinate derived from it was off by
-    # 39x79 points — blocks that never registered, spells that dropped back into
-    # hand, a land that would not play. Silent, because a click that misses
-    # reports success. The mirror is only a fallback now.
-    if r=$(bash scripts/dev/arena-rect.sh 2>/dev/null); then echo "$r"
-    elif [ -f "$MTGA_STATE_FILE" ] && state_py rect 2>/dev/null; then
-      echo "arena: WARNING: used the state mirror's rect; it can be stale" >&2
-    else die "no Arena window from the native helper and no state mirror"
-    fi ;;
-  shot)
-    mkdir -p "$SHOTS"; out="$SHOTS/${1:-shot-$(date +%H%M%S)}.png"; rm -f "$out"
-    # Capture only Arena's own rect. A bare `screencapture -x` takes the whole
-    # desktop, which sweeps up every other window that happens to be open.
-    # screenshot-arena.sh gets the region from the native helper.
-    bash scripts/dev/screenshot-arena.sh "$out" >/dev/null
-    sips -Z "${MTGA_SHOT_WIDTH:-1800}" "$out" >/dev/null && echo "$out" ;;
-  click)    activate; "$(helper click)" "$1" "$2" ;;
-  drag)     # Press at one point, move, release at another. Arena's hand cards
-            # cannot be played with a click — a click only opens the card's
-            # zoom preview — so anything that plays a card needs this.
-            [ $# -ge 4 ] || die "drag fromX fromY toX toY [steps]"
-            activate; "$(helper drag)" "$1" "$2" "$3" "$4" "${5:-24}" ;;
-  move)     "$(helper move-mouse)" "$1" "$2" ;;
-  scroll)   activate; "$(helper scroll)" "$1" "$2" "$3" ;;
+  activate) macctl window MTGA >/dev/null && echo "Arena frontmost" ;;
+  front)    macctl apps | python3 -c "import sys,json;print(json.load(sys.stdin)['apps'][0]['name'])" ;;
+  rect)     macctl window MTGA | python3 -c "
+import sys, json
+b = json.load(sys.stdin)['window']['bounds']
+print(','.join(str(int(v)) for v in b))
+" ;;
+  shot)     mkdir -p "$SHOTS"; out="$SHOTS/${1:-shot-$(date +%H%M%S)}.png"; rm -f "$out"
+            macctl shot MTGA --out "$out" >/dev/null && echo "$out" ;;
+  click)    # Points in, fractions out: macctl reads the rect live so nothing here can cache it.
+            IFS=, read -r wx wy ww wh <<< "$("$0" rect)"
+            macctl click MTGA "$(python3 -c "print(($1-$wx)/$ww)")" "$(python3 -c "print(($2-$wy)/$wh)")" ;;
+  drag)     [ $# -ge 4 ] || die "drag fromX fromY toX toY [steps]"
+            IFS=, read -r wx wy ww wh <<< "$("$0" rect)"
+            f() { python3 -c "print(($1-$2)/$3)"; }
+            macctl drag MTGA "$(f "$1" "$wx" "$ww")" "$(f "$2" "$wy" "$wh")" \
+                             "$(f "$3" "$wx" "$ww")" "$(f "$4" "$wy" "$wh")" --steps "${5:-24}" ;;
+  move)     IFS=, read -r wx wy ww wh <<< "$("$0" rect)"
+            macctl move MTGA "$(python3 -c "print(($1-$wx)/$ww)")" "$(python3 -c "print(($2-$wy)/$wh)")" ;;
+  scroll)   IFS=, read -r wx wy ww wh <<< "$("$0" rect)"
+            macctl scroll MTGA "$(python3 -c "print(($1-$wx)/$ww)")" "$(python3 -c "print(($2-$wy)/$wh)")" "$3" ;;
   key)
-    # A key CODE only. This used to paste $1 straight into AppleScript source,
-    # which made the one allow-listed command a route to arbitrary AppleScript —
-    # including menu items this must never touch, like Log Out and Exit Game.
-    case "${1:-}" in
-      ''|*[!0-9]*) die "key CODE (digits only)" ;;
-    esac
-    [ "$1" -le 255 ] || die "key code out of range: $1"
-    activate; osascript -e "tell application \"System Events\" to key code $1" ;;
+    # A key NAME or chord, handed to macctl. Text and key names are passed as
+    # arguments and never interpolated into a script, which is what once turned
+    # this single allow-listed command into a route to arbitrary AppleScript.
+    [ $# -ge 1 ] || die "key CHORD (e.g. return, escape, cmd+q)"
+    macctl key "$1" ;;
   type)
-    # Type literal text into whatever Arena field has focus (card search). The
-    # text is passed as an argument, never interpolated into the script source,
-    # so quotes and backslashes in a card name cannot break out of the string.
     [ $# -ge 1 ] || die "type TEXT"
-    activate
-    osascript -e 'on run argv
-  tell application "System Events" to keystroke (item 1 of argv)
-end run' -- "$*" ;;
-  clear)    # Select-all then delete: empties a focused text field.
-            activate; osascript -e 'tell application "System Events" to keystroke "a" using command down' -e 'tell application "System Events" to key code 51' ;;
+    macctl type "$*" ;;
+  clear)    macctl key cmd+a; macctl key delete ;;
   state)    # Forward every argument: "state basic 12345" needs both, and passing
             # only the first silently answered "not a basic land".
             [ -f "$MTGA_STATE_FILE" ] || die "no state mirror at $MTGA_STATE_FILE"; state_py "${@:-pos}" ;;
   pick)     bash scripts/dev/pick-next-card.sh "$@" ;;
-  build)    [ -f "$MTGA_STATE_FILE" ] || die "no state mirror at $MTGA_STATE_FILE"; for t in click move-mouse scroll ocr; do helper $t >/dev/null; done; npx tsx scripts/dev/deckbuild.ts "$MTGA_STATE_FILE" "$@" ;;
-  ocr)      "$(helper ocr)" "$@" ;;
-  read)
-    # Read the text in an arbitrary screen region (points). The general form of
-    # "what does the screen actually say here?", which is how a click is
-    # verified before it is committed.
-    [ $# -ge 4 ] || die "read X Y W H"
-    helper ocr >/dev/null
-    ./node_modules/.bin/tsx scripts/dev/read-region.ts "$1" "$2" "$3" "$4" ;;
+  build)    [ -f "$MTGA_STATE_FILE" ] || die "no state mirror at $MTGA_STATE_FILE"; npx tsx scripts/dev/deckbuild.ts "$MTGA_STATE_FILE" "$@" ;;
+  ocr)      die "removed: use \`macctl read\` or \`macctl find\`" ;;
+  read)     macctl read MTGA ;;
   draft)
     end=$((SECONDS + ${1:-570})); maxpack="${2:-99}"; last=""
     while [ $SECONDS -lt $end ]; do
