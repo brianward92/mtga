@@ -4,6 +4,7 @@ import { homedir } from 'os'
 import { join } from 'path'
 import { replay, creatures, battlefield, openMana, ourTurnToAct } from '../../shared/gre'
 
+
 const LOG = process.env.MTGA_LOG ?? join(homedir(), 'Library/Logs/Wizards of the Coast/MTGA/Player.log')
 const state = replay(readFileSync(LOG, 'utf8').split('\n'))
 const me = state.seat
@@ -21,6 +22,16 @@ for (const [label, seat] of [['mine', me], ['theirs', them]] as const) {
   ).join(', ') : ''))
 }
 console.log(`their open mana: ${me ? openMana(state, them) : '?'} · their permanents: ${battlefield(state, them).length}`)
+// The hand, by type. Enough to judge a mulligan without naming a single card:
+// land count is the question, and the rest is curve.
+const zoneOf = new Map(Object.values(state.zones).map(z => [z.zoneId, `${z.type}:${z.ownerSeatId ?? ''}`]))
+const hand = Object.values(state.objects).filter(o => (zoneOf.get(o.zoneId!) ?? '').startsWith(`ZoneType_Hand:${me}`))
+const kind = (o: typeof hand[number]) => o.cardTypes?.[0]?.replace('CardType_', '') ?? '?'
+const tally = hand.reduce<Record<string, number>>((acc, o) => { acc[kind(o)] = (acc[kind(o)] ?? 0) + 1; return acc }, {})
+console.log(`hand (${hand.length}): ` + Object.entries(tally).map(([k, n]) => `${n} ${k}`).join(', ') +
+            (hand.length ? '  [' + hand.map(o => `#${o.instanceId}:${kind(o)[0]}`).join(' ') + ']' : ''))
+const myLands = battlefield(state, me!).filter(o => o.cardTypes?.includes('CardType_Land'))
+console.log(`my lands: ${myLands.length} (${myLands.filter(l => !l.isTapped).length} untapped)`)
 console.log(`decision: ${state.decision ? state.decision.kind : 'none'}${ourTurnToAct(state) ? '  <-- OURS TO ANSWER' : ''}`)
 if (state.decision?.kind === 'blockers') {
   for (const b of state.decision.blockers) {

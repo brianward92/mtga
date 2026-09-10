@@ -57,7 +57,12 @@ async function main() {
     // as such cost four turns and the whole board: the loop happily passed
     // priority through two of my own main phases with a creature and a land
     // drop in hand, while the opponent developed unopposed.
-    if (ours && d!.kind === 'actions') {
+    // Only my own main phase is worth stopping for. Holding priority during
+    // combat with an instant in hand is not a deployment decision, and treating
+    // it as one halts the loop at every step of every combat.
+    const myMain = s.turn.activePlayer === s.seat &&
+      (s.turn.phase === 'Phase_Main1' || s.turn.phase === 'Phase_Main2')
+    if (ours && myMain && d!.kind === 'actions') {
       // The engine's action list is NOT filtered by affordability: on turn one
       // with no lands it still lists every Cast in hand. So compare against the
       // mana actually available, or the loop stops every turn on spells that

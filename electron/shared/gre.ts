@@ -204,8 +204,18 @@ export function applyMessage(state: GameState, message: GreMessage): GameState {
   if (gs) {
     if (gs.type === 'GameStateType_Full') {
       // A full snapshot is authoritative: anything not in it is gone.
+      //
+      // And it is how a NEW GAME announces itself, which matters because the
+      // log is one long file across every game of a match. Without clearing the
+      // result and the turn counter here, game two opens already reporting that
+      // game one was won, on turn nineteen. A stale "finished" is the worst of
+      // these: it says stop playing.
       next.objects = {}
       next.zones = {}
+      next.turn = {}
+      next.life = {}
+      next.decision = null
+      delete next.finished
     }
     next.gameStateId = gs.gameStateId ?? next.gameStateId
     if (gs.turnInfo) Object.assign(next.turn, gs.turnInfo)

@@ -1,21 +1,18 @@
 #!/usr/bin/env bash
-# Where each card in hand is on screen.
+# Where each card in hand is on screen, in one capture.
 #
-# Read in narrow vertical slices rather than one wide strip. The OCR merges
-# every text box sharing a row into one line with no horizontal limit, so a
-# single read of the hand returns all seven card names welded together with a
-# centre point in the middle of the hand, which is on no card at all.
+# --boxes returns Vision's individual text boxes instead of merged lines. The
+# merge joins everything sharing a row, which welds a whole hand of card names
+# into one string centred on no card at all. Working around that by reading the
+# row through a dozen narrow crops cost about twelve seconds per turn; this is
+# under one.
 set -euo pipefail
-Y="${1:-0.855}"      # top of the card-name row, as a fraction of the window
-H="${2:-0.055}"
-for i in $(seq 0 11); do
-  X=$(python3 -c "print(f'{0.12 + $i*0.07:.4f}')")
-  macctl read MTGA --region "$X,$Y,0.075,$H" 2>/dev/null | python3 -c "
+Y="${1:-0.78}"; H="${2:-0.22}"   # generous: the hand arcs, and a tight crop clips the names entirely
+macctl read MTGA --region "0.05,$Y,0.90,$H" --boxes 2>/dev/null | python3 -c "
 import json,sys
 try: d=json.load(sys.stdin)
 except Exception: sys.exit()
-for l in d.get('lines',[]):
-    t=l['text'].strip()
-    if len(t)>2: print(f\"{l['at'][0]:5d} {l['at'][1]:4d}  {t}\")
+for b in sorted(d.get('boxes',[]), key=lambda b: b['at'][0]):
+    t=b['text'].strip()
+    if len(t)>2: print(f\"{b['at'][0]:5d} {b['at'][1]:4d}  {t}\")
 "
-done | sort -n | uniq
