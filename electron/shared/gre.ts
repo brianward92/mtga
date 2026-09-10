@@ -126,11 +126,25 @@ export function extractGreMessages(line: string): GreMessage[] {
 
 // ---- folding messages into a state -----------------------------------------
 
+/**
+ * Read a numeric field that Arena wraps as `{value: n}`.
+ *
+ * The subtlety that matters: Arena omits `value` entirely when the number is
+ * **zero**, so a 0/5 wall arrives as `power: {}`. Reading that as "unknown"
+ * makes a defensive creature indistinguishable from an unread threat, and the
+ * whole point of reading the board is to know what is actually across from you.
+ * An empty object is a present field, and a present field with no value is 0.
+ *
+ * A field that is absent altogether is a different thing: the diff simply did
+ * not mention it, and the previous value stands. That case returns undefined so
+ * the merge leaves it alone.
+ */
 function num(v: unknown): number | undefined {
   if (typeof v === 'number') return v
-  if (v && typeof v === 'object' && 'value' in (v as Record<string, unknown>)) {
+  if (v && typeof v === 'object') {
     const inner = (v as { value?: unknown }).value
-    return typeof inner === 'number' ? inner : undefined
+    if (typeof inner === 'number') return inner
+    return 0
   }
   return undefined
 }
