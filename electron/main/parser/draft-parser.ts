@@ -52,7 +52,24 @@ const KEY_SET_DECK = 'Event_SetDeck'
  * that already left the draft and must not start a session.
  */
 const IN_DRAFT_MODULES = new Set(['PlayerDraft', 'BotDraft', 'Draft'])
+/**
+ * Modules where a course may still NAME an unnamed session: the draft is over
+ * but the player has not moved on. A course already playing matches is a
+ * different, older event and must not claim a draft in progress.
+ */
 const POST_DRAFT_MODULES = new Set(['DeckSelect', 'DeckBuilder', 'DeckBuild'])
+
+/**
+ * Modules whose listing still carries the full CardPool.
+ *
+ * Verified on 2026-09-09 by pressing Done and reading the reply: the course
+ * moves to CreateMatch and the pool is STILL served. A separate set from the
+ * naming rule above, because these answer different questions — this one is
+ * "does this listing know the pool", not "is this the draft we are in". Without
+ * CreateMatch the pool stopped being adopted at the exact moment the raw log
+ * rotates away, which is the worst possible time to stop recording it.
+ */
+const POOL_MODULES = new Set([...POST_DRAFT_MODULES, 'CreateMatch', 'Match'])
 
 /**
  * Bare response marker line: "[UnityCrossThreadLogger]<== BotDraftDraftStatus(guid)"
@@ -591,7 +608,7 @@ export class DraftParser extends EventEmitter {
       const withPool = list
         .map(c => c as { InternalEventName?: unknown; CurrentModule?: unknown; CardPool?: unknown; CourseId?: unknown })
         .filter(c => typeof c.InternalEventName === 'string' && typeof c.CurrentModule === 'string'
-          && POST_DRAFT_MODULES.has(c.CurrentModule) && parseDraftEventName(c.InternalEventName)
+          && POOL_MODULES.has(c.CurrentModule) && parseDraftEventName(c.InternalEventName)
           && toGrpIds(c.CardPool).length > 0)
       // Exactly one, or we cannot tell which deck the player is building.
       if (withPool.length === 1) {

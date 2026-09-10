@@ -750,3 +750,23 @@ describe('DraftParser — adopting a pool from a course parked in the deckbuilde
     expect(captured.ends[0].pool).toHaveLength(45)
   })
 })
+
+describe('DraftParser — the pool is still served after the deck is submitted', () => {
+  it('adopts a pool from a course that has moved on to playing matches', () => {
+    // Verified against a real log on 2026-09-09: pressing Done moves the course
+    // to CreateMatch and Arena keeps sending the whole CardPool. That is also
+    // the moment the raw log starts rotating away, so it is the worst possible
+    // time to stop recording it.
+    const parser = new DraftParser()
+    const captured = capture(parser)
+    const body = JSON.stringify({ Courses: [{
+      CourseId: 'd6112364', InternalEventName: 'QuickDraft_LCI_20260908',
+      CurrentModule: 'CreateMatch', CardPool: Array.from({ length: 45 }, (_, i) => 87140 + i)
+    }] })
+    parser.handleLine('[UnityCrossThreadLogger]<== EventGetCoursesV2(abc)')
+    parser.handleLine(body)
+    expect(captured.ends).toHaveLength(1)
+    expect(captured.ends[0].pool).toHaveLength(45)
+    expect(captured.ends[0].draftId).toBe('d6112364')
+  })
+})
