@@ -29,20 +29,21 @@ Companion files: `lci-combat-reference.md` (every LCI instant-speed card by colo
 
 | Property | Quick Draft | Premier Draft |
 |---|---|---|
-| Draft opponents | Bots, sequential | 8 humans |
+| Draft opponents | 7 bots, no pick timers | 7 humans |
+| **Match opponents** | **Humans** | Humans |
 | Match format | **Best-of-one** | Best-of-one |
 | Run ends at | 7 wins or 3 losses | 7 wins or 3 losses |
 | Entry | 5,000 gold / 750 gems | 10,000 gold / 1,500 gems |
 | Deck | Minimum 40 cards | Minimum 40 cards |
 
-Source: Draftsim's Quick Draft guide, which states "Quick Draft is restricted to Best-of-One only games (BO1)". Corroborated structurally by 17Lands' event taxonomy, which gives every best-of-three event a separate label (`TradDraft`, `TradSealed`, `*_Bo3`) and lists no Bo3 variant of `QuickDraft`.
+Sources: **Wizards' own MTG Arena formats page** — *"Quick Draft: Draft cards against bots with no time limits. Build a 40-card deck to play against **live players** until reaching either seven wins or three losses, whichever comes first"*, and *"Premier Draft: … Best-of-One matches"*. Bo1 for Quick Draft is confirmed by Arena's own achievement text ("Get 7 wins in a **Best-of-1** Limited event") and by `matchWinCondition: MatchWinCondition_SingleElimination` with `gameNumber: 1` in every logged Limited match on this machine; corroborated structurally by 17Lands' event taxonomy, which labels every best-of-three event separately (`TradDraft`, `TradSealed`, `*_Bo3`) and lists no Bo3 variant of `QuickDraft`. Entry fees are from mtg.wiki and Draftsim (no first-party page reachable).
 
 **What Bo1 changes in play:**
 
 1. There is no game 2 and no sideboarding. Never take a line that spends equity to gather information.
 2. Never concede early "to save time for the next game" — there is no next game.
 3. Mulligans use the London rule (CR 103.5): draw a full seven, then put N cards on the bottom. A mulligan to six is a *selected* six out of seven — bottom the worst card, not a random one.
-4. Arena applies opening-hand smoothing in Bo1 formats only: it looks at two candidate opening hands and keeps the one whose land-to-spell ratio is closer to the deck's overall ratio. Practical effect: extreme opening sevens (0–1 land, 6–7 lands) are rarer than raw hypergeometric math predicts. (Draftsim; secondary source.)
+4. Arena applies opening-hand smoothing in Bo1 only. **First-party**, Arena tip `Queue_Tip_22`, verbatim: *"In best-of-one matches, your starting hand is selected from two random hands, leaning towards the one with the more average land-spell mix."* Practical effect: extreme opening sevens (0–1 land, 6–7 lands) are rarer than the raw hypergeometric table in §11 predicts. **Unverified: whether it is reapplied after a mulligan** — so do not let it move a mulligan decision.
 
 ---
 
@@ -507,6 +508,6 @@ Pre-loss checklist. Most losses from ahead come from this list rather than from 
 
 ### Marked unverified
 
-- Whether Arena's opening-hand smoothing is skipped after a mulligan. The sources establish that it is Bo1-only and applies to the opening hand; they do not establish what happens after a mulligan. Do not factor it into mulligan decisions.
-- Whether match opponents in Quick Draft are always human. Draftsim confirms the draft is against bots and the format is Bo1, but no source reachable here states the match-opponent policy. The Bo1 format itself is well corroborated.
+- Whether Arena's opening-hand smoothing is skipped after a mulligan. The smoothing itself is first-party (Arena tip `Queue_Tip_22`, quoted in §1) and applies "in best-of-one matches" to "your starting hand"; no source establishes what happens after a mulligan. Do not factor it into mulligan decisions.
+- ~~Whether match opponents in Quick Draft are always human~~ — **resolved, they are.** Wizards' MTG Arena formats page: Quick Draft is "Draft cards against bots… to play against **live players**". Arena's own Codex says the same. §1 is updated.
 - Whether LCI is currently in Arena's Quick Draft rotation. Quick Draft cycles through sets; check the client.

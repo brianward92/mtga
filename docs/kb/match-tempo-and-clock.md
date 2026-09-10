@@ -258,7 +258,7 @@ Your clock is stopped whenever `turnInfo.decisionPlayer` is not you. Use those w
 
 Each adds real decision points; each has a fast default. Oracle text verified via the Scryfall API.
 
-**Explore** (18 LCI cards) — *"Reveal the top card of your library. Put that card into your hand if it's a land. Otherwise, put a +1/+1 counter on this creature, then put the card back or put it into your graveyard."* (reminder text as printed on **Cenote Scout** `{G}`, 1/1, uncommon).
+**Explore** (25 LCI cards reference explore; 18 of them are sources that can cause one — see `lci-mechanics-deep.md` §5) — *"Reveal the top card of your library. Put that card into your hand if it's a land. Otherwise, put a +1/+1 counter on this creature, then put the card back or put it into your graveyard."* (reminder text as printed on **Cenote Scout** `{G}`, 1/1, uncommon).
 - Land reveal is **not a decision** — it goes to hand automatically. 0 s.
 - Nonland reveal is binary: top or graveyard. Default **bin it** if you have descend payoffs or the card is weak; keep it on top only if you actively want to draw it next turn. 3 s.
 - The +1/+1 counter changes combat math. Re-read the displayed P/T from the log; do not recompute it.
@@ -267,7 +267,7 @@ Each adds real decision points; each has a fast default. Oracle text verified vi
 
 **Craft** (19 LCI cards) — *"Craft only as a sorcery."* Sorcery speed, and the cost exiles **this artifact plus a permanent or card of the named type** from the battlefield or your graveyard, which opens a chooser. Example: **Tithing Blade** `{1}{B}` — *"Craft with creature {4}{B} ({4}{B}, Exile this artifact, Exile a creature you control or a creature card from your graveyard: Return this card transformed under its owner's control.)"* Decide which permanent you are exiling *before* you start the activation.
 
-**Discover N** (24 LCI cards) — *"Exile cards from the top of your library until you exile a nonland card with mana value N or less. Cast it without paying its mana cost or put it into your hand. Put the rest on the bottom in a random order."* Example: **Geological Appraiser** `{2}{R}{R}`, 3/2, uncommon, discover 3. This is the biggest single clock event in the set — a hidden reveal, a binary, then possibly a full cast with targets. **Budget 20 s and cast it early in the turn**, while your budget is still growing.
+**Discover N** (23 LCI cards) — *"Exile cards from the top of your library until you exile a nonland card with mana value N or less. Cast it without paying its mana cost or put it into your hand. Put the rest on the bottom in a random order."* Example: **Geological Appraiser** `{2}{R}{R}`, 3/2, uncommon, discover 3. This is the biggest single clock event in the set — a hidden reveal, a binary, then possibly a full cast with targets. **Budget 20 s and cast it early in the turn**, while your budget is still growing.
 
 **Descend N** (28 LCI cards) — a static count of permanent cards in your graveyard. Example: **Basking Capybara** `{1}{G}`, base **1/3**, common — *"Descend 4 — This creature gets +3/+0 as long as there are four or more permanent cards in your graveyard"*, so a **4/3** attacker the moment the count hits four. Track the count incrementally; never recount the graveyard on your own clock; never assume a descend creature's printed stats.
 
@@ -291,9 +291,10 @@ Auto-pass on, auto-tap on, auto-choose-replacement on. **Leave these as they are
 | Setting | Tooltip | Why |
 |---|---|---|
 | Auto Tap | "Automatically taps mana sources and spends mana when paying costs." | Removes clicks per spell |
-| Auto Assign Combat Damage | "Your creatures automatically assign their combat damage." | Removes a damage-division UI |
 | Auto Order Triggered Abilities | "Automatically order triggered abilities rather than manually ordering them." | Removes a modal per multi-trigger |
 | Auto Choose Replacement Effects | "Automatically choose the order for replacement effects rather than manually selecting them." | Same |
+
+**Turn OFF: `Auto Assign Combat Damage`** ("Your creatures automatically assign their combat damage."). It saves a few seconds and costs you the CR 510.1c free division — the choice that decides whether your multi-blocked attacker kills one blocker or two. Combat is the weakest part of this agent's play; buy the prompt. This aligns with `rules-stack-and-timing.md` §16 and `arena-board-reading.md` §5. (`lci-playbook.md` says to leave it on only as a fallback if dragging in the Assign Damage browser proves unreliable in practice — decide that from the first observed multi-block, not in advance.)
 
 Auto-pass modes in the enum: `None`, `Clear`, `EndStep`, `FullControl`, `ResolveAll`, `ResolveMyStackEffects`, `Turn`, `UnlessAction`, `UnlessOpponentAction`. `ResolveMyStackEffects` is what the client sends and the right one. Do not fight it.
 
@@ -326,7 +327,7 @@ Procedure:
 
 The full ESC menu is: Resume, Concede, Settings, Keybindings, Customize, Check Status, Forums, Exit Game. Concede and Exit Game sit in the same list. Menu buttons are not game objects, so they emit no `onHover` — **confirm the label under the cursor visually before clicking.**
 
-**When to concede in Bo1 Quick Draft:** only when the game is genuinely unwinnable. Conceding ends the *match* and costs one of your three event losses immediately; there is no game 2 whose clock you are protecting. **Time pressure is never by itself a reason to concede** — a roped turn costs one turn, a concession costs the match.
+**When to concede in Bo1 Quick Draft: effectively never.** `limited-fundamentals.md` §10 owns this ruling and it is the stricter one — play to 0 life. Conceding ends the *match* and spends one of your three event losses immediately; there is no game 2 whose clock you are protecting, and an opponent can still misplay. **Time pressure is never by itself a reason to concede** — a roped turn costs one turn, a concession costs the match. The procedure above exists so that a deliberate concede, if a human ever orders one, does not misfire onto Exit Game.
 
 ---
 
@@ -402,6 +403,6 @@ Marked so they are never trusted as fact.
 3. **Arena client localization database** (SQLite, table `Loc`): `/Users/brianward/Library/Application Support/com.wizards.mtga/Downloads/Raw/Raw_ClientLocalization_cc198ec371902bf594a5a38b59070986.mtga` — every quoted on-screen string: `NPE/Timers/27-32`, `DuelScene/TimeoutUsed`, `DuelScene/Warning/AFK_Warning`, `DuelScene/Warning/MatchClockLowTime`, `DuelScene/EscapeMenu/*`, `DuelScene/ClientPrompt/Are_You_Sure_Title`, `DuelScene/ClientPrompt/Forfeit_Match`, `DuelScene/ScreenSpace/Prompts/FullControlToolTip`, `DuelScene/SettingsMenu/Gameplay/*`, `DuelScene/PhaseLadder/PhaseStop/*`, `DuelScene/Browsers/Click_Add_Stop`, `MainNav/Settings/Gameplay/*`, `MainNav/EventPage/*`, `MainNav/Rewards/EventRewards/ClaimPrizeButton`, `Codex/WaysToPlay/Formats/Limited_QuickDraft_A`, `Codex/HowToPlay/QuickStart/BeginAndEnd_C`, `Achievements/Core/Advanced/Undefeated_desc_alt_2`, `SystemMessage/System_Network_Idle*`.
 4. **Arena il2cpp metadata string table**: `/Users/Shared/Epic Games/MagicTheGathering/MTGA.app/Contents/Resources/Data/il2cpp_data/Metadata/global-metadata.dat` — the complete `TimerType_*`, `TimerBehavior_*`, `ResultReason_*`, `MatchWinCondition_*`, `AutoPassOption_*` and `ManaSelectionType_*` enums; `MeterPipCount`, `PipFill`, `ITimeoutDisplayController`; the absence of any "rope" identifier.
 5. **Magic: The Gathering Comprehensive Rules**, effective 7 August 2026 (`https://media.wizards.com/2026/downloads/MagicCompRules%2020260819.txt`) — 103.5 (London mulligan), 104.3a (concession), 302.6 (summoning sickness), 509.1 and 509.1a–i (declare blockers), 510.1a–e (combat damage assignment), 702.111a (menace).
-6. **Scryfall API** (`https://api.scryfall.com`) — oracle text, mana costs, power/toughness and rarity. LCI mechanic counts by `e:lci oracle:<kw>`: explore 18, discover 24, descend 28, craft 19 (`oracle:"craft with"`). Cards cited: Cenote Scout, Tithing Blade // Consuming Sepulcher, Geological Appraiser, Basking Capybara, Map token (`tbig`).
+6. **Scryfall API** (`https://api.scryfall.com`) — oracle text, mana costs, power/toughness and rarity. LCI mechanic counts by `e:lci oracle:<kw>` over the 291 draftable cards, re-counted 2026-09-10: explore 25, discover 23, descend 28, craft 19 (`oracle:"craft with"`). Cards cited: Cenote Scout, Tithing Blade // Consuming Sepulcher, Geological Appraiser, Basking Capybara, Map token (`tbig`).
 7. **Draftsim, MTG Arena draft guide** (`https://draftsim.com/mtg-arena-draft-guide/`) — Quick Draft is Bo1 against players, drafted against bots without timers, 7 wins or 3 losses, 750 gems / 5,000 gold entry.
 8. **Sibling KB files**: `arena-board-reading.md` (§4 field map, §5 combat), `lci-combat-reference.md` (open-mana threats), `rules-stack-and-timing.md` (§16 auto-pass and stops).

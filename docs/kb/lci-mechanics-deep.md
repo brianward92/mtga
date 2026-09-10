@@ -13,7 +13,7 @@ Companion file: `lci-combat-reference.md` (generated instant-speed / removal / b
 | 3 | Only **16%** of the draftable pool (21% of commons) is instants/sorceries. | ~4 of every 5 cards in a graveyard count. **Descend 4 arrives fast.** Do not assume a full graveyard is a low count. |
 | 4 | The **mechanics' own abilities** are all sorcery-speed: craft, Map tokens, Hidden Cave discover, Captivating Cave, Seeker of Sunlight `{G}`, Guidestone Compass, Geode Grotto. | An untapped Map or Hidden Cave is never a combat trick. |
 | 5 | **But nine mechanic cards ARE instant-speed and do ruin combat.** | §2. Trumpeting Carnosaur `{4}{R}{R}` is the worst — `{2}{R}`, discard it **from hand**: 3 damage. It never appears on board first. |
-| 6 | **Crew has no timing restriction** (CR 702.122a). | Watertight Gondola (4/4, crew 1) and Bladewheel Chariot (5/5, crew 1) can be crewed **after attackers are declared** and ambush-block. |
+| 6 | **Crew has no timing restriction** (CR 702.122a), but a blocker must already be a creature when blockers are declared (CR 509.1a). | Watertight Gondola (4/4, crew 1) and Bladewheel Chariot (5/5, crew 1) can be crewed **during the declare-attackers step** and ambush-block. Crewing *after* blockers are declared is too late. Crewing taps the crew, so it costs you those blockers. |
 | 7 | Evasion gained **after** a legal block is declared does not undo the block (CR 509.1b). | Blocking Didact Echo `{4}{U}` on the ground is safe once declared, even if it gains flying. Only its state **at declare-blockers** matters. |
 | 8 | **Discover N** = mana value **N or less** (≤), fixed N. **Cascade** = strictly less than the source spell's MV. | Discover 3 finds a 3-drop. |
 | 9 | Discover: exiling is **mandatory**, only cast-vs-hand is a choice. X in the discovered card is forced to **0**. Mandatory additional costs still must be paid. Cost reductions never change mana value. | Gargantuan Leech `{7}{B}` is MV 8 forever — discover 3/4/5 can never find it. |
@@ -146,7 +146,7 @@ CR 307.5: "only as a sorcery" = **you have priority, your main phase, empty stac
 | **Idol of the Deep King** | `{2}{R}` | C | **Flash.** ETB 2 damage to any target. A common. |
 | **Spring-Loaded Sawblades** | `{1}{W}` | U | **Flash.** ETB **5 damage to a target TAPPED creature an opponent controls** — punishes attacking, does nothing to a blocker. |
 | **Lodestone Needle** | `{1}{U}` | U | **Flash.** ETB tap a creature and put two stun counters on it. |
-| **Crew** (CR 702.122a) | — | — | **No timing restriction.** Watertight Gondola and Bladewheel Chariot (5/5) can be crewed after attackers are declared, then block. |
+| **Crew** (CR 702.122a) | — | — | **No timing restriction**, so Watertight Gondola and Bladewheel Chariot (5/5) can be crewed in the declare-attackers step and then block. CR 509.1a still requires it to be a creature *at* declare-blockers, so crewing later does nothing. |
 
 ### They can raise their descend count at instant speed
 
@@ -468,11 +468,11 @@ Precombat main phase with **Merfolk Cave-Diver `{2}{U}` (2/4)** on board: activa
 |---|---|---|
 | Drafting opponents | **Bots** | **First-party:** Arena's own event module for `QuickDraft_LCI_20260908` is literally named `BotDraft` |
 | Run ends at | **3 losses** | **First-party:** local Arena log shows `CurrentWins:1, CurrentLosses:3` → `ClaimPrize` → `Complete` |
-| Match structure | **Best-of-one.** No sideboarding, no game two | Draftsim (secondary) |
-| Win cap | **7 wins** | Draftsim (secondary) |
-| Entry | 5,000 gold or 750 gems | Draftsim (secondary) |
-| Bo3 alternative | Traditional Draft, not Quick Draft | Draftsim (secondary) |
-| Game opponents | Human players (only the *draft* is botted) | Draftsim (secondary) |
+| Match structure | **Best-of-one.** No sideboarding, no game two | Arena achievement string: "Get 7 wins in a **Best-of-1** Limited event"; `MatchWinCondition_SingleElimination` + `gameNumber: 1` in every logged Limited match |
+| Win cap | **7 wins** | **First-party:** Wizards' MTG Arena formats page — "until reaching either seven wins or three losses, whichever comes first" |
+| Entry | 5,000 gold or 750 gems | mtg.wiki; Draftsim (secondary — no first-party page reachable) |
+| Bo3 alternative | Traditional Draft, not Quick Draft | Arena Codex `Limited_TraditionalDraft_A` |
+| Game opponents | **Human players** (only the *draft* is botted) | **First-party:** Wizards' formats page ("play against **live players**") and Arena Codex `Limited_QuickDraft_A` ("you'll still play against other **human opponents**") |
 
 **Bo1 consequences for play:** no sideboard and no second game, so nothing carries forward and there is no reason to play around a card you have not seen this game. Every match is one decision set.
 
@@ -561,5 +561,7 @@ CR 702.85a  Cascade: mana value LESS THAN the cascading spell's. (Contrast disco
 - **Official rulings**, via Scryfall's rulings endpoints (these mirror Wizards' own) — quoted for Geological Appraiser, Hit the Mother Lode, Daring Discovery, Curator of Sun's Creation, Jadelight Spelunker, Over the Edge, Twists and Turns, Miner's Guidewing, Merfolk Cave-Diver, Subterranean Schooner, Market Gnome, Throne of the Grim Captain, Sunbird Standard, Kaslem's Stonetree, Waterlogged Hulk, Souls of the Lost, Squirming Emergence, Terror Tide, The Mycotyrant, Matzalantli, Uchbenbak, Basking Capybara, Restless Anchorage, Spelunking.
 - **Wizards of the Coast, "The Lost Caverns of Ixalan Release Notes"** (Jess Dunks and Eric Levine, Nov 2023) — https://magic.wizards.com/en/news/feature/the-lost-caverns-of-ixalan-release-notes — General Notes on craft, discover, descend, explore and Map tokens. Every passage used here was independently confirmed against the mirrored rulings above.
 - **Local MTG Arena client logs** (`~/Library/Logs/Wizards of the Coast/MTGA/Player*.log`) — first-party evidence for the Quick Draft structure: event `QuickDraft_LCI_20260908`, draft module named `BotDraft`, and a run terminating at `CurrentLosses: 3`.
-- **Draftsim, "MTG Arena Quick Draft"** — https://draftsim.com/mtg-arena-quick-draft/ — secondary source, used only for Bo1, the 7-win cap, the entry fee, and that gameplay opponents are human.
+- **Wizards of the Coast, MTG Arena formats page** — https://magic.wizards.com/en/news/mtg-arena/mtg-arena-formats — first-party for bot drafting, human match opponents, and the seven-wins-or-three-losses run.
+- **MTG Arena in-client localization database** — `Codex/WaysToPlay/Formats/Limited_QuickDraft_A` and `Achievements/Core/Advanced/Undefeated_desc_alt_2` — first-party for human match opponents and Best-of-1.
+- **Draftsim, "MTG Arena Quick Draft"** — https://draftsim.com/mtg-arena-quick-draft/ — secondary corroboration, and the only source for the entry fee.
 - Derived numbers (permanent vs instant/sorcery ratios, Cave mana output counts, the 42.5% explore-land figure) were computed from the Scryfall data in this session; the arithmetic is stated inline so it can be rechecked.

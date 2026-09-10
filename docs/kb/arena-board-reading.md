@@ -16,10 +16,10 @@ Companion file: `lci-combat-reference.md` (what the opponent's open mana can act
 | 6 | **Craft is sorcery-speed only and expensive** ({5}{G}{G} for the 7/7). It never happens mid-combat. | An "empty" board of artifacts is not a combat threat; it is a main-phase threat. |
 | 7 | Quick Draft is **best-of-one**, human opponents, run ends at **7 wins or 3 losses**. No sideboarding, ever. | Never hold a card back "for game two". |
 | 8 | **Full Control on Mac is Cmd**, not Ctrl. Space passes priority. Shift+Return passes the rest of the turn but **still stops for blocks**. | Shift+Return is the safe workhorse key. |
-| 9 | **The rope starts with 30 s left**, not at zero. Banks: 61 s your turn, 45 s theirs. **4 timeouts used = game conceded.** | A 55-second turn is free. A 95-second turn costs a timeout. |
+| 9 | **The rope starts with 30 s left**, not at zero. Banks *open at* 61 s your turn / 45 s theirs and **grow as the turn goes on** (median peak 115 s / 70 s). Running a turn bank to zero **ends that turn**, it does not concede. | A 95 s turn is usually still free. The clock that concedes you is `TimerType_Inactivity` (150 s with no input). Read `durationSec - elapsedSec`; never assume 61. |
 | 10 | Attackers = objects with `attackState`; `attackInfo.targetId` = what they hit. Blockers = objects with `blockInfo.attackerIds`. `BlockState_Unblocked` = getting through. | The whole combat picture in three fields. |
 | 11 | **Never count lands off the screen.** Identical permanents collapse into one card with a quantity badge. Count from the log, and add Treasures. | An OCR land count is systematically low. |
-| 12 | Summoning sickness is **not** a log field. Infer from `AnnotationType_EnteredZoneThisTurn`. `summoningSick` appears 0 times. | Do not grep for it. |
+| 12 | Summoning sickness **is** a log field, spelled **`hasSummoningSickness`** (`summoningSick` is not a field and greps to 0 — that is a spelling miss, not an absence). | Grep the right name. And it is irrelevant to blocking: CR 302.6 stops attacking and {T} abilities only, so **never exclude a summoning-sick creature from the block table.** |
 | 13 | Hovering writes `"onHover": {"objectId": N}` to the log. | The exact way to bind a pixel to a game object. |
 | 14 | Clicking a hand card usually only **previews** it, and the preview animation looks like a cast. **Drag to play**, then verify in the log. | The single most common false success. |
 
@@ -92,13 +92,15 @@ Verified from the `"timers"` array of a real limited Bo1 match. Each player gets
 
 Also in `gameInfo`: `"maxTimeoutCount": 4`, `"timeoutDurationSec": 30`, `"maxPipCount": 3`, `"startingLifeTotal": 20`, `"superFormat": "SuperFormat_Limited"`.
 
-**The rope.** Every TakeControl timer has `"warningThresholdSec": 30`. That is the rope: it starts burning with **30 seconds left**, not at zero. When the bank empties, one of your 4 timeouts is consumed and you get a fresh 30 s; the client prints `TIMEOUT USED` (loc key `DuelScene/TimeoutUsed` — OCR that exact uppercase string). **Burn all 4 and the game is conceded for you.**
+**The rope.** Every TakeControl timer has `"warningThresholdSec": 30`. That is the rope: it starts burning with **30 seconds left**, not at zero. When the bank empties, one of your 4 timeouts is consumed and you get a fresh 30 s; the client prints `TIMEOUT USED` (loc key `DuelScene/TimeoutUsed` — OCR that exact uppercase string).
 
-Budget: a 55-second turn is free; a 95-second turn costs a timeout you cannot get back. Banks reset each turn and do not carry over, so there is no reward for rushing a turn you have already paid for.
+**Running a turn bank out does NOT concede the game.** These are `TimerBehavior_TakeControl` timers: expiry with no credit left ends *that turn* (`NPE/Timers/30`: "If the timer runs out, your turn will be over"). Only `TimerType_Inactivity` (`TimerBehavior_Timeout`, 150 s with no input at all) concedes you.
+
+**The bank grows during the turn.** 61 s and 45 s are opening values, not caps: measured across 8 Bo1 Limited games the active-player budget reaches a median peak of 115 s (p90 142 s, max 156 s) and the non-active budget 70 s. So a 95-second turn is usually still free. Read `durationSec - elapsedMs/1000` off your own running timer rather than assuming. Full measurement: `match-tempo-and-clock.md` §1–§4, which owns this subject.
 
 Two OCR-able warnings:
-- `DuelScene/Warning/AFK_Warning` — "**Warning!** You haven't acted recently. Act soon or you'll concede the game!"
-- `DuelScene/Warning/MatchClockLowTime` — "Less than {minutesRemaining} minutes remaining in your match timer. You will concede the match if it expires." There is a whole-match clock as well as per-turn banks.
+- `DuelScene/Warning/AFK_Warning` — "**Warning!** You haven't acted recently. Act soon or you'll concede the game!" This is the inactivity clock, and it is the one that loses matches.
+- `DuelScene/Warning/MatchClockLowTime` — "Less than {minutesRemaining} minutes remaining in your match timer. You will concede the match if it expires." **The string exists but no match clock is issued in this format:** `TimerType_MatchClock` appears zero times in the logs, and each player received only their six timer ids in all 8 logged Bo1 Limited games. Do not budget for a whole-match clock.
 
 Read the live remainder from the log, not the rope animation: timer objects carry `"running": true` and `"elapsedMs"`.
 
@@ -121,7 +123,7 @@ Read the live remainder from the log, not the rope animation: timer objects carr
 | P/T was modified | `AnnotationType_ModifiedPower`, `ModifiedToughness`, `PowerToughnessModCreated` | Tells you *that* it is buffed, useful for judging whether the buff is temporary |
 | Graveyard / Exile | objects in `ZoneType_Graveyard` / `ZoneType_Exile` | Browsable in-client for both players |
 | The stack | objects in `ZoneType_Stack` | |
-| Summoning sickness | **not a field.** Infer from `AnnotationType_EnteredZoneThisTurn` | `summoningSick` appears 0 times |
+| Summoning sickness | **`hasSummoningSickness`** on the object (40 log lines carry it in the reference match). `AnnotationType_EnteredZoneThisTurn` is a cross-check | The string `summoningSick` is not the field name and greps to 0. Relevant to attacking and {T} abilities only — **not** to blocking (CR 302.6) |
 | Legal actions | the `"actions"` array on any decision message | If a cast is not in it, it is not castable |
 
 **Phase and step enums** (exact spellings, from observed frequencies in a real match):
@@ -284,6 +286,8 @@ All counts computed from the 292-card Scryfall LCI set.
 
 A permanent's current face is not the card you saw cast. The craft artifacts become large creatures — **but craft is sorcery-speed only and costs real mana**, so this is a main-phase threat, never a combat trick.
 
+**LCI has 19 craft cards, not 9.** The table below is only the subset whose back face is a large body — the ones that change combat math. For the complete 19, with materials and back-face text, see `lci-mechanics-deep.md` §4.
+
 | Front | Front cost | Craft cost | Also exile | Back | Back P/T |
 |---|---|---|---|---|---|
 | Oteclan Landmark | `{W}` | `{2}{W}` | an artifact | Oteclan Levitator | 1/4 |
@@ -418,7 +422,7 @@ Duel-scene pixel geometry has **not** been measured. On the first match, record 
 | Declined a good block fearing an explore pump | Maps and every LCI explore activation are sorcery-only | Explore is never a combat trick |
 | Assigned trample damage and nothing got through | Every blocker must be assigned lethal first | CR 702.19b |
 | Waited for a response window after assigning damage | Foundations removed it | Damage is dealt immediately |
-| Lost to the clock | The rope starts at 30 s remaining, and 4 timeouts is a loss | Watch `elapsedMs`, OCR `TIMEOUT USED` |
+| Lost to the clock | Going 150 s with **no input at all** hits `TimerType_Inactivity` and concedes the game. (Running a turn bank out only ends the turn.) | Send a harmless input — a hover or right-click zoom — at least once a minute; OCR the AFK warning |
 | Read a black frame as "control not present" | Display asleep | `macctl` wakes it and reports `wokeScreen` |
 | Every input silently refused | Screen locked, or Secure Event Input held | Exit code 3 with a reason. Reads still work while locked; input does not. `macctl awake --while-pid $$` before a long run |
 | A modal blocks everything | Disconnect and confirmation dialogs are announced nowhere in the log | Detect by OCR; the idle-disconnect dialog reads "You have been disconnected.  Please reconnect to continue playing." |

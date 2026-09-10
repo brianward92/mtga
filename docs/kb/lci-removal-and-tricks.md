@@ -21,7 +21,7 @@ Every card name, mana cost, power/toughness, rarity and rules text below was ver
 
 1. **Double-blocking: there is no damage assignment order.** CR 510.1c — the attacker divides its damage among your blockers however it chooses, with **no obligation to assign lethal to any of them first**. A big blocker no longer shields a small one. Assume the worst split. Only trample (CR 702.19b) still forces lethal-to-all-blockers before any damage goes to you.
 2. **Tapping an attacking creature does nothing.** CR 506.4b: tapping a creature already declared as an attacker or blocker does not remove it from combat and does not prevent its combat damage. Tap effects must be used *before* attackers or *before* blockers.
-3. **Crew costs zero mana and is instant speed** (CR 702.122a). Any untapped Vehicle plus one spare creature is an ambush blocker.
+3. **Crew costs zero mana and is instant speed** (CR 702.122a). Any untapped Vehicle plus one spare creature is an ambush blocker — **but the Vehicle must already be a creature when blockers are declared** (CR 509.1a), so the crew has to happen in the declare-attackers step, not after blocks. Crewing also **taps** the crewing creatures, which then cannot block themselves and become legal targets for Cosmium Blast, Spring-Loaded Sawblades and the discounted Quicksand Whirlpool.
 4. **Acrobatic Leap {W}** (C) untaps their creature and gives it +1/+3 and flying. One white mana is a surprise blocker.
 5. **Poison Dart Frog {1}{G}** (C) is a deathtouch blocker whenever they hold 2 mana (`{2}: gains deathtouch`) — and it taps for any colour, so it is hidden mana too.
 6. **Hunter's Blowgun {1}** (C) grants deathtouch **during its controller's turn** and reach otherwise. It attacks you with deathtouch; it blocks you without.

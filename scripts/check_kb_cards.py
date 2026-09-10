@@ -25,6 +25,26 @@ UA = {"User-Agent": "mtga-kb/1.0", "Accept": "application/json"}
 # A name is only treated as a card claim when a mana cost or a rarity marker
 # follows it. Prose is full of Title Case that is not a card, and flagging all of
 # it buries the one real error in ninety false ones.
+# Names that are not cards but read like them, each one adjudicated by hand once
+# so a later run does not re-litigate it. Recording the verdict is the point:
+# without this the same thirty prose fragments are re-checked every time and the
+# one real error hides among them.
+ADJUDICATED = {
+    # Collective shorthand for the five commons Hidden Cataract, Hidden
+    # Courtyard, Hidden Necropolis, Hidden Nursery and Hidden Volcano. Verified:
+    # exactly five, one per colour, all enter tapped, all tap for a single
+    # colour, all sacrifice for Discover 4 at sorcery speed only.
+    "hidden cave", "hidden caves",
+    # Creature types, not cards.
+    "cat advisor", "human soldier", "merfolk scout", "vampire knight",
+    "legendary creature",
+    # Rules and stats prose.
+    "create a treasure", "flash equipment", "gih in premier", "in limited",
+    "quick draft", "lci quick draft", "the map", "the frog",
+    # A rules example deliberately drawn from outside the set.
+    "altar's reap",
+}
+
 NAME = re.compile(r"\b([A-Z][A-Za-z'\-]+(?: (?:of|the|to|a|an|in|on|and|de|del|for)? ?[A-Z][A-Za-z'\-]+){1,4})\b")
 IS_CLAIM = (re.compile(r"\{[0-9WUBRGCX]"), re.compile(r"\((C|U|R|M)\)"))
 
@@ -43,6 +63,9 @@ def known_names(set_code="lci"):
             for part in variant.split(" // "):
                 part = part.strip()
                 names |= {part.lower(), part.lower() + "s", part.lower().rstrip("s")}
+                # A back face is routinely written without its article: the card
+                # is "The Grim Captain", the prose says "the Grim Captain".
+                names.add(part.lower().removeprefix("the ").strip())
                 if "," in part:
                     before, after = part.split(",", 1)
                     names.add(before.strip().lower())
@@ -72,8 +95,18 @@ def main():
             tail = text[match.end():match.end() + 40]
             if not any(p.search(tail) for p in IS_CLAIM):
                 continue
+            # Shouty prose ("MAPS ARE SORCERY-SPEED") is never a card name.
+            if raw.upper() == raw:
+                continue
             claims += 1
             variants = {raw, re.sub(r"'s\b", "", raw).strip(), raw.rstrip("s"), raw + "s"}
+            if any(v.lower() in ADJUDICATED for v in variants):
+                continue
+            # "Back of X" and "Blocking X" are prose wrapped around a real name;
+            # strip the wrapper rather than flagging the whole phrase.
+            for prefix in ("back of ", "blocking ", "untapped ", "plus ", "the "):
+                if raw.lower().startswith(prefix):
+                    variants.add(raw[len(prefix):])
             if not any(v.lower() in known for v in variants):
                 unresolved.setdefault(raw, set()).add(path.name)
 

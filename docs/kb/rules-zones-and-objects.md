@@ -422,16 +422,17 @@ A creature you put 2 damage on this turn is at full toughness next turn. **Do no
 
 | Fact | Value | Evidence |
 |---|---|---|
-| Draft opponents | **Bots** | Verified in this machine's log for `QuickDraft_LCI_20260908`: `"CurrentModule":"BotDraft"` (32 occurrences). Corroborated by Draftsim: *"Quick Draft is a way that you can draft a set on MTG Arena with bots only."* |
-| Match format | **Best-of-one** | Draftsim: *"Quick Draft is restricted to Best-of-One only games (BO1)."* **Not** independently confirmed from this machine's logs — see below. |
-| Run length | 7 wins or 3 losses | Draftsim: players continue *"until you get seven wins or three losses."* |
-| Entry fee | 5,000 gold or 750 gems | Draftsim |
+| Draft opponents | **Bots** | Verified in this machine's log for `QuickDraft_LCI_20260908`: `"CurrentModule":"BotDraft"` (32 occurrences). Corroborated first-party by Wizards' MTG Arena formats page: *"Draft cards against bots with no time limits."* |
+| Match opponents | **Human players** | **First-party.** Wizards' formats page: *"Build a 40-card deck to play against **live players**…"*; Arena's in-client Codex `Codex/WaysToPlay/Formats/Limited_QuickDraft_A`: *"while you'll still play against other **human opponents**, you'll be drafted with 7 other AI opponents."* |
+| Match format | **Best-of-one** | Arena's own achievement string (`Undefeated_desc_alt_2`: "Get 7 wins in a **Best-of-1** Limited event…"); `"matchWinCondition": "MatchWinCondition_SingleElimination"` and `"gameNumber": 1` in all 8 logged Limited matches on this machine; mtg.wiki and Draftsim agree. Not observed in an LCI Quick Draft match specifically — see below. |
+| Run length | 7 wins or 3 losses | **First-party.** Wizards' formats page: *"…until reaching either seven wins or three losses, whichever comes first."* Local log independently shows a run ending at `CurrentLosses: 3`. |
+| Entry fee | 5,000 gold or 750 gems | mtg.wiki Arena/Events; Draftsim. No first-party page reachable. |
 | Card pool | **LCI main set** | The drafted deck's Arena ids (87383, 87160, 87301, 87326, 87412) all resolve to `set:lci` on Scryfall |
 | Minimum deck size | 40 | Arena Limited match settings observed on this machine (`"minDeckSize": 40`), from HOB Sealed/Premier Draft matches, not from an LCI Quick Draft match |
 | Turn timer | 30 s per priority, 4 timeouts, 3 pips | Same source: `"timeoutDurationSec": 30, "maxTimeoutCount": 4, "maxPipCount": 3` |
 | Mulligan | London | Same source: `"mulliganType": "MulliganType_London"` |
 
-**Evidence caveat, stated plainly:** the `QuickDraft_LCI_20260908` logs on this machine contain **draft-phase data only** — `BotDraft` and `ClaimPrize` modules, and **zero** game-state messages. No match in that event has been logged. The match-level settings above (Bo1, 40-card minimum, 30-second timer, London mulligan) were read from `Player-prev.log.bak-20260822`, whose Limited events are `PremierDraft_HOB_20260811` and `Sealed_HOB_20260811`. They are Arena's general Limited match settings and are expected to apply, but they are not direct observations of an LCI Quick Draft match.
+**Evidence caveat, stated plainly:** the `QuickDraft_LCI_20260908` logs on this machine contain **draft-phase data only** — `BotDraft` and `ClaimPrize` modules, and **zero** game-state messages. No match in that event has been logged. The match-level settings above (`MatchWinCondition_SingleElimination`, `gameNumber: 1`, 40-card minimum, 30-second timer, London mulligan) were read from `Player-prev.log.bak-20260822`, whose Limited events are `PremierDraft_HOB_20260811` and `Sealed_HOB_20260811`. They come from the match's format config (`SuperFormat_Limited`) rather than from the event, so they are expected to apply — but confirm `maxTimeoutCount` reads 4 in the first LCI Quick Draft game. The **format** facts (bots draft, humans play, 7 wins / 3 losses) do not depend on those logs; they are first-party from Wizards and Arena's Codex.
 
 **What Bo1 changes about play:**
 - No sideboarding, no game 2. A card exiled by `Ray of Ruin` {4}{B}, `Quicksand Whirlpool`, or a craft cost is gone for the whole match.
@@ -447,4 +448,6 @@ A creature you put 2 damage on this turn is at full toughness next turn. **Do no
 3. **Scryfall rulings endpoint** (official Wizards rulings), quoted for: Broodrage Mycoid, Basking Capybara, Souls of the Lost, Self-Reflection, Deepfathom Echo, Eaten by Piranhas, Dusk Rose Reliquary, Oteclan Landmark, Market Gnome, Saheeli's Lattice.
 4. **Scryfall arena_id lookups** — https://api.scryfall.com/cards/arena/{id} — used to confirm the drafted pool maps to `set:lci`.
 5. **MTG Arena client logs on this machine** — `/Users/brianward/Library/Logs/Wizards of the Coast/MTGA/` (`Player.log`, `Player-prev.log.draft-20260908`, `Player-prev.log.bak-20260822`). See the evidence caveat in §14 for which log each field came from.
-6. **Draftsim, "MTG Arena Quick Draft"** — https://draftsim.com/mtg-arena-quick-draft/ — for best-of-one, 7 wins / 3 losses, entry fee, and bots-only drafting. Secondary source; Wizards' own event page could not be reached.
+6. **Wizards of the Coast, MTG Arena formats page** — https://magic.wizards.com/en/news/mtg-arena/mtg-arena-formats — first-party: Quick Draft is drafted against bots and played against live players, run ends at seven wins or three losses.
+7. **MTG Arena in-client localization database** — `Codex/WaysToPlay/Formats/Limited_QuickDraft_A` (human match opponents, 7 AI drafters, no pick timers); `Achievements/Core/Advanced/Undefeated_desc_alt_2` (Best-of-1 Limited event).
+8. **Draftsim, "MTG Arena Quick Draft"** — https://draftsim.com/mtg-arena-quick-draft/ — secondary corroboration for best-of-one and the entry fee.

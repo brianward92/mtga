@@ -50,7 +50,7 @@ Exact wiki wording for Quick Draft: *"Entry fee: 5,000 gold or 750 gems. Best-of
 3. **Drafting and deckbuilding are untimed; match turns are on a timer.** Deliberate during the draft. In combat, use the procedure at the end of this file rather than re-deriving from scratch.
 4. **The draft is against bots, so pack signals are unreliable.** Bots do not cut colours the way humans do. A late premium card usually means a bot mispriced it, not that a colour is open.
 
-**Opponents:** the wiki confirms only that the *drafters* are bots, and that match results affect Limited rank. It does not state who the *matches* are against. Per the operating brief, Quick Draft matches are against human opponents — play accordingly, and do not soften any combat decision on the assumption of a weak opponent. (See "Unverified" at the end.)
+**Opponents:** the wiki confirms only that the *drafters* are bots. Two first-party Wizards sources settle who the *matches* are against, and both say humans: the MTG Arena formats page — *"Draft cards against bots with no time limits. Build a 40-card deck to play against **live players** until reaching either seven wins or three losses"* — and Arena's own in-client Codex (`Codex/WaysToPlay/Formats/Limited_QuickDraft_A`): *"while you'll still play against other **human opponents**, you'll be drafted with 7 other AI opponents."* Play accordingly: do not soften any combat decision on the assumption of a weak opponent.
 
 ---
 
@@ -460,8 +460,8 @@ Cards the **bots overrate** relative to humans (take them later than the bots do
 
 ## Unverified — do not rely on these
 
-- **Who the matches are against.** The MTG Wiki confirms the *drafters* are bots and that match results affect Limited rank, but does not state that *matches* are against humans. That claim comes from the operating brief, not from a source verified here.
-- **Arena Bo1 opening-hand smoothing.** Bo1 games are said to draw two candidate opening hands and keep the one closer to the deck's average land count. This could not be verified against any source and would materially affect mulligan decisions. Deliberately omitted rather than asserted.
+- ~~Who the matches are against~~ — **now verified.** Wizards' MTG Arena formats page ("play against live players") and Arena's in-client Codex (`Codex/WaysToPlay/Formats/Limited_QuickDraft_A`, "you'll still play against other human opponents") both say humans. See Format facts above.
+- ~~Arena Bo1 opening-hand smoothing~~ — **now verified as first-party**, from Arena's own tip `Queue_Tip_22`: *"In best-of-one matches, your starting hand is selected from two random hands, leaning towards the one with the more average land-spell mix."* Still unverified: whether smoothing is reapplied after a mulligan. Do not factor it into a mulligan decision; see `limited-fundamentals.md` §1 and §11.
 - **Absolute 17lands percentages.** The endpoint is degraded (see caveat table). Ordering is directional; the numbers are not comparable to published 2023-24 figures, which could not be retrieved for cross-check.
 - **Cards with no win-rate data.** 64 of 108 commons fall below the sample threshold. Their ★/⚠ marks reflect pick position plus card-text evaluation, not measured performance. Marks backed by data carry their sample size inline.
 - **Pack composition.** "Commons are 77.6% of cards seen" and "no dedicated Cave slot" are inferred from 17lands `seen_count`, not from an official Arena collation statement.
@@ -472,7 +472,7 @@ Cards the **bots overrate** relative to humans (take them later than the bots do
 ## Sources
 
 - **Scryfall API** — all card names, mana costs, type lines, power/toughness, oracle text and keywords, retrieved 2026-09-10: `https://api.scryfall.com/cards/search?q=set%3Alci+rarity%3Acommon&unique=cards` (113 unique cards; 108 after removing the 5 basics). Keyword rosters taken from Scryfall's structured `keywords` field, not text matching.
-- **Comprehensive Rules**, effective June 7, 2024: `https://media.wizards.com/2024/downloads/MagicCompRules%2020240607.txt` — CR 110.4/110.4a (permanent card), 506.4b (tapping after declaration), 508.1f (attacking taps), 509.1a (blockers untapped), 509.1h (remains blocked), 702.2c (deathtouch assignment), 702.19b/d (trample), 702.20b (vigilance), 702.111b (menace).
+- **Comprehensive Rules.** Every rule cited here was re-checked against the **current** text, effective August 7, 2026 (`https://media.wizards.com/2026/downloads/MagicCompRules%2020260819.txt`), which is the version the rest of this knowledge base uses. *(An earlier pass of this file quoted the June 7, 2024 document — a version that predates the 8 November 2024 deletion of damage assignment order. Nothing cited below changed between the two, but do not re-derive combat rules from the 2024 text.)* Rules used: CR 110.4/110.4a (permanent card), 506.4b (tapping after declaration), 508.1f (attacking taps), 509.1a (blockers untapped), 509.1h (remains blocked), 702.2c (deathtouch assignment), 702.19b/d (trample), 702.20b (vigilance), 702.111b (menace).
 - **17lands card ratings, LCI Quick Draft**: `https://www.17lands.com/card_ratings/data?expansion=LCI&format=QuickDraft` — 108 commons; 44 with GP WR, 4 with GIH WR; 72,056 total games.
 - **17lands card ratings, LCI Premier Draft**: `https://www.17lands.com/card_ratings/data?expansion=LCI&format=PremierDraft` — 71,238 total games; used only for the bot-vs-human ALSA comparison.
 - **Degraded-endpoint evidence**: requests with `start_date=2023-11-14&end_date=2023-11-16` and `start_date=2023-01-01&end_date=2026-09-10` returned byte-identical JSON (SHA-256 `d33c292b96622e2c…`), proving the date filters are ignored.
