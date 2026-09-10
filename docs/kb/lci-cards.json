@@ -4,25 +4,9 @@
   "17lands"
  ],
  "cards": {
-  "A-Geological Appraiser": {
-   "colors": "R",
-   "inDraftPool": false,
-   "keywords": [
-    "Discover"
-   ],
-   "manaCost": "{3}{R}{R}",
-   "mv": 5.0,
-   "name": "A-Geological Appraiser",
-   "oracle": "When Geological Appraiser enters, if you cast it, discover 3. (Exile cards from the top of your library until you exile a nonland card with mana value 3 or less. Cast it without paying its mana cost or put it into your hand. Put the rest on the bottom in a random order.)",
-   "power": "3",
-   "premierDraft": null,
-   "quickDraft": null,
-   "rarity": "uncommon",
-   "toughness": "2",
-   "type": "Creature \u2014 Human Artificer"
-  },
   "Abrade": {
    "colors": "R",
+   "frontName": "Abrade",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{1}{R}",
@@ -52,6 +36,7 @@
   },
   "Abuelo's Awakening": {
    "colors": "W",
+   "frontName": "Abuelo's Awakening",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{X}{3}{W}",
@@ -81,6 +66,7 @@
   },
   "Abuelo, Ancestral Echo": {
    "colors": "UW",
+   "frontName": "Abuelo, Ancestral Echo",
    "inDraftPool": true,
    "keywords": [
     "Flying",
@@ -113,6 +99,7 @@
   },
   "Abyssal Gorestalker": {
    "colors": "B",
+   "frontName": "Abyssal Gorestalker",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{4}{B}{B}",
@@ -142,7 +129,8 @@
   },
   "Aclazotz, Deepest Betrayal // Temple of the Dead": {
    "colors": "B",
-   "inDraftPool": false,
+   "frontName": "Aclazotz, Deepest Betrayal",
+   "inDraftPool": true,
    "keywords": [
     "Flying",
     "Lifelink",
@@ -161,6 +149,7 @@
   },
   "Acolyte of Aclazotz": {
    "colors": "B",
+   "frontName": "Acolyte of Aclazotz",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{2}{B}",
@@ -190,6 +179,7 @@
   },
   "Acrobatic Leap": {
    "colors": "W",
+   "frontName": "Acrobatic Leap",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{W}",
@@ -219,6 +209,7 @@
   },
   "Adaptive Gemguard": {
    "colors": "W",
+   "frontName": "Adaptive Gemguard",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{3}{W}",
@@ -248,6 +239,7 @@
   },
   "Akal Pakal, First Among Equals": {
    "colors": "U",
+   "frontName": "Akal Pakal, First Among Equals",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{2}{U}",
@@ -277,6 +269,7 @@
   },
   "Akawalli, the Seething Tower": {
    "colors": "BG",
+   "frontName": "Akawalli, the Seething Tower",
    "inDraftPool": true,
    "keywords": [
     "Descend"
@@ -308,6 +301,7 @@
   },
   "Amalia Benavides Aguirre": {
    "colors": "BW",
+   "frontName": "Amalia Benavides Aguirre",
    "inDraftPool": true,
    "keywords": [
     "Explore",
@@ -340,6 +334,7 @@
   },
   "Ancestors' Aid": {
    "colors": "R",
+   "frontName": "Ancestors' Aid",
    "inDraftPool": true,
    "keywords": [
     "Treasure"
@@ -371,6 +366,7 @@
   },
   "Ancestral Reminiscence": {
    "colors": "U",
+   "frontName": "Ancestral Reminiscence",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{3}{U}",
@@ -400,6 +396,7 @@
   },
   "Anim Pakal, Thousandth Moon": {
    "colors": "RW",
+   "frontName": "Anim Pakal, Thousandth Moon",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{1}{R}{W}",
@@ -429,6 +426,7 @@
   },
   "Another Chance": {
    "colors": "B",
+   "frontName": "Another Chance",
    "inDraftPool": true,
    "keywords": [
     "Mill"
@@ -460,6 +458,7 @@
   },
   "Armored Kincaller": {
    "colors": "G",
+   "frontName": "Armored Kincaller",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{2}{G}",
@@ -489,6 +488,7 @@
   },
   "Attentive Sunscribe": {
    "colors": "W",
+   "frontName": "Attentive Sunscribe",
    "inDraftPool": true,
    "keywords": [
     "Scry"
@@ -520,6 +520,7 @@
   },
   "Bartolom\u00e9 del Presidio": {
    "colors": "BW",
+   "frontName": "Bartolom\u00e9 del Presidio",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{W}{B}",
@@ -549,6 +550,7 @@
   },
   "Basking Capybara": {
    "colors": "G",
+   "frontName": "Basking Capybara",
    "inDraftPool": true,
    "keywords": [
     "Descend"
@@ -580,6 +582,7 @@
   },
   "Bat Colony": {
    "colors": "W",
+   "frontName": "Bat Colony",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{2}{W}",
@@ -609,6 +612,7 @@
   },
   "Bedrock Tortoise": {
    "colors": "G",
+   "frontName": "Bedrock Tortoise",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{3}{G}",
@@ -638,6 +642,7 @@
   },
   "Belligerent Yearling": {
    "colors": "R",
+   "frontName": "Belligerent Yearling",
    "inDraftPool": true,
    "keywords": [
     "Trample"
@@ -669,6 +674,7 @@
   },
   "Bitter Triumph": {
    "colors": "B",
+   "frontName": "Bitter Triumph",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{1}{B}",
@@ -698,6 +704,7 @@
   },
   "Bloodletter of Aclazotz": {
    "colors": "B",
+   "frontName": "Bloodletter of Aclazotz",
    "inDraftPool": true,
    "keywords": [
     "Flying"
@@ -729,6 +736,7 @@
   },
   "Bloodthorn Flail": {
    "colors": "B",
+   "frontName": "Bloodthorn Flail",
    "inDraftPool": true,
    "keywords": [
     "Equip"
@@ -760,6 +768,7 @@
   },
   "Bonehoard Dracosaur": {
    "colors": "R",
+   "frontName": "Bonehoard Dracosaur",
    "inDraftPool": true,
    "keywords": [
     "Flying",
@@ -793,6 +802,7 @@
   },
   "Brackish Blunder": {
    "colors": "U",
+   "frontName": "Brackish Blunder",
    "inDraftPool": true,
    "keywords": [
     "Explore"
@@ -824,7 +834,8 @@
   },
   "Braided Net // Braided Quipu": {
    "colors": "U",
-   "inDraftPool": false,
+   "frontName": "Braided Net",
+   "inDraftPool": true,
    "keywords": [
     "Craft",
     "Transform"
@@ -842,7 +853,8 @@
   },
   "Brass's Tunnel-Grinder // Tecutlan, the Searing Rift": {
    "colors": "R",
-   "inDraftPool": false,
+   "frontName": "Brass's Tunnel-Grinder",
+   "inDraftPool": true,
    "keywords": [
     "Transform",
     "Discover"
@@ -860,6 +872,7 @@
   },
   "Brazen Blademaster": {
    "colors": "R",
+   "frontName": "Brazen Blademaster",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{2}{R}",
@@ -889,6 +902,7 @@
   },
   "Breeches, Eager Pillager": {
    "colors": "R",
+   "frontName": "Breeches, Eager Pillager",
    "inDraftPool": true,
    "keywords": [
     "First strike",
@@ -921,6 +935,7 @@
   },
   "Bringer of the Last Gift": {
    "colors": "B",
+   "frontName": "Bringer of the Last Gift",
    "inDraftPool": true,
    "keywords": [
     "Flying"
@@ -952,6 +967,7 @@
   },
   "Broodrage Mycoid": {
    "colors": "B",
+   "frontName": "Broodrage Mycoid",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{3}{B}",
@@ -981,6 +997,7 @@
   },
   "Buried Treasure": {
    "colors": "",
+   "frontName": "Buried Treasure",
    "inDraftPool": true,
    "keywords": [
     "Discover"
@@ -1012,6 +1029,7 @@
   },
   "Burning Sun Cavalry": {
    "colors": "R",
+   "frontName": "Burning Sun Cavalry",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{1}{R}",
@@ -1041,6 +1059,7 @@
   },
   "Calamitous Cave-In": {
    "colors": "R",
+   "frontName": "Calamitous Cave-In",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{3}{R}",
@@ -1070,6 +1089,7 @@
   },
   "Canonized in Blood": {
    "colors": "B",
+   "frontName": "Canonized in Blood",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{1}{B}",
@@ -1099,6 +1119,7 @@
   },
   "Caparocti Sunborn": {
    "colors": "RW",
+   "frontName": "Caparocti Sunborn",
    "inDraftPool": true,
    "keywords": [
     "Discover"
@@ -1130,6 +1151,7 @@
   },
   "Captain Storm, Cosmium Raider": {
    "colors": "RU",
+   "frontName": "Captain Storm, Cosmium Raider",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{U}{R}",
@@ -1159,6 +1181,7 @@
   },
   "Captivating Cave": {
    "colors": "",
+   "frontName": "Captivating Cave",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "",
@@ -1188,6 +1211,7 @@
   },
   "Careening Mine Cart": {
    "colors": "",
+   "frontName": "Careening Mine Cart",
    "inDraftPool": true,
    "keywords": [
     "Treasure",
@@ -1220,6 +1244,7 @@
   },
   "Cartographer's Companion": {
    "colors": "",
+   "frontName": "Cartographer's Companion",
    "inDraftPool": true,
    "keywords": [
     "Explore"
@@ -1251,6 +1276,7 @@
   },
   "Cavern Stomper": {
    "colors": "G",
+   "frontName": "Cavern Stomper",
    "inDraftPool": true,
    "keywords": [
     "Scry"
@@ -1282,6 +1308,7 @@
   },
   "Cavern of Souls": {
    "colors": "",
+   "frontName": "Cavern of Souls",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "",
@@ -1311,6 +1338,7 @@
   },
   "Cavernous Maw": {
    "colors": "",
+   "frontName": "Cavernous Maw",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "",
@@ -1340,6 +1368,7 @@
   },
   "Cenote Scout": {
    "colors": "G",
+   "frontName": "Cenote Scout",
    "inDraftPool": true,
    "keywords": [
     "Explore"
@@ -1371,6 +1400,7 @@
   },
   "Chart a Course": {
    "colors": "U",
+   "frontName": "Chart a Course",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{1}{U}",
@@ -1400,6 +1430,7 @@
   },
   "Child of the Volcano": {
    "colors": "R",
+   "frontName": "Child of the Volcano",
    "inDraftPool": true,
    "keywords": [
     "Trample"
@@ -1431,6 +1462,7 @@
   },
   "Chimil, the Inner Sun": {
    "colors": "",
+   "frontName": "Chimil, the Inner Sun",
    "inDraftPool": true,
    "keywords": [
     "Discover"
@@ -1462,6 +1494,7 @@
   },
   "Chupacabra Echo": {
    "colors": "B",
+   "frontName": "Chupacabra Echo",
    "inDraftPool": true,
    "keywords": [
     "Fathomless descent"
@@ -1493,7 +1526,8 @@
   },
   "Clay-Fired Bricks // Cosmium Kiln": {
    "colors": "W",
-   "inDraftPool": false,
+   "frontName": "Clay-Fired Bricks",
+   "inDraftPool": true,
    "keywords": [
     "Craft",
     "Transform"
@@ -1511,6 +1545,7 @@
   },
   "Coati Scavenger": {
    "colors": "G",
+   "frontName": "Coati Scavenger",
    "inDraftPool": true,
    "keywords": [
     "Descend"
@@ -1542,6 +1577,7 @@
   },
   "Cogwork Wrestler": {
    "colors": "U",
+   "frontName": "Cogwork Wrestler",
    "inDraftPool": true,
    "keywords": [
     "Flash"
@@ -1573,6 +1609,7 @@
   },
   "Colossadactyl": {
    "colors": "G",
+   "frontName": "Colossadactyl",
    "inDraftPool": true,
    "keywords": [
     "Reach",
@@ -1605,6 +1642,7 @@
   },
   "Compass Gnome": {
    "colors": "",
+   "frontName": "Compass Gnome",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{2}",
@@ -1634,6 +1672,7 @@
   },
   "Confounding Riddle": {
    "colors": "U",
+   "frontName": "Confounding Riddle",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{2}{U}",
@@ -1663,6 +1702,7 @@
   },
   "Contested Game Ball": {
    "colors": "",
+   "frontName": "Contested Game Ball",
    "inDraftPool": true,
    "keywords": [
     "Treasure"
@@ -1694,6 +1734,7 @@
   },
   "Corpses of the Lost": {
    "colors": "B",
+   "frontName": "Corpses of the Lost",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{2}{B}",
@@ -1723,6 +1764,7 @@
   },
   "Cosmium Blast": {
    "colors": "W",
+   "frontName": "Cosmium Blast",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{1}{W}",
@@ -1752,6 +1794,7 @@
   },
   "Cosmium Confluence": {
    "colors": "G",
+   "frontName": "Cosmium Confluence",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{4}{G}",
@@ -1781,6 +1824,7 @@
   },
   "Council of Echoes": {
    "colors": "U",
+   "frontName": "Council of Echoes",
    "inDraftPool": true,
    "keywords": [
     "Flying",
@@ -1813,6 +1857,7 @@
   },
   "Curator of Sun's Creation": {
    "colors": "R",
+   "frontName": "Curator of Sun's Creation",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{3}{R}",
@@ -1842,6 +1887,7 @@
   },
   "Daring Discovery": {
    "colors": "R",
+   "frontName": "Daring Discovery",
    "inDraftPool": true,
    "keywords": [
     "Discover"
@@ -1873,6 +1919,7 @@
   },
   "Dauntless Dismantler": {
    "colors": "W",
+   "frontName": "Dauntless Dismantler",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{1}{W}",
@@ -1902,6 +1949,7 @@
   },
   "Dead Weight": {
    "colors": "B",
+   "frontName": "Dead Weight",
    "inDraftPool": true,
    "keywords": [
     "Enchant"
@@ -1933,6 +1981,7 @@
   },
   "Deathcap Marionette": {
    "colors": "B",
+   "frontName": "Deathcap Marionette",
    "inDraftPool": true,
    "keywords": [
     "Mill",
@@ -1965,6 +2014,7 @@
   },
   "Deconstruction Hammer": {
    "colors": "W",
+   "frontName": "Deconstruction Hammer",
    "inDraftPool": true,
    "keywords": [
     "Equip"
@@ -1996,6 +2046,7 @@
   },
   "Deep Goblin Skulltaker": {
    "colors": "B",
+   "frontName": "Deep Goblin Skulltaker",
    "inDraftPool": true,
    "keywords": [
     "Menace"
@@ -2027,6 +2078,7 @@
   },
   "Deep-Cavern Bat": {
    "colors": "B",
+   "frontName": "Deep-Cavern Bat",
    "inDraftPool": true,
    "keywords": [
     "Flying",
@@ -2059,6 +2111,7 @@
   },
   "Deepfathom Echo": {
    "colors": "GU",
+   "frontName": "Deepfathom Echo",
    "inDraftPool": true,
    "keywords": [
     "Explore"
@@ -2090,6 +2143,7 @@
   },
   "Deeproot Pilgrimage": {
    "colors": "U",
+   "frontName": "Deeproot Pilgrimage",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{1}{U}",
@@ -2119,6 +2173,7 @@
   },
   "Defossilize": {
    "colors": "B",
+   "frontName": "Defossilize",
    "inDraftPool": true,
    "keywords": [
     "Explore"
@@ -2150,6 +2205,7 @@
   },
   "Diamond Pick-Axe": {
    "colors": "R",
+   "frontName": "Diamond Pick-Axe",
    "inDraftPool": true,
    "keywords": [
     "Indestructible",
@@ -2183,6 +2239,7 @@
   },
   "Didact Echo": {
    "colors": "U",
+   "frontName": "Didact Echo",
    "inDraftPool": true,
    "keywords": [
     "Descend"
@@ -2214,6 +2271,7 @@
   },
   "Digsite Conservator": {
    "colors": "",
+   "frontName": "Digsite Conservator",
    "inDraftPool": true,
    "keywords": [
     "Discover"
@@ -2245,6 +2303,7 @@
   },
   "Dinotomaton": {
    "colors": "R",
+   "frontName": "Dinotomaton",
    "inDraftPool": true,
    "keywords": [
     "Menace"
@@ -2276,7 +2335,8 @@
   },
   "Dire Flail // Dire Blunderbuss": {
    "colors": "R",
-   "inDraftPool": false,
+   "frontName": "Dire Flail",
+   "inDraftPool": true,
    "keywords": [
     "Craft",
     "Transform",
@@ -2295,6 +2355,7 @@
   },
   "Disruptor Wanderglyph": {
    "colors": "",
+   "frontName": "Disruptor Wanderglyph",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{4}",
@@ -2324,6 +2385,7 @@
   },
   "Disturbed Slumber": {
    "colors": "G",
+   "frontName": "Disturbed Slumber",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{1}{G}",
@@ -2353,7 +2415,8 @@
   },
   "Dowsing Device // Geode Grotto": {
    "colors": "R",
-   "inDraftPool": false,
+   "frontName": "Dowsing Device",
+   "inDraftPool": true,
    "keywords": [
     "Transform"
    ],
@@ -2370,6 +2433,7 @@
   },
   "Dreadmaw's Ire": {
    "colors": "R",
+   "frontName": "Dreadmaw's Ire",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{R}",
@@ -2399,6 +2463,7 @@
   },
   "Dusk Rose Reliquary": {
    "colors": "W",
+   "frontName": "Dusk Rose Reliquary",
    "inDraftPool": true,
    "keywords": [
     "Ward"
@@ -2430,6 +2495,7 @@
   },
   "Earthshaker Dreadmaw": {
    "colors": "G",
+   "frontName": "Earthshaker Dreadmaw",
    "inDraftPool": true,
    "keywords": [
     "Trample"
@@ -2461,6 +2527,7 @@
   },
   "Eaten by Piranhas": {
    "colors": "U",
+   "frontName": "Eaten by Piranhas",
    "inDraftPool": true,
    "keywords": [
     "Enchant",
@@ -2493,6 +2560,7 @@
   },
   "Echo of Dusk": {
    "colors": "B",
+   "frontName": "Echo of Dusk",
    "inDraftPool": true,
    "keywords": [
     "Descend"
@@ -2524,6 +2592,7 @@
   },
   "Echoing Deeps": {
    "colors": "",
+   "frontName": "Echoing Deeps",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "",
@@ -2553,6 +2622,7 @@
   },
   "Enterprising Scallywag": {
    "colors": "R",
+   "frontName": "Enterprising Scallywag",
    "inDraftPool": true,
    "keywords": [
     "Treasure"
@@ -2584,6 +2654,7 @@
   },
   "Envoy of Okinec Ahau": {
    "colors": "W",
+   "frontName": "Envoy of Okinec Ahau",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{2}{W}",
@@ -2613,6 +2684,7 @@
   },
   "Etali's Favor": {
    "colors": "R",
+   "frontName": "Etali's Favor",
    "inDraftPool": true,
    "keywords": [
     "Discover",
@@ -2645,6 +2717,7 @@
   },
   "Explorer's Cache": {
    "colors": "G",
+   "frontName": "Explorer's Cache",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{1}{G}",
@@ -2674,6 +2747,7 @@
   },
   "Fabrication Foundry": {
    "colors": "W",
+   "frontName": "Fabrication Foundry",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{1}{W}",
@@ -2703,6 +2777,7 @@
   },
   "Family Reunion": {
    "colors": "W",
+   "frontName": "Family Reunion",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{1}{W}",
@@ -2732,6 +2807,7 @@
   },
   "Fanatical Offering": {
    "colors": "B",
+   "frontName": "Fanatical Offering",
    "inDraftPool": true,
    "keywords": [
     "Explore"
@@ -2763,6 +2839,7 @@
   },
   "Forest": {
    "colors": "",
+   "frontName": "Forest",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "",
@@ -2778,6 +2855,7 @@
   },
   "Forgotten Monument": {
    "colors": "",
+   "frontName": "Forgotten Monument",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "",
@@ -2807,6 +2885,7 @@
   },
   "Frilled Cave-Wurm": {
    "colors": "U",
+   "frontName": "Frilled Cave-Wurm",
    "inDraftPool": true,
    "keywords": [
     "Descend"
@@ -2838,6 +2917,7 @@
   },
   "Fungal Fortitude": {
    "colors": "B",
+   "frontName": "Fungal Fortitude",
    "inDraftPool": true,
    "keywords": [
     "Enchant",
@@ -2870,6 +2950,7 @@
   },
   "Gargantuan Leech": {
    "colors": "B",
+   "frontName": "Gargantuan Leech",
    "inDraftPool": true,
    "keywords": [
     "Lifelink"
@@ -2901,6 +2982,7 @@
   },
   "Geological Appraiser": {
    "colors": "R",
+   "frontName": "Geological Appraiser",
    "inDraftPool": true,
    "keywords": [
     "Discover"
@@ -2932,6 +3014,7 @@
   },
   "Get Lost": {
    "colors": "W",
+   "frontName": "Get Lost",
    "inDraftPool": true,
    "keywords": [
     "Explore"
@@ -2963,6 +3046,7 @@
   },
   "Ghalta, Stampede Tyrant": {
    "colors": "G",
+   "frontName": "Ghalta, Stampede Tyrant",
    "inDraftPool": true,
    "keywords": [
     "Trample"
@@ -2994,6 +3078,7 @@
   },
   "Gishath, Sun's Avatar": {
    "colors": "GRW",
+   "frontName": "Gishath, Sun's Avatar",
    "inDraftPool": true,
    "keywords": [
     "Vigilance",
@@ -3027,6 +3112,7 @@
   },
   "Glimpse the Core": {
    "colors": "G",
+   "frontName": "Glimpse the Core",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{1}{G}",
@@ -3056,6 +3142,7 @@
   },
   "Glorifier of Suffering": {
    "colors": "W",
+   "frontName": "Glorifier of Suffering",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{2}{W}",
@@ -3085,6 +3172,7 @@
   },
   "Glowcap Lantern": {
    "colors": "G",
+   "frontName": "Glowcap Lantern",
    "inDraftPool": true,
    "keywords": [
     "Explore",
@@ -3117,6 +3205,7 @@
   },
   "Goblin Tomb Raider": {
    "colors": "R",
+   "frontName": "Goblin Tomb Raider",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{R}",
@@ -3146,6 +3235,7 @@
   },
   "Goldfury Strider": {
    "colors": "R",
+   "frontName": "Goldfury Strider",
    "inDraftPool": true,
    "keywords": [
     "Trample"
@@ -3177,7 +3267,8 @@
   },
   "Grasping Shadows // Shadows' Lair": {
    "colors": "B",
-   "inDraftPool": false,
+   "frontName": "Grasping Shadows",
+   "inDraftPool": true,
    "keywords": [
     "Transform"
    ],
@@ -3194,6 +3285,7 @@
   },
   "Greedy Freebooter": {
    "colors": "B",
+   "frontName": "Greedy Freebooter",
    "inDraftPool": true,
    "keywords": [
     "Treasure",
@@ -3226,7 +3318,8 @@
   },
   "Growing Rites of Itlimoc // Itlimoc, Cradle of the Sun": {
    "colors": "G",
-   "inDraftPool": false,
+   "frontName": "Growing Rites of Itlimoc",
+   "inDraftPool": true,
    "keywords": [
     "Transform"
    ],
@@ -3243,6 +3336,7 @@
   },
   "Guardian of the Great Door": {
    "colors": "W",
+   "frontName": "Guardian of the Great Door",
    "inDraftPool": true,
    "keywords": [
     "Flying"
@@ -3274,6 +3368,7 @@
   },
   "Helping Hand": {
    "colors": "W",
+   "frontName": "Helping Hand",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{W}",
@@ -3303,6 +3398,7 @@
   },
   "Hermitic Nautilus": {
    "colors": "U",
+   "frontName": "Hermitic Nautilus",
    "inDraftPool": true,
    "keywords": [
     "Vigilance"
@@ -3334,6 +3430,7 @@
   },
   "Hidden Cataract": {
    "colors": "",
+   "frontName": "Hidden Cataract",
    "inDraftPool": true,
    "keywords": [
     "Discover"
@@ -3365,6 +3462,7 @@
   },
   "Hidden Courtyard": {
    "colors": "",
+   "frontName": "Hidden Courtyard",
    "inDraftPool": true,
    "keywords": [
     "Discover"
@@ -3396,6 +3494,7 @@
   },
   "Hidden Necropolis": {
    "colors": "",
+   "frontName": "Hidden Necropolis",
    "inDraftPool": true,
    "keywords": [
     "Discover"
@@ -3427,6 +3526,7 @@
   },
   "Hidden Nursery": {
    "colors": "",
+   "frontName": "Hidden Nursery",
    "inDraftPool": true,
    "keywords": [
     "Discover"
@@ -3458,6 +3558,7 @@
   },
   "Hidden Volcano": {
    "colors": "",
+   "frontName": "Hidden Volcano",
    "inDraftPool": true,
    "keywords": [
     "Discover"
@@ -3489,6 +3590,7 @@
   },
   "Hit the Mother Lode": {
    "colors": "R",
+   "frontName": "Hit the Mother Lode",
    "inDraftPool": true,
    "keywords": [
     "Treasure",
@@ -3521,6 +3623,7 @@
   },
   "Hotfoot Gnome": {
    "colors": "R",
+   "frontName": "Hotfoot Gnome",
    "inDraftPool": true,
    "keywords": [
     "Haste"
@@ -3552,6 +3655,7 @@
   },
   "Hoverstone Pilgrim": {
    "colors": "",
+   "frontName": "Hoverstone Pilgrim",
    "inDraftPool": true,
    "keywords": [
     "Flying",
@@ -3584,6 +3688,7 @@
   },
   "Huatli's Final Strike": {
    "colors": "G",
+   "frontName": "Huatli's Final Strike",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{2}{G}",
@@ -3613,7 +3718,8 @@
   },
   "Huatli, Poet of Unity // Roar of the Fifth People": {
    "colors": "G",
-   "inDraftPool": false,
+   "frontName": "Huatli, Poet of Unity",
+   "inDraftPool": true,
    "keywords": [
     "Transform"
    ],
@@ -3630,6 +3736,7 @@
   },
   "Hulking Raptor": {
    "colors": "G",
+   "frontName": "Hulking Raptor",
    "inDraftPool": true,
    "keywords": [
     "Ward"
@@ -3661,6 +3768,7 @@
   },
   "Hunter's Blowgun": {
    "colors": "",
+   "frontName": "Hunter's Blowgun",
    "inDraftPool": true,
    "keywords": [
     "Equip"
@@ -3692,6 +3800,7 @@
   },
   "Hurl into History": {
    "colors": "U",
+   "frontName": "Hurl into History",
    "inDraftPool": true,
    "keywords": [
     "Discover"
@@ -3723,7 +3832,8 @@
   },
   "Idol of the Deep King // Sovereign's Macuahuitl": {
    "colors": "R",
-   "inDraftPool": false,
+   "frontName": "Idol of the Deep King",
+   "inDraftPool": true,
    "keywords": [
     "Craft",
     "Transform",
@@ -3743,6 +3853,7 @@
   },
   "In the Presence of Ages": {
    "colors": "G",
+   "frontName": "In the Presence of Ages",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{2}{G}",
@@ -3772,6 +3883,7 @@
   },
   "Inti, Seneschal of the Sun": {
    "colors": "R",
+   "frontName": "Inti, Seneschal of the Sun",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{1}{R}",
@@ -3801,6 +3913,7 @@
   },
   "Intrepid Paleontologist": {
    "colors": "G",
+   "frontName": "Intrepid Paleontologist",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{1}{G}",
@@ -3830,7 +3943,8 @@
   },
   "Inverted Iceberg // Iceberg Titan": {
    "colors": "U",
-   "inDraftPool": false,
+   "frontName": "Inverted Iceberg",
+   "inDraftPool": true,
    "keywords": [
     "Craft",
     "Transform",
@@ -3849,6 +3963,7 @@
   },
   "Ironpaw Aspirant": {
    "colors": "W",
+   "frontName": "Ironpaw Aspirant",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{1}{W}",
@@ -3878,6 +3993,7 @@
   },
   "Island": {
    "colors": "",
+   "frontName": "Island",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "",
@@ -3893,6 +4009,7 @@
   },
   "Itzquinth, Firstborn of Gishath": {
    "colors": "GR",
+   "frontName": "Itzquinth, Firstborn of Gishath",
    "inDraftPool": true,
    "keywords": [
     "Haste"
@@ -3924,6 +4041,7 @@
   },
   "Ixalli's Lorekeeper": {
    "colors": "G",
+   "frontName": "Ixalli's Lorekeeper",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{G}",
@@ -3953,7 +4071,8 @@
   },
   "Jade Seedstones // Jadeheart Attendant": {
    "colors": "G",
-   "inDraftPool": false,
+   "frontName": "Jade Seedstones",
+   "inDraftPool": true,
    "keywords": [
     "Craft",
     "Transform"
@@ -3971,6 +4090,7 @@
   },
   "Jadelight Spelunker": {
    "colors": "G",
+   "frontName": "Jadelight Spelunker",
    "inDraftPool": true,
    "keywords": [
     "Explore"
@@ -4002,6 +4122,7 @@
   },
   "Join the Dead": {
    "colors": "B",
+   "frontName": "Join the Dead",
    "inDraftPool": true,
    "keywords": [
     "Descend"
@@ -4033,7 +4154,8 @@
   },
   "Kaslem's Stonetree // Kaslem's Strider": {
    "colors": "G",
-   "inDraftPool": false,
+   "frontName": "Kaslem's Stonetree",
+   "inDraftPool": true,
    "keywords": [
     "Craft",
     "Transform"
@@ -4051,7 +4173,8 @@
   },
   "Kellan, Daring Traveler // Journey On": {
    "colors": "W",
-   "inDraftPool": false,
+   "frontName": "Kellan, Daring Traveler",
+   "inDraftPool": true,
    "keywords": [],
    "manaCost": "{1}{W} // {G}",
    "mv": 2.0,
@@ -4066,6 +4189,7 @@
   },
   "Kinjalli's Dawnrunner": {
    "colors": "W",
+   "frontName": "Kinjalli's Dawnrunner",
    "inDraftPool": true,
    "keywords": [
     "Explore",
@@ -4098,6 +4222,7 @@
   },
   "Kitesail Larcenist": {
    "colors": "U",
+   "frontName": "Kitesail Larcenist",
    "inDraftPool": true,
    "keywords": [
     "Flying",
@@ -4130,6 +4255,7 @@
   },
   "Kutzil's Flanker": {
    "colors": "W",
+   "frontName": "Kutzil's Flanker",
    "inDraftPool": true,
    "keywords": [
     "Flash",
@@ -4162,6 +4288,7 @@
   },
   "Kutzil, Malamet Exemplar": {
    "colors": "GW",
+   "frontName": "Kutzil, Malamet Exemplar",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{1}{G}{W}",
@@ -4191,7 +4318,8 @@
   },
   "Lodestone Needle // Guidestone Compass": {
    "colors": "U",
-   "inDraftPool": false,
+   "frontName": "Lodestone Needle",
+   "inDraftPool": true,
    "keywords": [
     "Craft",
     "Transform",
@@ -4211,6 +4339,7 @@
   },
   "Magmatic Galleon": {
    "colors": "R",
+   "frontName": "Magmatic Galleon",
    "inDraftPool": true,
    "keywords": [
     "Treasure",
@@ -4243,6 +4372,7 @@
   },
   "Malamet Battle Glyph": {
    "colors": "G",
+   "frontName": "Malamet Battle Glyph",
    "inDraftPool": true,
    "keywords": [
     "Fight"
@@ -4274,6 +4404,7 @@
   },
   "Malamet Brawler": {
    "colors": "G",
+   "frontName": "Malamet Brawler",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{1}{G}",
@@ -4303,6 +4434,7 @@
   },
   "Malamet Scythe": {
    "colors": "G",
+   "frontName": "Malamet Scythe",
    "inDraftPool": true,
    "keywords": [
     "Equip",
@@ -4335,6 +4467,7 @@
   },
   "Malamet Veteran": {
    "colors": "G",
+   "frontName": "Malamet Veteran",
    "inDraftPool": true,
    "keywords": [
     "Descend",
@@ -4367,6 +4500,7 @@
   },
   "Malamet War Scribe": {
    "colors": "W",
+   "frontName": "Malamet War Scribe",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{3}{W}{W}",
@@ -4396,6 +4530,7 @@
   },
   "Malcolm, Alluring Scoundrel": {
    "colors": "U",
+   "frontName": "Malcolm, Alluring Scoundrel",
    "inDraftPool": true,
    "keywords": [
     "Flying",
@@ -4428,6 +4563,7 @@
   },
   "Malicious Eclipse": {
    "colors": "B",
+   "frontName": "Malicious Eclipse",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{1}{B}{B}",
@@ -4457,6 +4593,7 @@
   },
   "Marauding Brinefang": {
    "colors": "U",
+   "frontName": "Marauding Brinefang",
    "inDraftPool": true,
    "keywords": [
     "Islandcycling",
@@ -4492,6 +4629,7 @@
   },
   "Market Gnome": {
    "colors": "W",
+   "frontName": "Market Gnome",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{W}",
@@ -4521,7 +4659,8 @@
   },
   "Master's Guide-Mural // Master's Manufactory": {
    "colors": "UW",
-   "inDraftPool": false,
+   "frontName": "Master's Guide-Mural",
+   "inDraftPool": true,
    "keywords": [
     "Craft",
     "Transform"
@@ -4539,7 +4678,8 @@
   },
   "Matzalantli, the Great Door // The Core": {
    "colors": "",
-   "inDraftPool": false,
+   "frontName": "Matzalantli, the Great Door",
+   "inDraftPool": true,
    "keywords": [
     "Transform",
     "Fathomless descent"
@@ -4557,6 +4697,7 @@
   },
   "Mephitic Draught": {
    "colors": "B",
+   "frontName": "Mephitic Draught",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{1}{B}",
@@ -4586,6 +4727,7 @@
   },
   "Merfolk Cave-Diver": {
    "colors": "U",
+   "frontName": "Merfolk Cave-Diver",
    "inDraftPool": true,
    "keywords": [
     "Explore"
@@ -4617,6 +4759,7 @@
   },
   "Might of the Ancestors": {
    "colors": "W",
+   "frontName": "Might of the Ancestors",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{2}{W}",
@@ -4646,6 +4789,7 @@
   },
   "Miner's Guidewing": {
    "colors": "W",
+   "frontName": "Miner's Guidewing",
    "inDraftPool": true,
    "keywords": [
     "Flying",
@@ -4679,6 +4823,7 @@
   },
   "Mineshaft Spider": {
    "colors": "G",
+   "frontName": "Mineshaft Spider",
    "inDraftPool": true,
    "keywords": [
     "Reach",
@@ -4711,6 +4856,7 @@
   },
   "Mischievous Pup": {
    "colors": "W",
+   "frontName": "Mischievous Pup",
    "inDraftPool": true,
    "keywords": [
     "Flash"
@@ -4742,6 +4888,7 @@
   },
   "Molten Collapse": {
    "colors": "BR",
+   "frontName": "Molten Collapse",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{B}{R}",
@@ -4771,6 +4918,7 @@
   },
   "Mountain": {
    "colors": "",
+   "frontName": "Mountain",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "",
@@ -4786,6 +4934,7 @@
   },
   "Nicanzil, Current Conductor": {
    "colors": "GU",
+   "frontName": "Nicanzil, Current Conductor",
    "inDraftPool": true,
    "keywords": [
     "Explore"
@@ -4817,6 +4966,7 @@
   },
   "Nurturing Bristleback": {
    "colors": "G",
+   "frontName": "Nurturing Bristleback",
    "inDraftPool": true,
    "keywords": [
     "Landcycling",
@@ -4851,6 +5001,7 @@
   },
   "Oaken Siren": {
    "colors": "U",
+   "frontName": "Oaken Siren",
    "inDraftPool": true,
    "keywords": [
     "Flying",
@@ -4883,7 +5034,8 @@
   },
   "Ojer Axonil, Deepest Might // Temple of Power": {
    "colors": "R",
-   "inDraftPool": false,
+   "frontName": "Ojer Axonil, Deepest Might",
+   "inDraftPool": true,
    "keywords": [
     "Transform",
     "Trample"
@@ -4901,7 +5053,8 @@
   },
   "Ojer Kaslem, Deepest Growth // Temple of Cultivation": {
    "colors": "G",
-   "inDraftPool": false,
+   "frontName": "Ojer Kaslem, Deepest Growth",
+   "inDraftPool": true,
    "keywords": [
     "Transform",
     "Trample"
@@ -4919,7 +5072,8 @@
   },
   "Ojer Pakpatiq, Deepest Epoch // Temple of Cyclical Time": {
    "colors": "U",
-   "inDraftPool": false,
+   "frontName": "Ojer Pakpatiq, Deepest Epoch",
+   "inDraftPool": true,
    "keywords": [
     "Flying",
     "Transform"
@@ -4937,7 +5091,8 @@
   },
   "Ojer Taq, Deepest Foundation // Temple of Civilization": {
    "colors": "W",
-   "inDraftPool": false,
+   "frontName": "Ojer Taq, Deepest Foundation",
+   "inDraftPool": true,
    "keywords": [
     "Vigilance",
     "Transform"
@@ -4955,6 +5110,7 @@
   },
   "Oltec Archaeologists": {
    "colors": "W",
+   "frontName": "Oltec Archaeologists",
    "inDraftPool": true,
    "keywords": [
     "Scry"
@@ -4986,6 +5142,7 @@
   },
   "Oltec Cloud Guard": {
    "colors": "W",
+   "frontName": "Oltec Cloud Guard",
    "inDraftPool": true,
    "keywords": [
     "Flying"
@@ -5017,6 +5174,7 @@
   },
   "Orazca Puzzle-Door": {
    "colors": "U",
+   "frontName": "Orazca Puzzle-Door",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{U}",
@@ -5046,7 +5204,8 @@
   },
   "Oteclan Landmark // Oteclan Levitator": {
    "colors": "W",
-   "inDraftPool": false,
+   "frontName": "Oteclan Landmark",
+   "inDraftPool": true,
    "keywords": [
     "Scry",
     "Flying",
@@ -5066,6 +5225,7 @@
   },
   "Out of Air": {
    "colors": "U",
+   "frontName": "Out of Air",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{2}{U}{U}",
@@ -5095,6 +5255,7 @@
   },
   "Over the Edge": {
    "colors": "G",
+   "frontName": "Over the Edge",
    "inDraftPool": true,
    "keywords": [
     "Explore"
@@ -5126,6 +5287,7 @@
   },
   "Palani's Hatcher": {
    "colors": "GR",
+   "frontName": "Palani's Hatcher",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{3}{R}{G}",
@@ -5155,6 +5317,7 @@
   },
   "Panicked Altisaur": {
    "colors": "R",
+   "frontName": "Panicked Altisaur",
    "inDraftPool": true,
    "keywords": [
     "Reach"
@@ -5186,6 +5349,7 @@
   },
   "Pathfinding Axejaw": {
    "colors": "G",
+   "frontName": "Pathfinding Axejaw",
    "inDraftPool": true,
    "keywords": [
     "Explore"
@@ -5217,6 +5381,7 @@
   },
   "Petrify": {
    "colors": "W",
+   "frontName": "Petrify",
    "inDraftPool": true,
    "keywords": [
     "Enchant"
@@ -5248,6 +5413,7 @@
   },
   "Pirate Hat": {
    "colors": "U",
+   "frontName": "Pirate Hat",
    "inDraftPool": true,
    "keywords": [
     "Equip"
@@ -5279,6 +5445,7 @@
   },
   "Pit of Offerings": {
    "colors": "",
+   "frontName": "Pit of Offerings",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "",
@@ -5308,6 +5475,7 @@
   },
   "Plains": {
    "colors": "",
+   "frontName": "Plains",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "",
@@ -5323,6 +5491,7 @@
   },
   "Plundering Pirate": {
    "colors": "R",
+   "frontName": "Plundering Pirate",
    "inDraftPool": true,
    "keywords": [
     "Treasure"
@@ -5354,6 +5523,7 @@
   },
   "Poetic Ingenuity": {
    "colors": "R",
+   "frontName": "Poetic Ingenuity",
    "inDraftPool": true,
    "keywords": [
     "Treasure"
@@ -5385,6 +5555,7 @@
   },
   "Poison Dart Frog": {
    "colors": "G",
+   "frontName": "Poison Dart Frog",
    "inDraftPool": true,
    "keywords": [
     "Reach"
@@ -5416,6 +5587,7 @@
   },
   "Preacher of the Schism": {
    "colors": "B",
+   "frontName": "Preacher of the Schism",
    "inDraftPool": true,
    "keywords": [
     "Deathtouch"
@@ -5447,6 +5619,7 @@
   },
   "Primordial Gnawer": {
    "colors": "B",
+   "frontName": "Primordial Gnawer",
    "inDraftPool": true,
    "keywords": [
     "Discover"
@@ -5478,6 +5651,7 @@
   },
   "Promising Vein": {
    "colors": "",
+   "frontName": "Promising Vein",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "",
@@ -5507,6 +5681,7 @@
   },
   "Pugnacious Hammerskull": {
    "colors": "G",
+   "frontName": "Pugnacious Hammerskull",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{2}{G}",
@@ -5536,6 +5711,7 @@
   },
   "Queen's Bay Paladin": {
    "colors": "B",
+   "frontName": "Queen's Bay Paladin",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{3}{B}{B}",
@@ -5565,6 +5741,7 @@
   },
   "Quicksand Whirlpool": {
    "colors": "W",
+   "frontName": "Quicksand Whirlpool",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{5}{W}",
@@ -5594,6 +5771,7 @@
   },
   "Quintorius Kand": {
    "colors": "RW",
+   "frontName": "Quintorius Kand",
    "inDraftPool": true,
    "keywords": [
     "Discover"
@@ -5625,6 +5803,7 @@
   },
   "Rampaging Ceratops": {
    "colors": "R",
+   "frontName": "Rampaging Ceratops",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{4}{R}",
@@ -5654,6 +5833,7 @@
   },
   "Rampaging Spiketail": {
    "colors": "B",
+   "frontName": "Rampaging Spiketail",
    "inDraftPool": true,
    "keywords": [
     "Landcycling",
@@ -5688,6 +5868,7 @@
   },
   "Ray of Ruin": {
    "colors": "B",
+   "frontName": "Ray of Ruin",
    "inDraftPool": true,
    "keywords": [
     "Scry"
@@ -5719,6 +5900,7 @@
   },
   "Relic's Roar": {
    "colors": "U",
+   "frontName": "Relic's Roar",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{U}",
@@ -5748,6 +5930,7 @@
   },
   "Resplendent Angel": {
    "colors": "W",
+   "frontName": "Resplendent Angel",
    "inDraftPool": true,
    "keywords": [
     "Flying"
@@ -5779,6 +5962,7 @@
   },
   "Restless Anchorage": {
    "colors": "",
+   "frontName": "Restless Anchorage",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "",
@@ -5808,6 +5992,7 @@
   },
   "Restless Prairie": {
    "colors": "",
+   "frontName": "Restless Prairie",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "",
@@ -5837,6 +6022,7 @@
   },
   "Restless Reef": {
    "colors": "",
+   "frontName": "Restless Reef",
    "inDraftPool": true,
    "keywords": [
     "Mill"
@@ -5868,6 +6054,7 @@
   },
   "Restless Ridgeline": {
    "colors": "",
+   "frontName": "Restless Ridgeline",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "",
@@ -5897,6 +6084,7 @@
   },
   "Restless Vents": {
    "colors": "",
+   "frontName": "Restless Vents",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "",
@@ -5926,6 +6114,7 @@
   },
   "River Herald Guide": {
    "colors": "G",
+   "frontName": "River Herald Guide",
    "inDraftPool": true,
    "keywords": [
     "Vigilance",
@@ -5958,6 +6147,7 @@
   },
   "River Herald Scout": {
    "colors": "U",
+   "frontName": "River Herald Scout",
    "inDraftPool": true,
    "keywords": [
     "Explore"
@@ -5989,6 +6179,7 @@
   },
   "Roaming Throne": {
    "colors": "",
+   "frontName": "Roaming Throne",
    "inDraftPool": true,
    "keywords": [
     "Ward"
@@ -6020,6 +6211,7 @@
   },
   "Ruin-Lurker Bat": {
    "colors": "W",
+   "frontName": "Ruin-Lurker Bat",
    "inDraftPool": true,
    "keywords": [
     "Scry",
@@ -6053,6 +6245,7 @@
   },
   "Rumbling Rockslide": {
    "colors": "R",
+   "frontName": "Rumbling Rockslide",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{3}{R}",
@@ -6082,6 +6275,7 @@
   },
   "Runaway Boulder": {
    "colors": "",
+   "frontName": "Runaway Boulder",
    "inDraftPool": true,
    "keywords": [
     "Flash",
@@ -6114,6 +6308,7 @@
   },
   "Sage of Days": {
    "colors": "U",
+   "frontName": "Sage of Days",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{2}{U}",
@@ -6143,7 +6338,8 @@
   },
   "Saheeli's Lattice // Mastercraft Raptor": {
    "colors": "R",
-   "inDraftPool": false,
+   "frontName": "Saheeli's Lattice",
+   "inDraftPool": true,
    "keywords": [
     "Craft",
     "Transform"
@@ -6161,6 +6357,7 @@
   },
   "Saheeli, the Sun's Brilliance": {
    "colors": "RU",
+   "frontName": "Saheeli, the Sun's Brilliance",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{U}{R}",
@@ -6190,6 +6387,7 @@
   },
   "Sanguine Evangelist": {
    "colors": "W",
+   "frontName": "Sanguine Evangelist",
    "inDraftPool": true,
    "keywords": [
     "Battle Cry"
@@ -6221,6 +6419,7 @@
   },
   "Scampering Surveyor": {
    "colors": "",
+   "frontName": "Scampering Surveyor",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{4}",
@@ -6250,6 +6449,7 @@
   },
   "Screaming Phantom": {
    "colors": "B",
+   "frontName": "Screaming Phantom",
    "inDraftPool": true,
    "keywords": [
     "Flying",
@@ -6282,6 +6482,7 @@
   },
   "Scytheclaw Raptor": {
    "colors": "R",
+   "frontName": "Scytheclaw Raptor",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{2}{R}",
@@ -6311,6 +6512,7 @@
   },
   "Seeker of Sunlight": {
    "colors": "G",
+   "frontName": "Seeker of Sunlight",
    "inDraftPool": true,
    "keywords": [
     "Explore"
@@ -6342,6 +6544,7 @@
   },
   "Seismic Monstrosaur": {
    "colors": "R",
+   "frontName": "Seismic Monstrosaur",
    "inDraftPool": true,
    "keywords": [
     "Mountaincycling",
@@ -6377,6 +6580,7 @@
   },
   "Self-Reflection": {
    "colors": "U",
+   "frontName": "Self-Reflection",
    "inDraftPool": true,
    "keywords": [
     "Flashback"
@@ -6408,6 +6612,7 @@
   },
   "Sentinel of the Nameless City": {
    "colors": "G",
+   "frontName": "Sentinel of the Nameless City",
    "inDraftPool": true,
    "keywords": [
     "Vigilance",
@@ -6440,6 +6645,7 @@
   },
   "Shipwreck Sentry": {
    "colors": "U",
+   "frontName": "Shipwreck Sentry",
    "inDraftPool": true,
    "keywords": [
     "Defender"
@@ -6471,6 +6677,7 @@
   },
   "Sinuous Benthisaur": {
    "colors": "U",
+   "frontName": "Sinuous Benthisaur",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{5}{U}",
@@ -6500,6 +6707,7 @@
   },
   "Skullcap Snail": {
    "colors": "B",
+   "frontName": "Skullcap Snail",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{1}{B}",
@@ -6529,6 +6737,7 @@
   },
   "Soaring Sandwing": {
    "colors": "W",
+   "frontName": "Soaring Sandwing",
    "inDraftPool": true,
    "keywords": [
     "Flying",
@@ -6564,6 +6773,7 @@
   },
   "Song of Stupefaction": {
    "colors": "U",
+   "frontName": "Song of Stupefaction",
    "inDraftPool": true,
    "keywords": [
     "Fathomless descent",
@@ -6597,6 +6807,7 @@
   },
   "Sorcerous Spyglass": {
    "colors": "",
+   "frontName": "Sorcerous Spyglass",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{2}",
@@ -6626,6 +6837,7 @@
   },
   "Soulcoil Viper": {
    "colors": "B",
+   "frontName": "Soulcoil Viper",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{2}{B}",
@@ -6655,6 +6867,7 @@
   },
   "Souls of the Lost": {
    "colors": "B",
+   "frontName": "Souls of the Lost",
    "inDraftPool": true,
    "keywords": [
     "Fathomless descent"
@@ -6686,6 +6899,7 @@
   },
   "Sovereign Okinec Ahau": {
    "colors": "GW",
+   "frontName": "Sovereign Okinec Ahau",
    "inDraftPool": true,
    "keywords": [
     "Ward"
@@ -6717,6 +6931,7 @@
   },
   "Spelunking": {
    "colors": "G",
+   "frontName": "Spelunking",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{2}{G}",
@@ -6746,7 +6961,8 @@
   },
   "Spring-Loaded Sawblades // Bladewheel Chariot": {
    "colors": "W",
-   "inDraftPool": false,
+   "frontName": "Spring-Loaded Sawblades",
+   "inDraftPool": true,
    "keywords": [
     "Craft",
     "Transform",
@@ -6766,6 +6982,7 @@
   },
   "Spyglass Siren": {
    "colors": "U",
+   "frontName": "Spyglass Siren",
    "inDraftPool": true,
    "keywords": [
     "Flying",
@@ -6798,6 +7015,7 @@
   },
   "Squirming Emergence": {
    "colors": "BG",
+   "frontName": "Squirming Emergence",
    "inDraftPool": true,
    "keywords": [
     "Fathomless descent"
@@ -6829,6 +7047,7 @@
   },
   "Staggering Size": {
    "colors": "G",
+   "frontName": "Staggering Size",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{1}{G}",
@@ -6858,6 +7077,7 @@
   },
   "Stalactite Stalker": {
    "colors": "B",
+   "frontName": "Stalactite Stalker",
    "inDraftPool": true,
    "keywords": [
     "Menace"
@@ -6889,6 +7109,7 @@
   },
   "Starving Revenant": {
    "colors": "B",
+   "frontName": "Starving Revenant",
    "inDraftPool": true,
    "keywords": [
     "Surveil",
@@ -6921,6 +7142,7 @@
   },
   "Staunch Crewmate": {
    "colors": "U",
+   "frontName": "Staunch Crewmate",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{1}{U}",
@@ -6950,6 +7172,7 @@
   },
   "Stinging Cave Crawler": {
    "colors": "B",
+   "frontName": "Stinging Cave Crawler",
    "inDraftPool": true,
    "keywords": [
     "Descend",
@@ -6982,6 +7205,7 @@
   },
   "Subterranean Schooner": {
    "colors": "U",
+   "frontName": "Subterranean Schooner",
    "inDraftPool": true,
    "keywords": [
     "Crew",
@@ -7014,7 +7238,8 @@
   },
   "Sunbird Standard // Sunbird Effigy": {
    "colors": "",
-   "inDraftPool": false,
+   "frontName": "Sunbird Standard",
+   "inDraftPool": true,
    "keywords": [
     "Flying",
     "Craft",
@@ -7035,6 +7260,7 @@
   },
   "Sunfire Torch": {
    "colors": "R",
+   "frontName": "Sunfire Torch",
    "inDraftPool": true,
    "keywords": [
     "Equip"
@@ -7066,6 +7292,7 @@
   },
   "Sunken Citadel": {
    "colors": "",
+   "frontName": "Sunken Citadel",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "",
@@ -7095,6 +7322,7 @@
   },
   "Sunshot Militia": {
    "colors": "R",
+   "frontName": "Sunshot Militia",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{1}{R}",
@@ -7124,6 +7352,7 @@
   },
   "Swamp": {
    "colors": "",
+   "frontName": "Swamp",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "",
@@ -7139,6 +7368,7 @@
   },
   "Swashbuckler's Whip": {
    "colors": "",
+   "frontName": "Swashbuckler's Whip",
    "inDraftPool": true,
    "keywords": [
     "Discover",
@@ -7171,6 +7401,7 @@
   },
   "Synapse Necromage": {
    "colors": "B",
+   "frontName": "Synapse Necromage",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{2}{B}",
@@ -7200,7 +7431,8 @@
   },
   "Tarrian's Journal // The Tomb of Aclazotz": {
    "colors": "B",
-   "inDraftPool": false,
+   "frontName": "Tarrian's Journal",
+   "inDraftPool": true,
    "keywords": [
     "Transform"
    ],
@@ -7217,6 +7449,7 @@
   },
   "Tarrian's Soulcleaver": {
    "colors": "",
+   "frontName": "Tarrian's Soulcleaver",
    "inDraftPool": true,
    "keywords": [
     "Equip"
@@ -7248,6 +7481,7 @@
   },
   "Tectonic Hazard": {
    "colors": "R",
+   "frontName": "Tectonic Hazard",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{R}",
@@ -7277,6 +7511,7 @@
   },
   "Tendril of the Mycotyrant": {
    "colors": "G",
+   "frontName": "Tendril of the Mycotyrant",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{1}{G}",
@@ -7306,6 +7541,7 @@
   },
   "Terror Tide": {
    "colors": "B",
+   "frontName": "Terror Tide",
    "inDraftPool": true,
    "keywords": [
     "Fathomless descent"
@@ -7337,6 +7573,7 @@
   },
   "The Ancient One": {
    "colors": "BU",
+   "frontName": "The Ancient One",
    "inDraftPool": true,
    "keywords": [
     "Descend",
@@ -7369,6 +7606,7 @@
   },
   "The Belligerent": {
    "colors": "RU",
+   "frontName": "The Belligerent",
    "inDraftPool": true,
    "keywords": [
     "Treasure",
@@ -7401,7 +7639,8 @@
   },
   "The Enigma Jewel // Locus of Enlightenment": {
    "colors": "U",
-   "inDraftPool": false,
+   "frontName": "The Enigma Jewel",
+   "inDraftPool": true,
    "keywords": [
     "Craft",
     "Transform"
@@ -7419,7 +7658,8 @@
   },
   "The Everflowing Well // The Myriad Pools": {
    "colors": "U",
-   "inDraftPool": false,
+   "frontName": "The Everflowing Well",
+   "inDraftPool": true,
    "keywords": [
     "Transform",
     "Descend",
@@ -7438,6 +7678,7 @@
   },
   "The Millennium Calendar": {
    "colors": "",
+   "frontName": "The Millennium Calendar",
    "inDraftPool": true,
    "keywords": [
     "Double"
@@ -7469,6 +7710,7 @@
   },
   "The Mycotyrant": {
    "colors": "BG",
+   "frontName": "The Mycotyrant",
    "inDraftPool": true,
    "keywords": [
     "Trample"
@@ -7500,6 +7742,7 @@
   },
   "The Skullspore Nexus": {
    "colors": "G",
+   "frontName": "The Skullspore Nexus",
    "inDraftPool": true,
    "keywords": [
     "Double"
@@ -7531,6 +7774,7 @@
   },
   "Thousand Moons Crackshot": {
    "colors": "W",
+   "frontName": "Thousand Moons Crackshot",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{1}{W}",
@@ -7560,6 +7804,7 @@
   },
   "Thousand Moons Infantry": {
    "colors": "W",
+   "frontName": "Thousand Moons Infantry",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{2}{W}",
@@ -7589,7 +7834,8 @@
   },
   "Thousand Moons Smithy // Barracks of the Thousand": {
    "colors": "W",
-   "inDraftPool": false,
+   "frontName": "Thousand Moons Smithy",
+   "inDraftPool": true,
    "keywords": [
     "Transform"
    ],
@@ -7606,6 +7852,7 @@
   },
   "Thrashing Brontodon": {
    "colors": "G",
+   "frontName": "Thrashing Brontodon",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{1}{G}{G}",
@@ -7635,6 +7882,7 @@
   },
   "Threefold Thunderhulk": {
    "colors": "",
+   "frontName": "Threefold Thunderhulk",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{7}",
@@ -7664,7 +7912,8 @@
   },
   "Throne of the Grim Captain // The Grim Captain": {
    "colors": "",
-   "inDraftPool": false,
+   "frontName": "Throne of the Grim Captain",
+   "inDraftPool": true,
    "keywords": [
     "Lifelink",
     "Craft",
@@ -7687,6 +7936,7 @@
   },
   "Tinker's Tote": {
    "colors": "W",
+   "frontName": "Tinker's Tote",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{2}{W}",
@@ -7716,6 +7966,7 @@
   },
   "Tishana's Tidebinder": {
    "colors": "U",
+   "frontName": "Tishana's Tidebinder",
    "inDraftPool": true,
    "keywords": [
     "Flash"
@@ -7747,7 +7998,8 @@
   },
   "Tithing Blade // Consuming Sepulcher": {
    "colors": "B",
-   "inDraftPool": false,
+   "frontName": "Tithing Blade",
+   "inDraftPool": true,
    "keywords": [
     "Craft",
     "Transform"
@@ -7765,7 +8017,8 @@
   },
   "Treasure Map // Treasure Cove": {
    "colors": "",
-   "inDraftPool": false,
+   "frontName": "Treasure Map",
+   "inDraftPool": true,
    "keywords": [
     "Transform",
     "Treasure",
@@ -7784,6 +8037,7 @@
   },
   "Triumphant Chomp": {
    "colors": "R",
+   "frontName": "Triumphant Chomp",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{R}",
@@ -7813,6 +8067,7 @@
   },
   "Trumpeting Carnosaur": {
    "colors": "R",
+   "frontName": "Trumpeting Carnosaur",
    "inDraftPool": true,
    "keywords": [
     "Discover",
@@ -7845,7 +8100,8 @@
   },
   "Twists and Turns // Mycoid Maze": {
    "colors": "G",
-   "inDraftPool": false,
+   "frontName": "Twists and Turns",
+   "inDraftPool": true,
    "keywords": [
     "Transform",
     "Explore",
@@ -7864,6 +8120,7 @@
   },
   "Uchbenbak, the Great Mistake": {
    "colors": "BU",
+   "frontName": "Uchbenbak, the Great Mistake",
    "inDraftPool": true,
    "keywords": [
     "Vigilance",
@@ -7897,6 +8154,7 @@
   },
   "Unlucky Drop": {
    "colors": "U",
+   "frontName": "Unlucky Drop",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{3}{U}",
@@ -7926,7 +8184,8 @@
   },
   "Unstable Glyphbridge // Sandswirl Wanderglyph": {
    "colors": "W",
-   "inDraftPool": false,
+   "frontName": "Unstable Glyphbridge",
+   "inDraftPool": true,
    "keywords": [
     "Flying",
     "Craft",
@@ -7945,6 +8204,7 @@
   },
   "Vanguard of the Rose": {
    "colors": "W",
+   "frontName": "Vanguard of the Rose",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{1}{W}",
@@ -7974,7 +8234,8 @@
   },
   "Visage of Dread // Dread Osseosaur": {
    "colors": "B",
-   "inDraftPool": false,
+   "frontName": "Visage of Dread",
+   "inDraftPool": true,
    "keywords": [
     "Craft",
     "Transform",
@@ -7994,6 +8255,7 @@
   },
   "Vito's Inquisitor": {
    "colors": "B",
+   "frontName": "Vito's Inquisitor",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{3}{B}",
@@ -8023,6 +8285,7 @@
   },
   "Vito, Fanatic of Aclazotz": {
    "colors": "BW",
+   "frontName": "Vito, Fanatic of Aclazotz",
    "inDraftPool": true,
    "keywords": [
     "Flying"
@@ -8054,6 +8317,7 @@
   },
   "Volatile Fault": {
    "colors": "",
+   "frontName": "Volatile Fault",
    "inDraftPool": true,
    "keywords": [
     "Treasure"
@@ -8085,6 +8349,7 @@
   },
   "Volatile Wanderglyph": {
    "colors": "R",
+   "frontName": "Volatile Wanderglyph",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{1}{R}",
@@ -8114,6 +8379,7 @@
   },
   "Wail of the Forgotten": {
    "colors": "BU",
+   "frontName": "Wail of the Forgotten",
    "inDraftPool": true,
    "keywords": [
     "Descend"
@@ -8145,6 +8411,7 @@
   },
   "Walk with the Ancestors": {
    "colors": "G",
+   "frontName": "Walk with the Ancestors",
    "inDraftPool": true,
    "keywords": [
     "Discover"
@@ -8176,6 +8443,7 @@
   },
   "Warden of the Inner Sky": {
    "colors": "W",
+   "frontName": "Warden of the Inner Sky",
    "inDraftPool": true,
    "keywords": [
     "Scry"
@@ -8207,7 +8475,8 @@
   },
   "Waterlogged Hulk // Watertight Gondola": {
    "colors": "U",
-   "inDraftPool": false,
+   "frontName": "Waterlogged Hulk",
+   "inDraftPool": true,
    "keywords": [
     "Craft",
     "Vigilance",
@@ -8229,6 +8498,7 @@
   },
   "Waterwind Scout": {
    "colors": "U",
+   "frontName": "Waterwind Scout",
    "inDraftPool": true,
    "keywords": [
     "Flying",
@@ -8261,6 +8531,7 @@
   },
   "Waylaying Pirates": {
    "colors": "U",
+   "frontName": "Waylaying Pirates",
    "inDraftPool": true,
    "keywords": [],
    "manaCost": "{3}{U}",
@@ -8290,6 +8561,7 @@
   },
   "Zoetic Glyph": {
    "colors": "U",
+   "frontName": "Zoetic Glyph",
    "inDraftPool": true,
    "keywords": [
     "Discover",
@@ -8322,6 +8594,7 @@
   },
   "Zoyowa Lava-Tongue": {
    "colors": "BR",
+   "frontName": "Zoyowa Lava-Tongue",
    "inDraftPool": true,
    "keywords": [
     "Deathtouch"
@@ -8353,6 +8626,7 @@
   },
   "Zoyowa's Justice": {
    "colors": "R",
+   "frontName": "Zoyowa's Justice",
    "inDraftPool": true,
    "keywords": [
     "Discover"
@@ -8383,6 +8657,6 @@
    "type": "Instant"
   }
  },
- "count": 292,
+ "count": 291,
  "set": "LCI"
 }

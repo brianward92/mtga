@@ -129,6 +129,16 @@ def main():
     cards, seen = {}, set()
     for c in raw:
         name = c["name"]
+        # Alchemy rebalances are printed into the set but are not draftable, and
+        # having both "Geological Appraiser" and "A-Geological Appraiser" in a
+        # lookup is actively confusing when the answer is needed in seconds.
+        if name.startswith("A-"):
+            continue
+        # Scryfall names a double-faced card "Front // Back"; the set bundle,
+        # Arena and every human use the front face alone. Matching on the full
+        # string silently drops all 36 of LCI's DFCs from the draftable pool,
+        # which is a third of the artifacts and every transforming Cave.
+        front = name.split(" // ")[0]
         if name in seen:
             continue
         seen.add(name)
@@ -146,7 +156,8 @@ def main():
             "keywords": c.get("keywords", []),
             "colors": "".join(face(c, "colors", []) or []),
             "rarity": c.get("rarity"),
-            "inDraftPool": (name in pool) if pool else None,
+            "frontName": front,
+            "inDraftPool": (front in pool or name in pool) if pool else None,
             "quickDraft": quick.get(name),
             "premierDraft": premier.get(name),
         }
@@ -161,9 +172,14 @@ def main():
     def has_rate(c):
         return any((c.get(k) or {}).get("winRate") is not None for k in ("quickDraft", "premierDraft"))
     rated = sum(1 for c in cards.values() if has_rate(c))
+    in_pool = sum(1 for c in cards.values() if c["inDraftPool"])
+    if pool and in_pool < len(pool):
+        missing = sorted(pool - {c["frontName"] for c in cards.values()})
+        print(f"  WARNING: {len(missing)} bundle cards unmatched: {missing[:5]}", file=sys.stderr)
     creatures = sum(1 for c in cards.values() if "Creature" in c["type"])
     instants = sum(1 for c in cards.values() if "Instant" in c["type"])
-    print(f"  {creatures} creatures, {instants} instants, {rated} with a usable win rate")
+    print(f"  {in_pool} in the draftable pool, {creatures} creatures, "
+          f"{instants} instants, {rated} with a usable win rate")
     if rated < len(cards) // 2:
         print("  NOTE: 17lands is serving only the current re-run, so most rates are "
               "suppressed for sample size. Card evaluation should lean on the "

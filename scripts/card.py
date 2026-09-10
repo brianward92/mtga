@@ -107,7 +107,9 @@ def main():
         hits = [c for c in pool if needle in (c["oracle"] or "").lower()]
     elif args.name:
         needle = " ".join(args.name).lower()
-        hits = [c for c in pool if needle in c["name"].lower()]
+        hits = [c for c in pool
+                if needle in c["name"].lower()
+                or needle in (c.get("frontName") or "").lower()]
     else:
         hits = list(pool)
 
