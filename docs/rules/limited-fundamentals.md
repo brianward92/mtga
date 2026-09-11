@@ -2,7 +2,7 @@
 
 > Use this when: you are in a game and have to decide whether to block, whether to attack, whether to trade, or whether you are winning the race. Combat sections first; grep `PROCEDURE` for the step lists.
 
-Companion files: `lci-combat-reference.md` (every LCI instant-speed card by colour, removal, open-mana threats), `lci-playbook.md` (LCI archetypes and card-level play).
+LCI applications live in [`../formats/lci/rules-anchors.md`](../formats/lci/rules-anchors.md), with generated card tables in [`../formats/lci/combat-reference.md`](../formats/lci/combat-reference.md).
 
 ---
 
@@ -106,6 +106,8 @@ All from the Comprehensive Rules effective **August 7, 2026**.
 
 ## 4. PROCEDURE: declaring blockers
 
+Canonical procedure: [`blocking-procedure.md`](blocking-procedure.md).
+
 Run all seven steps in order. Do not shortcut.
 
 **Step 1 — Survival check, before anything else.**
@@ -135,7 +137,7 @@ Run all seven steps in order. Do not shortcut.
 - A menace attacker forces a gang block; treat it as (a) and pick two creatures you can afford to lose one of.
 
 **Step 6 — Trick check.**
-- Count their untapped lands and available colours; assume the biggest pump or removal in those colours (Section 9 and `lci-combat-reference.md`) and re-run Steps 2–5.
+- Count their untapped lands and available colours; for LCI use [`../formats/lci/combat-reference.md`](../formats/lci/combat-reference.md), then re-run the canonical procedure.
 - A block that degrades FREE → TRADE is usually still fine. A block that degrades to "my creature dies and theirs lives" is the one to reconsider.
 - **Consolation:** even if a trick kills your blocker, the attacker is still blocked and deals **no** damage to you (509.1h, 510.1c). You still absorbed the whole attack. Only trample leaks.
 - You get the last word — the attacker must act first after blocks (509.2).
@@ -357,7 +359,7 @@ Operational rules:
 
 ### LCI anchors: what open mana can mean
 
-All Scryfall-verified, all LCI, common unless marked. The full list is in `lci-combat-reference.md`; these are the ones that change combat math most.
+All Scryfall-verified, all LCI, common unless marked. The full generated list is in [`../formats/lci/combat-reference.md`](../formats/lci/combat-reference.md).
 
 | Card | Cost | Effect |
 |---|---|---|

@@ -15,11 +15,11 @@ import json
 import sys
 from pathlib import Path
 
-KB = Path(__file__).resolve().parent.parent / "docs" / "kb"
+KB = Path(__file__).resolve().parent.parent / "docs" / "formats" / "lci"
 
 
 def load(code="lci"):
-    path = KB / f"{code}-cards.json"
+    path = KB / "cards.json"
     if not path.exists():
         sys.exit(f"no card reference at {path}; run scripts/build_kb_cards.py {code.upper()}")
     return json.loads(path.read_text())["cards"]

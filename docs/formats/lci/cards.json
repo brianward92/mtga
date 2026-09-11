@@ -1,4 +1,7 @@
 {
+ "buildDate": "2026-09-11",
+ "scryfallSnapshot": "set:lci@2026-09-11",
+ "seventeenLandsSnapshot": "LCI QuickDraft+PremierDraft@2026-09-10",
  "builtFrom": [
   "scryfall",
   "17lands"

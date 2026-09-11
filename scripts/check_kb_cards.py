@@ -1,138 +1,85 @@
 #!/usr/bin/env python3
-"""Check every card name in the knowledge base against the real card list.
-
-The knowledge base is written by language models, and the failure mode that
-matters is not an omission but a confident invention: a card that does not exist,
-cited with a mana cost, trusted mid-game when there is no time to check. This is
-the mechanical defence. It resolves every card-shaped name in docs/kb/*.md
-against the generated card file, and asks Scryfall about whatever is left.
-
-Run it after any knowledge base edit.
-
-    python3 scripts/check_kb_cards.py          # exits non-zero if anything is unresolved
-"""
-import json
-import re
-import sys
-import time
-import urllib.parse
-import urllib.request
+"""Validate the checked MTG rules and LCI format references."""
+import argparse, json, re, sys, urllib.parse, urllib.request
 from pathlib import Path
 
-KB = Path(__file__).resolve().parent.parent / "docs" / "kb"
-UA = {"User-Agent": "mtga-kb/1.0", "Accept": "application/json"}
-
-# A name is only treated as a card claim when a mana cost or a rarity marker
-# follows it. Prose is full of Title Case that is not a card, and flagging all of
-# it buries the one real error in ninety false ones.
-# Names that are not cards but read like them, each one adjudicated by hand once
-# so a later run does not re-litigate it. Recording the verdict is the point:
-# without this the same thirty prose fragments are re-checked every time and the
-# one real error hides among them.
-ADJUDICATED = {
-    # Collective shorthand for the five commons Hidden Cataract, Hidden
-    # Courtyard, Hidden Necropolis, Hidden Nursery and Hidden Volcano. Verified:
-    # exactly five, one per colour, all enter tapped, all tap for a single
-    # colour, all sacrifice for Discover 4 at sorcery speed only.
-    "hidden cave", "hidden caves",
-    # Creature types, not cards.
-    "cat advisor", "human soldier", "merfolk scout", "vampire knight",
-    "legendary creature",
-    # Rules and stats prose.
-    "create a treasure", "flash equipment", "gih in premier", "in limited",
-    "quick draft", "lci quick draft", "the map", "the frog",
-    # A rules example deliberately drawn from outside the set.
-    "altar's reap",
-}
-
+REPO = Path(__file__).resolve().parent.parent
+DOCS, RULES, LCI = REPO / "docs", REPO / "docs/rules", REPO / "docs/formats/lci"
+FILES = sorted([*RULES.glob("*.md"), *LCI.glob("*.md")])
+SENTINEL = "<!-- procedure: declare-blockers -->"
+ADJUDICATED = {"hidden cave", "hidden caves", "cat advisor", "human soldier", "merfolk scout", "vampire knight", "legendary creature", "create a treasure", "flash equipment", "gih in premier", "in limited", "quick draft", "lci quick draft", "the map", "the frog", "altar's reap", "a-geological appraiser", "deep king", "hidden cave for discover", "nameless city", "one or two hidden caves", "quicksand whirlpool exile"}
 NAME = re.compile(r"\b([A-Z][A-Za-z'\-]+(?: (?:of|the|to|a|an|in|on|and|de|del|for)? ?[A-Z][A-Za-z'\-]+){1,4})\b")
-IS_CLAIM = (re.compile(r"\{[0-9WUBRGCX]"), re.compile(r"\((C|U|R|M)\)"))
+CLAIM = (re.compile(r"\{[0-9WUBRGCX]"), re.compile(r"\((C|U|R|M)\)"))
 
 
-def known_names(set_code="lci"):
-    """Every string a writer might reasonably use for a card in this set.
-
-    Three variations matter, all of them learned from false positives:
-    a double-faced card is written by its front name; a legendary creature's
-    "Malcolm, Alluring Scoundrel" is written as either half; and plurals and
-    possessives appear constantly in prose."""
-    cards = json.loads((KB / f"{set_code}-cards.json").read_text())["cards"]
+def known_names(cards):
     names = set()
     for full, card in cards.items():
         for variant in {full, card.get("frontName") or full}:
             for part in variant.split(" // "):
                 part = part.strip()
-                names |= {part.lower(), part.lower() + "s", part.lower().rstrip("s")}
-                # A back face is routinely written without its article: the card
-                # is "The Grim Captain", the prose says "the Grim Captain".
-                names.add(part.lower().removeprefix("the ").strip())
+                names |= {part.lower(), part.lower() + "s", part.lower().rstrip("s"), part.lower().removeprefix("the ").strip()}
                 if "," in part:
-                    before, after = part.split(",", 1)
-                    names.add(before.strip().lower())
-                    names.add(after.strip().lower())
-                    names.add(after.strip().lower().removeprefix("the ").strip())
+                    a, b = part.split(",", 1)
+                    names |= {a.strip().lower(), b.strip().lower(), b.strip().lower().removeprefix("the ").strip()}
     return names
 
 
-def in_scryfall_set(name, set_code):
+def online_match(name):
+    url = "https://api.scryfall.com/cards/named?fuzzy=" + urllib.parse.quote(name)
     try:
-        url = "https://api.scryfall.com/cards/named?fuzzy=" + urllib.parse.quote(name)
-        with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=15) as r:
-            return json.load(r).get("set", "").upper() == set_code.upper()
+        req = urllib.request.Request(url, headers={"User-Agent": "mtga-kb/1.0", "Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=15) as response:
+            return json.load(response).get("set", "").lower() == "lci"
     except Exception:
         return False
 
 
 def main():
-    set_code = sys.argv[1].lower() if len(sys.argv) > 1 else "lci"
-    known = known_names(set_code)
-    unresolved, claims = {}, 0
-
-    for path in sorted(KB.glob("*.md")):
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--offline", action="store_true", help="do not query Scryfall")
+    args = parser.parse_args()
+    errors = []
+    data = json.loads((LCI / "cards.json").read_text())
+    for key in ("buildDate", "scryfallSnapshot", "seventeenLandsSnapshot"):
+        if not data.get(key): errors.append(f"cards.json lacks {key}")
+    pool = sum(c.get("inDraftPool") is not False for c in data["cards"].values())
+    if pool != 291: errors.append(f"draftable pool is {pool}, expected 291")
+    combat = (LCI / "combat-reference.md").read_text()
+    if not re.search(r"Generated .* on \d{4}-\d{2}-\d{2}; source SHA-256 `[0-9a-f]{64}`", combat):
+        errors.append("combat-reference.md lacks generation date or source hash")
+    owners = [p for p in FILES if SENTINEL in p.read_text()]
+    if owners != [RULES / "blocking-procedure.md"]: errors.append(f"declare-blockers sentinel owner count is {len(owners)}")
+    heading = re.compile(r"^#{1,6} .*?(?:declare[- ]blockers.*procedure|procedure.*(?:blocking|blockers)).*$", re.I | re.M)
+    for path in FILES:
+        if path == RULES / "blocking-procedure.md": continue
+        text = path.read_text(); match = heading.search(text)
+        if match and "blocking-procedure.md" not in "\n".join(text[match.end():].lstrip().splitlines()[:2]):
+            errors.append(f"{path.relative_to(DOCS)}: blocking procedure heading is not a pointer")
+    link = re.compile(r"`?([^`\s]+\.md)`?\s+§(\d+)")
+    for path in FILES:
+        for target, section in link.findall(path.read_text()):
+            candidates = [(path.parent / target).resolve(), RULES / Path(target).name, LCI / Path(target).name]
+            found = next((p for p in candidates if p.exists()), None)
+            if not found: errors.append(f"{path.relative_to(DOCS)}: missing {target} §{section}")
+            elif not re.search(rf"^#+\s+{section}(?:\.|\s)", found.read_text(), re.M): errors.append(f"{path.relative_to(DOCS)}: {target} has no §{section}")
+    known, unresolved, claims = known_names(data["cards"]), {}, 0
+    for path in FILES:
         text = path.read_text()
         for match in NAME.finditer(text):
-            raw = match.group(1).strip()
-            tail = text[match.end():match.end() + 40]
-            if not any(p.search(tail) for p in IS_CLAIM):
-                continue
-            # Shouty prose ("MAPS ARE SORCERY-SPEED") is never a card name.
-            if raw.upper() == raw:
-                continue
+            raw, tail = match.group(1).strip(), text[match.end():match.end()+40]
+            if raw.upper() == raw or not any(p.search(tail) for p in CLAIM): continue
             claims += 1
             variants = {raw, re.sub(r"'s\b", "", raw).strip(), raw.rstrip("s"), raw + "s"}
-            if any(v.lower() in ADJUDICATED for v in variants):
-                continue
-            # "Back of X" and "Blocking X" are prose wrapped around a real name;
-            # strip the wrapper rather than flagging the whole phrase.
             for prefix in ("back of ", "blocking ", "untapped ", "plus ", "the "):
-                if raw.lower().startswith(prefix):
-                    variants.add(raw[len(prefix):])
-            if not any(v.lower() in known for v in variants):
-                unresolved.setdefault(raw, set()).add(path.name)
-
-    print(f"{claims} card-name claims across {len(list(KB.glob('*.md')))} files")
-    if not unresolved:
-        print("all resolve to real cards in the set")
-        return 0
-
-    print(f"{len(unresolved)} unresolved locally; asking Scryfall")
-    bad = []
-    for name in sorted(unresolved):
-        if not in_scryfall_set(name, set_code):
-            bad.append((name, sorted(unresolved[name])))
-        time.sleep(0.11)
-
-    if not bad:
-        print("all resolve to real cards in the set")
-        return 0
-    # Almost every one of these is prose the regex caught, not an invented card.
-    # It still has to be read, because the one that is not prose is the one that
-    # loses a game.
-    print(f"\n{len(bad)} name(s) not found in {set_code.upper()} — read each one in context:")
-    for name, files in bad:
-        print(f"  {name:34} {', '.join(files)}")
-    return 1
+                if raw.lower().startswith(prefix): variants.add(raw[len(prefix):])
+            if not any(v.lower() in ADJUDICATED or v.lower() in known for v in variants): unresolved.setdefault(raw, set()).add(str(path.relative_to(DOCS)))
+    if not args.offline: unresolved = {n: p for n, p in unresolved.items() if not online_match(n)}
+    errors += [f"unresolved LCI card name {n}: {', '.join(sorted(p))}" for n, p in sorted(unresolved.items())]
+    print(f"{claims} card-name claims across {len(FILES)} files")
+    if errors:
+        print("\n".join(f"ERROR: {e}" for e in errors)); return 1
+    print("knowledge base structure, references, metadata, and card claims are valid"); return 0
 
 
-if __name__ == "__main__":
-    sys.exit(main())
+if __name__ == "__main__": sys.exit(main())

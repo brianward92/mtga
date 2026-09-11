@@ -24,10 +24,11 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from datetime import date
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-KB = REPO / "docs" / "kb"
+KB = REPO / "docs" / "formats" / "lci"
 BUNDLE = Path("/Applications/MTGA Draft Assistant.app/Contents/Resources/draftfm/sets")
 UA = "mtga-kb/1.0 (+local knowledge base build)"
 
@@ -162,9 +163,17 @@ def main():
             "premierDraft": premier.get(name),
         }
 
-    out = KB / f"{code.lower()}-cards.json"
+    out = KB / "cards.json"
     out.write_text(json.dumps(
-        {"set": code, "builtFrom": ["scryfall", "17lands"], "count": len(cards), "cards": cards},
+        {
+            "set": code,
+            "buildDate": date.today().isoformat(),
+            "scryfallSnapshot": f"set:{code.lower()}@{date.today().isoformat()}",
+            "seventeenLandsSnapshot": f"{code} QuickDraft+PremierDraft@{date.today().isoformat()}",
+            "builtFrom": ["scryfall", "17lands"],
+            "count": len(cards),
+            "cards": cards,
+        },
         indent=1, sort_keys=True,
     ))
     print(f"wrote {out} ({len(cards)} cards, {out.stat().st_size // 1024}KB)")

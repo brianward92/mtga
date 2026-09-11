@@ -218,6 +218,8 @@ Two sorcery-speed uncommons that still wreck your combat plans:
 
 ## The blocking procedure
 
+Canonical procedure: [`../../rules/blocking-procedure.md`](../../rules/blocking-procedure.md).
+
 **Step 1 — read the board before you read your hand.**
 1. Their untapped lands, **by colour**. Add Treasures and mana creatures.
 2. **Permanent cards in their graveyard** — the descend count.

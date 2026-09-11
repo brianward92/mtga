@@ -12,10 +12,12 @@ where those errors come from. If the card file is right, this file is right.
 import json
 import re
 import sys
+import hashlib
+from datetime import date
 from collections import defaultdict
 from pathlib import Path
 
-KB = Path(__file__).resolve().parent.parent / "docs" / "kb"
+KB = Path(__file__).resolve().parent.parent / "docs" / "formats" / "lci"
 
 # Keywords that change whether a block is legal or survivable. Ordered by how
 # often they decide a combat, not alphabetically.
@@ -61,7 +63,9 @@ def table(rows, headers):
 
 def main():
     code = (sys.argv[1] if len(sys.argv) > 1 else "LCI").lower()
-    data = json.loads((KB / f"{code}-cards.json").read_text())
+    card_path = KB / "cards.json"
+    card_bytes = card_path.read_bytes()
+    data = json.loads(card_bytes)
     cards = [c for c in data["cards"].values() if c.get("inDraftPool") is not False]
     creatures = [c for c in cards if "Creature" in c["type"]]
 
@@ -71,7 +75,8 @@ def main():
         "> Use this when: deciding whether to attack or block, or working out what "
         "the opponent's open mana threatens.",
         "",
-        "**Generated from `" + f"{code}-cards.json" + "` by `scripts/build_kb_combat.py`. "
+        "**Generated from `cards.json` by `scripts/build_kb_combat.py` on "
+        + date.today().isoformat() + "; source SHA-256 `" + hashlib.sha256(card_bytes).hexdigest() + "`. "
         "Do not edit by hand.** Every number here is computed from the card pool, so it "
         "cannot drift from reality the way a written list does. Regenerate after any card "
         "file rebuild.",
@@ -150,8 +155,6 @@ def main():
         rows = []
         for c in group:
             effect = (c["oracle"] or "").split("\n")[0]
-            if len(effect) > 90:
-                effect = effect[:87] + "..."
             rows.append([c["manaCost"], c["name"], c["rarity"][0].upper(), effect])
         parts += [table(rows, ["Cost", "Name", "R", "Effect"]), ""]
 
@@ -171,7 +174,7 @@ def main():
                      ", ".join(f"{c['name']} {c['manaCost']}" for c in cheap)])
     parts += [table(rows, ["Effect", "Count", "At instant speed", "Cheapest"]), ""]
 
-    out = KB / f"{code}-combat-reference.md"
+    out = KB / "combat-reference.md"
     out.write_text("\n".join(parts) + "\n")
     print(f"wrote {out} ({len(parts)} blocks, {out.stat().st_size // 1024}KB)")
 

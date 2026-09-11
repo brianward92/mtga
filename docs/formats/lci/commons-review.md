@@ -2,7 +2,7 @@
 
 > Use this when: you are declaring blockers or deciding an attack in an LCI Quick Draft match and need to know what the opponent's open mana can actually do, or what a common on the board really is.
 
-Companion file: `lci-combat-reference.md` covers the **whole** draft pool (all rarities), auto-generated. This file covers the **108 non-basic commons** only, with evaluation data. Commons are 77.6% of every card seen in an LCI pack, so this is most of what you will face.
+Companion file: [`combat-reference.md`](combat-reference.md) covers the **whole** draft pool (all rarities), auto-generated. This file covers the **108 non-basic commons** only, with evaluation data.
 
 ---
 
@@ -162,6 +162,8 @@ Before every block, count **permanent cards** in the relevant graveyard. Per CR 
 - **Deathtouch: any nonzero combat damage counts as lethal for damage assignment** (CR 702.2c), so a 1/1 deathtoucher blocking a 6/6 lets the attacker assign only 1 and send 5 elsewhere if it has trample.
 
 ### Declare-blockers procedure — run this in order, every time
+
+Canonical procedure: [`../../rules/blocking-procedure.md`](../../rules/blocking-procedure.md).
 
 1. Read their untapped lands: **how much mana, and which colours?**
 2. Look up only those colours at that cost in the instant-speed table. If they cannot pay for anything, block on raw stats.

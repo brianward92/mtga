@@ -2,7 +2,7 @@
 
 > Use this when: an LCI mechanic is on the board or the stack and the answer changes a block, an attack, or whether to hold mana — descend counts, discover, craft, explore, Maps, Caves.
 
-Companion file: `lci-combat-reference.md` (generated instant-speed / removal / body-size tables for the whole set). This file covers the six mechanics only. Where the two overlap, both were built from the same Scryfall data.
+Companion file: [`combat-reference.md`](combat-reference.md) contains generated instant-speed, removal, and body-size tables. This file covers the six mechanics only.
 
 ## Quick reference
 
@@ -32,6 +32,8 @@ Companion file: `lci-combat-reference.md` (generated instant-speed / removal / b
 This is the section to open when declaring blockers. Descend statics change **mid-combat**, including between the first-strike and regular damage steps.
 
 ### Before declaring blockers, in order
+
+Apply the canonical [`blocking procedure`](../../rules/blocking-procedure.md), with the LCI-specific descend checks below.
 
 1. **Count permanent cards in the OPPONENT's graveyard.** Everything except instants and sorceries. Tokens are not there (they cease to exist). That number is their descend count.
 2. **At 3, treat every descend-4 body as already on.** One creature dying in this combat flips it before damage.

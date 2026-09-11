@@ -29,6 +29,8 @@ Scope: LCI (Lost Caverns of Ixalan) Quick Draft on MTG Arena. Every card below i
 
 ## 1. Declaring blockers — run this every time
 
+Canonical procedure: [`blocking-procedure.md`](blocking-procedure.md).
+
 1. **Count their graveyard.** Permanent cards only. Cross-reference §2. A 1/3 `Basking Capybara` {1}{G} is a **4/3** at four; a 3/2 `Didact Echo` {4}{U} **gains flying** at four.
 2. **Count their untapped mana by colour.** Cross-reference §3. Map tokens and Treasures are not tricks by themselves — but Treasures pay for tricks.
 3. **Read the displayed P/T, not the card you remember.** Explore creatures carry +1/+1 counters and are bigger than their printed box.
