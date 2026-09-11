@@ -115,3 +115,91 @@ Collected as it happened. Each entry: what was observed, what it cost, what to c
   stuck. Dismissed via "Ignore Limit" → "Ignore Limit For Today" (authorized).
   Detect it: a bottom-band read showing OK + Ignore Limit. Consider
   raising/removing the MTGA limit before a run.
+- **Shift+Enter passes the TURN, not priority.** Used as an "End Turn" fallback
+  while still in first main, it skipped combat outright: six unblockable damage
+  forgone on turn 14 of game 2. Never fall back to it before combat; use the
+  step button (Next / To Combat) and only key-pass from second main or later.
+- **Selecting an attacker by clicking is unreliable this game** (two failures
+  at the right card centre with the button still reading All Attack). Arena
+  also accepts a short drag of the creature toward the opponent to declare it;
+  use that. And "No Attack" exists as its own button (x≈1324, y≈651) when the
+  main one reads All Attack — use it by name rather than the key-pass.
+- **Overlapping cards: two clicks 41px apart hit the same card and cancel.**
+  With four creatures the Echoes overlap; undeclaring "each" toggled one twice.
+  Click each card's unique visible strip (its left edge), or reduce the target
+  set first. And step.sh must never auto-click "N Attackers"/"N Blockers" —
+  that submits the declaration. Cost: a 3-creature attack instead of a lone
+  deathtouch poke on turn 20 of game 2.
+- **Game 2, turn 20: the accidental three-creature attack cost the board.**
+  Overlapping-card undeclare failed, the helper auto-submitted "3 Attackers",
+  the opponent flashed in a blocker and shrank an Echo at instant speed, and I
+  lost Necromage plus both Echoes for a 1/2. Lone-attacker lines are only
+  safe if the declaration is verified to be exactly one BEFORE submitting.
+- **"No Attacks" moves.** With three buttons stacked (count / No Attacks / All
+  Attack) the fixed coordinate I had for it hit All Attack instead, and three
+  1/1s went into four blockers. Locate it by label every time (btn.sh "No Attack").
+
+## Game 2 (loss, 0-2)
+
+- Was winning 22-10 on the lone-deathtouch-lifelink line until the accidental
+  three-creature attack (overlap undeclare + auto-submitted count) fed the
+  board away. Then Join the Dead on the Necromage and a −4/−0 on the Marionette
+  removed the wall; 15 power into 7 life.
+- Things that worked and should be kept: All Attack → undeclare → verify "1
+  Attacker" → submit by name; Marionette deathtouch blocks verified via
+  `declared` before submitting; No Attacks / End Turn by label; reading card
+  text from the local card file before deciding (Crawler/Marionette deathtouch).
+- Things to change for game 3: never attack unless the declaration count is
+  verified equal to the plan; treat "decision: actions" during THEIR turn as
+  "pass with the button, never a key"; keep both deathtouchers home when they
+  hold removal mana.
+
+## Game 3 (loss by inactivity, 0-3) — the event ended here
+
+- Turns 1-5 went to plan: land every turn, Echo of Dusk on 3, a lone Echo
+  attack on 5 (20→18), Visage of Dread in second main with the opponent as the
+  target. Then the agent's context was compacted. The game kept running.
+- **Three consecutive rope expiries lose the match outright.** Turn 7 (my
+  main, actions), turn 8 (their attack, blockers), turn 9 (my main): each
+  timed out at roughly one-minute intervals, 23:23 → 23:26, and Arena ended
+  the game `ResultReason_Timeout`, winner seat 2. I was back at 23:30. Life was
+  17-18 with a 2/2 against three creatures, so the board was not lost; the
+  clock was.
+- **This is the single biggest hole in the setup.** Everything reads the game
+  from the log and clicks through the UI, and every action waits for the model.
+  When the model is absent (compaction, a long think, a crash) nothing keeps
+  the game alive. A backend dead-man's switch fixes it: watch-match already
+  sees every decision that is ours and the rope timer; if a decision has been
+  ours for longer than N seconds (say 35 of the 60-second rope) and no click
+  has happened, take the minimum-regret default — play a land if one is in
+  hand in first main, otherwise pass priority with the button; on blockers,
+  submit no blocks only if no lethal is on the table, else chump the largest
+  attacker with the smallest creature. Any answered prompt resets Arena's
+  timeout count, so even a bad default keeps the match alive for the model to
+  resume. It must never run while the model is mid-action (a lock file the
+  helpers touch), and it must log every default it took.
+- **Compaction itself is predictable.** The context ran out a few turns into
+  the game after ~44 hours of session. Before a match starts, check how much
+  context remains; if it is below a safe margin, compact deliberately between
+  games (the event page has no clock), never mid-game.
+- Visage of Dread's `targets` prompt was answered by an ad-hoc click script
+  (it happened to work: target instance 2 = the opponent, and they discarded).
+  `targets` needs a proper handler in act.sh: read the prompt's legal targets
+  from the log and click the matching avatar/card, then verify the response.
+- OCR read the event page's "Claim" button as "Сlaйm" (Cyrillic С and й).
+  `click-text` missed it once because й→i was not in the homoglyph map; the
+  second look read it clean. The map now has й and the other Cyrillic letters
+  Vision reached for. Prize claimed: 50 gems (12,760 → 12,810) plus the pack,
+  confirmed in the log as `Source: EventReward`.
+
+## Event result
+
+0 wins, 3 losses. 750 gems in, 50 gems and one LCI pack out. Games 1 and 2
+were lost to tool bugs in combat (attacker locator, auto-submitted counts),
+game 3 to the model being away. None of the three was lost to the draft or the
+deck: the picks and the 40-card build went through cleanly on the first try
+after the rail-parser fix.
+
+Priority order for the next run: (1) the dead-man's switch above, (2) a real
+`targets` handler, (3) never let a helper submit a declaration count, (4) a
+pre-match context check.

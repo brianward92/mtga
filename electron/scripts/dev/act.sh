@@ -36,3 +36,11 @@ npx tsx "$here/settle.ts" "${SETTLE_MS:-4000}" >/dev/null 2>&1 || true
 # blockers on the same visual pile puts two of them on the same creature and
 # wastes one. The log says what really happened; the screen does not.
 npx tsx "$here/match.ts"
+# An optional "you may" trigger is a screen prompt with no distinct request in
+# the log, so the parser says "none" while the game waits on us. The
+# bottom-right button gives it away.
+btn=$(macctl read MTGA --region 0.80,0.85,0.20,0.12 --boxes 2>/dev/null | python3 -c "
+import json,sys
+try: print(' / '.join(b['text'] for b in json.load(sys.stdin).get('boxes',[])))
+except Exception: pass")
+case "$btn" in *"Take Action"*|*"Decline"*|*"Submit"*) echo "PROMPT on screen: $btn" ;; esac

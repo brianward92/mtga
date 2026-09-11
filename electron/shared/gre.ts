@@ -210,6 +210,12 @@ function mergeObject(previous: GameObject | undefined, next: GameObject): GameOb
   for (const [key, value] of Object.entries(next)) {
     if (value !== undefined) merged[key] = value
   }
+  // Arena omits a boolean when it becomes false. An object that appears in a
+  // diff WITHOUT isTapped has untapped; without hasSummoningSickness it can
+  // attack. Keeping the old `true` read every land as tapped at the start of
+  // my own turn — "4 lands (0 untapped)" — and every creature as sick forever.
+  if (next.isTapped === undefined) merged.isTapped = false
+  if (next.hasSummoningSickness === undefined) merged.hasSummoningSickness = false
   return merged as unknown as GameObject
 }
 
@@ -265,7 +271,12 @@ export function applyMessage(state: GameState, message: GreMessage): GameState {
 
     // The clock that is actually counting down. Arena keeps six timers per
     // player and only the running one is the rope.
-    const running = (gs.timers ?? []).find((t: any) => t.running && typeof t.durationSec === 'number')
+    // Only the two player clocks are the rope. Arena also runs a 2-second
+    // delay timer that is 'running' far more often, and reading that one
+    // printed "clock 2s" on every turn of a match, which is exactly the
+    // number that should make an agent panic and did nothing but mislead.
+    const running = (gs.timers ?? []).find((t: any) => t.running && typeof t.durationSec === 'number' &&
+      (t.type === 'TimerType_ActivePlayer' || t.type === 'TimerType_NonActivePlayer'))
     if (running) next.timerSeconds = running.durationSec - (running.elapsedSec ?? 0)
 
     if (gs.gameInfo?.results?.length) {
