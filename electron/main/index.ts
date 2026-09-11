@@ -34,8 +34,9 @@ import { badgesAreLive, isDraftScene, wantsOverlayContent, type OverlayActivity 
 import { loadPrefs, savePrefs } from './prefs'
 import { StatusTray } from './status-tray'
 import type { DraftState, Prefs } from '../shared/state'
-import { sidebarShellFrame, sidebarSide, type CalibrationOp, type Rect } from '../shared/layout'
+import { calibrationFor, packLayout, sidebarShellFrame, sidebarSide, type CalibrationOp, type Rect } from '../shared/layout'
 import { arenaDisplayOrder } from '../shared/display-order'
+import { buildDeck } from '../shared/deck-plan'
 
 // ---------------------------------------------------------------------------
 // Singletons
@@ -200,7 +201,16 @@ function mirrorState(state: DraftState): void {
   const file = process.env.MTGA_STATE_FILE
   if (!file) return
   try {
-    writeFileSync(file, JSON.stringify({ ...state, arena: poller.lastKnown, standAside: standAside.active }))
+    const arena = poller.lastKnown
+    const ordered = arenaDisplayOrder(state.cards).map(i => state.cards[i])
+    const layout = arena
+      ? packLayout(arena, ordered.length, calibrationFor(loadPrefs().calibrations, arena))
+      : null
+    const packSlots = layout
+      ? ordered.map((card, i) => ({ grpId: card.grpId, rect: layout.cards[i]?.card })).filter(slot => slot.rect)
+      : []
+    const plan = state.phase === 'complete' ? buildDeck(state.pool) : null
+    writeFileSync(file, JSON.stringify({ ...state, arena, standAside: standAside.active, packSlots, plan }))
   } catch { /* dev only */ }
 }
 
