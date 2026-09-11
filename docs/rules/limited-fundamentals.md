@@ -25,28 +25,6 @@ LCI applications live in [`../formats/lci/rules-anchors.md`](../formats/lci/rule
 
 ---
 
-## 1. Format facts
-
-| Property | Quick Draft | Premier Draft |
-|---|---|---|
-| Draft opponents | 7 bots, no pick timers | 7 humans |
-| **Match opponents** | **Humans** | Humans |
-| Match format | **Best-of-one** | Best-of-one |
-| Run ends at | 7 wins or 3 losses | 7 wins or 3 losses |
-| Entry | 5,000 gold / 750 gems | 10,000 gold / 1,500 gems |
-| Deck | Minimum 40 cards | Minimum 40 cards |
-
-Sources: **Wizards' own MTG Arena formats page** — *"Quick Draft: Draft cards against bots with no time limits. Build a 40-card deck to play against **live players** until reaching either seven wins or three losses, whichever comes first"*, and *"Premier Draft: … Best-of-One matches"*. Bo1 for Quick Draft is confirmed by Arena's own achievement text ("Get 7 wins in a **Best-of-1** Limited event") and by `matchWinCondition: MatchWinCondition_SingleElimination` with `gameNumber: 1` in every logged Limited match on this machine; corroborated structurally by 17Lands' event taxonomy, which labels every best-of-three event separately (`TradDraft`, `TradSealed`, `*_Bo3`) and lists no Bo3 variant of `QuickDraft`. Entry fees are from mtg.wiki and Draftsim (no first-party page reachable).
-
-**What Bo1 changes in play:**
-
-1. There is no game 2 and no sideboarding. Never take a line that spends equity to gather information.
-2. Never concede early "to save time for the next game" — there is no next game.
-3. Mulligans use the London rule (CR 103.5): draw a full seven, then put N cards on the bottom. A mulligan to six is a *selected* six out of seven — bottom the worst card, not a random one.
-4. Arena applies opening-hand smoothing in Bo1 only. **First-party**, Arena tip `Queue_Tip_22`, verbatim: *"In best-of-one matches, your starting hand is selected from two random hands, leaning towards the one with the more average land-spell mix."* Practical effect: extreme opening sevens (0–1 land, 6–7 lands) are rarer than the raw hypergeometric table in §11 predicts. **Unverified: whether it is reapplied after a mulligan** — so do not let it move a mulligan decision.
-
----
-
 ## 2. The rules change every LCI-era article predates
 
 LCI released November 2023. The combat rules changed November 2024. Every LCI set review, primer and combat guide describes the old rule.
@@ -108,62 +86,6 @@ All from the Comprehensive Rules effective **August 7, 2026**.
 
 Canonical procedure: [`blocking-procedure.md`](blocking-procedure.md).
 
-Run all seven steps in order. Do not shortcut.
-
-**Step 1 — Survival check, before anything else.**
-- Sum the power of every attacker. Call it `T`.
-- If `T < your life`, you cannot die this combat; blocking is a value decision. Go to Step 2.
-- If `T >= your life`, you **must** block enough. Required absorption `A = T - life + 1`.
-  - Blocking a non-trampler of power `P` absorbs `P` — all of it.
-  - Blocking a trampler of power `P` absorbs only `min(P, your blocker's toughness)`.
-- Add their reach from hand: count untapped lands and available colours, add the largest pump those colours can produce.
-- At this step card economy is irrelevant. Chump as much as needed.
-
-**Step 2 — Take every free block.** With your blocker `Pb/Tb` against attacker `Pa/Ta`:
-- `Pb >= Ta` and `Pa < Tb` → **FREE BLOCK**: theirs dies, yours lives. Always take it.
-- `Pb < Ta` and `Pa < Tb` → **WALL BLOCK**: nobody dies, damage absorbed for free. Always take it.
-
-**Step 3 — Decide trades.** `Pb >= Ta` and `Pa >= Tb` → both die.
-- **Take it** if: you are not the beatdown; their creature is better than yours; you are on the draw or behind on board and want a long game; the life saved crosses a race boundary (Section 6).
-- **Refuse it** if: you are the beatdown and need that creature attacking; your creature has a pending job (trigger, evasion, alpha strike); you are at a life total where the damage is irrelevant.
-
-**Step 4 — Chump blocks.** Only when Step 1 forces it, or the creature has no remaining job. Do not chump early to protect life you do not need — check the survival table in Section 6 first. A creature left alive can chump a *bigger* threat later.
-
-**Step 5 — Gang blocks (two or more on one attacker).**
-- You kill it only if `sum of your blockers' powers >= attacker's toughness`.
-- **The attacker picks the split at damage time with full information** (CR 510.1c). Assume they destroy the most valuable subset of your blockers whose combined toughness is `<= their power`.
-- Only gang block if (a) you accept losing whichever creature they choose, or (b) `attacker power < your smallest blocker's toughness`, so nothing of yours dies.
-- **Never gang block a deathtouch attacker.** One damage each kills every blocker.
-- A menace attacker forces a gang block; treat it as (a) and pick two creatures you can afford to lose one of.
-
-**Step 6 — Trick check.**
-- Count their untapped lands and available colours; for LCI use [`../formats/lci/combat-reference.md`](../formats/lci/combat-reference.md), then re-run the canonical procedure.
-- A block that degrades FREE → TRADE is usually still fine. A block that degrades to "my creature dies and theirs lives" is the one to reconsider.
-- **Consolation:** even if a trick kills your blocker, the attacker is still blocked and deals **no** damage to you (509.1h, 510.1c). You still absorbed the whole attack. Only trample leaks.
-- You get the last word — the attacker must act first after blocks (509.2).
-
-**Step 7 — Flip-the-answer checklist.** Re-check the block if the attacker has first strike or double strike (your creature can die before dealing damage), deathtouch (any block loses your creature), trample (chumps leak), menace (needs two blockers), or if a lord or pump effect is already on their board.
-
-### Single-block outcome grid
-
-Rows are your blocker, columns their attacker.
-
-| your blocker | 2/1 | 2/2 | 3/2 | 3/3 | 4/2 | 4/4 | 5/5 | 6/6 |
-|---|---|---|---|---|---|---|---|---|
-| **1/1** | TRADE | CHUMP | CHUMP | CHUMP | CHUMP | CHUMP | CHUMP | CHUMP |
-| **2/2** | TRADE | TRADE | TRADE | CHUMP | TRADE | CHUMP | CHUMP | CHUMP |
-| **2/3** | FREE | FREE | TRADE | CHUMP | TRADE | CHUMP | CHUMP | CHUMP |
-| **3/3** | FREE | FREE | TRADE | TRADE | TRADE | CHUMP | CHUMP | CHUMP |
-| **0/4** | WALL | WALL | WALL | WALL | CHUMP | CHUMP | CHUMP | CHUMP |
-| **1/4** | FREE | WALL | WALL | WALL | CHUMP | CHUMP | CHUMP | CHUMP |
-| **3/5** | FREE | FREE | FREE | FREE | FREE | WALL | CHUMP | CHUMP |
-| **4/4** | FREE | FREE | FREE | FREE | TRADE | TRADE | CHUMP | CHUMP |
-| **5/5** | FREE | FREE | FREE | FREE | FREE | FREE | TRADE | CHUMP |
-
-**Default bias: block more than feels comfortable.** A creature produces value only on turns it attacks or blocks — "If you neither attack nor block with Wetland Sambar, then you've wasted a turn's worth of its value." And "people bluff less often than you'd expect and people block less often than you'd expect." (Reid Duke, *Attacking and Blocking*.) A 0/5 that never blocks was a blank card.
-
----
-
 ## 5. PROCEDURE: declaring attackers
 
 1. **Establish your role** (Section 7). The beatdown attacks with nearly everything; the control player attacks only with what is free.
@@ -221,86 +143,6 @@ Verified exhaustively against a turn-by-turn simulation over 80,000 combinations
 
 ---
 
-## 7. Roles, and the play/draw data that decides them
-
-Mike Flores, *Who's The Beatdown?* (1999): **"Misassignment of Role = Game Loss."** Reid Duke's restatement: "Do not try to race against an opponent who can output damage faster than you. Do not try to outlast an opponent with a stronger late game."
-
-**The core test is inevitability.** "If you were to let both players draw 30 cards and spot them 100 free mana every turn for the rest of the game, who would win?" **The player without inevitability must be the beatdown.**
-
-| Signal | You are the BEATDOWN | You are the CONTROL |
-|---|---|---|
-| Seat | On the play | On the draw |
-| Curve | Lower than theirs | Higher than theirs |
-| Board right now | Ahead on creatures | Behind on creatures |
-| Removal in hand | Fewer | More |
-| Bombs / card advantage engines | They have them | You have them |
-| Evasion | You have it | They have it |
-| Life totals | You are lower | You are higher |
-| Land drops | You missed one | They missed one |
-
-### The seat is a hard signal, not a feeling
-
-LCI Premier Draft public game data, 823,614 games. Play-side win rate is bias-corrected as `(win rate on play + (1 - win rate on draw)) / 2`, which removes the skill bias of the 17Lands user population (their raw win rate in this data is 55.34%, not 50%).
-
-| Game length | Play-side win rate | games |
-|---|---|---|
-| ends by turn 6 | **64.9%** | 137,133 |
-| turns 7–8 | 54.4% | 255,996 |
-| turns 9–10 | 49.2% | 217,392 |
-| turns 11–12 | **47.8%** | 122,714 |
-| turns 13+ | 48.9% | 90,379 |
-
-**Read it as a role assignment rule.** On the play your equity is concentrated in short games: be the beatdown by default and try to end it by turn 8. On the draw your equity is in long games: trade, block, stabilise, and push the game past turn 9, where the extra card makes you the favourite.
-
-*Caveat: causation runs partly the other way — games are short partly because someone got run over. The direction of the effect is solid; treat the exact percentages as indicative.*
-
-### Overall play advantage
-
-| Format | Play-side win rate | games |
-|---|---|---|
-| **LCI Quick Draft** | **53.0%** | 377,449 |
-| LCI Premier Draft | 53.2% | 1,103,311 |
-| LCI Traditional (Bo3) Draft | 53.3% | 100,680 |
-| LCI Sealed | 52.8% | 57,152 |
-
-In the raw LCI Premier Draft records: 58.6% win rate on the play vs 52.1% on the draw — a 6.5 point gap in user win rate.
-
-### By seat
-
-| | On the play | On the draw |
-|---|---|---|
-| Role default | Beatdown | Control |
-| Target game length | End by turn 8 | Reach turn 10+ |
-| Trades | Refuse trades that blunt your clock | Take almost every trade |
-| Blocking | Block less; keep attacking | Block more; stabilise |
-| Land drops | You are a card behind: 84.5% to hit turn 3 with 17 lands | 90.4% to hit turn 3 |
-
-"Mirroring your opponent's actions when you're on the draw will often be a losing battle" — to break serve you must trade resources and slow the game down.
-
-**Roles are fluid.** "Your deck might be aggressive, but if your opponent has a fast start you simply have to play defense." Re-run the checklist whenever the board materially changes. The classic failure is a deck built to attack that keeps attacking into a board it can no longer beat: "You have to be willing to cast your Stormbreath Dragon and not attack, as strange as it may feel."
-
-**Turning the corner.** Stop defending and start killing as soon as your defence is stable enough, not when it is perfect. "There's a ton of value in being able to end the game quickly," because you leave much less room for things to go wrong.
-
-### How long the game lasts
-
-LCI Quick Draft, 377,449 games. A "turn" here is a full turn cycle — each player has had that many turns. (Verified: in the raw records, a player on the play has drawn about `num_turns - 1` cards and a player on the draw about `num_turns`, which is only possible if the field counts each player's own turns.)
-
-| Turn | share ending | cumulative |
-|---|---|---|
-| ≤5 | — | 6.8% |
-| 6 | 10.2% | 17.0% |
-| 7 | 15.4% | 32.3% |
-| **8** | **16.4%** | **48.8%** |
-| 9 | 14.6% | 63.4% |
-| 10 | 11.7% | 75.1% |
-| 11 | 8.6% | 83.7% |
-| 12 | 5.9% | 89.6% |
-| 14 | 2.5% | 96.0% |
-
-Median: turn 9. **Half of all games are over by turn 9 and 90% by turn 12.** A card you cannot cast by turn 8 will not matter in most games.
-
----
-
 ## 8. Trading creatures
 
 A creature-for-creature trade is card-neutral. The question is never "is this 1-for-1?" but "does simplifying the board help me or them?"
@@ -319,66 +161,6 @@ A creature-for-creature trade is card-neutral. The question is never "is this 1-
 **Why ahead ⇒ trade:** "A simple game is a controlled game and a predictable game. In such a case, your advantages are more likely to remain advantages."
 
 **Why behind ⇒ refuse:** "When I'm losing, I might be willing to take some extra damage in order to maintain a complicated board state where unexpected things can happen. When you have zero creatures facing down two creatures, there's no room for interpretation — you're losing. When you have two creatures against four creatures, however, you might have some space to maneuver."
-
----
-
-## 9. Tempo, card advantage, and when to cast a trick
-
-There is no exchange rate. "It's impossible to say that 'this much tempo is a fair trade for this much card advantage.'" What you can do is identify which resource is currently binding.
-
-| | Early stage | Late stage |
-|---|---|---|
-| Bottleneck | **Mana** — many spells, few lands | **Cards** — much mana, empty hands |
-| Scarce resource | Tempo | Cards, life total |
-| Right play | Develop the board; spend all your mana every turn | Squeeze maximum value from each card, even slowly |
-| Card draw spells | Hold them | Cast them |
-| In LCI Quick Draft | roughly turns 1–5 | roughly turns 6+ |
-
-Operational rules:
-
-1. **In the early stage, spending all your mana every turn is close to the whole game.** If the choice is a perfect play next turn or a good play now, take the good play now. "If you find yourself very often ending the turn without using all of your mana, this should be a red flag."
-2. Deploy creatures and removal first; save card draw for the late stage.
-3. An early tempo lead converts into life total and does not evaporate when the board stabilises.
-4. Play your land before your spells. When two plays are both available, make the one that gives you more information or more options later.
-
-### Holding a trick versus deploying
-
-**Default: "All things equal, it's best to wait until the last possible moment to cast your spells."** Two situations override it and say cast now: you gain a real tempo advantage by deploying on curve, or you fear a specific response and **all their lands are tapped** right now — take that window even if it means casting an instant at sorcery speed.
-
-| Situation | Play |
-|---|---|
-| You are attacking, they have open mana and might have a trick | Wait. If they act you get another window; if you commit first they answer with full information. |
-| You are attacking, they are tapped out | Cast at your last opportunity — after blockers, before damage. |
-| You are blocking and want to use a trick | Bad spot by default: "You shouldn't plan to use combat tricks when you block, because your opponent will have all of his or her mana open." |
-| You hold damage-based removal and they have a pump spell | Cast it on your own turn, on your terms. |
-| You hold unconditional removal and they can grant hexproof | Cast it while they are tapped out. |
-
-**Do not overload on tricks.** "If you draw an awkward hand with too many combat tricks, you'll be forced to use them in imperfect situations, playing into your opponent's hands." Reid Duke cautions against more than two or three combat tricks in a Limited deck.
-
-**Worst outcome to avoid:** pumping a creature into open mana and having it removed in response — a two-for-one plus a wasted turn.
-
-### LCI anchors: what open mana can mean
-
-All Scryfall-verified, all LCI, common unless marked. The full generated list is in [`../formats/lci/combat-reference.md`](../formats/lci/combat-reference.md).
-
-| Card | Cost | Effect |
-|---|---|---|
-| Acrobatic Leap | {W} | +1/+3, gains flying, untap it (an untapped blocker, or a blocker that blocks twice) |
-| Relic's Roar | {U} | Target artifact or creature becomes a Dinosaur artifact creature with **base P/T 4/3** — can shrink a big attacker as well as grow a small one |
-| Cogwork Wrestler | {U} | 1/2 artifact creature with **flash**; on ETB, a creature an opponent controls gets −2/−0 (a surprise blocker *and* a shrink) |
-| Dreadmaw's Ire (uncommon) | {R} | Target attacking creature gets +2/+2 and gains trample |
-| Abrade | {1}{R} | 3 damage to target creature |
-| Ancestors' Aid | {1}{R} | +2/+0 and first strike; create a Treasure |
-| Cosmium Blast | {1}{W} | 4 damage to target attacking or blocking creature |
-| Family Reunion | {1}{W} | Your creatures get +1/+1, **or** your creatures gain hexproof |
-| Brackish Blunder | {1}{U} | Return target creature to owner's hand |
-| Staggering Size | {1}{G} | +3/+3 and trample — wins the combat *and* leaks damage past a chump |
-| Fungal Fortitude | {1}{B} | **Flash** Aura: +2/+0, and the creature returns to the battlefield tapped when it dies |
-| Bitter Triumph (uncommon) | {1}{B} | Destroy target creature or planeswalker (discard a card or pay 3 life) |
-| Join the Dead | {1}{B}{B} | −5/−5; **−10/−10 instead with descend 4** (four or more permanent cards in their graveyard) |
-| Huatli's Final Strike | {2}{G} | Their creature takes damage equal to your creature's power (+1/+0 first) — a removal spell that does not need combat |
-
-Two open green mana is the single biggest swing: Staggering Size {1}{G} makes any blocked creature three points bigger *and* a trampler.
 
 ---
 

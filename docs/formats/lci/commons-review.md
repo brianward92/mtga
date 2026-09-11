@@ -463,7 +463,6 @@ Cards the **bots overrate** relative to humans (take them later than the bots do
 ## Unverified — do not rely on these
 
 - ~~Who the matches are against~~ — **now verified.** Wizards' MTG Arena formats page ("play against live players") and Arena's in-client Codex (`Codex/WaysToPlay/Formats/Limited_QuickDraft_A`, "you'll still play against other human opponents") both say humans. See Format facts above.
-- ~~Arena Bo1 opening-hand smoothing~~ — **now verified as first-party**, from Arena's own tip `Queue_Tip_22`: *"In best-of-one matches, your starting hand is selected from two random hands, leaning towards the one with the more average land-spell mix."* Still unverified: whether smoothing is reapplied after a mulligan. Do not factor it into a mulligan decision; see `limited-fundamentals.md` §1 and §11.
 - **Absolute 17lands percentages.** The endpoint is degraded (see caveat table). Ordering is directional; the numbers are not comparable to published 2023-24 figures, which could not be retrieved for cross-check.
 - **Cards with no win-rate data.** 64 of 108 commons fall below the sample threshold. Their ★/⚠ marks reflect pick position plus card-text evaluation, not measured performance. Marks backed by data carry their sample size inline.
 - **Pack composition.** "Commons are 77.6% of cards seen" and "no dedicated Cave slot" are inferred from 17lands `seen_count`, not from an official Arena collation statement.

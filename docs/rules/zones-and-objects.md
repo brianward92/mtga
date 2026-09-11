@@ -27,106 +27,6 @@ Scope: LCI (Lost Caverns of Ixalan) Quick Draft on MTG Arena. Every card below i
 
 ---
 
-## 1. Declaring blockers — run this every time
-
-Canonical procedure: [`blocking-procedure.md`](blocking-procedure.md).
-
-1. **Count their graveyard.** Permanent cards only. Cross-reference §2. A 1/3 `Basking Capybara` {1}{G} is a **4/3** at four; a 3/2 `Didact Echo` {4}{U} **gains flying** at four.
-2. **Count their untapped mana by colour.** Cross-reference §3. Map tokens and Treasures are not tricks by themselves — but Treasures pay for tricks.
-3. **Read the displayed P/T, not the card you remember.** Explore creatures carry +1/+1 counters and are bigger than their printed box.
-4. **Check every attacker for a dies-trigger** (§8). Trading hands them that value.
-5. **Check for deathtouch.** `Stinging Cave Crawler` {2}{B} 1/3 kills whatever it blocks or blocks it. Never block it with your best creature.
-6. **Check for double strike.** `Kinjalli's Dawnrunner` {2}{W} 1/1 deals first-strike damage that can kill a creature, push their graveyard past four, and pump another attacker **before** the regular damage step.
-7. **Your Fungus tokens cannot block.** Do not count them as blockers.
-8. Only now, declare.
-
-### Removing a creature in combat — the timing rule
-| Goal | Do this |
-|---|---|
-| Get your attacker's damage through | Kill the blocker **before the declare blockers step**. After blockers are declared it is too late — 509.1h. |
-| Save your own blocked attacker | Kill their blocker any time. Your creature survives and deals no damage. |
-| Fog one big attacker | Block it, then **bounce or sacrifice your own blocker**. The attacker stays blocked and deals zero. Fails against trample. |
-
----
-
-## 2. Descend — the numbers that change a block
-
-Descend counts **permanent cards** in the graveyard: artifact, battle, creature, enchantment, land, planeswalker (110.4a). These are static abilities, so they flip the instant the count changes — including mid-combat, off first-strike damage.
-
-| Card | Cost | Base | At 4 permanent cards | At 8 |
-|---|---|---|---|---|
-| `Basking Capybara` (C) | {1}{G} | 1/3 | **4/3** | 4/3 |
-| `Echo of Dusk` (C) | {1}{B} | 2/2 | **3/3, lifelink** | 3/3 lifelink |
-| `Frilled Cave-Wurm` (C) | {3}{U} | 2/5 | **4/5** | 4/5 |
-| `Didact Echo` (C) | {4}{U} | 3/2 | **3/2, FLYING** | 3/2 flying |
-| `Akawalli, the Seething Tower` (U) | {1}{B}{G} | 3/3 | **5/5 trample** | **7/7 trample, can't be blocked by more than one creature** |
-| `Watertight Gondola` (U, craft back face of `Waterlogged Hulk` {U}) | — | 4/4 vigilance Vehicle | 4/4 | **can't be blocked** |
-| `The Ancient One` (M) | {U}{B} | 8/8 | cannot attack or block | **can attack and block** |
-| `Souls of the Lost` (R) | {1}{B} | */*+1 | power = permanent cards in your graveyard, toughness = that +1 | grows |
-
-**"Your graveyard" means the ability controller's graveyard.** Evaluating their `Basking Capybara`, count **their** yard.
-
-### Two flavours, different counting
-| Wording | Counts |
-|---|---|
-| "if you **descended this turn**" | A permanent card was put into that graveyard **from anywhere this turn**. It does not matter if it is still there. |
-| "**descend 4 / descend 8 / fathomless descent**" | Permanent cards **currently** in that graveyard. |
-
-Official ruling (`Broodrage Mycoid`): end-step "if you descended this turn" abilities **trigger only once** per end step, and *"It's not possible to put a permanent card into your graveyard during the end step in time to have the ability trigger."*
-
-Intervening-if clauses check **twice** — on trigger and again on resolution. If the count drops in between, nothing happens (`Basking Capybara` ruling).
-
-### Other descend payoffs at C/U
-`Ruin-Lurker Bat` {W} (scry 1) · `Enterprising Scallywag` {1}{R} (Treasure) · `Deep Goblin Skulltaker` {2}{B} 2/2 menace (+1/+1 counter) · `Child of the Volcano` {3}{R} 3/3 trample (+1/+1 counter) · `Broodrage Mycoid` {3}{B} 4/3 (makes a 1/1 Fungus that can't block) · `Canonized in Blood` {1}{B} (+1/+1 counter on target creature) · `Coati Scavenger` {2}{G} 3/2 (return a permanent card from graveyard to **hand**) · `Stinging Cave Crawler` {2}{B} (draw on attack) · `Malamet Veteran` {4}{G} 5/4 trample (+1/+1 counter on attack) · `Council of Echoes` {4}{U}{U} 4/4 flier (bounce) · `Join the Dead` {1}{B}{B} (-10/-10 instead of -5/-5) · `Chupacabra Echo` {2}{B}{B} 3/2 (-X/-X) · `Uchbenbak, the Great Mistake` {3}{U}{B} 6/4 vigilance menace (self-reanimate at descend 8 with a finality counter: *"If this permanent would be put into a graveyard from the battlefield, exile it instead"*, 122.1h).
-
-### Filling your own graveyard
-`Waterlogged Hulk` {U} ({T}: mill 1) · `Inverted Iceberg` {1}{U} (ETB mill 1, draw 1) · `Dread Osseosaur` (craft back face of `Visage of Dread` {1}{B}; mill 2 on enter **or attack**) · `Song of Stupefaction` {1}{U} (ETB may mill 2) · `Another Chance` {2}{B} (may mill 2, return up to two creature cards) · `Fanatical Offering` {1}{B} (sacrifice an artifact or creature as a cost — that is a permanent card) · explore (binning a revealed nonland permanent card).
-
-### Graveyard hate
-`Digsite Conservator` {2} 2/1 (U): *"Sacrifice this creature: Exile up to four target cards from a single graveyard. Activate only as a sorcery."* **Sorcery speed** — use it proactively on your own turn, never as a response. `Buried Treasure` {2} (C) exiles **itself** from your graveyard for discover 5, which lowers your own count by one.
-
----
-
-## 3. Open-mana read — every instant-speed C/U play in LCI
-
-Complete list of common and uncommon cards that can be cast or activated during combat. Anything not here (including every Map token, every explore activation, and `Daring Discovery` {4}{R}) is sorcery-speed and cannot interfere.
-
-**Combat-relevant (changes the math):**
-
-| Mana | Card | Effect |
-|---|---|---|
-| {W} | `Acrobatic Leap` (C) | +1/+3 and flying until EOT; **untap it** |
-| {1}{W} | **`Cosmium Blast`** (C) | **4 damage to target attacking OR blocking creature** |
-| {1}{W} | `Family Reunion` (C) | Your creatures +1/+1 **or** gain hexproof |
-| {1}{W} | `Spring-Loaded Sawblades` (U) | 5 damage to target **TAPPED** creature an opponent controls |
-| {2}{W} | `Mischievous Pup` (U) | Flash 3/1 surprise blocker; bounce one of your own permanents |
-| {2}{W} | `Quicksand Whirlpool` (C) | **Exile** target creature — costs {3} less if it targets a **tapped** creature ({5}{W} otherwise) |
-| {U} | `Cogwork Wrestler` (C) | Flash 1/2 body; target creature an opponent controls gets **-2/-0** |
-| {U} | `Relic's Roar` (C) | Target artifact or creature becomes a Dinosaur artifact creature with **base P/T 4/3** |
-| {1}{U} | `Brackish Blunder` (C) | Bounce a creature (**destroys tokens**) |
-| {1}{U} | `Eaten by Piranhas` (U) | Flash Aura: loses all abilities, becomes base 1/1 black Skeleton (**counters still apply**) |
-| {1}{U} | `Lodestone Needle` (U) | Tap up to one artifact/creature + two stun counters (**useless once it is already attacking or blocking**) |
-| {3}{U} | `Unlucky Drop` (C) | Owner puts target artifact or creature on top or bottom of their library |
-| {1}{B} | `Fungal Fortitude` (C) | Flash Aura: +2/+0; on death returns it tapped under its **owner's** control |
-| {1}{B} | **`Bitter Triumph`** (U) | **Destroy target creature or planeswalker** (additional cost: discard a card or pay 3 life) |
-| {1}{B}{B} | `Join the Dead` (C) | -5/-5, or **-10/-10** at descend 4 |
-| {R} | `Dreadmaw's Ire` (U) | Target **attacking** creature +2/+2 and trample |
-| {1}{R} | **`Abrade`** (C) | **3 damage to target creature**, or destroy target artifact |
-| {1}{R} | `Ancestors' Aid` (C) | +2/+0 and **first strike**; also a Treasure |
-| {1}{R} | `Zoyowa's Justice` (U) | Shuffle target artifact/creature (MV 1+) into its owner's library |
-| {2}{R} | `Idol of the Deep King` (C) | Flash artifact: 2 damage to any target |
-| {1}{G} | **`Staggering Size`** (C) | **+3/+3 and trample** |
-| {1}{G} | `Disturbed Slumber` (C) | A land they control becomes a **4/4 with reach and haste**; it must be blocked this turn if able |
-| {2}{G} | `Huatli's Final Strike` (C) | Their creature +1/+0, then it deals damage equal to its power to a creature you control |
-| {2}{G} | `Malamet Scythe` (C) | Flash Equipment, auto-attaches: **+2/+2** |
-| {6} | `Runaway Boulder` (C) | Flash artifact: **6 damage** to target creature an opponent controls |
-
-**Instant-speed but not combat math:** `Fanatical Offering` {1}{B}, `Another Chance` {2}{B}, `In the Presence of Ages` {2}{G}, `Confounding Riddle` {2}{U} (or counter unless they pay {4}), `Out of Air` {2}{U}{U} ({U}{U} against a creature spell), `Hurl into History` {3}{U}{U}.
-
-**The read that matters:** two open mana of any colour is enough to kill or brick an attacker in white, black, red and green. Blue two-mana plays shrink or neutralise rather than kill.
-
----
-
 ## 4. The master rule — 400.7, new object
 
 > **CR 400.7:** "An object that moves from one zone to another becomes a new object with no memory of, or relation to, its previous existence."
@@ -420,36 +320,12 @@ A creature you put 2 damage on this turn is at full toughness next turn. **Do no
 
 ---
 
-## 14. Event facts
-
-| Fact | Value | Evidence |
-|---|---|---|
-| Draft opponents | **Bots** | Verified in this machine's log for `QuickDraft_LCI_20260908`: `"CurrentModule":"BotDraft"` (32 occurrences). Corroborated first-party by Wizards' MTG Arena formats page: *"Draft cards against bots with no time limits."* |
-| Match opponents | **Human players** | **First-party.** Wizards' formats page: *"Build a 40-card deck to play against **live players**…"*; Arena's in-client Codex `Codex/WaysToPlay/Formats/Limited_QuickDraft_A`: *"while you'll still play against other **human opponents**, you'll be drafted with 7 other AI opponents."* |
-| Match format | **Best-of-one** | Arena's own achievement string (`Undefeated_desc_alt_2`: "Get 7 wins in a **Best-of-1** Limited event…"); `"matchWinCondition": "MatchWinCondition_SingleElimination"` and `"gameNumber": 1` in all 8 logged Limited matches on this machine; mtg.wiki and Draftsim agree. Not observed in an LCI Quick Draft match specifically — see below. |
-| Run length | 7 wins or 3 losses | **First-party.** Wizards' formats page: *"…until reaching either seven wins or three losses, whichever comes first."* Local log independently shows a run ending at `CurrentLosses: 3`. |
-| Entry fee | 5,000 gold or 750 gems | mtg.wiki Arena/Events; Draftsim. No first-party page reachable. |
-| Card pool | **LCI main set** | The drafted deck's Arena ids (87383, 87160, 87301, 87326, 87412) all resolve to `set:lci` on Scryfall |
-| Minimum deck size | 40 | Arena Limited match settings observed on this machine (`"minDeckSize": 40`), from HOB Sealed/Premier Draft matches, not from an LCI Quick Draft match |
-| Turn timer | 30 s per priority, 4 timeouts, 3 pips | Same source: `"timeoutDurationSec": 30, "maxTimeoutCount": 4, "maxPipCount": 3` |
-| Mulligan | London | Same source: `"mulliganType": "MulliganType_London"` |
-
-**Evidence caveat, stated plainly:** the `QuickDraft_LCI_20260908` logs on this machine contain **draft-phase data only** — `BotDraft` and `ClaimPrize` modules, and **zero** game-state messages. No match in that event has been logged. The match-level settings above (`MatchWinCondition_SingleElimination`, `gameNumber: 1`, 40-card minimum, 30-second timer, London mulligan) were read from `Player-prev.log.bak-20260822`, whose Limited events are `PremierDraft_HOB_20260811` and `Sealed_HOB_20260811`. They come from the match's format config (`SuperFormat_Limited`) rather than from the event, so they are expected to apply — but confirm `maxTimeoutCount` reads 4 in the first LCI Quick Draft game. The **format** facts (bots draft, humans play, 7 wins / 3 losses) do not depend on those logs; they are first-party from Wizards and Arena's Codex.
-
-**What Bo1 changes about play:**
-- No sideboarding, no game 2. A card exiled by `Ray of Ruin` {4}{B}, `Quicksand Whirlpool`, or a craft cost is gone for the whole match.
-- You never get to learn the opponent's tricks and adjust next game. The open-mana table in §3 is the only read you get.
-- The 30-second timer is why this file is tables. Grep, don't read.
-
----
-
 ## Sources
 
 1. **Magic: The Gathering Comprehensive Rules**, effective August 7, 2026 — https://media.wizards.com/2026/downloads/MagicCompRules%2020260819.txt (downloaded and grepped locally; every rule number and quote taken verbatim). Rules used: 110.2a, 110.4a, 110.5b, 111.6, 111.7, 111.8, 111.10a, 111.10s, 113.7a, 115.9b, 122.1a, 122.1h, 122.2, 122.3, 302.6, 400.1, 400.2, 400.3, 400.7, 404.2, 506.4, 506.4b, 509.1h, 510.1c, 510.2, 514.2, 604.7, 608.2h, 613.4b, 613.4c, 701.44a, 701.44c, 702.2e, 702.167a, 704.3, 704.5d, 704.5f, 704.5g, 704.5h, 704.5j, 704.5m, 704.5n, 704.5q, 704.8, 707.2.
 2. **Scryfall API card data** — https://api.scryfall.com/cards/search?q=e%3Alci (all 292 unique cards downloaded to JSON and grepped locally). Every card name, mana cost, type line, power/toughness, rarity and oracle text above comes from that dump.
 3. **Scryfall rulings endpoint** (official Wizards rulings), quoted for: Broodrage Mycoid, Basking Capybara, Souls of the Lost, Self-Reflection, Deepfathom Echo, Eaten by Piranhas, Dusk Rose Reliquary, Oteclan Landmark, Market Gnome, Saheeli's Lattice.
 4. **Scryfall arena_id lookups** — https://api.scryfall.com/cards/arena/{id} — used to confirm the drafted pool maps to `set:lci`.
-5. **MTG Arena client logs on this machine** — `/Users/brianward/Library/Logs/Wizards of the Coast/MTGA/` (`Player.log`, `Player-prev.log.draft-20260908`, `Player-prev.log.bak-20260822`). See the evidence caveat in §14 for which log each field came from.
 6. **Wizards of the Coast, MTG Arena formats page** — https://magic.wizards.com/en/news/mtg-arena/mtg-arena-formats — first-party: Quick Draft is drafted against bots and played against live players, run ends at seven wins or three losses.
 7. **MTG Arena in-client localization database** — `Codex/WaysToPlay/Formats/Limited_QuickDraft_A` (human match opponents, 7 AI drafters, no pick timers); `Achievements/Core/Advanced/Undefeated_desc_alt_2` (Best-of-1 Limited event).
 8. **Draftsim, "MTG Arena Quick Draft"** — https://draftsim.com/mtg-arena-quick-draft/ — secondary corroboration for best-of-one and the entry fee.

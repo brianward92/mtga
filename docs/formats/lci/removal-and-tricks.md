@@ -220,36 +220,6 @@ Two sorcery-speed uncommons that still wreck your combat plans:
 
 Canonical procedure: [`../../rules/blocking-procedure.md`](../../rules/blocking-procedure.md).
 
-**Step 1 — read the board before you read your hand.**
-1. Their untapped lands, **by colour**. Add Treasures and mana creatures.
-2. **Permanent cards in their graveyard** — the descend count.
-3. Untapped **Vehicles**, and whether they have any creature to crew (crew is free and instant speed).
-4. Lands that could animate: Cavernous Maw ({2}), a Disturbed Slumber target ({1}{G}), a Restless land.
-
-**Step 2 — look up the worst case above.** Ask literally: *if they have the single best card their open mana buys, is this block still acceptable?*
-
-**Step 3 — choose from this ladder, top down.**
-
-| Situation | Action |
-|---|---|
-| The block trades up or kills for free **even after the worst trick** | Block. |
-| You are dead or nearly dead to their board next turn | Block anyway. Losing a creature to a trick beats losing the match. |
-| The block is only good if they have no trick, and you are **not** under pressure | **Do not block.** Take the damage. |
-| The attacker is bigger than everything you have and you are stable | Take the damage. Chump-block only when you would otherwise die within two turns. |
-| They attack with everything and you have more blockers than attackers | Block where your creature survives; leave the rest. Do not spread thin. |
-| They attack with exactly one creature into your bigger board | This is a trick or a trap almost every time. Block only if the block survives the worst case. |
-
-**Step 4 — check the three things that most often go wrong.**
-1. **First strike.** Ancestors' Aid {1}{R} turns any block into a one-sided kill. Two open red mana is the most common trick mana in the format.
-2. **Deathtouch.** Did they leave {2} up for Poison Dart Frog {1}{G}? Does an attacker carry Hunter's Blowgun {1}? On their turn the Blowgun creature has deathtouch.
-3. **The double-block split.** Assume the attacker chooses the split that hurts you most.
-
-**Step 5 — when you are the attacker.** Do not attack a creature into:
-- **{1}{W}** if 4 damage (Cosmium Blast) kills your attacker. Cosmium Blast can *only* hit an attacking or blocking creature, so they will always be able to use it in combat.
-- **{2}{W}** if losing your best creature to an exile (Quicksand Whirlpool, discounted against your now-tapped attacker) ends the game.
-- **{2}{G}** with a bigger creature on their side — Huatli's Final Strike is a one-sided kill.
-- Anything, if they control **Kutzil, Malamet Exemplar** — your own tricks cannot be cast on your turn.
-
 ## Combat rules that decide blocks
 
 ### 1. There is no damage assignment order
