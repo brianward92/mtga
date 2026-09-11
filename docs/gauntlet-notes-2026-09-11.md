@@ -186,3 +186,70 @@ longer mistaken for an absent one.
 White: **win, win, loss.** Three straight is the bar, so white restarts at zero.
 Game 3 was lost on the board, not to a tool: a flier we could not block, at two
 life, with a strong ground board that could not race it.
+
+## After five white games: W, W, L, W, L
+
+Three wins, two losses, and never three in a row — so white is not mastered and
+the gauntlet has not advanced. Worth separating why.
+
+**None of the five was lost to a tool.** That is the real change from the LCI
+draft run, where two of three losses were helpers acting on their own. Games 3
+and 5 were lost on the board: both times to a slow bleed where I kept declining
+blocks to preserve creatures, fell to single-digit life, and then could not
+both race and hold the ground. Game 3 ended to a flier the deck simply cannot
+block.
+
+That is a play problem, not an automation one, and it is the one worth fixing
+next: the decline-the-block reflex is wrong when the opponent's board is wider
+than ours, because the life total is the resource that runs out first.
+
+### More findings from games 4 and 5
+
+- **Blocking is click-blocker-then-click-attacker**, same as declaring an
+  attacker, and the log's `declared` field confirms it landed before submitting.
+  Verified repeatedly; this is the one combat interaction that never worked
+  under the old drag-based approach.
+- **The engine's action list offers casts during the declare-attackers step.**
+  `turn.py` started in the main phase, Arena auto-advanced to "Choose attackers"
+  while it worked, and the next cast was stranded behind a Cancel. Adeline sat
+  in hand for four turns of one game because of it. The phase is now re-checked
+  every pass, not once at the top.
+- **Do not re-derive available mana after each cast — subtract it.** Arena
+  reports the lands it just tapped a beat late, so re-reading said we could
+  afford two more one-drops with every land tapped, and "cast" three creatures
+  of which exactly one resolved. Measure once, then track the spend.
+- **At the end step the button is whatever the engine is waiting on** —
+  "Resolve" with something on the stack, not "End Turn". Asking for End Turn
+  there refuses forever, and the turn loop spun in place printing the same line.
+- **Rank creatures from the log, not the screen.** A rules tooltip parks over
+  the board often enough that every power/toughness box becomes unreadable at
+  once. Power comes from the game state, position from OCR, matched by name.
+
+### What is general and what is Arena's
+
+Worth stating plainly, since it is the question underneath this whole exercise.
+
+**Belongs in `macctl`** — nothing here knows what a card is:
+- Region-scoped, unmerged text search. `read` and `shot` take `--region` and
+  `--boxes`; `find`, `click-text`, `wait-for` and `verify` do not, which is the
+  entire reason `btn.sh` exists as a re-implementation carrying a second copy of
+  the homoglyph table.
+- Retry-until-present. Almost every failure this session was a first look taken
+  before the UI finished drawing. A `--timeout` on `click-text` would remove
+  most of the retry loops written by hand today.
+- Hover-then-click as an option on `click`. Unity wants to see the pointer
+  arrive; a cold click is intermittent.
+- Scroll that Unity honours. `macctl scroll` delivers line-unit events and
+  Arena's grid does not move at any magnitude. Pixel-unit events with
+  continuous phases — what a real trackpad sends — are the likely fix.
+- Fuzzy text matching as a first-class option: fold lookalikes, tolerate a
+  clipped first glyph and single-letter substitutions. Every consumer has now
+  written its own version of this.
+- `window --size`, and an honest refusal when the app owns its geometry.
+
+**Belongs in mtga** — all of it is knowledge about this game:
+- Which gesture each zone wants (double-click in hand, click on board).
+- Where the buttons are and what their labels mean, including the refusal list.
+- That Assign Damage has its own Done in the middle of the screen.
+- The GRE log parser, the mana arithmetic, the combat judgement.
+- That the client's resolution lives in `com.wizards.mtga` preferences.

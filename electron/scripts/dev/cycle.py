@@ -30,6 +30,7 @@ def state():
                          capture_output=True, text=True, timeout=60).stdout
     return json.loads(raw.strip().splitlines()[-1])
 
+stuck = 0
 for rnd in range(ROUNDS):
     sh('hold.sh')
     st = state()
@@ -56,8 +57,19 @@ for rnd in range(ROUNDS):
         continue
 
     if active == me and phase in ('Phase_Main2', 'Phase_Ending') and ours:
-        print(f"--- our turn {t.get('turnNumber')}: nothing left, ending")
-        sh('step.sh', 'End Turn')
+        # "End Turn" is the label in second main, but by the end step the button
+        # says whatever the engine is waiting on — "Resolve" with something on
+        # the stack. Asking for End Turn there refuses forever, and the loop
+        # span in place printing the same line.
+        want = 'End Turn' if phase == 'Phase_Main2' else 'advance'
+        print(f"--- our turn {t.get('turnNumber')}: nothing left, ending ({phase})")
+        out = sh('step.sh', want) if want != 'advance' else sh('step.sh')
+        if 'NOT clicking' in out:
+            print('   ' + out.strip().splitlines()[0])
+            stuck += 1
+            if stuck >= 2:
+                print('cycle: stuck on the step button — stopping')
+                break
         continue
 
     out = py('go.py', '10')

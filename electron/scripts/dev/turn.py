@@ -121,6 +121,7 @@ else:
 
 # Then creatures, dearest first, re-checking after each one.
 tried: set[str] = set()
+spent = None
 while True:
     # Let the client catch up before asking what we can afford. Arena reports
     # the lands it has just tapped a beat late, so a state read taken straight
@@ -128,8 +129,22 @@ while True:
     # picked up and stranded behind a Cancel.
     time.sleep(1.1)
     st = state()
+    # Re-check the phase every pass, not just once at the top. Arena advances
+    # on its own when we have nothing to do, so a loop that started in the main
+    # phase can find itself in "Choose attackers" — where a creature cannot be
+    # cast at all. The cast is then picked up, stranded behind a Cancel, and the
+    # card that was meant to win the game sat in hand for four turns.
+    ph = st['turn'].get('phase')
+    if st['turn'].get('activePlayer') != me or ph not in ('Phase_Main1', 'Phase_Main2'):
+        print(f"turn.py: phase moved to {ph} — stopping")
+        break
     legal = legal_by_instance(st)
-    have = mana_available(st)
+    # Trust our own arithmetic over a re-read. Arena reports the lands it just
+    # tapped a beat late, so re-deriving available mana after every cast said we
+    # could still afford two more one-drops with an empty board of tapped lands
+    # — and it duly "cast" three creatures of which exactly one resolved.
+    # Measure once, then subtract what we spend.
+    have = mana_available(st) if spent is None else max(0, spent)
     cands = []
     for o in st['hand']:
         acts = [a for a in legal.get(o['instanceId'], []) if a['actionType'] == 'ActionType_Cast']
@@ -148,9 +163,9 @@ while True:
     # version did, leaving mana unspent every turn it happened.
     progressed = False
     for cost, nm in cands:
-        if nm in tried:
+        if nm in tried or cost > have:
             continue
-        print(f"cast: {nm}  (also offered: {', '.join(c[1] for c in cands if c[1] != nm) or 'none'})")
+        print(f"cast: {nm} for {cost} (of {have} mana)")
         tried.add(nm)
         if DRY:
             progressed = False
@@ -158,6 +173,7 @@ while True:
         if play(nm):
             if unstick():
                 continue
+            spent = have - cost
             progressed = True
             break
         unstick()
