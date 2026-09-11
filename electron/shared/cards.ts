@@ -121,7 +121,27 @@ export function namesMatch(observed: string, name: string): boolean {
   // Ancestors". Ignore the first character when what follows is long enough to
   // identify the card on its own.
   if (a.length >= 9 && b.includes(a.slice(1))) return true
+  // The general rule behind all of the above: recognition of a card title is
+  // noisy at the edges and occasionally inside ("nafical Offering" for
+  // Fanatical Offering — two glyphs clipped and a t read as f). For a long
+  // title, close enough is the same card: no two names in a fifteen-card pack
+  // are within a fifth of each other by edit distance.
+  if (a.length >= 10 && b.length >= 10 && similarity(a, b) >= 0.8) return true
   return false
+}
+
+/** 1 - normalised Levenshtein distance. Strings are short; O(n*m) is fine. */
+function similarity(x: string, y: string): number {
+  const prev: number[] = Array.from({ length: y.length + 1 }, (_, i) => i)
+  for (let i = 1; i <= x.length; i++) {
+    let diag = prev[0]; prev[0] = i
+    for (let j = 1; j <= y.length; j++) {
+      const tmp = prev[j]
+      prev[j] = Math.min(prev[j] + 1, prev[j - 1] + 1, diag + (x[i - 1] === y[j - 1] ? 0 : 1))
+      diag = tmp
+    }
+  }
+  return 1 - prev[y.length] / Math.max(x.length, y.length)
 }
 
 // ---- pool-level colour facts ------------------------------------------------

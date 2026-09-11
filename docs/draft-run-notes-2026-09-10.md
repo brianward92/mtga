@@ -25,3 +25,12 @@ Collected as it happened. Each entry: what was observed, what it cost, what to c
 
 - Pick cadence with the loop healthy: ~5s per pick, ~25s of verified picks
   between refusals.
+- **ROOT CAUSE of the clipped titles: the verify band's 12% left inset.** Every
+  refused pick was a first glyph cut off. With the left inset at 5% (right kept
+  at 12%, where the pip sits) pick 8 read "Fanatical Offering" exactly. The
+  matcher now also carries a similarity threshold (≥0.8 on ≥10 chars) as
+  defence, replacing three stacked special cases. Four picks were lost to
+  refusals before this; each cost a stop, a manual diagnosis, and a relaunch.
+- **Monitor the loop, don't wait on it.** A tail on the loop's output with a
+  filter for PICKED/ABORT/GIVING catches a refusal on its first occurrence
+  instead of after six. Same treatment for build and play.

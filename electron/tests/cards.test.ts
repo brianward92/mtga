@@ -133,6 +133,14 @@ describe('namesMatch tolerates a clipped leading glyph', () => {
     expect(namesMatch('kawalli, the Seething Tower 1*', 'Akawalli, the Seething Tower')).toBe(true)
     expect(namesMatch('Chupacabra Echo 2', 'Chupacabra Echo')).toBe(true)
   })
+  it('accepts a long title mangled at the edge and inside', () => {
+    // Pick 8 of pack 2: "Fa" clipped and a t read as f.
+    expect(namesMatch('nafical Offering', 'Fanatical Offering')).toBe(true)
+  })
+  it('does not confuse two different titles that merely look alike', () => {
+    expect(namesMatch('Echo of Dusk', 'Echo of Deceit')).toBe(false)
+    expect(namesMatch('Synapse Necromage', 'Skullcap Snail')).toBe(false)
+  })
   it('still refuses short or unrelated reads', () => {
     expect(namesMatch('cabra', 'Chupacabra Echo')).toBe(false)
     expect(namesMatch('Staggering Siz', 'Chupacabra Echo')).toBe(false)

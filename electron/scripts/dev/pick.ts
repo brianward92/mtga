@@ -52,11 +52,17 @@ if (what === 'confirm') {
   // pick 14 of a live draft — and choosing the line nearest the centre picked
   // the "1", compared it to Burning Sun Cavalry, and refused a card that was
   // plainly there.
-  const inset = r.width * 0.12
+  // Asymmetric on purpose. A 12% inset on the left clipped the first glyph of
+  // four different titles in one draft ("hupacabra", "Valk", "kawalli",
+  // "nafical Offering"), and each became a matcher patch. The title starts
+  // near the card's left edge; the right edge is where the pip sits, and that
+  // is the side worth staying away from.
+  const insetL = r.width * 0.05
+  const insetR = r.width * 0.12
   const band = {
-    x: Math.round(rect.x + r.x + inset),
+    x: Math.round(rect.x + r.x + insetL),
     y: Math.round(rect.y + r.y + r.height * 0.04),
-    width: Math.round(r.width - 2 * inset),
+    width: Math.round(r.width - insetL - insetR),
     height: Math.round(r.height * 0.14)
   }
   const lines = readTextLines(band).filter(l => l.text.trim())
