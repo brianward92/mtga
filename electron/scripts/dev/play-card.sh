@@ -27,7 +27,7 @@ want="$1"
 # repeatedly reported "not in hand" while sitting plainly in it, costing a play
 # a turn. Three looks, a beat apart, and only then call it absent.
 match_in_hand() {
-bash "$here/hand.sh" 0.72 0.28 2>/dev/null | python3 -c "
+bash "$here/hand.sh" "${2:-0.72}" "${3:-0.28}" 2>/dev/null | python3 -c "
 import sys, re
 want = sys.argv[1].lower()
 rows = [l.rstrip() for l in sys.stdin if l.strip()]
@@ -41,16 +41,31 @@ def loose(w, t):
     for ch in t:
         if i < len(w) and ch == w[i]: i += 1
     return i >= len(w) - 1 and i >= 4
-for test in (sub, skipfirst, loose):
+def prefix(w, t):
+    # Vision frequently returns only the first word of a card's name — 'Hopeful'
+    # for 'Hopeful Initiate', 'Coppei' for 'Coppercoat Vanguard'. Every other
+    # test here assumes it has the whole title, so the card was reported absent
+    # while sitting in hand, and the turn spent no mana. A long-enough prefix of
+    # the name we asked for is that card.
+    w = re.sub(r'[^a-z]', '', w); t = re.sub(r'[^a-z]', '', t)
+    return len(t) >= 5 and (w.startswith(t) or w.startswith(t[1:]))
+for test in (sub, skipfirst, prefix, loose):
     for r in rows:
         if test(want, text(r)): print(r); sys.exit(0)
 " "$1" | head -1
 }
+# Vary the crop between attempts, do not just repeat the same look.
+# Vision's output depends on the crop it is given: the leftmost card's name is
+# missing from the narrow band and present in a wider one, while a card whose
+# name survives the narrow read gets split in two by the wide one. Neither
+# band is better; they fail on different cards. Three different crops find
+# what one crop, tried three times, does not.
 hit=""
-for attempt in 1 2 3; do
-  hit=$(match_in_hand "$want")
+for band in "0.72 0.28" "0.62 0.38" "0.66 0.34"; do
+  set -- $band
+  hit=$(match_in_hand "$want" "$1" "$2")
   [ -n "$hit" ] && break
-  sleep 0.8
+  sleep 0.6
 done
 if [ -z "$hit" ]; then echo "play-card: '$want' is not in hand"; exit 1; fi
 x=$(echo "$hit" | awk '{print $1}'); y=$(echo "$hit" | awk '{print $2}')

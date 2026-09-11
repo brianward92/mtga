@@ -40,7 +40,12 @@ for i in range(CYCLES):
     if ours and kind in STOP:
         reason = f"decision: {kind}"
         break
-    if ours and kind == 'actions' and t.get('activePlayer') == me and t.get('phase') == 'Phase_Main1':
+    # Stop at our main phase whether or not priority has arrived yet. Waiting
+    # for `decision: actions` meant that on turns where the client took a beat
+    # to hand us priority, the loop kept advancing and walked straight into
+    # combat — and a land cannot be played from there. That is where the missed
+    # land drops were coming from.
+    if t.get('activePlayer') == me and t.get('phase') == 'Phase_Main1':
         reason = 'our main phase'
         break
     if ours:

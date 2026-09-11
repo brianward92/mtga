@@ -43,9 +43,27 @@ for rnd in range(ROUNDS):
     ours = t.get('decisionPlayer') == me and kind != 'none'
     phase, active = t.get('phase'), t.get('activePlayer')
 
+    if ours and kind == 'chooseN':
+        # A cleanup discard is not a decision worth a model round trip, and it
+        # arrives every single turn once the hand is full. Anything else that
+        # asks us to choose N still stops.
+        screen = subprocess.run(['macctl', 'read', 'MTGA'], capture_output=True,
+                                text=True, timeout=25).stdout
+        if 'iscard' in screen:
+            print("--- cleanup discard")
+            out = sh('discard.sh')
+            print('   ' + (out.strip().splitlines() or ['(no output)'])[-1])
+            continue
+
     if ours and kind in STOP:
         print(f"cycle: STOP — {kind}")
         break
+
+    if active == me and phase == 'Phase_Main1' and not ours:
+        # Our main phase, priority not handed over yet. Wait for it rather than
+        # advancing past the only window in which a land can be played.
+        sh('await.sh', '20')
+        continue
 
     if active == me and phase == 'Phase_Main1' and ours:
         print(f"--- our turn {t.get('turnNumber')}: developing")
@@ -61,9 +79,13 @@ for rnd in range(ROUNDS):
         # says whatever the engine is waiting on — "Resolve" with something on
         # the stack. Asking for End Turn there refuses forever, and the loop
         # span in place printing the same line.
-        want = 'End Turn' if phase == 'Phase_Main2' else 'advance'
         print(f"--- our turn {t.get('turnNumber')}: nothing left, ending ({phase})")
-        out = sh('step.sh', want) if want != 'advance' else sh('step.sh')
+        out = sh('step.sh', 'End Turn') if phase == 'Phase_Main2' else ''
+        if not out or 'NOT clicking' in out:
+            # Second main does not always say "End Turn": with something still
+            # resolving it reads "Next / To End", and insisting on the words
+            # stalled the loop in place. A plain advance is the same click.
+            out = sh('step.sh')
         if 'NOT clicking' in out:
             print('   ' + out.strip().splitlines()[0])
             stuck += 1

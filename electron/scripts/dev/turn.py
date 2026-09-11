@@ -88,7 +88,13 @@ def unstick():
     hit = next((b for b in boxes if 'ancel' in b.get('text', '')), None)
     if not hit:
         return False
-    print(f"     (backing out a stranded cast: Cancel at {hit['at']})")
+    # Say WHY, because the two reasons need different responses. A "Pay {W}"
+    # on screen means the cost cannot be met with the mana we have — counting
+    # lands tells you how MUCH mana is available, not what colour, and two
+    # Mutavaults make two mana that cannot cast a single white one-drop. That
+    # is not a bug to fix, it is a card to skip.
+    why = 'cannot pay the cost' if any('Pay' in b.get('text', '') for b in boxes) else 'stranded'
+    print(f"     (backing out: {why}; Cancel at {hit['at']})")
     subprocess.run(['bash', os.path.join(HERE, 'click-at.sh'),
                     str(hit['at'][0]), str(hit['at'][1])], timeout=40)
     return True
@@ -122,6 +128,7 @@ else:
 # Then creatures, dearest first, re-checking after each one.
 tried: set[str] = set()
 spent = None
+strands = 0
 while True:
     # Let the client catch up before asking what we can afford. Arena reports
     # the lands it has just tapped a beat late, so a state read taken straight
@@ -172,12 +179,17 @@ while True:
             break
         if play(nm):
             if unstick():
+                strands += 1
                 continue
+            strands = 0
             spent = have - cost
             progressed = True
             break
         unstick()
     if not progressed:
+        break
+    if strands >= 2:
+        print("turn.py: two casts in a row could not be paid for — stopping")
         break
 
 subprocess.run(['python3', os.path.join(HERE, 'plan.py')])
