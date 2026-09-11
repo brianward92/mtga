@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+touch /tmp/mtga-acting 2>/dev/null || true
 # Where each card in hand is on screen, in one capture.
 #
 # --boxes returns Vision's individual text boxes instead of merged lines. The

@@ -7,6 +7,31 @@ import { replay, creatures, battlefield, openMana, ourTurnToAct, bestAssignment 
 
 const LOG = process.env.MTGA_LOG ?? join(homedir(), 'Library/Logs/Wizards of the Coast/MTGA/Player.log')
 const state = replay(readFileSync(LOG, 'utf8').split('\n'))
+// `--json` dumps the machine-readable state: the hand with grpIds, and the
+// actions the engine says are legal. Everything that decides what to cast
+// should read this rather than guessing from mana, because the engine already
+// knows what we can afford and the OCR does not.
+if (process.argv.includes('--json')) {
+  const seat = state.seat
+  const zoneOfJ = new Map(Object.values(state.zones).map(z => [z.zoneId, `${z.type}:${z.ownerSeatId ?? ''}`]))
+  const inHand = Object.values(state.objects)
+    .filter(o => (zoneOfJ.get(o.zoneId!) ?? '').startsWith(`ZoneType_Hand:${seat}`))
+    .map(o => ({ instanceId: o.instanceId, grpId: o.grpId, cardTypes: o.cardTypes }))
+  console.log(JSON.stringify({
+    seat, turn: state.turn, life: state.life, finished: state.finished ?? null,
+    timerSeconds: state.timerSeconds ?? null,
+    decision: state.decision ?? null,
+    hand: inHand,
+    myBattlefield: battlefield(state, seat!).map(o => ({
+      instanceId: o.instanceId, grpId: o.grpId, power: o.power, toughness: o.toughness,
+      isTapped: !!o.isTapped, sick: !!o.hasSummoningSickness, cardTypes: o.cardTypes })),
+    theirBattlefield: battlefield(state, seat === 1 ? 2 : 1).map(o => ({
+      instanceId: o.instanceId, grpId: o.grpId, power: o.power, toughness: o.toughness,
+      isTapped: !!o.isTapped, sick: !!o.hasSummoningSickness, cardTypes: o.cardTypes })),
+  }))
+  process.exit(0)
+}
+
 const me = state.seat
 const them = me === 1 ? 2 : 1
 

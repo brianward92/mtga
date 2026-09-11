@@ -10,6 +10,8 @@
 #   act.sh click 0.925 0.889
 #   act.sh drag 0.42 0.95 0.40 0.60
 set -uo pipefail
+# Tell the rope guard a real driver is working, so it stands down (see guard.ts).
+touch /tmp/mtga-acting 2>/dev/null || true
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 
 # Move the cursor off the board before clicking.

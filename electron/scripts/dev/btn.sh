@@ -5,6 +5,8 @@
 # "Mulligan" and "Keep" arrive as one string whose centre is the gap between
 # them. --boxes keeps them apart, which is the whole point.
 set -uo pipefail
+# Tell the rope guard a real driver is working, so it stands down (see guard.ts).
+touch /tmp/mtga-acting 2>/dev/null || true
 want="$1"; region="${2:-0.0,0.70,1.0,0.30}"
 hit=$(macctl read MTGA --region "$region" --boxes 2>/dev/null | python3 -c "
 import json,sys,unicodedata

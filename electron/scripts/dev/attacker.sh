@@ -6,6 +6,8 @@
 # Hidden Volcano over a 7/7 once, which cost a game. Stay in the lane and
 # never return a land.
 set -uo pipefail
+# Tell the rope guard a real driver is working, so it stands down (see guard.ts).
+touch /tmp/mtga-acting 2>/dev/null || true
 macctl read MTGA --region 0.10,0.24,0.75,0.20 --boxes 2>/dev/null | python3 -c "
 import json,sys,re
 LAND=re.compile(r'volcano|swamp|cave|island|mountain|forest|plains|passage|tunnel|citadel|vents|maw|monument|grotto|lair|deeps', re.I)
