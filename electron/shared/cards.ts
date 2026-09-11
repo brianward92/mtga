@@ -112,6 +112,11 @@ export function namesMatch(observed: string, name: string): boolean {
   // read contained anywhere in the name is the same card; at eight characters
   // and up nothing else in a pack shares that much of a title.
   if (a.length >= 8 && b.includes(a)) return true
+  // The clipped first glyph can also be MANGLED rather than missing: a W with
+  // its left stroke cut off reads as a V, and pick 15 refused "Valk with the
+  // Ancestors". Ignore the first character when what follows is long enough to
+  // identify the card on its own.
+  if (a.length >= 9 && b.includes(a.slice(1))) return true
   return false
 }
 

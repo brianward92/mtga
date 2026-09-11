@@ -124,6 +124,10 @@ describe('namesMatch tolerates a clipped leading glyph', () => {
     // the pick with the entry fee already paid.
     expect(namesMatch('hupacabra Echo', 'Chupacabra Echo')).toBe(true)
   })
+  it('accepts a long read whose first character was mangled by the crop', () => {
+    // Pick 15: a W with its left stroke clipped reads as a V.
+    expect(namesMatch('Valk with the Ancestors', 'Walk with the Ancestors')).toBe(true)
+  })
   it('still refuses short or unrelated reads', () => {
     expect(namesMatch('cabra', 'Chupacabra Echo')).toBe(false)
     expect(namesMatch('Staggering Siz', 'Chupacabra Echo')).toBe(false)
