@@ -270,7 +270,12 @@ export function parseRailLine(text: string): { count: number; name: string } | n
   const m = text.trim().match(/^(\d{1,2}|[Il])\s*[xX×]\s*(.+)$/)
   if (!m) return null
   const count = /^[Il]$/.test(m[1]) ? 1 : Number(m[1])
-  return { count, name: m[2].trim() }
+  // Recognition drops stray glyphs between the count and the name — the
+  // Swamp row of a live build read "17x ( Swamp". Left as "( Swamp" the row is
+  // not a basic-land name, the builder sees no Swamps at all, and it adds
+  // sixteen on top of the seventeen already there: 57/40. A name starts with
+  // a letter.
+  return { count, name: m[2].trim().replace(/^[^A-Za-z]+/, '').trim() }
 }
 
 /**

@@ -34,3 +34,18 @@ Collected as it happened. Each entry: what was observed, what it cost, what to c
 - **Monitor the loop, don't wait on it.** A tail on the loop's output with a
   filter for PICKED/ABORT/GIVING catches a refusal on its first occurrence
   instead of after six. Same treatment for build and play.
+
+## Build phase
+
+- **The audit's prediction came true: a lost rail row reads as "have 0" and
+  the builder ADDS.** Arena auto-adds 17 basics when the builder opens. The
+  Swamp row read as "17x ( Swamp"; "( Swamp" is not a basic-land name; the
+  script saw zero Swamps, added 16, and finished at 57/40 with 33 Swamps. The
+  spells were right. Fix: strip leading non-letters from a parsed rail name.
+  Recovery: rerun the build — its excess-removal path clicks the row 17 times.
+- **Cut phase was clean**: 22 cuts, each read back from the header count,
+  62 → 40, no misses. Stray tokens on rail rows ("Skulltaker ( 2",
+  "Seethi... 1") were absorbed by the tolerant matcher.
+- **Idea:** before adding basics, if the header count already exceeds the
+  target, refuse — adding cannot be right. A count sanity check would have
+  caught this even with the parse failure.

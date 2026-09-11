@@ -53,6 +53,10 @@ describe('rail OCR parsing', () => {
     expect(parseRailLine('Draft Deck')).toBeNull()
   })
   it('parses the deck count header and matches truncated names', () => {
+    // A stray "(" between count and name made the Swamp row invisible as a
+    // basic, and the builder added 16 Swamps on top of 17: 57/40.
+    expect(parseRailLine('17x ( Swamp')).toEqual({ count: 17, name: 'Swamp' })
+    expect(parseRailLine('2x Fanatical Offering 1')).toEqual({ count: 2, name: 'Fanatical Offering 1' })
     expect(parseDeckCount('41/40 Cards')).toBe(41)
     expect(parseDeckCount('40/40 Cards')).toBe(40)
     // A creature's printed power and toughness is the same shape as a deck
