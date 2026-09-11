@@ -294,7 +294,7 @@ describe('restoring a draft from our own history', () => {
   const recorded = {
     eventName: 'QuickDraft_DSK_20260811', draftId: null, set: 'DSK', format: 'QuickDraft',
     pool: [1, 2], picks: [{ pack: 1, pick: 1, grpId: 1, name: 'Murder' }],
-    complete: true, at: '2026-09-09T10:00:00Z'
+    complete: true, at: new Date().toISOString()
   }
   const historyWith = (draft: unknown) => ({ append: vi.fn(), lastDraft: vi.fn(() => draft) })
 

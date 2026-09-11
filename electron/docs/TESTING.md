@@ -160,20 +160,8 @@ Arena session; it intentionally disables real cursor sampling.
 ## Live verification
 
 Live checks observe the already-running app and Arena unless lifecycle changes
-were expressly approved. Capture the Arena window, not the whole desktop, with:
-
-```bash
-scripts/dev/screenshot-arena.sh
-scripts/dev/screenshot-arena.sh /tmp/arena-pack2.png
-```
-
-Usage is `screenshot-arena.sh [OUTPUT.png]`; `-h` or `--help` prints it. With no
-output path, the helper writes `./arena-screenshot-YYYYMMDD-HHMMSS.png`, and it
-refuses to overwrite an existing file. It queries the development window
-helper first, falls back to the installed app's helper, and captures only the
-reported Arena rectangle without launching the app. Screenshot capture may
-require Screen Recording; do not grant or alter that permission without
-approval.
+were expressly approved. Arena capture and input tooling lives in
+`~/src/arena-control`; follow that repository's verification procedures.
 
 If the helper warns that Arena is not frontmost, another window may overlap
 that rectangle. Do not retain or share the image until its contents have been
@@ -271,31 +259,6 @@ This section requires explicit permission to change the app/Arena lifecycle.
 
 ## Development picker
 
-`scripts/dev/pick-next-card.sh` is a development-only real-Arena tool. The
-product app itself remains Accessibility-free, but this helper activates Arena,
-queries its window through System Events, and synthesizes mouse input, so macOS
-may require Accessibility permission. Even `--dry-run` activates Arena, may
-wake a sleeping live session, compiles local Swift helpers when absent, and
-must not be treated as a passive inspection command.
-
-It requires the app to have started with `MTGA_STATE_FILE` and Arena to be on a
-draft pack:
-
-```bash
-# Resolve and print the model's top choice without clicking.
-scripts/dev/pick-next-card.sh top --dry-run
-
-# Resolve a specific Arena grpId without clicking.
-scripts/dev/pick-next-card.sh 92301 --dry-run
-
-# Make the current top-ranked pick. Run only with explicit authorization.
-scripts/dev/pick-next-card.sh top
-```
-
-Usage is `pick-next-card.sh [top|<grpId>] [--dry-run] [--allow-land]`.
-The script lists the pack, computes the target cell from mirrored state and the
-live Arena rectangle, refuses basic lands unless `--allow-land` is present, and
-never clicks a one-card pack. A real run double-clicks once, waits for a new
-history pick, and retries once only when the same pack/pick is still visible.
-Always run `--dry-run` first, re-check the displayed pack/pick and card name,
-and obtain explicit approval before removing `--dry-run`.
+Draft picking and all other Arena-driving workflows live in
+`~/src/arena-control`. This repository only produces the overlay state mirror
+that those workflows may consume.
