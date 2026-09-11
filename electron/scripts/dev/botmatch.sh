@@ -7,9 +7,14 @@ click() { macctl click MTGA "$1" "$2" >/dev/null 2>&1; sleep "${3:-2.5}"; }
 # the second press starts the match rather than choosing one.
 click 0.9039 0.9398 3     # Play -> opens the play panel
 click 0.9039 0.9398 4     # Play -> start the match with the remembered deck
-for i in $(seq 1 20); do
-  n=$(grep -c "greToClientMessages" ~/Library/Logs/Wizards\ of\ the\ Coast/MTGA/Player.log 2>/dev/null || echo 0)
-  [ "$n" -gt 0 ] && { echo "match started ($n gre lines)"; exit 0; }
+# Wait for a NEW game, not for any game traffic at all. The log is one file
+# across every match, so a non-zero line count just means a game was played at
+# some point today — the previous one, whose final state then looks live.
+LOG=~/Library/Logs/Wizards\ of\ the\ Coast/MTGA/Player.log
+before=$(grep -c "MulliganReq" "$LOG" 2>/dev/null || echo 0)
+for i in $(seq 1 25); do
+  now=$(grep -c "MulliganReq" "$LOG" 2>/dev/null || echo 0)
+  [ "$now" -gt "$before" ] && { echo "new game started"; exit 0; }
   sleep 3
 done
-echo "no game traffic after 60s"
+echo "no new game after 75s"; exit 1

@@ -2,7 +2,7 @@
 import { readFileSync } from 'fs'
 import { homedir } from 'os'
 import { join } from 'path'
-import { replay, creatures, battlefield, openMana, ourTurnToAct } from '../../shared/gre'
+import { replay, creatures, battlefield, openMana, ourTurnToAct, bestAssignment } from '../../shared/gre'
 
 
 const LOG = process.env.MTGA_LOG ?? join(homedir(), 'Library/Logs/Wizards of the Coast/MTGA/Player.log')
@@ -10,6 +10,13 @@ const state = replay(readFileSync(LOG, 'utf8').split('\n'))
 const me = state.seat
 const them = me === 1 ? 2 : 1
 
+// Elapsed since the game started, so slowness is visible rather than felt.
+let elapsed = ''
+try {
+  const t0 = Number(readFileSync('/tmp/game-start', 'utf8').trim())
+  const secs = Math.round(Date.now() / 1000 - t0)
+  elapsed = `  [${Math.floor(secs / 60)}m${String(secs % 60).padStart(2, '0')}s]`
+} catch { /* no timer running */ }
 console.log(`seat ${me ?? '?'}  ·  turn ${state.turn.turnNumber ?? '?'}  ${state.turn.phase ?? ''} ${state.turn.step ?? ''}`)
 console.log(`life  me ${state.life[me!] ?? '?'}  ·  them ${state.life[them] ?? '?'}` +
             (state.timerSeconds !== undefined ? `  ·  clock ${state.timerSeconds}s` : ''))
@@ -38,6 +45,23 @@ if (state.decision?.kind === 'blockers') {
     console.log(`  blocker #${b.blockerInstanceId} may block: ${b.legalAttackers.join(', ')}` +
                 (b.declared.length ? `  (declared: ${b.declared.join(', ')})` : ''))
   }
+}
+if (state.decision?.kind === 'assignDamage') {
+  // Print the plan, not just the prompt. This is the decision that stalls a
+  // game when it goes unnoticed and wins one when it is taken well.
+  for (const a of state.decision.assigners) {
+    console.log(`  #${a.instanceId} divides ${a.total} damage:`)
+    for (const t of a.targets) {
+      console.log(`     #${t.instanceId}${t.isPlayer ? ' (player)' : ''} lethal=${t.lethal ?? '-'} assigned=${t.assigned ?? '-'}`)
+    }
+    const plan = bestAssignment(a.total, a.targets)
+    console.log(`     best: ${plan.map(p => `${p.damage}->#${p.instanceId}`).join(' ')} ` +
+                `(${plan.filter(p => p.kills).length} kill(s))`)
+  }
+}
+if (state.decision?.kind === 'chooseN') {
+  const d = state.decision
+  console.log(`  choose ${d.min ?? '?'}-${d.max ?? '?'} of ${d.options.length} option(s)`)
 }
 if (state.decision?.kind === 'actions') {
   console.log(`  ${state.decision.actions.length} legal action(s): ` +

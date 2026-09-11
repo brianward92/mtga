@@ -60,6 +60,19 @@ export interface LegalAction {
   manaCost?: Array<{ color?: string[]; count?: number }>
 }
 
+/** One creature an attacker's damage can be divided among. */
+export interface DamageTarget {
+  instanceId: number
+  /** Damage needed to kill it. The engine computes this, so it already accounts
+   *  for damage marked earlier in the turn and for deathtouch. */
+  lethal?: number
+  /** Cap for the defending player or planeswalker, when trample applies. */
+  max?: number
+  assigned?: number
+  /** True when this entry is the defending player rather than a creature. */
+  isPlayer?: boolean
+}
+
 /** What the GRE is waiting for. Null when it is not our turn to answer. */
 export type Decision =
   | { kind: 'blockers'; blockers: Array<{ blockerInstanceId: number; legalAttackers: number[]; maxAttackers?: number; declared: number[] }> }
@@ -67,6 +80,25 @@ export type Decision =
   | { kind: 'mulligan' }
   | { kind: 'targets'; sourceInstanceId?: number; options: number[] }
   | { kind: 'actions'; actions: LegalAction[] }
+  /**
+   * Our attacker was blocked by more than one creature and we choose how to
+   * divide its damage.
+   *
+   * Worth naming rather than lumping in with "other", because it is the single
+   * most valuable decision in a game and it kept arriving unlabelled. A gang
+   * block looks like a disaster and is usually a gift: the defender commits
+   * several creatures, we get to spread the damage, and the engine hands us each
+   * blocker's exact lethal threshold. Four damage across a 2/1, a 2/2 and a 1/1
+   * kills all three.
+   *
+   * It is also why a game silently stops at combat damage. Nothing advances
+   * until this is answered.
+   */
+  | { kind: 'assignDamage'; assigners: Array<{ instanceId: number; total: number; targets: DamageTarget[] }> }
+  /** Choose N of something: a search, a sacrifice, a scry-like pick. */
+  | { kind: 'chooseN'; min?: number; max?: number; options: number[] }
+  /** A yes/no the client is asking, such as the legend rule. */
+  | { kind: 'confirm'; prompt?: string }
   | { kind: 'other'; type: string }
 
 export interface GameState {
@@ -283,6 +315,34 @@ function decisionFrom(message: GreMessage): Decision | null {
         options: first?.targetIdx ?? first?.legalTargets?.map((t: any) => t.targetInstanceId) ?? [],
       }
     }
+    case 'GREMessageType_AssignDamageReq': {
+      const assigners = (m.assignDamageReq?.damageAssigners ?? []).map((a: any) => ({
+        instanceId: a.instanceId,
+        total: a.totalDamage,
+        targets: (a.assignments ?? []).map((t: any) => ({
+          instanceId: t.instanceId,
+          lethal: t.minDamage,
+          max: t.maxDamage,
+          assigned: t.assignedDamage,
+          // The defending player appears in this list alongside the blockers,
+          // distinguished only by having a cap instead of a lethal threshold.
+          isPlayer: t.minDamage === undefined && t.maxDamage !== undefined,
+        })),
+      }))
+      return { kind: 'assignDamage', assigners }
+    }
+    case 'GREMessageType_SelectNReq': {
+      const req = m.selectNReq ?? {}
+      return {
+        kind: 'chooseN',
+        min: req.minSelection,
+        max: req.maxSelection,
+        options: (req.ids ?? req.options ?? []) as number[],
+      }
+    }
+    case 'GREMessageType_ConfirmReq':
+    case 'GREMessageType_PromptReq':
+      return { kind: 'confirm', prompt: m.prompt?.promptId ? String(m.prompt.promptId) : undefined }
     case 'GREMessageType_ActionsAvailableReq': {
       const actions: LegalAction[] = (m.actionsAvailableReq?.actions ?? []).map((a: any) => ({
         seatId: m.systemSeatIds?.[0],
@@ -330,6 +390,57 @@ export function creatures(state: GameState, seat?: Seat): GameObject[] {
 /** Is the GRE waiting on us specifically? */
 export function ourTurnToAct(state: GameState): boolean {
   return state.decision !== null && state.turn.decisionPlayer === state.seat
+}
+
+/**
+ * How to divide a blocked attacker's damage for the most value.
+ *
+ * A gang block looks like a disaster and is usually a gift: the defender
+ * commits several creatures, we choose how to spread the damage, and the engine
+ * tells us each blocker's exact lethal threshold.
+ *
+ * Greedy cheapest-first is the obvious approach and it is subtly wrong. It
+ * maximises how MANY blockers die, not what dies: four damage across lethal
+ * thresholds of 1, 2, 1, 1, 3 kills three creatures either way, but spending
+ * 1+1+1 kills two 1/1s while 1+2+1 kills the 2/2 instead. Same count, more
+ * removed.
+ *
+ * So enumerate the subsets. Blockers are few — a legal block is at most a
+ * handful of creatures — and an exact answer to the most valuable decision in a
+ * game is worth sixty-four iterations. Kills first, then total toughness
+ * removed as the tie-break, then any remainder to the player if trample allows.
+ */
+export function bestAssignment(
+  total: number,
+  targets: DamageTarget[]
+): Array<{ instanceId: number; damage: number; kills: boolean }> {
+  const creatures = targets.filter(t => !t.isPlayer && (t.lethal ?? 0) > 0)
+  const player = targets.find(t => t.isPlayer)
+
+  let best: DamageTarget[] = []
+  let bestScore = [-1, -1]
+  const limit = 1 << Math.min(creatures.length, 16)
+  for (let mask = 0; mask < limit; mask++) {
+    const chosen: DamageTarget[] = []
+    let spent = 0
+    for (let i = 0; i < creatures.length; i++) {
+      if (mask & (1 << i)) { chosen.push(creatures[i]); spent += creatures[i].lethal ?? 0 }
+    }
+    if (spent > total) continue
+    const score = [chosen.length, chosen.reduce((n, c) => n + (c.lethal ?? 0), 0)]
+    if (score[0] > bestScore[0] || (score[0] === bestScore[0] && score[1] > bestScore[1])) {
+      best = chosen; bestScore = score
+    }
+  }
+
+  const out = new Map<number, number>()
+  let left = total
+  for (const c of best) { out.set(c.instanceId, c.lethal ?? 0); left -= c.lethal ?? 0 }
+  if (player && left > 0) out.set(player.instanceId, Math.min(left, player.max ?? left))
+
+  return targets
+    .filter(t => out.has(t.instanceId))
+    .map(t => ({ instanceId: t.instanceId, damage: out.get(t.instanceId)!, kills: !t.isPlayer }))
 }
 
 /** Untapped lands the opponent controls: the input to "what can they have". */

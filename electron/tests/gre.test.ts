@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   applyMessage, battlefield, creatures, emptyGame, extractGreMessages,
-  ourTurnToAct, openMana, replay, type GameState,
+  ourTurnToAct, openMana, replay, bestAssignment, type GameState,
 } from '../shared/gre'
 
 /** A real recorded match. Everything asserted below actually happened. */
@@ -162,5 +162,68 @@ describe('questions the play loop asks', () => {
     const mine = battlefield(state, state.seat).map(o => o.instanceId)
     const theirs = battlefield(state, state.seat === 1 ? 2 : 1).map(o => o.instanceId)
     expect(mine.filter(id => theirs.includes(id))).toEqual([])
+  })
+})
+
+describe('damage assignment on a gang block', () => {
+  function prompts(): string[] {
+    const raw = gunzipSync(readFileSync(join(__dirname, 'fixtures/gre-prompts.log.gz')))
+    return raw.toString('utf8').split('\n').filter(Boolean)
+  }
+
+  it('names the decision instead of calling it "other"', () => {
+    // This is why a game silently stalls at combat damage. It went unlabelled
+    // for a whole session and every occurrence meant grepping the log by hand.
+    const seen = prompts().flatMap(l => extractGreMessages(l))
+      .map(m => applyMessage(emptyGame(), m).decision?.kind)
+      .filter(Boolean)
+    expect(seen).toContain('assignDamage')
+  })
+
+  it('reports each blocker with the damage that kills it', () => {
+    let found: any = null
+    for (const line of prompts()) {
+      for (const m of extractGreMessages(line)) {
+        const d = applyMessage(emptyGame(), m).decision
+        if (d?.kind === 'assignDamage' && d.assigners[0]?.targets.length > 1) found = d
+      }
+    }
+    expect(found).not.toBeNull()
+    const a = found.assigners[0]
+    expect(a.total).toBeGreaterThan(0)
+    for (const t of a.targets) {
+      if (!t.isPlayer) expect(t.lethal).toBeGreaterThan(0)
+    }
+  })
+
+  it('spends damage cheapest-first, so a gang block kills the most creatures', () => {
+    // The real case from a practice game: a 4/4 blocked by a 2/1, a 2/2, a 1/1,
+    // another 1/1 and a 2/3. Four damage, spent well, kills three of them.
+    const plan = bestAssignment(4, [
+      { instanceId: 293, lethal: 1 },
+      { instanceId: 316, lethal: 2 },
+      { instanceId: 333, lethal: 1 },
+      { instanceId: 340, lethal: 1 },
+      { instanceId: 351, lethal: 3 },
+    ])
+    expect(plan.filter(p => p.kills).length).toBe(3)
+    expect(plan.reduce((n, p) => n + p.damage, 0)).toBe(4)
+    // Never the single biggest blocker: that spends three damage for one kill.
+    expect(plan.map(p => p.instanceId)).not.toContain(351)
+  })
+
+  it('trample: kills what it can, then sends the rest at the player', () => {
+    const plan = bestAssignment(16, [
+      { instanceId: 331, lethal: 5 },
+      { instanceId: 354, lethal: 3 },
+      { instanceId: 2, max: 8, isPlayer: true },
+    ])
+    expect(plan.find(p => p.instanceId === 2)?.damage).toBe(8)
+    expect(plan.filter(p => p.kills).length).toBe(2)
+  })
+
+  it('assigns nothing it cannot afford', () => {
+    const plan = bestAssignment(1, [{ instanceId: 1, lethal: 5 }, { instanceId: 2, lethal: 4 }])
+    expect(plan).toEqual([])
   })
 })
