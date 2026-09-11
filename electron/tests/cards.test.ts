@@ -128,6 +128,11 @@ describe('namesMatch tolerates a clipped leading glyph', () => {
     // Pick 15: a W with its left stroke clipped reads as a V.
     expect(namesMatch('Valk with the Ancestors', 'Walk with the Ancestors')).toBe(true)
   })
+  it('ignores trailing letter-less tokens the row picked up', () => {
+    // Pick 6 of pack 2: leading A clipped AND a pip read after the title.
+    expect(namesMatch('kawalli, the Seething Tower 1*', 'Akawalli, the Seething Tower')).toBe(true)
+    expect(namesMatch('Chupacabra Echo 2', 'Chupacabra Echo')).toBe(true)
+  })
   it('still refuses short or unrelated reads', () => {
     expect(namesMatch('cabra', 'Chupacabra Echo')).toBe(false)
     expect(namesMatch('Staggering Siz', 'Chupacabra Echo')).toBe(false)

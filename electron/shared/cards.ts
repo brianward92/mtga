@@ -100,7 +100,11 @@ export function isBasicLand(card: CardIdentity): boolean {
  * The 8-character floor keeps short names from swallowing longer ones.
  */
 export function namesMatch(observed: string, name: string): boolean {
-  const a = titleKey(observed.replace(/[….]+$/, ''))
+  // Recognition tacks on whatever sits after the title on the same row: pick 6
+  // of pack 2 read "kawalli, the Seething Tower 1*", the "1*" being a pip. Drop
+  // trailing tokens that carry no letters; a card name never ends in one.
+  const trimmed = observed.replace(/[….]+$/, '').replace(/(\s+[^A-Za-z\s]+)+\s*$/, '')
+  const a = titleKey(trimmed)
   const b = titleKey(name)
   if (!a || !b) return false
   if (a === b) return true
