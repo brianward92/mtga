@@ -42,10 +42,16 @@ if (what === 'confirm') {
   // Arena prints the title in a band across the top of the card frame.
   //
   // Inset from the card's edges. An ordering error moves a card by exactly ONE
-  // cell, into a band that touches this one, so a full-width read plus "does any
-  // line match" would happily accept the neighbour's title bleeding in. The
-  // inset keeps the read inside this card, and the decision below uses only the
-  // line closest to the card's centre rather than any line in the region.
+  // cell, into a band that touches this one, so a full-width read would happily
+  // accept the neighbour's title bleeding in. The inset keeps the read inside
+  // this card, and the band is cropped BEFORE recognition, so nothing outside
+  // this cell can appear in the result at all.
+  //
+  // That is what makes "any line in the band" safe, and it has to be any line:
+  // the cell also contains stray short tokens — a "1" sat on the title row of
+  // pick 14 of a live draft — and choosing the line nearest the centre picked
+  // the "1", compared it to Burning Sun Cavalry, and refused a card that was
+  // plainly there.
   const inset = r.width * 0.12
   const band = {
     x: Math.round(rect.x + r.x + inset),
@@ -59,8 +65,10 @@ if (what === 'confirm') {
   const nearest = lines.length > 0
     ? lines.reduce((best, l) => Math.abs(l.y - centre) < Math.abs(best.y - centre) ? l : best)
     : null
-  const ok = nearest !== null && namesMatch(nearest.text, target.name)
-  console.log(`${ok ? 'MATCH' : 'MISMATCH'} expected="${target.name}" read="${nearest?.text ?? '(nothing)'}" all="${seen.join(' / ') || '(nothing)'}"`)
+  const matched = lines.find(l => namesMatch(l.text, target.name)) ?? null
+  const ok = matched !== null
+  const shown = matched ?? nearest
+  console.log(`${ok ? 'MATCH' : 'MISMATCH'} expected="${target.name}" read="${shown?.text ?? '(nothing)'}" all="${seen.join(' / ') || '(nothing)'}"`)
   process.exit(ok ? 0 : 6)
 } else if (what === 'list') {
   for (const c of [...cards].sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99))) {

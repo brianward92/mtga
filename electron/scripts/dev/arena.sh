@@ -124,7 +124,7 @@ print(','.join(str(int(v)) for v in b))
   read)     macctl read MTGA ;;
   draft)
     stay_awake
-    end=$((SECONDS + ${1:-570})); maxpack="${2:-99}"; last=""
+    end=$((SECONDS + ${1:-570})); maxpack="${2:-99}"; last=""; retries=0
     while [ $SECONDS -lt $end ]; do
       info="$(state_py pos 2>/dev/null || true)"
       case "$info" in *"phase=complete"*) echo "DRAFT COMPLETE"; exit 0 ;; esac
@@ -138,8 +138,18 @@ print(','.join(str(int(v)) for v in b))
         # Match what pick-next-card.sh actually prints. The old pattern missed
         # "WARNING: pick not confirmed", so a failed pick printed NOTHING and the
         # loop spun silently with the pack still open until the timer ran out.
-        bash scripts/dev/pick-next-card.sh top 2>&1 | grep -E '^PICKED|^ABORTING|^NOT RETRYING|^WARNING|REFUS|abort' | tail -1 || true
-        last="$pos"
+        out=$(bash scripts/dev/pick-next-card.sh top 2>&1 | grep -E '^PICKED|^ABORTING|^NOT RETRYING|^WARNING|REFUS|abort' | tail -1 || true)
+        echo "$out"
+        # A refused pick leaves the position unchanged, and in a bot draft nothing
+        # else ever changes it: there is no pick timer. Marking the position as
+        # handled therefore parked the loop on pick 14 of a paid draft until its
+        # own budget ran out. Leave it unmarked so the next iteration tries
+        # again — a single OCR miss is not absence — but count, so a cell that
+        # never verifies stops the loop instead of spinning on it.
+        case "$out" in
+          *PICKED*) last="$pos"; retries=0 ;;
+          *) retries=$((retries + 1)); [ "$retries" -ge 6 ] && { echo "GIVING UP: $pos refused $retries times"; exit 5; }; sleep 2 ;;
+        esac
       fi
       sleep 1
     done

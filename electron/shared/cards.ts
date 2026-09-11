@@ -106,6 +106,12 @@ export function namesMatch(observed: string, name: string): boolean {
   if (a === b) return true
   if (a.length >= 8 && b.startsWith(a)) return true
   if (b.length >= 8 && a.startsWith(b)) return true
+  // A crop can clip the FIRST glyph as easily as the last: pick one of a live
+  // draft read "hupacabra Echo" for Chupacabra Echo and the prefix rules above
+  // refused it, which aborted the pick with the entry fee already paid. A long
+  // read contained anywhere in the name is the same card; at eight characters
+  // and up nothing else in a pack shares that much of a title.
+  if (a.length >= 8 && b.includes(a)) return true
   return false
 }
 

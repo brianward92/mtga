@@ -117,3 +117,15 @@ describe('castingColors — what a card COSTS, not what it is', () => {
     expect(castingColors({ name: 'Hidden Courtyard', colors: '', manaCost: '', colorIdentity: 'W', type: 'Land', rarity: 'common' })).toEqual(['W'])
   })
 })
+
+describe('namesMatch tolerates a clipped leading glyph', () => {
+  it('accepts a long read missing its first character', () => {
+    // Pick one of a live draft: the crop clipped the C. Refusing this aborted
+    // the pick with the entry fee already paid.
+    expect(namesMatch('hupacabra Echo', 'Chupacabra Echo')).toBe(true)
+  })
+  it('still refuses short or unrelated reads', () => {
+    expect(namesMatch('cabra', 'Chupacabra Echo')).toBe(false)
+    expect(namesMatch('Staggering Siz', 'Chupacabra Echo')).toBe(false)
+  })
+})
