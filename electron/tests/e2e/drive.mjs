@@ -486,7 +486,7 @@ try {
   }, 'sidebar yields to an intersecting preview while the covered badge lifts')
   await page.evaluate(layer => {
     document.dispatchEvent(new CustomEvent('mtga:e2e-layer', { detail: layer }))
-  }, { cells: [], regions: [{ x: 100, y: 100, width: 200, height: 200 }], covered: false, hudCovered: true })
+  }, { cells: [], regions: [], covered: false, hudCovered: true })
   await waitFor(page, S => {
     const rail = document.querySelector(S.rail)
     const hud = document.querySelector(S.hud)
@@ -503,6 +503,10 @@ try {
       detail: { cells: [], regions: [], covered: false, hudCovered: false }
     }))
   })
+  await waitFor(page, S => {
+    const rail = document.querySelector(S.rail)
+    return !!rail && Math.abs(Number.parseFloat(getComputedStyle(rail).opacity) - 1) < 0.005
+  }, 'sidebar returns to full opacity once the preview is gone')
 
   await expectDraftSidebarGeometry(page, '04-sheet full sidebar remains restored and pointer-owning')
   await shot(page, '04-sheet')

@@ -71,7 +71,7 @@ describe('LayerDetector fallback activity', () => {
     detector.dispose()
   })
 
-  it('uses right-column placement after dwell and reports thresholded neighbours', () => {
+  it('lifts every other badge once the hover preview is up', () => {
     const poller = new FakePoller()
     poller.lastKnown = { x: 0, y: 0, width: 1512, height: 949 }
     const cards = packLayout(poller.lastKnown, 14, DEFAULT_CALIBRATION).cards.map(slot => slot.card)
@@ -94,7 +94,7 @@ describe('LayerDetector fallback activity', () => {
 
     const [preview] = detector.state.regions
     expect(preview.x + preview.width).toBeLessThan(rightmost.x)
-    expect(detector.state.cells).toEqual([2, 3, 7, 8])
+    expect(detector.state.cells).toEqual([0, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13])
     expect(detector.state.selectedCell).toBe(4)
 
     getCursorScreenPoint.mockReturnValue({ x: -1, y: -1 })

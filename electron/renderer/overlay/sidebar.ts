@@ -1,5 +1,4 @@
 /** Geometry and presentation state for the full Arena right-column sidebar. */
-import { intersects } from '../../shared/hover'
 import { sidebarShellFrame, sidebarSide, type Rect } from '../../shared/layout'
 import type { DraftState, LayerState } from '../../shared/state'
 
@@ -28,11 +27,10 @@ export function sidebarPanelFrame(view: ViewSize): Rect {
 /**
  * Renderer-ready sidebar state.
  *
- * The sidebar yields to Arena's hover preview: while the predicted preview (or
- * its flavour-text box) lands on the sidebar's strip, the sidebar fades so the
- * card the drafter is inspecting stays readable. The fade tracks the prediction
- * live rather than latching on a selected cell — a rail that stayed ghosted
- * after the cursor left was worse than one that simply covers that content.
+ * The sidebar yields to Arena's hover preview: whenever a preview is up the
+ * sidebar fades, wherever Arena draws it — predicted geometry misses keyword
+ * panels and right-hand pops. It tracks the live hover rather than latching on
+ * a selected cell, so it returns as soon as the cursor leaves the card.
  */
 export function sidebarPresentation(
   phase: DraftState['phase'],
@@ -41,8 +39,5 @@ export function sidebarPresentation(
   layer: Pick<LayerState, 'regions' | 'selectedCell' | 'hudCovered'>
 ): { open: boolean; faded: boolean } {
   const open = enabled && (phase === 'active' || phase === 'complete')
-  if (!open) return { open, faded: false }
-  const shell = sidebarShellFrame(view, sidebarSide(phase))
-  const faded = layer.regions.some(r => intersects(r, shell))
-  return { open, faded }
+  return { open, faded: open && layer.regions.length > 0 }
 }

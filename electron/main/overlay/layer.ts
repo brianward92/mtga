@@ -181,7 +181,10 @@ export class LayerDetector extends EventEmitter {
     const split = typeof name === 'string' && name.includes(' // ')
     const flipLeft = isRightmostGridColumn(hoveredIdx, maxCols)
     const regions = hoveredIdx >= 0 ? predictPopout(cellRects[hoveredIdx], view, { split, flipLeft }) : []
-    const cells = previewCoveredCellIndices(cellRects, hoveredIdx, regions)
+    // Arena's preview lands in more places than we can predict (keyword
+    // panels, token pairs, right-hand pops), so while one is up every badge
+    // but the hovered card's steps aside.
+    const cells = hoveredIdx >= 0 ? cellRects.map((_, i) => i).filter(i => i !== hoveredIdx) : []
     const hudCovered = !!this.hudRect && regions.some(r => intersects(r, this.hudRect!))
     this.publish({ cells, regions, selectedCell, covered: false, hudCovered })
   }

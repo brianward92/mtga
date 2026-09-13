@@ -30,32 +30,17 @@ describe('full right-column sidebar geometry', () => {
     expect(sidebarPanelFrame({ width: NaN, height: 949 })).toEqual({ x: 0, y: 0, width: 0, height: 0 })
   })
 
-  it('yields the column while Arena previews land on it', () => {
+  it('yields the column whenever an Arena preview is up, wherever it lands', () => {
     const view = { width: 1512, height: 949 }
-    const rail = sidebarShellFrame(view)
-    const overRail = { x: rail.x + 20, y: rail.y + 20, width: 300, height: 500 }
     const overPack = { x: 300, y: 250, width: 380, height: 520 }
 
-    // A preview on the rail fades it; one over the pack leaves it fully opaque.
-    expect(sidebarPresentation('active', true, view, { regions: [overRail], selectedCell: 4, hudCovered: false }))
-      .toEqual({ open: true, faded: true })
     expect(sidebarPresentation('active', true, view, { regions: [overPack], selectedCell: 4, hudCovered: false }))
-      .toEqual({ open: true, faded: false })
-    // The fade follows the live prediction, not a latched selection or the
-    // capture path's own hudCovered flag.
-    expect(sidebarPresentation('active', true, view, { regions: [], selectedCell: 4, hudCovered: true }))
-      .toEqual({ open: true, faded: false })
-  })
-
-  it('tests the completion column on the side it actually occupies', () => {
-    const view = { width: 1512, height: 949 }
-    const completeRail = sidebarShellFrame(view, 'left')
-    const overComplete = { x: completeRail.x + 20, y: completeRail.y + 20, width: 200, height: 400 }
-    const overRight = { x: 1300, y: 200, width: 180, height: 400 }
-
-    expect(sidebarPresentation('complete', true, view, { regions: [overComplete], selectedCell: null, hudCovered: false }))
       .toEqual({ open: true, faded: true })
-    expect(sidebarPresentation('complete', true, view, { regions: [overRight], selectedCell: null, hudCovered: false }))
+    expect(sidebarPresentation('complete', true, view, { regions: [overPack], selectedCell: null, hudCovered: false }))
+      .toEqual({ open: true, faded: true })
+    // The fade follows the live hover, not a latched selection or the capture
+    // path's own hudCovered flag.
+    expect(sidebarPresentation('active', true, view, { regions: [], selectedCell: 4, hudCovered: true }))
       .toEqual({ open: true, faded: false })
   })
 
