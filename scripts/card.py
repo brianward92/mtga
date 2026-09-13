@@ -10,6 +10,7 @@ file and prints plain text. No network, no imports beyond the standard library.
     scripts/card.py --top 15                   best cards in the set by win rate
     scripts/card.py --top 15 -c R --commons    best red commons
 """
+
 import argparse
 import json
 import sys
@@ -21,7 +22,9 @@ KB = Path(__file__).resolve().parent.parent / "docs" / "formats" / "lci"
 def load(code="lci"):
     path = KB / "cards.json"
     if not path.exists():
-        sys.exit(f"no card reference at {path}; run scripts/build_kb_cards.py {code.upper()}")
+        sys.exit(
+            f"no card reference at {path}; run scripts/build_kb_cards.py {code.upper()}"
+        )
     return json.loads(path.read_text())["cards"]
 
 
@@ -56,11 +59,13 @@ def alsa(card):
 def line(card, verbose=False):
     rate, src, _ = wr(card)
     seen = alsa(card)
-    body = f"{card['power']}/{card['toughness']}" if card.get("power") is not None else ""
+    body = (
+        f"{card['power']}/{card['toughness']}" if card.get("power") is not None else ""
+    )
     if rate is not None:
         stats = f"{rate * 100:5.1f}%{src}"
     elif seen is not None:
-        stats = f"p{seen:4.1f} "        # average pick seen at, the fallback signal
+        stats = f"p{seen:4.1f} "  # average pick seen at, the fallback signal
     else:
         stats = "   -   "
     head = f"  {stats}  {card['manaCost']:<10} {card['name']:<32} {card['rarity'][0].upper()}  {body:<6} {card['type']}"
@@ -78,8 +83,12 @@ def main():
     p.add_argument("--commons", action="store_true", help="commons only")
     p.add_argument("--instants", action="store_true", help="instant-speed only")
     p.add_argument("--top", type=int, help="best N by win rate")
-    p.add_argument("--threat", nargs=2, metavar=("COLORS", "MANA"),
-                   help="what the opponent can cast at instant speed with this much open mana")
+    p.add_argument(
+        "--threat",
+        nargs=2,
+        metavar=("COLORS", "MANA"),
+        help="what the opponent can cast at instant speed with this much open mana",
+    )
     p.add_argument("--set", default="lci")
     args = p.parse_args()
 
@@ -90,14 +99,19 @@ def main():
         colors, mana = args.threat[0].upper(), int(args.threat[1])
         # Instant speed only: a sorcery cannot ruin a block, and treating one as
         # a threat is how you talk yourself out of a good attack.
-        hits = [c for c in pool
-                if ("Instant" in c["type"] or "Flash" in c.get("keywords", []))
-                and (c["mv"] or 0) <= mana
-                and (not c["colors"] or all(ch in colors for ch in c["colors"]))]
+        hits = [
+            c
+            for c in pool
+            if ("Instant" in c["type"] or "Flash" in c.get("keywords", []))
+            and (c["mv"] or 0) <= mana
+            and (not c["colors"] or all(ch in colors for ch in c["colors"]))
+        ]
         # Cheapest first: with two mana open the two-drops are what to fear, and
         # a blank rate must not push a real threat down the list.
         hits.sort(key=lambda c: (c["mv"] or 0, alsa(c) or 9, c["name"]))
-        print(f"{len(hits)} instant-speed cards castable off {mana} mana of {colors}:\n")
+        print(
+            f"{len(hits)} instant-speed cards castable off {mana} mana of {colors}:\n"
+        )
         for c in hits:
             print(line(c, verbose=True))
         return
@@ -107,19 +121,28 @@ def main():
         hits = [c for c in pool if needle in (c["oracle"] or "").lower()]
     elif args.name:
         needle = " ".join(args.name).lower()
-        hits = [c for c in pool
-                if needle in c["name"].lower()
-                or needle in (c.get("frontName") or "").lower()]
+        hits = [
+            c
+            for c in pool
+            if needle in c["name"].lower()
+            or needle in (c.get("frontName") or "").lower()
+        ]
     else:
         hits = list(pool)
 
     if args.colors:
         want = args.colors.upper()
-        hits = [c for c in hits if c["colors"] and all(ch in want for ch in c["colors"])]
+        hits = [
+            c for c in hits if c["colors"] and all(ch in want for ch in c["colors"])
+        ]
     if args.commons:
         hits = [c for c in hits if c["rarity"] == "common"]
     if args.instants:
-        hits = [c for c in hits if "Instant" in c["type"] or "Flash" in c.get("keywords", [])]
+        hits = [
+            c
+            for c in hits
+            if "Instant" in c["type"] or "Flash" in c.get("keywords", [])
+        ]
 
     if args.top:
         # Rank by win rate where the sample supports it, otherwise by how early
@@ -135,8 +158,10 @@ def main():
         print("no match")
         return
     verbose = len(hits) <= 12
-    print(f"{len(hits)} card(s)   [win% of decks running it, Q/P = Quick/Premier; "
-          f"pN = average pick seen at, lower is better]\n")
+    print(
+        f"{len(hits)} card(s)   [win% of decks running it, Q/P = Quick/Premier; "
+        f"pN = average pick seen at, lower is better]\n"
+    )
     for c in hits:
         print(line(c, verbose=verbose))
 

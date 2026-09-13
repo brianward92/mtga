@@ -19,6 +19,7 @@ and because a network hiccup mid-match must not be able to cost a game.
 Usage:
     python3 scripts/build_kb_cards.py LCI
 """
+
 import json
 import sys
 import time
@@ -36,7 +37,9 @@ UA = "mtga-kb/1.0 (+local knowledge base build)"
 def get(url, tries=3):
     for attempt in range(tries):
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
+            req = urllib.request.Request(
+                url, headers={"User-Agent": UA, "Accept": "application/json"}
+            )
             with urllib.request.urlopen(req, timeout=30) as r:
                 return json.load(r)
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as e:
@@ -48,12 +51,15 @@ def get(url, tries=3):
 
 def scryfall_set(code):
     """Every card in the set, following Scryfall's pagination."""
-    cards, url = [], f"https://api.scryfall.com/cards/search?q=e%3A{code.lower()}&unique=prints&order=set"
+    cards, url = (
+        [],
+        f"https://api.scryfall.com/cards/search?q=e%3A{code.lower()}&unique=prints&order=set",
+    )
     while url:
         page = get(url)
         cards.extend(page["data"])
         url = page.get("next_page") if page.get("has_more") else None
-        time.sleep(0.1)   # Scryfall asks for 50-100ms between requests.
+        time.sleep(0.1)  # Scryfall asks for 50-100ms between requests.
     return cards
 
 
@@ -164,35 +170,50 @@ def main():
         }
 
     out = KB / "cards.json"
-    out.write_text(json.dumps(
-        {
-            "set": code,
-            "buildDate": date.today().isoformat(),
-            "scryfallSnapshot": f"set:{code.lower()}@{date.today().isoformat()}",
-            "seventeenLandsSnapshot": f"{code} QuickDraft+PremierDraft@{date.today().isoformat()}",
-            "builtFrom": ["scryfall", "17lands"],
-            "count": len(cards),
-            "cards": cards,
-        },
-        indent=1, sort_keys=True,
-    ))
+    out.write_text(
+        json.dumps(
+            {
+                "set": code,
+                "buildDate": date.today().isoformat(),
+                "scryfallSnapshot": f"set:{code.lower()}@{date.today().isoformat()}",
+                "seventeenLandsSnapshot": f"{code} QuickDraft+PremierDraft@{date.today().isoformat()}",
+                "builtFrom": ["scryfall", "17lands"],
+                "count": len(cards),
+                "cards": cards,
+            },
+            indent=1,
+            sort_keys=True,
+        )
+    )
     print(f"wrote {out} ({len(cards)} cards, {out.stat().st_size // 1024}KB)")
 
     def has_rate(c):
-        return any((c.get(k) or {}).get("winRate") is not None for k in ("quickDraft", "premierDraft"))
+        return any(
+            (c.get(k) or {}).get("winRate") is not None
+            for k in ("quickDraft", "premierDraft")
+        )
+
     rated = sum(1 for c in cards.values() if has_rate(c))
     in_pool = sum(1 for c in cards.values() if c["inDraftPool"])
     if pool and in_pool < len(pool):
         missing = sorted(pool - {c["frontName"] for c in cards.values()})
-        print(f"  WARNING: {len(missing)} bundle cards unmatched: {missing[:5]}", file=sys.stderr)
+        print(
+            f"  WARNING: {len(missing)} bundle cards unmatched: {missing[:5]}",
+            file=sys.stderr,
+        )
     creatures = sum(1 for c in cards.values() if "Creature" in c["type"])
     instants = sum(1 for c in cards.values() if "Instant" in c["type"])
-    print(f"  {in_pool} in the draftable pool, {creatures} creatures, "
-          f"{instants} instants, {rated} with a usable win rate")
+    print(
+        f"  {in_pool} in the draftable pool, {creatures} creatures, "
+        f"{instants} instants, {rated} with a usable win rate"
+    )
     if rated < len(cards) // 2:
-        print("  NOTE: 17lands is serving only the current re-run, so most rates are "
-              "suppressed for sample size. Card evaluation should lean on the "
-              "written set review, not on these numbers.", file=sys.stderr)
+        print(
+            "  NOTE: 17lands is serving only the current re-run, so most rates are "
+            "suppressed for sample size. Card evaluation should lean on the "
+            "written set review, not on these numbers.",
+            file=sys.stderr,
+        )
 
 
 if __name__ == "__main__":

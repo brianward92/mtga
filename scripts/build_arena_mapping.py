@@ -37,7 +37,11 @@ OUTPUT_FILE = OUTPUT_DIR / "arena_mapping.json"
 # resources/draftfm wholesale), so the overlay can correct card identity
 # without Arena being installed on the machine that built it.
 APP_CARDS_FILE = (
-    Path(__file__).parent.parent / "electron" / "resources" / "draftfm" / "arena-cards.json"
+    Path(__file__).parent.parent
+    / "electron"
+    / "resources"
+    / "draftfm"
+    / "arena-cards.json"
 )
 
 COLOR_MAP = {1: "W", 2: "U", 3: "B", 4: "R", 5: "G"}
@@ -171,18 +175,26 @@ def build_app_cards(db_path: Path) -> dict[str, Any]:
     cur = conn.cursor()
     loc = load_localizations(cur)
 
-    cur.execute(
-        """
+    cur.execute("""
         SELECT GrpId, TitleId, ExpansionCode, IsToken, IsPrimaryCard, Rarity,
                Order_MythicToCommon, Order_ColorOrder, Order_Title
         FROM Cards
-        """
-    )
+        """)
 
     ids: dict[str, str] = {}
     order: dict[str, list[Any]] = {}
     by_name: dict[str, list[Any]] = {}
-    for grp_id, title_id, set_code, is_token, is_primary, rarity, o_rarity, o_color, o_title in cur.fetchall():
+    for (
+        grp_id,
+        title_id,
+        set_code,
+        is_token,
+        is_primary,
+        rarity,
+        o_rarity,
+        o_color,
+        o_title,
+    ) in cur.fetchall():
         if is_token:
             continue
         name = clean_name(loc.get(title_id, ""))
@@ -360,7 +372,9 @@ def main():
         out = args.emit_app_cards
         out.parent.mkdir(parents=True, exist_ok=True)
         with open(out, "w", encoding="utf-8") as f:
-            json.dump(payload, f, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+            json.dump(
+                payload, f, ensure_ascii=False, separators=(",", ":"), sort_keys=True
+            )
         src = payload["source"]
         print(
             f"Wrote {out} from {src['database']}: "
