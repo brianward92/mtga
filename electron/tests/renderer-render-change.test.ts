@@ -24,13 +24,12 @@ describe('renderer change detection', () => {
     const layer = {
       cells: [1, 3],
       regions: [{ x: 2, y: 4, width: 6, height: 8 }],
-      selectedCell: 3,
-      covered: false,
-      hudCovered: true
+      covered: false
     }
     expect(sameLayerState(layer, { ...layer, cells: [...layer.cells], regions: layer.regions.map(r => ({ ...r })) })).toBe(true)
     expect(sameLayerState(layer, { ...layer, cells: [1, 2] })).toBe(false)
-    expect(sameLayerState(layer, { ...layer, selectedCell: null })).toBe(false)
+    expect(sameLayerState(layer, { ...layer, covered: true })).toBe(false)
+    expect(sameLayerState(layer, { ...layer, regions: [] })).toBe(false)
   })
 
   it('recognizes equivalent calibration payloads', () => {

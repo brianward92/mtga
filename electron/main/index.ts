@@ -28,13 +28,14 @@ import { createOverlayWindow, setOverlayRect, showOverlay, hideOverlay, setOverl
 import { LayerDetector } from './overlay/layer'
 import { Calibration } from './overlay/calibration'
 import { StandAside } from './overlay/stand-aside'
+import { SidebarPointer, pointOnSidebar } from './overlay/sidebar-pointer'
 import { screenCaptureGranted } from './overlay/occlusion'
 import { OverlayGeometrySync } from './overlay/geometry-sync'
 import { badgesAreLive, isDraftScene, wantsOverlayContent, type OverlayActivity } from './overlay/activity-policy'
 import { loadPrefs, savePrefs } from './prefs'
 import { StatusTray } from './status-tray'
 import type { DraftState, Prefs } from '../shared/state'
-import { calibrationFor, packLayout, sidebarShellFrame, sidebarSide, type CalibrationOp, type Rect } from '../shared/layout'
+import { calibrationFor, packLayout, sidebarSide, type CalibrationOp } from '../shared/layout'
 import { arenaDisplayOrder } from '../shared/display-order'
 import { buildDeck } from '../shared/deck-plan'
 
@@ -50,14 +51,19 @@ let coordinator: DraftCoordinator
 let layer: LayerDetector
 const calibration = new Calibration()
 const standAside = new StandAside()
-let standAsideTimer: NodeJS.Timeout | null = null
+const sidebarPointer = new SidebarPointer()
+let pointerTimer: NodeJS.Timeout | null = null
 const poller = new ArenaGeometryPoller()
 let quitCommitted = false
 let quitTimer: NodeJS.Timeout | null = null
 /** Pool & picks section of the rail: open by default during a draft. */
 let sheetOpen = true
-/** Whether main has claimed the mouse for the sidebar strip. */
-let sidebarPointerOwned = false
+/**
+ * Test seam: the e2e harness fakes the Arena window over the whole screen and
+ * drives a synthetic mouse, so the real cursor must not claim the strip or
+ * pull activation away from the test runner.
+ */
+const E2E = process.env.MTGA_E2E === '1'
 
 // ---------------------------------------------------------------------------
 // Overlay visibility policy
@@ -91,34 +97,33 @@ function sidebarOpen(): boolean {
 }
 
 /**
- * Claim the mouse the moment the cursor crosses into the sidebar.
- *
- * The renderer can also ask for interactivity, but only after a forwarded
- * mousemove has round-tripped over IPC — by which time Arena has already seen
- * the same move and popped one of its own pool previews out from under us.
- * Deciding here, straight off the cursor poll, is what makes the strip opaque
- * to Arena rather than merely opaque to the eye.
+ * The sidebar strip is a dead zone for Arena (main/overlay/sidebar-pointer.ts):
+ * while the pointer is on it the overlay takes the mouse and becomes the
+ * active application, so Arena sees neither clicks nor hover there. Both go
+ * back the moment the pointer leaves. Decided here, straight off the cursor
+ * poll and the renderer's forwarded moves, before Arena's own hover preview
+ * has time to open under the strip.
  */
-function sidebarPointerTick(rect: ArenaRect, cursor: { x: number; y: number }): void {
+function syncSidebarPointer(local: { x: number; y: number }): void {
   if (!overlay || overlay.isDestroyed()) return
-  const wanted = sidebarOpen() && !standAside.active && poller.isFound() && overlay.isVisible() &&
-    pointInRect(cursor, sidebarShellFrame(rect, sidebarSide(coordinator.current.phase)))
-  if (wanted === sidebarPointerOwned) return
-  sidebarPointerOwned = wanted
-  setOverlayInteractive(overlay, wanted)
-}
-
-function pointInRect(p: { x: number; y: number }, r: Rect): boolean {
-  return r.width > 0 && r.height > 0 &&
-    p.x >= r.x && p.x < r.x + r.width && p.y >= r.y && p.y < r.y + r.height
-}
-
-/** Poll the cursor while the overlay is up, so the sidebar can claim it. */
-function standAsideTick(): void {
   const rect = poller.lastKnown
-  if (!rect || calibration.active) return
+  const onStrip = !!rect && sidebarOpen() && !standAside.active && !calibration.active &&
+    poller.isFound() && overlay.isVisible() &&
+    pointOnSidebar(local, rect, sidebarSide(coordinator.current.phase))
+  const action = sidebarPointer.update(onStrip)
+  if (!action) return
+  setOverlayInteractive(overlay, action === 'claim')
+  if (E2E) return
+  if (action === 'claim') app.focus({ steal: true })
+  else poller.activateArena()
+}
+
+/** Poll the cursor while the overlay is up, so the strip can claim it. */
+function pointerTick(): void {
+  const rect = poller.lastKnown
+  if (!rect || E2E) return
   const cursor = screen.getCursorScreenPoint()
-  sidebarPointerTick(rect, { x: cursor.x - rect.x, y: cursor.y - rect.y })
+  syncSidebarPointer({ x: cursor.x - rect.x, y: cursor.y - rect.y })
 }
 
 /**
@@ -164,6 +169,8 @@ const overlayGeometrySync = new OverlayGeometrySync({
   show: () => { if (overlay) showOverlay(overlay) },
   hide: () => { if (overlay) hideOverlay(overlay) },
   afterSync: () => {
+    // A hidden or stood-aside overlay no longer holds the strip.
+    if (sidebarPointer.active) pointerTick()
     // Cursor polling is useful only while badge geometry is live.
     layer?.syncActivity()
     // Window capture only while badges need layer awareness.
@@ -193,9 +200,9 @@ function pushState(state: DraftState): void {
 }
 
 /**
- * Dev seam: MTGA_STATE_FILE=path mirrors every DraftState push to disk, plus
- * the Arena rect the overlay is using (window mode agnostic — the development
- * picker needs the same rect we do, including full screen).
+ * MTGA_STATE_FILE=path mirrors every DraftState push to disk, with the Arena
+ * rect the overlay is using, the pack slots and the deck plan, for tools that
+ * read the overlay's view of the draft.
  */
 function mirrorState(state: DraftState): void {
   const file = process.env.MTGA_STATE_FILE
@@ -211,7 +218,7 @@ function mirrorState(state: DraftState): void {
       : []
     const plan = state.phase === 'complete' ? buildDeck(state.pool) : null
     writeFileSync(file, JSON.stringify({ ...state, arena, standAside: standAside.active, packSlots, plan }))
-  } catch { /* dev only */ }
+  } catch { /* the mirror is best-effort */ }
 }
 
 function pushPrefs(prefs: Prefs): void {
@@ -271,9 +278,7 @@ function setupGeometry(): void {
   poller.on('frontmost', () => syncOverlay())
   poller.on('capture', () => refreshTray())
   poller.on('click', (point: { x: number; y: number }) => noteGlobalClick(point))
-  // Fast enough that the strip takes the mouse before Arena's hover preview
-  // has time to open under it.
-  standAsideTimer = setInterval(standAsideTick, 40)
+  pointerTimer = setInterval(pointerTick, 16)
   poller.on('helper-missing', () => coordinator.setWarning('Window helper missing from the app bundle — overlay cannot locate Arena'))
   layer = new LayerDetector({
     poller,
@@ -302,12 +307,13 @@ function setupIpc(): void {
   ipcMain.handle('overlay:get-state', () => coordinator.current)
   ipcMain.handle('overlay:get-prefs', () => loadPrefs())
   ipcMain.on('overlay:interactive', (_e, on: boolean) => {
-    // While main owns the sidebar strip its cursor poll is authoritative: a
-    // stale renderer "false" here would hand the mouse straight back to Arena.
-    if (sidebarPointerOwned) return
+    // The renderer's forwarded move is the fastest word that the pointer has
+    // reached the strip; the cursor poll stays authoritative for leaving it,
+    // so a stale renderer "false" cannot hand the mouse back to Arena.
+    if (!E2E) pointerTick()
+    if (sidebarPointer.active) return
     if (overlay) setOverlayInteractive(overlay, !!on)
   })
-  ipcMain.on('overlay:hud-rect', (_e, rect: Rect | null) => layer.setHudRect(rect && typeof rect === 'object' ? rect : null))
   ipcMain.on('overlay:action', (_e, msg: { name?: string; data?: unknown }) => {
     switch (msg?.name) {
       case 'toggle-badges': pushPrefs(savePrefs({ badges: !loadPrefs().badges })); break
@@ -467,7 +473,7 @@ app.on('before-quit', event => {
 })
 
 function cleanup(): void {
-  if (standAsideTimer) { clearInterval(standAsideTimer); standAsideTimer = null }
+  if (pointerTimer) { clearInterval(pointerTimer); pointerTimer = null }
   overlayGeometrySync.dispose()
   globalShortcut.unregisterAll()
   layer?.dispose()

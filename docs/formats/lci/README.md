@@ -7,7 +7,6 @@ The generated card snapshot contains 291 draftable cards. It was built on 2026-0
 - [`mechanics.md`](mechanics.md): descend, discover, craft, explore, Map tokens, and Caves.
 - [`commons-review.md`](commons-review.md): empirical review of the 108 non-basic commons.
 - [`removal-and-tricks.md`](removal-and-tricks.md): open-mana, removal, and combat-trick reference.
-- [`playbook.md`](playbook.md): archetypes and deck construction.
 - [`rules-anchors.md`](rules-anchors.md): LCI applications extracted from the general rules documents.
 - [`combat-reference.md`](combat-reference.md) and [`cards.json`](cards.json): generated card-pool references.
 

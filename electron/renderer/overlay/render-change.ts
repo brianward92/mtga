@@ -18,7 +18,7 @@ export function sameViewPrefs(a: ViewPrefs, b: ViewPrefs): boolean {
 
 /** Compare layer-awareness payloads without relying on object identity. */
 export function sameLayerState(a: LayerState, b: LayerState): boolean {
-  return a.covered === b.covered && a.hudCovered === b.hudCovered && a.selectedCell === b.selectedCell &&
+  return a.covered === b.covered &&
     sameNumbers(a.cells, b.cells) && a.regions.length === b.regions.length &&
     a.regions.every((rect, i) => {
       const other = b.regions[i]

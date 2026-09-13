@@ -470,12 +470,11 @@ try {
       style.pointerEvents === 'auto'
   }, '400ms sidebar dwell never fades, yields, or releases pointer ownership')
 
-  // Clean test-only injection proves the production predicted-region path:
-  // an Arena preview landing on the sidebar fades it out of the way, while
-  // badge lifting stays intact.
+  // Clean test-only injection proves the production path: an Arena preview
+  // fades the sidebar out of the way, while badge lifting stays intact.
   await page.evaluate(layer => {
     document.dispatchEvent(new CustomEvent('mtga:e2e-layer', { detail: layer }))
-  }, { cells: [1], regions: [{ x: 1120, y: 200, width: 160, height: 300 }], covered: false, hudCovered: true })
+  }, { cells: [1], regions: [{ x: 1120, y: 200, width: 160, height: 300 }], covered: false })
   await waitFor(page, S => {
     const rail = document.querySelector(S.rail)
     const cells = [...document.querySelectorAll(S.cell)]
@@ -484,29 +483,20 @@ try {
     return rail.classList.contains('yield') && Number.parseFloat(style.opacity) < 0.1 &&
       cells[1].classList.contains('behind')
   }, 'sidebar yields to an intersecting preview while the covered badge lifts')
-  await page.evaluate(layer => {
-    document.dispatchEvent(new CustomEvent('mtga:e2e-layer', { detail: layer }))
-  }, { cells: [], regions: [], covered: false, hudCovered: true })
-  await waitFor(page, S => {
-    const rail = document.querySelector(S.rail)
-    const hud = document.querySelector(S.hud)
-    if (!rail || !hud) return false
-    const style = getComputedStyle(rail)
-    const colorParts = style.backgroundColor.match(/^rgba?\(([^)]+)\)$/)?.[1]
-      .split(',').map(part => Number.parseFloat(part.trim())) ?? []
-    const alpha = colorParts.length === 4 ? colorParts[3] : 1
-    return !hud.classList.contains('covered') &&
-      Math.abs(Number.parseFloat(style.opacity) - 1) < 0.005 && Math.abs(alpha - 1) < 0.005
-  }, 'sidebar remains opaque and pointer-owning despite hudCovered')
   await page.evaluate(() => {
     document.dispatchEvent(new CustomEvent('mtga:e2e-layer', {
-      detail: { cells: [], regions: [], covered: false, hudCovered: false }
+      detail: { cells: [], regions: [], covered: false }
     }))
   })
   await waitFor(page, S => {
     const rail = document.querySelector(S.rail)
-    return !!rail && Math.abs(Number.parseFloat(getComputedStyle(rail).opacity) - 1) < 0.005
-  }, 'sidebar returns to full opacity once the preview is gone')
+    if (!rail) return false
+    const style = getComputedStyle(rail)
+    const colorParts = style.backgroundColor.match(/^rgba?\(([^)]+)\)$/)?.[1]
+      .split(',').map(part => Number.parseFloat(part.trim())) ?? []
+    const alpha = colorParts.length === 4 ? colorParts[3] : 1
+    return Math.abs(Number.parseFloat(style.opacity) - 1) < 0.005 && Math.abs(alpha - 1) < 0.005
+  }, 'sidebar returns to full opacity and stays opaque once the preview is gone')
 
   await expectDraftSidebarGeometry(page, '04-sheet full sidebar remains restored and pointer-owning')
   await shot(page, '04-sheet')

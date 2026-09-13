@@ -28,15 +28,14 @@ export function sidebarPanelFrame(view: ViewSize): Rect {
  * Renderer-ready sidebar state.
  *
  * The sidebar yields to Arena's hover preview: whenever a preview is up the
- * sidebar fades, wherever Arena draws it — predicted geometry misses keyword
- * panels and right-hand pops. It tracks the live hover rather than latching on
- * a selected cell, so it returns as soon as the cursor leaves the card.
+ * sidebar fades, wherever Arena draws it — the right-most column's preview
+ * lands under the sidebar. It follows the live hover, so it returns as soon
+ * as the cursor leaves the card.
  */
 export function sidebarPresentation(
   phase: DraftState['phase'],
   enabled: boolean,
-  view: ViewSize,
-  layer: Pick<LayerState, 'regions' | 'selectedCell' | 'hudCovered'>
+  layer: Pick<LayerState, 'regions'>
 ): { open: boolean; faded: boolean } {
   const open = enabled && (phase === 'active' || phase === 'complete')
   return { open, faded: open && layer.regions.length > 0 }

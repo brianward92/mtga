@@ -391,8 +391,7 @@ button {
 .hud.hud-bl { bottom: 2%; left: 2%; }
 .hud.hud-br { bottom: 2%; right: 2%; }
 .hud.hidden { display: none; }
-.hud.covered { opacity: 0; pointer-events: none; }
-.hud.yield:not(.covered) { opacity: 0.08; pointer-events: none; }
+.hud.yield { opacity: 0.08; pointer-events: none; }
 body.calibrating .hud,
 body.calibrating .sheet { display: none; }
 
@@ -813,8 +812,8 @@ body.calibrating .sheet { display: none; }
 
    The raw strip has no click-through gutters. One rounded, six-pixel-inset
    surface orders header → recommendation → ranked table → pool summary →
-   internally scrolling grouped pool → footer. Only a predicted card preview
-   may fade this common owner; it remains interactive while faded.
+   internally scrolling grouped pool → footer. Only a pack-card preview may
+   fade this common owner; it remains interactive while faded.
    ========================================================================== */
 
 .draft-rail {

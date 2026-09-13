@@ -7,8 +7,8 @@
  *   F w,h,<base64 gray>   one-shot ScreenCaptureKit luminance frame (only with
  *                         capture on — an opt-in that needs Screen Recording)
  *   C on|off              whether frames are flowing
- * and takes "capture on|off" / "rate <hz>" on stdin. Geometry needs NO
- * permission (CGWindowList); we never use AppleScript/Accessibility.
+ * and takes "capture on|off" / "rate <hz>" / "activate" on stdin. Geometry
+ * needs NO permission (CGWindowList); we never use AppleScript/Accessibility.
  *
  * Test seam: MTGA_FAKE_ARENA_FILE names a JSON {x,y,width,height} that is
  * polled instead of spawning the helper (e2e / dev without Arena).
@@ -160,6 +160,16 @@ export class ArenaGeometryPoller extends EventEmitter {
     if (this.retryTimer) { clearTimeout(this.retryTimer); this.retryTimer = null }
     this.stopHelper()
     this.state = 'unknown'
+  }
+
+  /**
+   * Make Arena the active application again. The overlay takes activation
+   * while the pointer is on the sidebar (main/overlay/sidebar-pointer.ts) and
+   * hands it back through the helper: Electron can activate itself but not
+   * another application. A no-op without the helper or without Arena.
+   */
+  activateArena(): void {
+    this.helperWrite('activate')
   }
 
   /** Turn the helper's frame feed on/off ("capture on|off" over stdin). */

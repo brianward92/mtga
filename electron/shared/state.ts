@@ -132,16 +132,12 @@ import type { CalibrationConfig, Rect } from './layout'
 
 /** What Arena's own UI is currently drawn over (see main/overlay/layer.ts). */
 export interface LayerState {
-  /** Pack cells (display order) covered by Arena UI. */
+  /** Pack cells (display order) whose badges must lift. */
   cells: number[]
-  /** Predicted preview regions (window px) when no capture is available. */
+  /** Where Arena's hover preview is expected (window px); empty when none is up. */
   regions: Rect[]
-  /** Last pack cell whose 350 ms preview dwell completed; null after a pack change. */
-  selectedCell: number | null
   /** Whole pack covered (modal) or not on screen — lift everything. */
   covered: boolean
-  /** The renderer-reported HUD rect is covered. */
-  hudCovered: boolean
 }
 
 /** Calibration-panel state pushed independently of draft snapshots. */

@@ -4,7 +4,7 @@ This file owns LCI-specific applications of the general rules. The underlying ru
 
 ## Format and role anchors
 
-LCI Quick Draft is best-of-one. Format speed, play/draw measurements, archetype roles, and the empirical value of tempo are properties of this queue and dataset rather than general Magic rules. See [`playbook.md`](playbook.md) and [`commons-review.md`](commons-review.md) for the measured claims.
+LCI Quick Draft is best-of-one. Format speed, play/draw measurements, archetype roles, and the empirical value of tempo are properties of this queue and dataset rather than general Magic rules. See [`commons-review.md`](commons-review.md) for the measured claims.
 
 ## Descend and graveyard count
 

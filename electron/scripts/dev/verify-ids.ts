@@ -6,8 +6,8 @@
 // the only way to know whether it is right.
 //
 // A mislabel is not cosmetic: the pack grid is ordered by card identity, so a
-// wrong name (or an unresolvable id) reorders the badge grid and can make the
-// picker click a different card than the one it recommended.
+// wrong name (or an unresolvable id) reorders the badge grid and puts every
+// badge after it on the wrong card.
 //
 // Two classes of noise are excluded deliberately:
 //   * Arena wraps hyphenated names in <nobr> markup ("<nobr>Cat-Gator</nobr>").

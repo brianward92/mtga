@@ -107,8 +107,8 @@ the mounted artifact—not only the source directory—before publishing it.
 
 ## Permissions
 
-The default overlay uses permission-free Arena window geometry and cursor
-prediction. It does not require Accessibility permission. **Precise layering**
+The default overlay uses permission-free Arena window geometry and the
+cursor position. It does not require Accessibility permission. **Precise layering**
 is optional and requests Screen Recording only to inspect one-shot luminance
 frames of the Arena window; frames are not stored. Building, packaging, and
 installing do not grant that permission automatically.

@@ -57,11 +57,10 @@ sidebar assertions pin the shell 74% through Arena's centred, height-scaled
 content box and y=11.5%, through the right and bottom edges; verify the design
 in `04-sheet.png`. The corresponding pure geometry test exercises the same
 contract at three window sizes, including letterboxed aspect ratios. The
-harness also proves that sidebar-body dwell never yields the sidebar, while a
-predicted intersecting preview fades it to 0.08. Pure integration coverage
-pins the separate 350 ms sticky pack-card selection path. Ranked rows and
-badge chips use the same rounded pack-softmax probability; the WHY gap uses
-those probabilities rather than head-to-head dominance.
+harness also proves that resting the pointer on the sidebar never yields it,
+while an Arena preview fades it to 0.08 and lifts the covered badge. Ranked
+rows and badge chips use the same rounded pack-softmax probability; the WHY
+gap uses those probabilities rather than head-to-head dominance.
 
 ## Synthetic log
 

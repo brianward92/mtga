@@ -54,7 +54,7 @@ export class RailInteraction {
   handlePointerMove(element: Element | null, x: number, y: number): boolean {
     const hit = !!(element && element.closest('.interactive'))
     // The full draft sidebar owns Arena's right column. It must remain opaque
-    // and interactive on dwell; only predicted pack-preview state may fade it.
+    // and interactive on dwell; only a pack-card preview may fade it.
     if (this.sidebarRoot?.classList.contains('open')) {
       this.resetDwell()
       this.setInteractive(hit)
@@ -82,8 +82,7 @@ export class RailInteraction {
     if (document.body.classList.contains('calibrating')) return false
     if (panel === 'hud') {
       return this.hudRoot.classList.contains('interactive') &&
-        !this.hudRoot.classList.contains('hidden') &&
-        !this.hudRoot.classList.contains('covered')
+        !this.hudRoot.classList.contains('hidden')
     }
     return this.sheetRoot.classList.contains('interactive') && this.sheetRoot.classList.contains('open')
   }

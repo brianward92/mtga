@@ -1,13 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   HoverPreviewIntent,
-  HoverPreviewSelection,
   hoveredCardIndex,
-  intersectionFraction,
-  intersects,
   isRightmostGridColumn,
-  predictPopout,
-  previewCoveredCellIndices
+  predictPopout
 } from '../shared/hover'
 import { DEFAULT_CALIBRATION, packLayout } from '../shared/layout'
 
@@ -97,42 +93,15 @@ describe('hover pop-out prediction', () => {
     expect(preview.x + preview.width).toBe(rightCard.x - rightCard.width * 0.5)
   })
 
-  it('intersects is symmetric and strict on edges', () => {
-    const a = { x: 0, y: 0, width: 10, height: 10 }
-    expect(intersects(a, { x: 10, y: 0, width: 5, height: 5 })).toBe(false)
-    expect(intersects(a, { x: 9, y: 9, width: 5, height: 5 })).toBe(true)
-  })
-
-  it('lifts neighbours only when their union overlap exceeds 15 percent', () => {
-    const cells = [
-      { x: 0, y: 0, width: 100, height: 100 },
-      { x: 100, y: 0, width: 100, height: 100 },
-      { x: 200, y: 0, width: 100, height: 100 }
-    ]
-    const exactThreshold = [{ x: 85, y: 0, width: 15, height: 100 }]
-    expect(intersectionFraction(cells[0], exactThreshold)).toBeCloseTo(0.15, 8)
-    expect(previewCoveredCellIndices(cells, 2, exactThreshold)).toEqual([])
-
-    const overlappingRegions = [
-      { x: 80, y: 0, width: 12, height: 100 },
-      { x: 88, y: 0, width: 12, height: 100 },
-      { x: 200, y: 0, width: 20, height: 100 }
-    ]
-    // The first two rectangles overlap: their union is 20%, not 24%.
-    expect(intersectionFraction(cells[0], overlappingRegions)).toBeCloseTo(0.2, 8)
-    // Cell 2 is the hovered card and is never lifted, despite a 20% overlap.
-    expect(previewCoveredCellIndices(cells, 2, overlappingRegions)).toEqual([0])
-  })
-
-  it('applies a 350 ms enter dwell and exact 120 ms leave grace', () => {
+  it('applies a 250 ms enter dwell and exact 120 ms leave grace', () => {
     const intent = new HoverPreviewIntent()
     expect(intent.update(2, 0)).toBe(-1)
-    expect(intent.update(2, 349)).toBe(-1)
-    expect(intent.update(2, 350)).toBe(2)
+    expect(intent.update(2, 249)).toBe(-1)
+    expect(intent.update(2, 250)).toBe(2)
 
-    expect(intent.update(-1, 351)).toBe(2)
-    expect(intent.update(-1, 470)).toBe(2)
-    expect(intent.update(-1, 471)).toBe(-1)
+    expect(intent.update(-1, 251)).toBe(2)
+    expect(intent.update(-1, 370)).toBe(2)
+    expect(intent.update(-1, 371)).toBe(-1)
   })
 
   it('keeps the active preview through a brief excursion but dwells on a new cell', () => {
@@ -146,20 +115,5 @@ describe('hover pop-out prediction', () => {
     expect(intent.update(2, 619)).toBe(1)
     expect(intent.update(2, 620)).toBe(-1)
     expect(intent.update(2, 850)).toBe(2)
-  })
-
-  it('latches the last fully dwelled preview selection until an explicit pack reset', () => {
-    const selection = new HoverPreviewSelection()
-    expect(selection.update(1, 0)).toBe(-1)
-    expect(selection.update(1, 349)).toBe(-1)
-    expect(selection.update(1, 350)).toBe(1)
-
-    expect(selection.update(-1, 1_000)).toBe(1)
-    expect(selection.update(2, 2_000)).toBe(1)
-    expect(selection.update(2, 2_349)).toBe(1)
-    expect(selection.update(2, 2_350)).toBe(2)
-
-    selection.reset()
-    expect(selection.update(-1, 3_000)).toBe(-1)
   })
 })

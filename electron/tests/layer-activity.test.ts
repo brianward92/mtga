@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const { getCursorScreenPoint } = vi.hoisted(() => ({
   getCursorScreenPoint: vi.fn(() => ({ x: -1, y: -1 }))
 }))
-vi.mock('electron', () => ({ screen: { getCursorScreenPoint } }))
+vi.mock('electron', () => ({ screen: { getCursorScreenPoint }, systemPreferences: {} }))
 
 import type { ArenaGeometryPoller, HelperFrame } from '../main/arena-geometry'
 import { LayerDetector } from '../main/overlay/layer'
@@ -32,7 +32,20 @@ function visiblePackFrame(view: { width: number; height: number }, count: number
   return { width, height, data }
 }
 
-describe('LayerDetector fallback activity', () => {
+function detectorFor(poller: FakePoller, active: () => boolean = () => true): LayerDetector {
+  return new LayerDetector({
+    poller: poller as unknown as ArenaGeometryPoller,
+    packCount: () => 14,
+    config: () => DEFAULT_CALIBRATION,
+    active
+  })
+}
+
+function hover(card: { x: number; y: number; width: number; height: number }): void {
+  getCursorScreenPoint.mockReturnValue({ x: card.x + card.width / 2, y: card.y + card.height / 2 })
+}
+
+describe('LayerDetector', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     getCursorScreenPoint.mockClear()
@@ -41,15 +54,10 @@ describe('LayerDetector fallback activity', () => {
 
   afterEach(() => vi.useRealTimers())
 
-  it('runs its 50 ms cursor fallback only while badges are live', () => {
+  it('runs its 50 ms cursor poll only while badges are live', () => {
     const poller = new FakePoller()
     let active = false
-    const detector = new LayerDetector({
-      poller: poller as unknown as ArenaGeometryPoller,
-      packCount: () => 14,
-      config: () => DEFAULT_CALIBRATION,
-      active: () => active
-    })
+    const detector = detectorFor(poller, () => active)
 
     expect(vi.getTimerCount()).toBe(0)
     vi.advanceTimersByTime(200)
@@ -71,77 +79,63 @@ describe('LayerDetector fallback activity', () => {
     detector.dispose()
   })
 
-  it('lifts every other badge once the hover preview is up', () => {
+  it('lifts every other badge and reports the preview once the cursor has rested on a card', () => {
     const poller = new FakePoller()
     poller.lastKnown = { x: 0, y: 0, width: 1512, height: 949 }
     const cards = packLayout(poller.lastKnown, 14, DEFAULT_CALIBRATION).cards.map(slot => slot.card)
     const rightmost = cards[4]
-    getCursorScreenPoint.mockReturnValue({
-      x: rightmost.x + rightmost.width / 2,
-      y: rightmost.y + rightmost.height / 2
-    })
-    const detector = new LayerDetector({
-      poller: poller as unknown as ArenaGeometryPoller,
-      packCount: () => 14,
-      config: () => DEFAULT_CALIBRATION,
-      active: () => true
-    })
+    hover(rightmost)
+    const detector = detectorFor(poller)
 
+    // The first poll lands at 50 ms; the 250 ms rest is measured from there.
     detector.syncActivity()
-    vi.advanceTimersByTime(399)
+    vi.advanceTimersByTime(299)
     expect(detector.state.regions).toEqual([])
+    expect(detector.state.cells).toEqual([])
     vi.advanceTimersByTime(1)
 
     const [preview] = detector.state.regions
     expect(preview.x + preview.width).toBeLessThan(rightmost.x)
     expect(detector.state.cells).toEqual([0, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13])
-    expect(detector.state.selectedCell).toBe(4)
+    expect(detector.state.covered).toBe(false)
 
+    // Leaving the card restores everything after the short leave grace.
     getCursorScreenPoint.mockReturnValue({ x: -1, y: -1 })
     vi.advanceTimersByTime(200)
-    expect(detector.state.regions).toEqual([])
-    expect(detector.state.selectedCell).toBe(4)
+    expect(detector.state).toEqual({ cells: [], regions: [], covered: false })
 
     detector.resetBaseline()
-    expect(detector.state.selectedCell).toBeNull()
-    expect(detector.state.regions).toEqual([])
+    expect(detector.state).toEqual({ cells: [], regions: [], covered: false })
     detector.dispose()
   })
 
-  it('tracks the sticky dwell selection on the capture path without predicted regions', () => {
+  it('steps aside the same way on the capture path, with pixel diffs on top', () => {
     const poller = new FakePoller()
     const view = poller.lastKnown
     const cards = packLayout(view, 14, DEFAULT_CALIBRATION).cards.map(slot => slot.card)
     const frame = visiblePackFrame(view, 14)
-    const detector = new LayerDetector({
-      poller: poller as unknown as ArenaGeometryPoller,
-      packCount: () => 14,
-      config: () => DEFAULT_CALIBRATION,
-      active: () => true
-    })
+    const detector = detectorFor(poller)
 
-    // Establish the capture baseline with no hover, then dwell on cell zero.
+    // Establish the capture baseline with no hover, then rest on cell zero.
     poller.emit('frame', frame)
-    getCursorScreenPoint.mockReturnValue({
-      x: cards[0].x + cards[0].width / 2,
-      y: cards[0].y + cards[0].height / 2
-    })
+    expect(detector.state).toEqual({ cells: [], regions: [], covered: false })
+    hover(cards[0])
     poller.emit('frame', frame)
-    vi.advanceTimersByTime(349)
+    vi.advanceTimersByTime(249)
     poller.emit('frame', frame)
-    expect(detector.state.selectedCell).toBeNull()
+    expect(detector.state.regions).toEqual([])
     vi.advanceTimersByTime(1)
     poller.emit('frame', frame)
 
-    expect(detector.state.regions).toEqual([])
-    expect(detector.state.selectedCell).toBe(0)
-    getCursorScreenPoint.mockReturnValue({ x: -1, y: -1 })
-    vi.advanceTimersByTime(500)
-    poller.emit('frame', frame)
-    expect(detector.state.selectedCell).toBe(0)
+    expect(detector.state.regions).toHaveLength(2)
+    expect(detector.state.cells).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13])
+    expect(detector.state.covered).toBe(false)
 
-    detector.resetBaseline()
-    expect(detector.state.selectedCell).toBeNull()
+    // A darkened pack (modal) lifts everything regardless of the cursor.
+    const dark: HelperFrame = { ...frame, data: frame.data.map(v => Math.round(v * 0.3)) }
+    poller.emit('frame', dark)
+    expect(detector.state.covered).toBe(true)
+
     detector.dispose()
   })
 })

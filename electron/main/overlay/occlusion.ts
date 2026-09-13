@@ -12,8 +12,8 @@
  *     something — a card preview of any shape, a Room card's landscape
  *     preview, a modal scrim — and its badge lifts. Whole-pack darkening
  *     (modal) is caught the same way.
- *  2. Fallback without permission: geometric prediction of the hover preview
- *     (renderer/badges/hover.ts), driven from the cursor position.
+ *  2. Fallback without permission: the cursor alone. Once it rests on a pack
+ *     card, Arena's preview is taken to be up (shared/hover.ts).
  */
 import { systemPreferences } from 'electron'
 import type { Rect } from '../../shared/layout'
@@ -99,20 +99,17 @@ interface OcclusionResult {
   coveredCells: number[]
   /** Whole pack area looks covered (modal scrim). */
   packCovered: boolean
-  /** The extra rect (panel) looks covered. */
-  extraCovered: boolean
 }
 
 /**
  * Decide occlusion for one frame against a baseline. Pure.
- * `cells` / `extra` are rects in FRAME px.
+ * `cells` are rects in FRAME px.
  */
 export function detectOcclusion(
   frame: GrayFrame,
   baseline: GrayFrame | null,
   pack: Rect,
-  cells: Rect[],
-  extra: Rect | null
+  cells: Rect[]
 ): OcclusionResult {
   const lum = meanLuminanceInRect(frame, pack)
   const baseLum = baseline ? meanLuminanceInRect(baseline, pack) : null
@@ -120,18 +117,13 @@ export function detectOcclusion(
     (lum !== null && lum < ABS_DARK) ||
     (lum !== null && baseLum !== null && baseLum > 0 && lum < baseLum * COVERED_RATIO)
   const coveredCells: number[] = []
-  let extraCovered = false
   if (baseline) {
     cells.forEach((cell, i) => {
       const d = meanDiffIn(frame, baseline, cell)
       if (d !== null && d > CELL_DIFF_THRESHOLD) coveredCells.push(i)
     })
-    if (extra) {
-      const d = meanDiffIn(frame, baseline, extra)
-      extraCovered = d !== null && d > CELL_DIFF_THRESHOLD
-    }
   }
-  return { coveredCells, packCovered, extraCovered }
+  return { coveredCells, packCovered }
 }
 
 /** macOS Screen Recording status for this app (drives the menu-bar hint). */

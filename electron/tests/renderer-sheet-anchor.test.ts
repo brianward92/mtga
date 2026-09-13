@@ -31,27 +31,18 @@ describe('full right-column sidebar geometry', () => {
   })
 
   it('yields the column whenever an Arena preview is up, wherever it lands', () => {
-    const view = { width: 1512, height: 949 }
     const overPack = { x: 300, y: 250, width: 380, height: 520 }
 
-    expect(sidebarPresentation('active', true, view, { regions: [overPack], selectedCell: 4, hudCovered: false }))
-      .toEqual({ open: true, faded: true })
-    expect(sidebarPresentation('complete', true, view, { regions: [overPack], selectedCell: null, hudCovered: false }))
-      .toEqual({ open: true, faded: true })
-    // The fade follows the live hover, not a latched selection or the capture
-    // path's own hudCovered flag.
-    expect(sidebarPresentation('active', true, view, { regions: [], selectedCell: 4, hudCovered: true }))
-      .toEqual({ open: true, faded: false })
+    expect(sidebarPresentation('active', true, { regions: [overPack] })).toEqual({ open: true, faded: true })
+    expect(sidebarPresentation('complete', true, { regions: [overPack] })).toEqual({ open: true, faded: true })
+    expect(sidebarPresentation('active', true, { regions: [] })).toEqual({ open: true, faded: false })
   })
 
   it('respects phase and master visibility', () => {
-    const view = { width: 1512, height: 949 }
     const region = { x: 1200, y: 200, width: 400, height: 700 }
 
-    expect(sidebarPresentation('active', false, view, { regions: [region], selectedCell: 3, hudCovered: false }))
-      .toEqual({ open: false, faded: false })
-    expect(sidebarPresentation('idle', true, view, { regions: [region], selectedCell: 3, hudCovered: false }))
-      .toEqual({ open: false, faded: false })
+    expect(sidebarPresentation('active', false, { regions: [region] })).toEqual({ open: false, faded: false })
+    expect(sidebarPresentation('idle', true, { regions: [region] })).toEqual({ open: false, faded: false })
   })
 })
 
@@ -93,7 +84,7 @@ function sheetHarness(sheetOpen = false) {
   const store: Store = {
     state: { ...EMPTY_STATE, phase: 'active', seq: 1 },
     prefs: { badges: true, hud: true, hudCorner: 'bl', layerDetection: false },
-    layer: { cells: [], regions: [], selectedCell: null, covered: false, hudCovered: false },
+    layer: { cells: [], regions: [], covered: false },
     calibrate: { active: false, count: 14, config: {} as never, arenaFound: true },
     sheetOpen,
     hoverCell: -1,

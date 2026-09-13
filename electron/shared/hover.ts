@@ -1,14 +1,16 @@
 /**
- * Hover pop-out prediction (pure — unit tested).
+ * Hover preview awareness (pure — unit tested).
  *
  * Arena draws its enlarged card preview INSIDE its own window, so an
- * always-on-top overlay cannot sit between the pack and the preview. Instead
- * we predict where the preview will be from the hovered card cell and hide
- * whatever we draw there. Measured on a 1512x949 Arena window: the preview is
- * ~2.1x the card, ~0.19 card-widths to the right, vertically centred on the
- * card. Arena deliberately flips the right-most grid column to the left and
- * clamps the bottom row upward; a flavour-text box also appears just
- * above-left of the preview.
+ * always-on-top overlay cannot sit between the pack and the preview. The
+ * overlay only knows the cursor: once it has rested on a pack card, Arena's
+ * preview is taken to be up, and everything the overlay draws steps aside
+ * until the cursor leaves the card. `predictPopout` estimates where the
+ * preview lands (measured on a 1512x949 window: ~2.1x the card, ~0.19
+ * card-widths to the right, vertically centred, flipped left for the
+ * right-most column, clamped at the bottom, with a flavour-text box just
+ * above). The fade and the badge lift only need to know that a preview is
+ * up; the estimate says where.
  */
 import type { Rect } from './layout'
 
@@ -24,10 +26,8 @@ const SPLIT_POPOUT_HEIGHT_SCALE = 2.35
 const SPLIT_POPOUT_GAP = 0.5
 /** Split/Room preview lift in source-card heights. */
 const SPLIT_POPOUT_TOP_OFFSET = 0.35
-/** A mere edge-touch must not make a neighbouring badge disappear. */
-const PREVIEW_CELL_COVERAGE_THRESHOLD = 0.15
-/** Required stable hover before predicted preview regions activate. */
-const HOVER_ENTER_DWELL_MS = 350
+/** Rest on a card this long before Arena's preview is taken to be up. */
+const HOVER_ENTER_DWELL_MS = 250
 /** Grace period that preserves a preview during a brief cursor excursion. */
 const HOVER_LEAVE_GRACE_MS = 120
 
@@ -37,11 +37,6 @@ export interface PopoutOptions {
   split?: boolean
   /** Arena places previews left of cards in the right-most grid column. */
   flipLeft?: boolean
-}
-
-/** Whether two positive-area rectangles overlap. */
-export function intersects(a: Rect, b: Rect): boolean {
-  return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y
 }
 
 /** Whether a point lies within a rectangle's half-open bounds. */
@@ -59,69 +54,6 @@ export function isRightmostGridColumn(index: number, maxCols: number): boolean {
   if (!Number.isInteger(index) || index < 0) return false
   const cols = Math.max(1, Math.floor(maxCols))
   return index % cols === cols - 1
-}
-
-/**
- * Fraction of `target` covered by the union of `regions` (0..1).
- *
- * The union matters because the main preview and its rules box overlap. A
- * straight sum would count those pixels twice and lift cells too eagerly.
- */
-export function intersectionFraction(target: Rect, regions: Rect[]): number {
-  if (target.width <= 0 || target.height <= 0 || regions.length === 0) return 0
-
-  const targetRight = target.x + target.width
-  const targetBottom = target.y + target.height
-  const clipped = regions.flatMap(region => {
-    const x = Math.max(target.x, region.x)
-    const y = Math.max(target.y, region.y)
-    const right = Math.min(targetRight, region.x + region.width)
-    const bottom = Math.min(targetBottom, region.y + region.height)
-    return right > x && bottom > y ? [{ x, y, width: right - x, height: bottom - y }] : []
-  })
-  if (clipped.length === 0) return 0
-
-  const edges = [...new Set(clipped.flatMap(rect => [rect.x, rect.x + rect.width]))].sort((a, b) => a - b)
-  let coveredArea = 0
-  for (let i = 0; i + 1 < edges.length; i++) {
-    const left = edges[i]
-    const right = edges[i + 1]
-    if (right <= left) continue
-    const intervals = clipped
-      .filter(rect => rect.x < right && rect.x + rect.width > left)
-      .map(rect => [rect.y, rect.y + rect.height] as const)
-      .sort((a, b) => a[0] - b[0])
-    if (intervals.length === 0) continue
-
-    let top = intervals[0][0]
-    let bottom = intervals[0][1]
-    let coveredHeight = 0
-    for (let j = 1; j < intervals.length; j++) {
-      const [nextTop, nextBottom] = intervals[j]
-      if (nextTop > bottom) {
-        coveredHeight += bottom - top
-        top = nextTop
-        bottom = nextBottom
-      } else {
-        bottom = Math.max(bottom, nextBottom)
-      }
-    }
-    coveredHeight += bottom - top
-    coveredArea += (right - left) * coveredHeight
-  }
-  return Math.min(1, coveredArea / (target.width * target.height))
-}
-
-/** Neighbour cells substantially covered by a predicted preview. */
-export function previewCoveredCellIndices(
-  cards: Rect[],
-  hoveredIndex: number,
-  regions: Rect[],
-  threshold = PREVIEW_CELL_COVERAGE_THRESHOLD
-): number[] {
-  return cards.flatMap((card, index) =>
-    index !== hoveredIndex && intersectionFraction(card, regions) > threshold ? [index] : []
-  )
 }
 
 /**
@@ -175,37 +107,6 @@ export class HoverPreviewIntent {
       this.leftSince = null
     }
     return this.active
-  }
-}
-
-/**
- * Last pack cell whose hover completed Arena's preview dwell.
- *
- * Unlike predicted regions, selection is sticky: Arena can keep the enlarged
- * card under inspection after the cursor leaves its source cell. Callers
- * explicitly reset this state when the pack identity changes.
- */
-export class HoverPreviewSelection {
-  private candidate = -1
-  private candidateSince = 0
-  private selected = -1
-
-  constructor(private readonly enterDwellMs = HOVER_ENTER_DWELL_MS) {}
-
-  reset(): void {
-    this.candidate = -1
-    this.candidateSince = 0
-    this.selected = -1
-  }
-
-  update(hoveredIndex: number, now: number): number {
-    const hovered = Number.isInteger(hoveredIndex) && hoveredIndex >= 0 ? hoveredIndex : -1
-    if (hovered !== this.candidate) {
-      this.candidate = hovered
-      this.candidateSince = now
-    }
-    if (hovered >= 0 && now - this.candidateSince >= this.enterDwellMs) this.selected = hovered
-    return this.selected
   }
 }
 

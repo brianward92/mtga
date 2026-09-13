@@ -19,7 +19,7 @@ describe('detectOcclusion', () => {
   it('flags only the cells whose pixels changed vs baseline', () => {
     const base = frame(40, 20, () => 120)
     const now = frame(40, 20, (x) => (x >= 10 && x < 20 ? 200 : 120)) // preview over cell 1
-    const r = detectOcclusion(now, base, pack, cells, null)
+    const r = detectOcclusion(now, base, pack, cells)
     expect(r.coveredCells).toEqual([1])
     expect(r.packCovered).toBe(false)
   })
@@ -27,24 +27,16 @@ describe('detectOcclusion', () => {
   it('treats a whole-pack darkening as a modal', () => {
     const base = frame(40, 20, () => 140)
     const now = frame(40, 20, () => 60)
-    const r = detectOcclusion(now, base, pack, cells, null)
+    const r = detectOcclusion(now, base, pack, cells)
     expect(r.packCovered).toBe(true)
     expect(r.coveredCells).toEqual([0, 1, 2])
   })
 
-  it('reports the extra (panel) rect separately', () => {
-    const base = frame(40, 20, () => 100)
-    const now = frame(40, 20, (x) => (x >= 30 ? 100 + CELL_DIFF_THRESHOLD * 2 : 100))
-    const r = detectOcclusion(now, base, pack, cells, { x: 30, y: 0, width: 10, height: 20 })
-    expect(r.extraCovered).toBe(true)
-    expect(r.coveredCells).toEqual([])
-  })
-
   it('without a baseline only the absolute-dark rule applies', () => {
     const dark = frame(40, 20, () => 20)
-    expect(detectOcclusion(dark, null, pack, cells, null).packCovered).toBe(true)
+    expect(detectOcclusion(dark, null, pack, cells).packCovered).toBe(true)
     const lit = frame(40, 20, () => 120)
-    expect(detectOcclusion(lit, null, pack, cells, null)).toEqual({ coveredCells: [], packCovered: false, extraCovered: false })
+    expect(detectOcclusion(lit, null, pack, cells)).toEqual({ coveredCells: [], packCovered: false })
   })
 
 })

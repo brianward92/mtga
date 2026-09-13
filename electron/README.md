@@ -10,6 +10,8 @@ running **locally**, weights bundled, no server.
 - One transparent overlay glued to the Arena window. It follows moves and
   resizes at 30 Hz; card badges are click-through, while a fully opaque
   sidebar owns Arena's full right column from the Deck header to the bottom.
+  The sidebar is a dead zone for Arena: neither clicks nor hover reach the
+  drafted-pool column underneath it.
 - **Card badges** on the pack grid: a frame per card tinted by tier, a chip
   with the pool-conditioned grade (the paper's 13-level ladder), a 5-flame
   conviction signal and the model's within-pack pick probability, `#1`–`#5`
@@ -22,12 +24,13 @@ running **locally**, weights bundled, no server.
   pool grade, a differing set grade, and the same pick probability as its card
   chip. Conviction remains a separate signal from those probabilities. The pool
   scrolls internally while provenance and compact controls stay at the bottom.
-- **Layering that works without permissions**: cursor geometry predicts Arena
-  card previews and lifts the badges beneath them. If a predicted preview
-  intersects the sidebar, the sidebar alone fades to 0.08 until that preview
-  leaves; resting the pointer on the sidebar never makes it yield. The opt-in
-  **Precise layering** menu item uses one-shot captures of only the Arena
-  window to also detect previews and modals; captures are never stored.
+- **Arena's own UI wins, without permissions**: once the cursor rests on a
+  pack card, every other badge lifts and the sidebar fades to 0.08 until the
+  cursor leaves, wherever Arena draws the preview. A click into Arena's menu
+  bar hides the overlay until the draft screen is clicked again. Resting the
+  pointer on the sidebar never makes it yield. The opt-in **Precise layering**
+  menu item uses one-shot captures of only the Arena window to also detect
+  modals; captures are never stored.
 - Inference and card metadata stay local. The only runtime content request is
   the currently displayed recommendation image, fetched directly from
   `cards.scryfall.io`; there is no DraftFM server.

@@ -19,7 +19,7 @@ import { draftStateAdvanced, sameCalibrateState, sameLayerState, sameViewPrefs }
 import { RailInteraction } from './rail-interaction'
 import { sidebarPresentation, sidebarShellFrame, sidebarSide } from './sidebar'
 
-const EMPTY_LAYER: LayerState = { cells: [], regions: [], selectedCell: null, covered: false, hudCovered: false }
+const EMPTY_LAYER: LayerState = { cells: [], regions: [], covered: false }
 const EMPTY_CALIBRATE: CalibrateState = { active: false, count: 14, config: { ...DEFAULT_CALIBRATION }, arenaFound: false }
 const DEFAULT_PREFS: ViewPrefs = { badges: true, hud: true, hudCorner: 'tr', layerDetection: false }
 
@@ -68,7 +68,7 @@ function render(): void {
   if (store.view.width <= 0 || store.view.height <= 0) return
   document.body.classList.toggle('calibrating', store.calibrate.active)
   const sidebarEnabled = store.prefs.hud && !store.calibrate.active
-  const sidebar = sidebarPresentation(store.state.phase, sidebarEnabled, store.view, store.layer)
+  const sidebar = sidebarPresentation(store.state.phase, sidebarEnabled, store.layer)
   railRoot.classList.toggle('open', sidebar.open)
   railRoot.classList.toggle('interactive', sidebar.open)
   railRoot.classList.toggle('yield', sidebar.faded)
@@ -98,9 +98,6 @@ function render(): void {
   badges.update(store, layout)
   hud.update(store)
   calibrate.update(store)
-  // Main still receives the header rect for preview prediction telemetry;
-  // renderer-owned sidebar fading uses the full pure rail frame above.
-  hud.reportRect(rect => bridge?.setHudRect(rect))
   sheet.update(store)
   if (resetSheetScroll) {
     sheetBody.scrollTop = 0
@@ -163,8 +160,8 @@ function onState(raw: unknown): void {
   store.state = next
   if (packChanged) {
     store.hoverCell = -1
-    // Main resets the detector on the same transition; clear its old-pack
-    // prediction synchronously so a selected preview cannot hold the rail faded.
+    // Main resets the detector on the same transition; clear the old pack's
+    // preview synchronously so it cannot hold the rail faded.
     store.layer = EMPTY_LAYER
   }
   schedule()
@@ -189,9 +186,7 @@ function onLayer(raw: unknown): void {
   const next: LayerState = {
     cells: Array.isArray(l?.cells) ? l!.cells : [],
     regions: Array.isArray(l?.regions) ? l!.regions : [],
-    selectedCell: Number.isInteger(l?.selectedCell) && Number(l?.selectedCell) >= 0 ? Number(l!.selectedCell) : null,
-    covered: l?.covered === true,
-    hudCovered: l?.hudCovered === true
+    covered: l?.covered === true
   }
   if (sameLayerState(store.layer, next)) return
   store.layer = next
@@ -235,8 +230,8 @@ function init(): void {
 
   if (!bridge) { render(); return }
   // Deliberately absent in production. The source E2E uses this to prove the
-  // same predicted-region fade/restore path while main's real cursor polling
-  // is disabled for deterministic screenshots.
+  // same fade/restore path while main's real cursor polling is disabled for
+  // deterministic screenshots.
   if (bridge.e2e) {
     document.addEventListener('mtga:e2e-layer', event => {
       onLayer((event as CustomEvent<unknown>).detail)

@@ -18,6 +18,9 @@
 // Stdin control channel (one command per line):
 //   capture on | capture off       enable / disable the frame feed
 //   rate <hz>                      base capture rate (default 4; 0 pauses)
+//   activate                       make Arena the active application again
+//                                  (the overlay takes activation while the
+//                                  pointer is on its sidebar)
 // The helper exits when stdin closes or a stdout write fails.
 //
 // Geometry uses CGWindowList (no Accessibility needed). Frames are one-shot
@@ -34,7 +37,7 @@ import CoreGraphics
 
 let arenaBundleIds: Set<String> = ["com.wizards.mtga"]
 let arenaNames: Set<String> = ["MTGA", "MTG Arena", "Magic: The Gathering Arena"]
-let selfBundleIds: Set<String> = ["com.mtga.tracker", "com.github.Electron"]
+let selfBundleIds: Set<String> = ["com.mtga.draft-assistant", "com.mtga.tracker", "com.github.Electron"]
 let FRAME_W = 160
 let DEFAULT_RATE_HZ = 4.0
 let BURST_WINDOW_S = 1.5
@@ -147,13 +150,23 @@ let shared = Shared()
 // ---------------------------------------------------------------------------
 // Stdin control channel
 // ---------------------------------------------------------------------------
+/// Hand activation back to Arena. AppKit calls run on the main queue, which
+/// dispatchMain() services.
+func activateArena() {
+  let pids = arenaPids()
+  DispatchQueue.main.async {
+    for pid in pids { NSRunningApplication(processIdentifier: pid)?.activate(options: []) }
+  }
+}
+
 DispatchQueue.global(qos: .utility).async {
   while let line = readLine(strippingNewline: true) {
     let parts = line.trimmingCharacters(in: .whitespaces).lowercased().split(separator: " ").map(String.init)
-    guard parts.count >= 2 else { continue }
-    switch parts[0] {
-    case "capture": shared.setCapture(parts[1] == "on")
-    case "rate": if let hz = Double(parts[1]) { shared.setRate(hz) }
+    guard let command = parts.first else { continue }
+    switch command {
+    case "activate": activateArena()
+    case "capture": if parts.count >= 2 { shared.setCapture(parts[1] == "on") }
+    case "rate": if parts.count >= 2, let hz = Double(parts[1]) { shared.setRate(hz) }
     default: break
     }
   }

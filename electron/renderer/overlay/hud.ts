@@ -6,7 +6,6 @@
  * Skeleton lives in index.html; this updates it in place.
  */
 import type { CardRow, Grade, HudCorner } from '../../shared/state'
-import type { Rect } from '../../shared/layout'
 import { arenaDisplayOrder } from '../../shared/display-order'
 import { gradeTier } from '../../shared/grades'
 import { flamesFromPercentile } from './flames'
@@ -88,8 +87,6 @@ export class Hud {
   private readonly failedArt = new Set<string>()
 
   private corner: HudCorner = 'tr'
-  private lastRect: Rect | null = null
-  private lastRectKey = 'init'
   private rootClass = ''
 
   constructor(private root: HTMLElement, private action: OverlayAction) {
@@ -218,20 +215,6 @@ export class Hud {
     const prov = bundleProvenance(state.snapshot)
     if (this.attrib.textContent !== prov) this.attrib.textContent = prov
     this.attrib.hidden = !prov
-  }
-
-  /** After a render: tell main where the HUD is (layer awareness lifts it). Reads layout once. */
-  reportRect(send: (rect: Rect | null) => void): Rect | null {
-    // display:none (hidden pref, calibrating) measures 0×0 → null.
-    const r = this.root.getBoundingClientRect()
-    const rect: Rect | null = r.width > 0 && r.height > 0 ? { x: r.left, y: r.top, width: r.width, height: r.height } : null
-    const key = rect ? `${Math.round(rect.x)},${Math.round(rect.y)},${Math.round(rect.width)},${Math.round(rect.height)}` : 'null'
-    if (key !== this.lastRectKey) {
-      this.lastRectKey = key
-      this.lastRect = rect
-      send(rect)
-    }
-    return this.lastRect
   }
 
   // ---- pieces --------------------------------------------------------------

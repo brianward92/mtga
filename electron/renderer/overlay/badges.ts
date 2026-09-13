@@ -7,9 +7,7 @@
  * updated in place (text/classes/geometry) — no innerHTML churn on state
  * pushes. Cells not in use are detached, so `[data-testid="badge-cell"]`
  * counts exactly the pack on screen. Layer awareness: cells main reports as
- * covered get `behind`; main applies the preview's calibrated overlap
- * threshold before reporting those cell indices. `covered` lifts the whole
- * layer.
+ * covered get `behind`; `covered` lifts the whole layer.
  */
 import type { PackLayout, Rect } from '../../shared/layout'
 import { arenaDisplayOrder } from '../../shared/display-order'
@@ -178,7 +176,7 @@ export class BadgeLayer {
     if (scored !== n.scored) { n.scored = scored; n.cell.dataset.scored = scored ? 'true' : 'false' }
 
     // Rank tag / conviction label.
-    // #1–#5 (Brian: seeing 4 and 5 helps); #4/#5 render dimmer via a class.
+    // #1–#5; #4/#5 render dimmer via a class.
     const rankText = chip.rank !== null && chip.rank <= 5 ? `#${chip.rank}` : ''
     if (n.rank.textContent !== rankText) n.rank.textContent = rankText
     n.rank.hidden = rankText === ''
