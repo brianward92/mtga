@@ -1,11 +1,9 @@
 /**
  * Flame ratings (pure logic — unit tested).
  *
- * The overlay speaks heat, not numbers: model conviction becomes a 1-5
- * flame rating. The top pick of a scored pack uses head-to-head dominance
- * bands (see conviction.ts); this module covers the percentile-based
- * ratings — a card's set-relative P1P1 percentile (chips for runner-ups,
- * hover detail, and the top card while fewer than 2 EVs are known).
+ * Every flame on screen rates the same thing: the card's percentile for the
+ * live pool. Pick conviction (head-to-head dominance, conviction.ts) is shown
+ * only as the top pick's band label, never as flames.
  */
 import { isFiniteNumber } from './shared'
 

@@ -160,8 +160,7 @@ Arena session; it intentionally disables real cursor sampling.
 ## Live verification
 
 Live checks observe the already-running app and Arena unless lifecycle changes
-were expressly approved. Arena capture and input tooling lives in
-`~/src/arena-control`; follow that repository's verification procedures.
+were expressly approved.
 
 If the helper warns that Arena is not frontmost, another window may overlap
 that rectangle. Do not retain or share the image until its contents have been
@@ -238,9 +237,8 @@ This section requires explicit permission to change the app/Arena lifecycle.
 - [ ] Resting the pointer anywhere on the sidebar does not fade it or yield
   interaction to Arena; there is no rail dwell behavior.
 - [ ] A predicted Arena pack-card preview still lifts only the badges it covers.
-  The sidebar fades to 0.08 when that region intersects it, or after a 350 ms
-  pack-card dwell identifies Arena's sticky selected preview. Selection remains
-  faded until the pack changes; unrelated movement never starts the fade.
+  The sidebar fades to 0.08 while that preview or its flavour-text box
+  intersects it, and returns to full opacity as soon as it no longer does.
 - [ ] The three-size geometry unit case and strict `04-sheet.png` checkpoint
   agree with the same x/y/right/bottom shell contract.
 
@@ -256,9 +254,3 @@ This section requires explicit permission to change the app/Arena lifecycle.
 - [ ] `Dismiss` immediately returns to the idle glyph with no badge or sidebar
   leak. Without dismissal, the summary returns to idle after its 15-second
   linger.
-
-## Development picker
-
-Draft picking and all other Arena-driving workflows live in
-`~/src/arena-control`. This repository only produces the overlay state mirror
-that those workflows may consume.

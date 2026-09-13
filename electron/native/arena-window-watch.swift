@@ -47,11 +47,26 @@ func emit(_ line: String) {
   do { try out.write(contentsOf: data) } catch { exit(0) } // parent gone
 }
 
+func isArena(_ pid: pid_t) -> Bool {
+  guard let app = NSRunningApplication(processIdentifier: pid) else { return false }
+  if let bid = app.bundleIdentifier, arenaBundleIds.contains(bid) { return true }
+  if let name = app.localizedName, arenaNames.contains(name) { return true }
+  return false
+}
+
+/// Arena's pids, derived from the window list rather than
+/// NSWorkspace.runningApplications: that array is KVO-driven and never refreshes
+/// in this process, which services dispatchMain() and not a main run loop, so an
+/// Arena launched after us would stay invisible forever. The window list and
+/// NSRunningApplication(processIdentifier:) are both read live.
 func arenaPids() -> Set<pid_t> {
   var pids = Set<pid_t>()
-  for app in NSWorkspace.shared.runningApplications {
-    if let bid = app.bundleIdentifier, arenaBundleIds.contains(bid) { pids.insert(app.processIdentifier) }
-    else if let name = app.localizedName, arenaNames.contains(name) { pids.insert(app.processIdentifier) }
+  guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]]
+  else { return pids }
+  var seen = Set<pid_t>()
+  for w in list {
+    guard let pid = w[kCGWindowOwnerPID as String] as? pid_t, seen.insert(pid).inserted else { continue }
+    if isArena(pid) { pids.insert(pid) }
   }
   return pids
 }

@@ -823,6 +823,9 @@ body.calibrating .sheet { display: none; }
   inset: 0;
   pointer-events: none;
 }
+/* Arena's hover preview wins the strip: fade out of its way, but stay
+   interactive so the drafter can still reach the rail's own controls. */
+.draft-rail.open.yield { opacity: 0.08; }
 .draft-rail-panel { display: contents; }
 .draft-rail:not(.open) > .draft-rail-panel > .hud-foot { display: none; }
 .draft-rail:not(.open) .sheet { display: none; }
@@ -836,6 +839,7 @@ body.calibrating .sheet { display: none; }
   overflow: hidden;
   background: var(--rail-glass);
   opacity: 1;
+  transition: opacity var(--t);
   pointer-events: auto;
 }
 .draft-rail.open > .draft-rail-panel {

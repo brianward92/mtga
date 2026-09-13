@@ -294,7 +294,9 @@ export class Hud {
     } else {
       const top = card
       const rating = top.percentile !== null ? flamesFromPercentile(top.percentile * 100) : null
-      this.paintFlames(state.scoring ? null : conviction ? conviction.flames : rating?.flames ?? null)
+      // Flames always rate the card for this pool, matching its badge; pick
+      // conviction lives in the band label.
+      this.paintFlames(state.scoring ? null : rating?.flames ?? null)
       setText(this.recBand, state.scoring ? '' : conviction ? shortBandLabel(conviction.label) : rating?.label ?? '')
       setText(this.recRank, state.scoring || top.rank === null ? '' : '#1')
       setText(this.recWhy, state.scoring ? 'scoring…' : buildWhy(top, ranked[1] ?? null, state.pool))

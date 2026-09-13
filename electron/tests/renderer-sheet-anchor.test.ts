@@ -30,22 +30,33 @@ describe('full right-column sidebar geometry', () => {
     expect(sidebarPanelFrame({ width: NaN, height: 949 })).toEqual({ x: 0, y: 0, width: 0, height: 0 })
   })
 
-  it('never yields the column to Arena content behind it', () => {
+  it('yields the column while Arena previews land on it', () => {
     const view = { width: 1512, height: 949 }
     const rail = sidebarShellFrame(view)
-    // A preview squarely over the rail, a modal reported by capture, and a
-    // preview over the pack all leave the pool and top picks fully readable.
     const overRail = { x: rail.x + 20, y: rail.y + 20, width: 300, height: 500 }
     const overPack = { x: 300, y: 250, width: 380, height: 520 }
 
+    // A preview on the rail fades it; one over the pack leaves it fully opaque.
     expect(sidebarPresentation('active', true, view, { regions: [overRail], selectedCell: 4, hudCovered: false }))
-      .toEqual({ open: true })
-    expect(sidebarPresentation('active', true, view, { regions: [], selectedCell: null, hudCovered: true }))
-      .toEqual({ open: true })
+      .toEqual({ open: true, faded: true })
     expect(sidebarPresentation('active', true, view, { regions: [overPack], selectedCell: 4, hudCovered: false }))
-      .toEqual({ open: true })
-    expect(sidebarPresentation('complete', true, view, { regions: [overRail], selectedCell: null, hudCovered: false }))
-      .toEqual({ open: true })
+      .toEqual({ open: true, faded: false })
+    // The fade follows the live prediction, not a latched selection or the
+    // capture path's own hudCovered flag.
+    expect(sidebarPresentation('active', true, view, { regions: [], selectedCell: 4, hudCovered: true }))
+      .toEqual({ open: true, faded: false })
+  })
+
+  it('tests the completion column on the side it actually occupies', () => {
+    const view = { width: 1512, height: 949 }
+    const completeRail = sidebarShellFrame(view, 'left')
+    const overComplete = { x: completeRail.x + 20, y: completeRail.y + 20, width: 200, height: 400 }
+    const overRight = { x: 1300, y: 200, width: 180, height: 400 }
+
+    expect(sidebarPresentation('complete', true, view, { regions: [overComplete], selectedCell: null, hudCovered: false }))
+      .toEqual({ open: true, faded: true })
+    expect(sidebarPresentation('complete', true, view, { regions: [overRight], selectedCell: null, hudCovered: false }))
+      .toEqual({ open: true, faded: false })
   })
 
   it('respects phase and master visibility', () => {
@@ -53,9 +64,9 @@ describe('full right-column sidebar geometry', () => {
     const region = { x: 1200, y: 200, width: 400, height: 700 }
 
     expect(sidebarPresentation('active', false, view, { regions: [region], selectedCell: 3, hudCovered: false }))
-      .toEqual({ open: false })
+      .toEqual({ open: false, faded: false })
     expect(sidebarPresentation('idle', true, view, { regions: [region], selectedCell: 3, hudCovered: false }))
-      .toEqual({ open: false })
+      .toEqual({ open: false, faded: false })
   })
 })
 

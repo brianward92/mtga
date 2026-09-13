@@ -169,8 +169,8 @@ async function expectSheetContained(page, label, requireScroll = false) {
   return false
 }
 
-async function expectLongPoolScroll(page, label) {
-  const result = await page.evaluate((S, geometry) => {
+async function expectLongPoolScroll(page, label, side = 'right') {
+  const result = await page.evaluate((S, geometry, side) => {
     const rail = document.querySelector(S.rail)
     const panel = document.querySelector(S.railPanel)
     const sheet = document.querySelector(S.sheetRoot)
@@ -194,7 +194,7 @@ async function expectLongPoolScroll(page, label) {
     const footerAfter = footer.getBoundingClientRect()
     const contentWidth = window.innerHeight * geometry.contentAspect
     const contentLeft = (window.innerWidth - contentWidth) / 2
-    const expectedLeft = Math.round(Math.max(0, Math.min(window.innerWidth, contentLeft + contentWidth * geometry.leftFraction)))
+    const expectedLeft = side === 'left' ? 0 : Math.round(Math.max(0, Math.min(window.innerWidth, contentLeft + contentWidth * geometry.leftFraction)))
     const expectedTop = Math.round(window.innerHeight * geometry.topFraction)
     const contained = Math.abs(railRect.left - expectedLeft) <= 1 && railRect.right <= window.innerWidth + 1 &&
       Math.abs(railRect.top - expectedTop) <= 1 && railRect.bottom <= window.innerHeight + 1 &&
@@ -215,15 +215,15 @@ async function expectLongPoolScroll(page, label) {
     probe.remove()
     body.scrollTop = 0
     return details
-  }, SEL, SIDEBAR_GEOMETRY)
+  }, SEL, SIDEBAR_GEOMETRY, side)
   if (result.ok) return true
   failures.push(`${label}: ${JSON.stringify(result)}`)
   console.error('  FAIL', label, result)
   return false
 }
 
-async function expectDraftSidebarGeometry(page, label) {
-  const result = await page.evaluate((S, geometry) => {
+async function expectDraftSidebarGeometry(page, label, side = 'right') {
+  const result = await page.evaluate((S, geometry, side) => {
     const rail = document.querySelector(S.rail)
     const panel = document.querySelector(S.railPanel)
     const hud = document.querySelector(S.hud)
@@ -253,15 +253,18 @@ async function expectDraftSidebarGeometry(page, label) {
     const view = { width: window.innerWidth, height: window.innerHeight }
     const contentWidth = view.height * geometry.contentAspect
     const contentLeft = (view.width - contentWidth) / 2
-    const shellLeft = Math.round(Math.max(0, Math.min(view.width, contentLeft + contentWidth * geometry.leftFraction)))
+    const shellLeft = side === 'left' ? 0 : Math.round(Math.max(0, Math.min(view.width, contentLeft + contentWidth * geometry.leftFraction)))
+    const shellRight = side === 'left'
+      ? Math.round(Math.max(0, Math.min(view.width, contentLeft + contentWidth * (1 - geometry.leftFraction))))
+      : view.width
     const shellTop = Math.round(view.height * geometry.topFraction)
     const expected = {
       left: shellLeft,
-      right: view.width,
+      right: shellRight,
       top: shellTop,
       bottom: view.height,
       panelLeft: shellLeft + geometry.inset,
-      panelRight: view.width - geometry.inset,
+      panelRight: shellRight - geometry.inset,
       panelTop: shellTop + geometry.inset,
       panelBottom: view.height - geometry.inset
     }
@@ -318,7 +321,7 @@ async function expectDraftSidebarGeometry(page, label) {
       sheet: { left: s.left, right: s.right, top: s.top, bottom: s.bottom, alpha: sheetAlpha, border: sheetStyle.borderTopWidth, classes: sheet.className },
       checks: { opened, fixedBounds, hierarchy, activeBlocks, oneSurface, edgeOwnership }
     }
-  }, SEL, SIDEBAR_GEOMETRY)
+  }, SEL, SIDEBAR_GEOMETRY, side)
   if (result.ok) return true
   failures.push(`${label}: ${JSON.stringify(result)}`)
   console.error('  FAIL', label, result)
@@ -359,13 +362,13 @@ try {
     const sheet = document.querySelector(S.sheetRoot)
     const badges = document.querySelector(S.badges)
     return !!rail && !rail.classList.contains('open') && rail.getAttribute('aria-hidden') === 'false' &&
-      !!hud && hud.classList.contains('idle') && hud.classList.contains('idle-min') &&
+      !!hud && hud.classList.contains('idle') &&
       hud.classList.contains('hud-tr') && !hud.classList.contains('interactive') &&
-      visible(S.hudIdle) && !visible(S.hudIdleText) && !visible(S.hudMain) &&
+      visible(S.hudIdle) && !visible(S.hudMain) &&
       !visible(S.hudWarning) && document.querySelectorAll(S.cell).length === 0 &&
       !!badges && !visible(S.badges) && !!sheet && !sheet.classList.contains('open') &&
       !visible(S.sheetRoot) && !document.querySelector(S.sheet)
-  }, 'idle renders only the click-through top-right glyph')
+  }, 'idle renders only the click-through top-right pill')
   await shot(page, '00-idle')
 
   await feedUntil(nthPickNext(1))
@@ -467,9 +470,9 @@ try {
       style.pointerEvents === 'auto'
   }, '400ms sidebar dwell never fades, yields, or releases pointer ownership')
 
-  // Clean test-only injection proves the production predicted-region path.
-  // The sidebar owns its column outright: neither an intersecting predicted
-  // preview nor `hudCovered` may fade it, while badge lifting stays intact.
+  // Clean test-only injection proves the production predicted-region path:
+  // an Arena preview landing on the sidebar fades it out of the way, while
+  // badge lifting stays intact.
   await page.evaluate(layer => {
     document.dispatchEvent(new CustomEvent('mtga:e2e-layer', { detail: layer }))
   }, { cells: [1], regions: [{ x: 1120, y: 200, width: 160, height: 300 }], covered: false, hudCovered: true })
@@ -478,9 +481,9 @@ try {
     const cells = [...document.querySelectorAll(S.cell)]
     if (!rail || cells.length < 2) return false
     const style = getComputedStyle(rail)
-    return Math.abs(Number.parseFloat(style.opacity) - 1) < 0.005 && style.pointerEvents === 'auto' &&
+    return rail.classList.contains('yield') && Number.parseFloat(style.opacity) < 0.1 &&
       cells[1].classList.contains('behind')
-  }, 'sidebar stays opaque under an intersecting preview while the covered badge lifts')
+  }, 'sidebar yields to an intersecting preview while the covered badge lifts')
   await page.evaluate(layer => {
     document.dispatchEvent(new CustomEvent('mtga:e2e-layer', { detail: layer }))
   }, { cells: [], regions: [{ x: 100, y: 100, width: 200, height: 200 }], covered: false, hudCovered: true })
@@ -568,8 +571,8 @@ try {
       document.querySelectorAll(S.cell).length === 0
   }, 'completion sidebar keeps grouped ordered pool, pick labels, lands divider, and no badge leak', 6000)
   await sleep(500)
-  await expectDraftSidebarGeometry(page, 'completion keeps the full opaque sidebar and bottom footer')
-  await expectLongPoolScroll(page, 'long grouped pool scrolls internally without moving the pinned footer')
+  await expectDraftSidebarGeometry(page, 'completion keeps the full opaque sidebar on the left column', 'left')
+  await expectLongPoolScroll(page, 'long grouped pool scrolls internally without moving the pinned footer', 'left')
   await shot(page, '08-complete')
 
   // The explicit Dismiss control ends the linger immediately and leaves only
@@ -587,11 +590,11 @@ try {
     const hud = document.querySelector(S.hud)
     const sheet = document.querySelector(S.sheetRoot)
     return !!rail && !rail.classList.contains('open') && rail.getAttribute('aria-hidden') === 'false' &&
-      !!hud && hud.classList.contains('idle') && hud.classList.contains('idle-min') &&
+      !!hud && hud.classList.contains('idle') &&
       hud.classList.contains('hud-tr') && !hud.classList.contains('interactive') &&
       visible(S.hudIdle) && !visible(S.hudMain) && !!sheet && !sheet.classList.contains('open') &&
       !visible(S.sheetRoot) && document.querySelectorAll(S.cell).length === 0
-  }, 'dismiss returns completion rail to the idle glyph', 3000)
+  }, 'dismiss returns completion rail to the idle pill', 3000)
 
   await browser.disconnect()
 } catch (err) {
