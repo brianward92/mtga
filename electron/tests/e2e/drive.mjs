@@ -416,7 +416,7 @@ try {
       !!meta?.textContent?.trim() && !!why?.textContent?.includes('#1') && !!why?.textContent?.includes('#2') &&
       art instanceof HTMLImageElement && art.loading === 'lazy' &&
       /^https:\/\/cards\.scryfall\.io\/normal\/front\/[0-9a-f]\/[0-9a-f]\/[0-9a-f-]+\.jpg$/.test(art.src) &&
-      !!heroRect && !!artRect && heroRect.height > 150 && artRect.width / heroRect.width > 0.28 && artRect.width / heroRect.width < 0.38 &&
+      !!heroRect && !!artRect && heroRect.height >= 120 && document.querySelector('#inspectRules')?.textContent?.trim().length > 20 && artRect.width / heroRect.width > 0.28 && artRect.width / heroRect.width < 0.38 &&
       csp.includes('img-src') && csp.includes('https://cards.scryfall.io') && !!pool
   }, 'ranked top five, card art, honest why, metadata, grades, and pool bar')
   await shot(page, '02-p1p1-scored')
@@ -471,7 +471,7 @@ try {
   }, '400ms sidebar dwell never fades, yields, or releases pointer ownership')
 
   // Clean test-only injection proves the production path: an Arena preview
-  // fades the sidebar out of the way, while badge lifting stays intact.
+  // leaves the sidebar opaque, while badge lifting stays intact.
   await page.evaluate(layer => {
     document.dispatchEvent(new CustomEvent('mtga:e2e-layer', { detail: layer }))
   }, { cells: [1], regions: [{ x: 1120, y: 200, width: 160, height: 300 }], covered: false })
@@ -480,9 +480,9 @@ try {
     const cells = [...document.querySelectorAll(S.cell)]
     if (!rail || cells.length < 2) return false
     const style = getComputedStyle(rail)
-    return rail.classList.contains('yield') && Number.parseFloat(style.opacity) < 0.1 &&
+    return !rail.classList.contains('yield') && Number.parseFloat(style.opacity) === 1 &&
       cells[1].classList.contains('behind')
-  }, 'sidebar yields to an intersecting preview while the covered badge lifts')
+  }, 'sidebar stays opaque during an intersecting preview while the covered badge lifts')
   await page.evaluate(() => {
     document.dispatchEvent(new CustomEvent('mtga:e2e-layer', {
       detail: { cells: [], regions: [], covered: false }

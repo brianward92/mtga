@@ -1,23 +1,10 @@
-/**
- * Hover preview awareness (pure — unit tested).
- *
- * Arena draws its enlarged card preview INSIDE its own window, so an
- * always-on-top overlay cannot sit between the pack and the preview. The
- * overlay only knows the cursor: once it has rested on a pack card, Arena's
- * preview is taken to be up, and everything the overlay draws steps aside
- * until the cursor leaves the card. `predictPopout` estimates where the
- * preview lands (measured on a 1512x949 window: ~2.1x the card, ~0.19
- * card-widths to the right, vertically centred, flipped left for the
- * right-most column, clamped at the bottom, with a flavour-text box just
- * above). The fade and the badge lift only need to know that a preview is
- * up; the estimate says where.
- */
-import type { Rect } from './layout'
+/** Geometry for Arena's enlarged card and its adjacent rules/flavour helper. */
+import type { LayoutView, Rect } from './layout'
 
 /** Portrait preview size relative to its source card. */
-const POPOUT_SCALE = 2.1
+const POPOUT_SCALE = 2.6
 /** Portrait preview gap in source-card widths. */
-const POPOUT_GAP = 0.19
+const POPOUT_GAP = 0.065
 /** Split/Room preview width in source-card widths. */
 const SPLIT_POPOUT_WIDTH_SCALE = 5.0
 /** Split/Room preview height in source-card heights. */
@@ -33,6 +20,8 @@ const HOVER_LEAVE_GRACE_MS = 120
 
 /** Arena preview variants inferred from the hovered card and grid column. */
 export interface PopoutOptions {
+  /** Transforming cards display two portrait faces side by side. */
+  doubleFaced?: boolean
   /** Arena renders Rooms/split cards as a wide landscape preview. */
   split?: boolean
   /** Arena places previews left of cards in the right-most grid column. */
@@ -113,9 +102,27 @@ export class HoverPreviewIntent {
 /** Regions Arena's preview is expected to cover for a hovered card. */
 export function predictPopout(
   card: Rect,
-  view: { width: number; height: number },
+  view: LayoutView,
   opts: PopoutOptions = {}
 ): Rect[] {
+  const offset = 28 - (view.titleBarHeight ?? 28)
+  if (offset) return predictPopout({ ...card, y: card.y + offset }, { width: view.width, height: view.height + offset }, opts).map(r => ({ ...r, y: r.y - offset }))
+  if (opts.doubleFaced) {
+    const width = card.width * POPOUT_SCALE
+    const height = card.height * POPOUT_SCALE
+    const gap = card.width * POPOUT_GAP
+    const totalWidth = width * 2 + gap
+    let x = card.x + card.width + gap
+    if (x + totalWidth > view.width) x = card.x - gap - totalWidth
+    x = Math.max(0, x)
+    const y = Math.max(view.height * 0.098, Math.min(view.height * 0.91 - height, card.y + card.height / 2 - height / 2))
+    const right = x + totalWidth
+    return [
+      { x, y, width, height },
+      { x: x + width + gap, y, width, height },
+      { x: right + width <= view.width ? right : Math.max(0, x - width), y, width, height: height * 0.8 }
+    ]
+  }
   const split = opts.split === true
   const w = card.width * (split ? SPLIT_POPOUT_WIDTH_SCALE : POPOUT_SCALE)
   const h = card.height * (split ? SPLIT_POPOUT_HEIGHT_SCALE : POPOUT_SCALE)
@@ -125,13 +132,12 @@ export function predictPopout(
   let y = split
     ? card.y - card.height * SPLIT_POPOUT_TOP_OFFSET
     : card.y + card.height / 2 - h / 2
-  y = Math.max(0, Math.min(view.height - h, y))
+  y = Math.max(view.height * 0.098, Math.min(view.height * 0.91 - h, y))
   const preview = { x, y, width: w, height: h }
-  // Flavour/rules-text box: bridges the hovered card and preview, level with
-  // the preview's top. Rooms use the same secondary region beside their wide
-  // landscape preview.
-  const boxLeft = Math.min(card.x, x)
-  const boxRight = Math.max(card.x + card.width, x + w)
-  const box = { x: boxLeft, y: y - card.height * 0.05, width: boxRight - boxLeft, height: card.height * 0.28 }
+  // Arena places the helper beside the enlarged card, using the other side
+  // when it would run beyond the window. Capture refines its variable height.
+  // Arena reserves an outer gutter for helpers even when the card itself fits.
+  const boxX = x + w * 2 <= view.width * 0.95 ? x + w : x - w
+  const box = { x: boxX, y, width: w, height: h * 0.48 }
   return [preview, box]
 }

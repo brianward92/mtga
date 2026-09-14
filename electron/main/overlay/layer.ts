@@ -3,11 +3,10 @@
  *
  * Arena is one native window; its hover previews and modals are drawn INSIDE
  * it, so no overlay can be z-ordered between them and the pack. The overlay
- * steps aside instead. The cursor is the signal: once it has rested on a pack
- * card, Arena's preview is taken to be up, every other badge lifts and the
- * sidebar fades, until the cursor leaves the card. Arena's preview lands in
- * more places than can be predicted (keyword panels, token pairs, right-hand
- * pops under the sidebar), so nothing is left standing next to it.
+ * uses cursor dwell to predict the enlarged card and adjacent helpers. Only
+ * intersecting badges lift; the opaque sidebar remains intact. Predictions
+ * briefly stay latched during the sidebar's activation handoff, then clear
+ * after Arena's enlarged preview has had time to dismiss.
  *
  * With window capture (native helper, one-shot screenshots) a "clear" baseline
  * of the pack is kept and each frame is diffed per cell, which additionally
@@ -17,7 +16,7 @@ import { EventEmitter } from 'events'
 import { screen } from 'electron'
 import type { ArenaGeometryPoller, ArenaRect, HelperFrame } from '../arena-geometry'
 import { packLayout, type CalibrationConfig, type Rect } from '../../shared/layout'
-import { HoverPreviewIntent, hoveredCardIndex, isRightmostGridColumn, predictPopout } from '../../shared/hover'
+import { HoverPreviewIntent, hoveredCardIndex, predictPopout } from '../../shared/hover'
 import { detectOcclusion, scaleRect, cardness, CARDNESS_MIN, ABS_DARK, meanLuminanceInRect, frameFromBytes, type GrayFrame } from './occlusion'
 
 import type { LayerState } from '../../shared/state'
@@ -30,9 +29,11 @@ interface LayerDeps {
   packCount: () => number
   /** Card names in Arena display order, used to identify split previews. */
   names?: () => string[]
+  doubleFaced?: () => boolean[]
   config: (rect: ArenaRect) => CalibrationConfig
   /** Whether badges are wanted right now (draft live, enabled, visible). */
   active: () => boolean
+  pointerCaptured?: () => boolean
 }
 
 /** Detects Arena content covering badges, with a cursor-prediction fallback. */
@@ -47,6 +48,7 @@ export class LayerDetector extends EventEmitter {
   private fallbackTimer: NodeJS.Timeout | null = null
   /** Enter dwell + leave grace: Arena only pops its preview once the cursor rests. */
   private hoverIntent = new HoverPreviewIntent()
+  private capturedSince: number | null = null
 
   constructor(private deps: LayerDeps) {
     super()
@@ -61,6 +63,7 @@ export class LayerDetector extends EventEmitter {
     this.baseline = null
     this.baselineCardness = 0
     this.hoverIntent.reset()
+    this.capturedSince = null
     this.publish(EMPTY)
   }
 
@@ -87,16 +90,17 @@ export class LayerDetector extends EventEmitter {
   }
 
   private layout(rect: ArenaRect, count: number) {
-    const key = `${rect.width}x${rect.height}:${count}`
+    const key = `${rect.width}x${rect.height}:${rect.titleBarHeight}:${count}`
     if (this.layoutKey !== key || !this.layoutCache) {
       this.layoutKey = key
-      this.layoutCache = packLayout({ width: rect.width, height: rect.height }, count, this.deps.config(rect))
+      this.layoutCache = packLayout({ width: rect.width, height: rect.height, titleBarHeight: rect.titleBarHeight }, count, this.deps.config(rect))
     }
     return this.layoutCache
   }
 
   private publish(next: LayerState): void {
-    const key = `${next.covered ? 1 : 0}|${next.cells.join(',')}|` +
+    next = { ...next, titleBarHeight: this.deps.poller.lastKnown?.titleBarHeight }
+    const key = `${next.titleBarHeight}|${next.covered ? 1 : 0}|${next.cells.join(',')}|` +
       next.regions.map(r => [r.x, r.y, r.width, r.height].map(Math.round).join(',')).join(';')
     if (key === this.lastKey) return
     this.lastKey = key
@@ -112,6 +116,20 @@ export class LayerDetector extends EventEmitter {
     return { x: c.x - rect.x, y: c.y - rect.y }
   }
 
+  /** Arena dismisses hover UI when our sidebar takes activation. */
+  private sidebarHandoff(): boolean {
+    if (!this.deps.pointerCaptured?.()) { this.capturedSince = null; return false }
+    const now = Date.now()
+    this.capturedSince ??= now
+    // Preserve badges through the short native dismissal animation, never
+    // indefinitely: the user may read or scroll the inspector for minutes.
+    if (now - this.capturedSince >= 300) {
+      this.hoverIntent.reset()
+      this.publish(EMPTY)
+    }
+    return true
+  }
+
   private onFrame(hf: HelperFrame): void {
     this.lastFrameAt = Date.now()
     const rect = this.deps.poller.lastKnown
@@ -121,7 +139,8 @@ export class LayerDetector extends EventEmitter {
       this.publish(EMPTY)
       return
     }
-    const view = { width: rect.width, height: rect.height }
+    if (this.sidebarHandoff()) return
+    const view = { width: rect.width, height: rect.height, titleBarHeight: rect.titleBarHeight }
     const layout = this.layout(rect, count)
     const cellRects = layout.cards.map(c => c.card)
     const hoveredIdx = hoveredCardIndex(this.cursorLocal(rect), cellRects)
@@ -148,7 +167,7 @@ export class LayerDetector extends EventEmitter {
       return
     }
     const preview = this.preview(previewIdx, cellRects, view, this.deps.config(rect).maxCols)
-    const cells = [...new Set([...preview.cells, ...result.coveredCells])].filter(i => i !== hoveredIdx).sort((a, b) => a - b)
+    const cells = [...new Set([...preview.cells, ...result.coveredCells])].sort((a, b) => a - b)
     this.publish({ cells, regions: preview.regions, covered: result.packCovered })
   }
 
@@ -162,9 +181,9 @@ export class LayerDetector extends EventEmitter {
     if (previewIdx < 0) return { cells: [], regions: [] }
     const name = this.deps.names?.()[previewIdx]
     const split = typeof name === 'string' && name.includes(' // ')
-    const flipLeft = isRightmostGridColumn(previewIdx, maxCols)
-    const regions = predictPopout(cellRects[previewIdx], view, { split, flipLeft })
-    const cells = cellRects.map((_, i) => i).filter(i => i !== previewIdx)
+    const doubleFaced = this.deps.doubleFaced?.()[previewIdx] === true
+    const regions = predictPopout(cellRects[previewIdx], view, { split, doubleFaced })
+    const cells = cellRects.flatMap((r, i) => regions.some(p => r.x < p.x + p.width && r.x + r.width > p.x && r.y < p.y + p.height && r.y + r.height > p.y) ? [i] : [])
     return { cells, regions }
   }
 
@@ -177,9 +196,10 @@ export class LayerDetector extends EventEmitter {
       this.hoverIntent.reset()
       return
     }
+    if (this.sidebarHandoff()) return
     // Frames are flowing: onFrame owns the hover intent.
     if (Date.now() - this.lastFrameAt < 1500) return
-    const view = { width: rect.width, height: rect.height }
+    const view = { width: rect.width, height: rect.height, titleBarHeight: rect.titleBarHeight }
     const cellRects = this.layout(rect, count).cards.map(c => c.card)
     const idx = hoveredCardIndex(this.cursorLocal(rect), cellRects)
     const previewIdx = this.hoverIntent.update(idx, Date.now())

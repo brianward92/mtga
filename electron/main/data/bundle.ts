@@ -1,3 +1,4 @@
+import type { CardFace } from '../../shared/state'
 /**
  * The offline set bundle shipped with the app (electron/resources/draftfm):
  *   model/<tag>/…                DraftFM ONNX export (+ featurizer_manifest.json)
@@ -19,6 +20,9 @@ import { loadArenaCards } from './arena-cards'
 
 /** Static card identity and display metadata keyed by Arena grpId. */
 export interface CardInfo {
+  hasBackFace?: boolean
+  oracleText?: string
+  faces?: CardFace[]
   grpId: number
   name: string
   rarity: string
@@ -86,6 +90,9 @@ interface IndexFile {
 }
 
 interface CardFields {
+  hasBackFace?: boolean
+  oracleText?: string
+  faces?: CardFace[]
   rarity?: string
   colors?: string
   colorIdentity?: string
@@ -199,6 +206,9 @@ export function loadSetBundle(root: string, set: string): SetBundle | null {
       manaValue: Number.isFinite(manaValue) ? manaValue : null,
       type: String(raw.type ?? ''),
       scryfallId: String(raw.scryfallId ?? ''),
+      oracleText: String(raw.oracleText ?? ''),
+      hasBackFace: raw.hasBackFace === true,
+      faces: Array.isArray(raw.faces) ? raw.faces : [],
       order: arena.order(grpId, name, String(raw.rarity || 'common'))
     }
   }

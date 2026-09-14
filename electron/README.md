@@ -8,7 +8,7 @@ running **locally**, weights bundled, no server.
 ## What it does
 
 - One transparent overlay glued to the Arena window. It follows moves and
-  resizes at 30 Hz; card badges are click-through, while a fully opaque
+  resizes with adaptive polling (up to 60 Hz during movement); card badges are click-through, while a fully opaque
   sidebar owns Arena's full right column from the Deck header to the bottom.
   The sidebar is a dead zone for Arena: neither clicks nor hover reach the
   drafted-pool column underneath it.
@@ -19,18 +19,21 @@ running **locally**, weights bundled, no server.
   beside the pool-conditioned grade when they differ.
 - **Draft sidebar**: set·format, P{pack}P{pick}, model and pool rating; a
   fixed-height recommendation block with lazy Scryfall card art and an honest
-  probability/pool-fit WHY, followed by an aligned #1–#5 table; pool colour
+  probability/pool-fit WHY, scrollable card rules and keyword help, a flip
+  control for double-faced art, followed by an aligned #1–#5 table; pool colour
   and lane summaries; then the drafted-card list. Each ranked row shows its
   pool grade, a differing set grade, and the same pick probability as its card
   chip. Conviction remains a separate signal from those probabilities. The pool
   scrolls internally while provenance and compact controls stay at the bottom.
-- **Arena's own UI wins, without permissions**: once the cursor rests on a
-  pack card, every other badge lifts and the sidebar fades to 0.08 until the
-  cursor leaves, wherever Arena draws the preview. A click into Arena's menu
-  bar hides the overlay until the draft screen is clicked again. Resting the
-  pointer on the sidebar never makes it yield. The opt-in **Precise layering**
-  menu item uses one-shot captures of only the Arena window to also detect
-  modals; captures are never stored.
+- **Card preview layering**: cursor dwell predicts Arena's enlarged card and
+  helpers, lifting intersecting badges while retaining distant ones. These
+  geometric predictions are approximate. The sidebar stays fixed and opaque
+  in both windowed and fullscreen modes, with the inspected card's rules inside
+  it. Arena's menu bar and Escape open an exclusive settings interaction;
+  Escape/back returns through settings pages before restoring the overlay.
+  The opt-in **Precise layering** menu item captures only the Arena window at
+  2 Hz to also detect covered content; captures are never stored. Normal
+  cursor-based operation requires no screen capture.
 - Inference and card metadata stay local. The only runtime content request is
   the currently displayed recommendation image, fetched directly from
   `cards.scryfall.io`; there is no DraftFM server.

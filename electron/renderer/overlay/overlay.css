@@ -161,7 +161,7 @@ button {
   box-shadow: 0 0 16px 3px rgba(126, 242, 182, 0.55);
   /* Held value when motion is reduced — the pulse only modulates around it. */
   opacity: 0.78;
-  animation: frame-pulse 2s ease-in-out infinite;
+  /* Static emphasis avoids repainting a full transparent window at 60 FPS. */
 }
 @keyframes frame-pulse {
   0%, 100% { opacity: 0.5; }
@@ -182,8 +182,8 @@ button {
   border: 1px solid var(--badge-hairline);
   border-radius: var(--pill);
   box-shadow: var(--badge-shadow), inset 0 1px 0 var(--badge-inner);
-  -webkit-backdrop-filter: var(--badge-blur);
-  backdrop-filter: var(--badge-blur);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 /* #1–#5, bottom-left over the artist credit line (#4/#5 dimmer). */
@@ -242,8 +242,8 @@ button {
   border: 1px solid var(--badge-hairline);
   border-radius: var(--pill);
   box-shadow: var(--badge-shadow), inset 0 1px 0 var(--badge-inner);
-  -webkit-backdrop-filter: var(--badge-blur);
-  backdrop-filter: var(--badge-blur);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
   transition: opacity var(--t-settle), border-color var(--t), box-shadow var(--t);
 }
 .badge-chip.top {
@@ -812,8 +812,8 @@ body.calibrating .sheet { display: none; }
 
    The raw strip has no click-through gutters. One rounded, six-pixel-inset
    surface orders header → recommendation → ranked table → pool summary →
-   internally scrolling grouped pool → footer. Only a pack-card preview may
-   fade this common owner; it remains interactive while faded.
+   internally scrolling grouped pool → footer. The column stays opaque and
+   interactive, including while Arena shows a card preview.
    ========================================================================== */
 
 .draft-rail {
@@ -822,9 +822,6 @@ body.calibrating .sheet { display: none; }
   inset: 0;
   pointer-events: none;
 }
-/* Arena's hover preview wins the strip: fade out of its way, but stay
-   interactive so the drafter can still reach the rail's own controls. */
-.draft-rail.open.yield { opacity: 0.08; }
 .draft-rail-panel { display: contents; }
 .draft-rail:not(.open) > .draft-rail-panel > .hud-foot { display: none; }
 .draft-rail:not(.open) .sheet { display: none; }
@@ -1169,3 +1166,20 @@ body.calibrating .draft-rail.open { display: none; }
 .draft-rail.open .deck-lands { font-size: 0.9rem; }
 .draft-rail.open .d-line { padding: 0.28rem 0; font-size: 1rem; gap: 0.55rem; }
 .draft-rail.open .s-in, .draft-rail.open .s-out, .draft-rail.open .s-close { font-size: 0.72rem; }
+
+/* A large Arena helper may leave a shorter dock. Keep the whole sidebar
+   accessible as one scrolling surface in that temporary position. */
+
+/* Fixed inspector slots: swapping hovered cards never moves the pool or ranking. */
+.card-inspector { flex: 0 0 auto; height: 10rem; min-height: 10rem; display: flex; flex-direction: column; border-top: 1px solid var(--border); padding-top: 0.45rem; }
+.card-inspector[hidden] { display: none; }
+.card-inspector-heading { display: flex; align-items: center; justify-content: space-between; height: 1.5rem; flex-shrink: 0; font-size: 0.75rem; color: var(--text-2); }
+.card-inspector-heading button { font: inherit; color: var(--text); background: transparent; border: 1px solid var(--border); border-radius: 4px; cursor: pointer; }
+.card-inspector-rules { overflow-y: auto; min-height: 0; font-size: 0.85rem; line-height: 1.4; padding-right: 0.35rem; }
+.card-inspector-rules p { white-space: pre-wrap; margin: 0.3rem 0 0.75rem; }
+.inspector-face-name { font-weight: 600; }
+.draft-rail.open .hud-rec { height: 10rem; min-height: 10rem; }
+.draft-rail.open .hud-rec-name { font-size: 1.1rem; }
+.draft-rail.open .hud-rec-grade { font-size: 2.7rem; }
+.draft-rail.open > .draft-rail-panel { overflow-y: auto; }
+.draft-rail.open .sheet { flex-shrink: 0; min-height: 8rem; }

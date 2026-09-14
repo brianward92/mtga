@@ -16,6 +16,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 const api = {
   getState: () => ipcRenderer.invoke('overlay:get-state'),
   getPrefs: () => ipcRenderer.invoke('overlay:get-prefs'),
+  getLayer: () => ipcRenderer.invoke('overlay:get-layer'),
   onState: (cb: (data: unknown) => void) => { ipcRenderer.on('overlay:state', (_e, d) => cb(d)) },
   onLayer: (cb: (data: unknown) => void) => { ipcRenderer.on('overlay:layer', (_e, d) => cb(d)) },
   onCalibrate: (cb: (data: unknown) => void) => { ipcRenderer.on('overlay:calibrate', (_e, d) => cb(d)) },

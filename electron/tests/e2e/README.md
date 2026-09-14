@@ -58,7 +58,7 @@ content box and y=11.5%, through the right and bottom edges; verify the design
 in `04-sheet.png`. The corresponding pure geometry test exercises the same
 contract at three window sizes, including letterboxed aspect ratios. The
 harness also proves that resting the pointer on the sidebar never yields it,
-while an Arena preview fades it to 0.08 and lifts the covered badge. Ranked
+while an Arena preview leaves it opaque and lifts the covered badge. Ranked
 rows and badge chips use the same rounded pack-softmax probability; the WHY
 gap uses those probabilities rather than head-to-head dominance.
 

@@ -1,3 +1,4 @@
+import { sidebarShellFrame } from '../shared/layout'
 /**
  * MTGA Draft Assistant — main process.
  *
@@ -28,7 +29,7 @@ import { createOverlayWindow, setOverlayRect, showOverlay, hideOverlay, setOverl
 import { LayerDetector } from './overlay/layer'
 import { Calibration } from './overlay/calibration'
 import { StandAside } from './overlay/stand-aside'
-import { SidebarPointer, pointOnSidebar } from './overlay/sidebar-pointer'
+import { SidebarPointer } from './overlay/sidebar-pointer'
 import { screenCaptureGranted } from './overlay/occlusion'
 import { OverlayGeometrySync } from './overlay/geometry-sync'
 import { badgesAreLive, isDraftScene, wantsOverlayContent, type OverlayActivity } from './overlay/activity-policy'
@@ -104,26 +105,49 @@ function sidebarOpen(): boolean {
  * poll and the renderer's forwarded moves, before Arena's own hover preview
  * has time to open under the strip.
  */
+let sidebarFocusTimer: NodeJS.Timeout | null = null
 function syncSidebarPointer(local: { x: number; y: number }): void {
   if (!overlay || overlay.isDestroyed()) return
   const rect = poller.lastKnown
   const onStrip = !!rect && sidebarOpen() && !standAside.active && !calibration.active &&
     poller.isFound() && overlay.isVisible() &&
-    pointOnSidebar(local, rect, sidebarSide(coordinator.current.phase))
+    (() => {
+      const r = sidebarShellFrame(rect, sidebarSide(coordinator.current.phase))
+      return local.x >= r.x && local.x < r.x + r.width && local.y >= r.y && local.y < r.y + r.height
+    })()
   const action = sidebarPointer.update(onStrip)
   if (!action) return
+  if (sidebarFocusTimer) clearTimeout(sidebarFocusTimer)
+  sidebarFocusTimer = null
   setOverlayInteractive(overlay, action === 'claim')
   if (E2E) return
-  if (action === 'claim') app.focus({ steal: true })
+  if (action === 'claim') {
+    // Windowed Unity can freeze its last preview when it loses focus. Give
+    // Arena a hover-exit move first, without warping the physical pointer.
+    poller.dismissHover()
+    sidebarFocusTimer = setTimeout(() => {
+      sidebarFocusTimer = null
+      if (sidebarPointer.active && overlay && !overlay.isDestroyed()) app.focus({ steal: true })
+    }, 100)
+  }
   else poller.activateArena()
 }
 
 /** Poll the cursor while the overlay is up, so the strip can claim it. */
+let lastHoverCell = -1
 function pointerTick(): void {
   const rect = poller.lastKnown
   if (!rect || E2E) return
   const cursor = screen.getCursorScreenPoint()
-  syncSidebarPointer({ x: cursor.x - rect.x, y: cursor.y - rect.y })
+  const local = { x: cursor.x - rect.x, y: cursor.y - rect.y }
+  syncSidebarPointer(local)
+  if (!isOverlayContentWanted() || !poller.arenaFrontmost || sidebarPointer.active || coordinator.current.phase !== 'active') return
+  const layout = packLayout(rect, coordinator.current.cards.length, calibration.configFor(rect))
+  const cell = layout.cards.findIndex(({ card: r }) => local.x >= r.x && local.x < r.x + r.width && local.y >= r.y && local.y < r.y + r.height)
+  if (cell >= 0 && cell !== lastHoverCell) {
+    lastHoverCell = cell
+    send('overlay:command', { name: 'hover-card', data: { cell } })
+  }
 }
 
 /**
@@ -192,7 +216,7 @@ let lastPickKey = ''
 function pushState(state: DraftState): void {
   // A new pack or pick means the drafter is back at the table.
   const pickKey = `${state.phase}:${state.pack}:${state.pick}`
-  if (pickKey !== lastPickKey) { lastPickKey = pickKey; releaseStandAside() }
+  if (pickKey !== lastPickKey) { lastPickKey = pickKey; lastHoverCell = -1; releaseStandAside() }
   send('overlay:state', state)
   syncOverlay()
   refreshTray()
@@ -271,6 +295,7 @@ function setupGeometry(): void {
     // Dragging or resizing Arena must never leave the overlay hidden: grabbing
     // the title bar puts the cursor near Arena's menu band.
     standAside.noteWindowMoved(Date.now())
+    if (layer) send('overlay:layer', { ...layer.state, titleBarHeight: poller.lastKnown?.titleBarHeight })
     syncOverlay()
     refreshTray()
   })
@@ -278,6 +303,12 @@ function setupGeometry(): void {
   poller.on('frontmost', () => syncOverlay())
   poller.on('capture', () => refreshTray())
   poller.on('click', (point: { x: number; y: number }) => noteGlobalClick(point))
+  poller.on('escape', () => {
+    if (!poller.arenaFrontmost) return
+    if (calibration.active) return
+    const changed = standAside.noteEscape()
+    if (changed) syncOverlay()
+  })
   pointerTimer = setInterval(pointerTick, 16)
   poller.on('helper-missing', () => coordinator.setWarning('Window helper missing from the app bundle — overlay cannot locate Arena'))
   layer = new LayerDetector({
@@ -287,8 +318,10 @@ function setupGeometry(): void {
       const cards = coordinator.current.cards
       return arenaDisplayOrder(cards).map(i => cards[i].name)
     },
+    doubleFaced: () => arenaDisplayOrder(coordinator.current.cards).map(i => coordinator.current.cards[i].hasBackFace === true),
     config: (rect: ArenaRect) => calibration.configFor(rect),
-    active: () => areBadgesLive() && !calibration.active
+    active: () => areBadgesLive() && !calibration.active,
+    pointerCaptured: () => sidebarPointer.active
   })
   layer.on('change', state => send('overlay:layer', state))
   layer.syncActivity()
@@ -306,6 +339,7 @@ function setupGeometry(): void {
 function setupIpc(): void {
   ipcMain.handle('overlay:get-state', () => coordinator.current)
   ipcMain.handle('overlay:get-prefs', () => loadPrefs())
+  ipcMain.handle('overlay:get-layer', () => ({ ...layer.state, titleBarHeight: poller.lastKnown?.titleBarHeight }))
   ipcMain.on('overlay:interactive', (_e, on: boolean) => {
     // The renderer's forwarded move is the fastest word that the pointer has
     // reached the strip; the cursor poll stays authoritative for leaving it,
@@ -386,6 +420,7 @@ async function createOverlay(): Promise<void> {
   overlay.webContents.on('did-finish-load', () => {
     send('overlay:state', coordinator.current)
     send('overlay:prefs', loadPrefs())
+    send('overlay:layer', { ...layer.state, titleBarHeight: poller.lastKnown?.titleBarHeight })
     send('overlay:command', { name: 'toggle-sheet', data: { open: sheetOpen } })
     pushCalibrate()
     syncOverlay()

@@ -24,19 +24,12 @@ export function sidebarPanelFrame(view: ViewSize): Rect {
   }
 }
 
-/**
- * Renderer-ready sidebar state.
- *
- * The sidebar yields to Arena's hover preview: whenever a preview is up the
- * sidebar fades, wherever Arena draws it — the right-most column's preview
- * lands under the sidebar. It follows the live hover, so it returns as soon
- * as the cursor leaves the card.
- */
+/** The sidebar owns its column and stays opaque during Arena previews. */
 export function sidebarPresentation(
   phase: DraftState['phase'],
   enabled: boolean,
-  layer: Pick<LayerState, 'regions'>
+  _layer: Pick<LayerState, 'regions'>
 ): { open: boolean; faded: boolean } {
   const open = enabled && (phase === 'active' || phase === 'complete')
-  return { open, faded: open && layer.regions.length > 0 }
+  return { open, faded: false }
 }

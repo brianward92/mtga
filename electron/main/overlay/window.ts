@@ -6,6 +6,7 @@
  * Never focusable — Arena keeps keyboard focus.
  */
 import { BrowserWindow, app } from 'electron'
+
 import { join } from 'path'
 import type { ArenaRect } from '../arena-geometry'
 
@@ -16,6 +17,9 @@ export function createOverlayWindow(): BrowserWindow {
     height: 800,
     show: false,
     transparent: true,
+    type: 'panel', // A floating auxiliary panel can accompany Arena in its fullscreen Space.
+    enableLargerThanScreen: true,
+    hiddenInMissionControl: true,
     frame: false,
     alwaysOnTop: true,
     skipTaskbar: true,

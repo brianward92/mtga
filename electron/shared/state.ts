@@ -8,7 +8,17 @@ import type { Grade } from './grades'
 export type { Grade }
 
 /** One pack or pool card with immutable identity and live model scores. */
+export interface CardFace {
+  name: string
+  type: string
+  manaCost: string
+  oracleText: string
+}
+
 export interface CardRow {
+  hasBackFace?: boolean
+  oracleText?: string
+  faces?: CardFace[]
   grpId: number
   name: string
   rarity: string
@@ -132,6 +142,8 @@ import type { CalibrationConfig, Rect } from './layout'
 
 /** What Arena's own UI is currently drawn over (see main/overlay/layer.ts). */
 export interface LayerState {
+  /** Actual Arena title bar; absent preserves legacy windowed geometry. */
+  titleBarHeight?: number
   /** Pack cells (display order) whose badges must lift. */
   cells: number[]
   /** Where Arena's hover preview is expected (window px); empty when none is up. */

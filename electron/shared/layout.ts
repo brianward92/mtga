@@ -13,6 +13,8 @@
  * numbered ghosts in calibration mode exist to verify the grid geometry.
  */
 
+export interface LayoutView { width: number; height: number; titleBarHeight?: number }
+
 export interface Rect {
   x: number
   y: number
@@ -296,9 +298,14 @@ export function sidebarSide(phase: string): SidebarSide {
 }
 
 export function sidebarShellFrame(
-  view: { width: number; height: number },
+  view: LayoutView,
   side: SidebarSide = 'right'
 ): Rect {
+  const offset = 28 - (view.titleBarHeight ?? 28)
+  if (offset) {
+    const r = sidebarShellFrame({ width: view.width, height: view.height + offset }, side)
+    return { ...r, y: r.y - offset }
+  }
   const width = Number.isFinite(view.width) ? Math.max(0, view.width) : 0
   const height = Number.isFinite(view.height) ? Math.max(0, view.height) : 0
   if (width === 0 || height === 0) return { x: 0, y: 0, width: 0, height: 0 }
@@ -315,10 +322,16 @@ export function sidebarShellFrame(
 }
 
 export function packLayout(
-  view: { width: number; height: number },
+  view: LayoutView,
   count: number,
   config: CalibrationConfig
 ): PackLayout {
+  const offset = 28 - (view.titleBarHeight ?? 28)
+  if (offset) {
+    const layout = packLayout({ width: view.width, height: view.height + offset }, count, config)
+    const shift = (r: Rect): Rect => ({ ...r, y: r.y - offset })
+    return { pack: shift(layout.pack), cards: layout.cards.map(c => ({ ...c, card: shift(c.card), badge: shift(c.badge) })) }
+  }
   const box = arenaContentBox(view)
   const pack: Rect = {
     x: box.x + config.packLeft * box.width,

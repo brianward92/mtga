@@ -17,6 +17,7 @@ export interface OverlayCommand {
 }
 
 interface ViewportSize {
+  titleBarHeight?: number
   width: number
   height: number
 }

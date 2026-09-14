@@ -47,7 +47,7 @@
         <div class="hud-rec-body">
           <div class="hud-rec-top">
             <span class="hud-rec-name" id="recName">Waiting for pack…</span>
-            <span class="hud-hovering" id="recHovering" hidden>hovering</span>
+            <span class="hud-hovering" id="recHovering" hidden>inspecting</span>
           </div>
           <div class="hud-rec-meta" id="recMeta"></div>
           <div class="hud-rec-conv" id="recConv">
@@ -57,6 +57,11 @@
           </div>
           <div class="hud-rec-why" id="recWhy"></div>
         </div>
+      </section>
+
+      <section class="card-inspector" id="cardInspector" aria-label="Card rules">
+        <div class="card-inspector-heading"><span>Card details</span><button id="inspectFlip" type="button" hidden>Other face</button></div>
+        <div class="card-inspector-rules" id="inspectRules" tabindex="0"></div>
       </section>
 
       <!-- Ranked table (#1–#5): fixed five rows so the top block never reflows -->

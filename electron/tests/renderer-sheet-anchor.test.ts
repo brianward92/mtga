@@ -30,11 +30,13 @@ describe('full right-column sidebar geometry', () => {
     expect(sidebarPanelFrame({ width: NaN, height: 949 })).toEqual({ x: 0, y: 0, width: 0, height: 0 })
   })
 
-  it('yields the column whenever an Arena preview is up, wherever it lands', () => {
+  it('keeps the column opaque whenever an Arena preview is up', () => {
     const overPack = { x: 300, y: 250, width: 380, height: 520 }
 
-    expect(sidebarPresentation('active', true, { regions: [overPack] })).toEqual({ open: true, faded: true })
-    expect(sidebarPresentation('complete', true, { regions: [overPack] })).toEqual({ open: true, faded: true })
+    expect(sidebarPresentation('active', true, { regions: [overPack] })).toEqual({ open: true, faded: false })
+    expect(sidebarPresentation('complete', true, { regions: [overPack] })).toEqual({ open: true, faded: false })
+    const overSidebar = { x: 1200, y: 200, width: 400, height: 700 }
+    expect(sidebarPresentation('active', true, { regions: [overSidebar] })).toEqual({ open: true, faded: false })
     expect(sidebarPresentation('active', true, { regions: [] })).toEqual({ open: true, faded: false })
   })
 

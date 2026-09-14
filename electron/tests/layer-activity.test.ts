@@ -79,7 +79,7 @@ describe('LayerDetector', () => {
     detector.dispose()
   })
 
-  it('lifts every other badge and reports the preview once the cursor has rested on a card', () => {
+  it('keeps distant badges visible while lifting only intersecting preview cells', () => {
     const poller = new FakePoller()
     poller.lastKnown = { x: 0, y: 0, width: 1512, height: 949 }
     const cards = packLayout(poller.lastKnown, 14, DEFAULT_CALIBRATION).cards.map(slot => slot.card)
@@ -95,8 +95,10 @@ describe('LayerDetector', () => {
     vi.advanceTimersByTime(1)
 
     const [preview] = detector.state.regions
-    expect(preview.x + preview.width).toBeLessThan(rightmost.x)
-    expect(detector.state.cells).toEqual([0, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13])
+    expect(preview.x).toBeGreaterThan(rightmost.x + rightmost.width)
+    expect(detector.state.cells).toEqual([2, 3, 4])
+    expect(detector.state.cells).not.toContain(0)
+    expect(detector.state.cells).not.toContain(13)
     expect(detector.state.covered).toBe(false)
 
     // Leaving the card restores everything after the short leave grace.
@@ -128,7 +130,9 @@ describe('LayerDetector', () => {
     poller.emit('frame', frame)
 
     expect(detector.state.regions).toHaveLength(2)
-    expect(detector.state.cells).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13])
+    expect(detector.state.cells).not.toContain(0)
+    expect(detector.state.cells).not.toContain(13)
+    expect(detector.state.cells.length).toBeGreaterThan(0)
     expect(detector.state.covered).toBe(false)
 
     // A darkened pack (modal) lifts everything regardless of the cursor.
@@ -136,6 +140,36 @@ describe('LayerDetector', () => {
     poller.emit('frame', dark)
     expect(detector.state.covered).toBe(true)
 
+    detector.dispose()
+  })
+
+  it('restores badges after the sidebar activation handoff without waiting for the mouse to leave', () => {
+    const poller = new FakePoller()
+    let captured = false
+    const detector = new LayerDetector({
+      poller: poller as unknown as ArenaGeometryPoller,
+      packCount: () => 14,
+      config: () => DEFAULT_CALIBRATION,
+      active: () => true,
+      pointerCaptured: () => captured
+    })
+    hover(packLayout(poller.lastKnown, 14, DEFAULT_CALIBRATION).cards[0].card)
+    detector.syncActivity()
+    vi.advanceTimersByTime(350)
+    const before = detector.state
+    expect(before.cells.length).toBeGreaterThan(0)
+    captured = true
+    getCursorScreenPoint.mockReturnValue({ x: -1, y: -1 })
+    vi.advanceTimersByTime(150)
+    expect(detector.state).toEqual(before)
+    vi.advanceTimersByTime(300)
+    expect(detector.state.cells).toEqual([])
+    expect(detector.state.regions).toEqual([])
+    vi.advanceTimersByTime(10_000)
+    expect(detector.state.cells).toEqual([])
+    captured = false
+    vi.advanceTimersByTime(250)
+    expect(detector.state.cells).toEqual([])
     detector.dispose()
   })
 })

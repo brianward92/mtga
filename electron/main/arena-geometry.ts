@@ -24,6 +24,7 @@ import { createInterface } from 'readline'
 
 /** Arena window bounds in global screen points. */
 export interface ArenaRect {
+  titleBarHeight?: number
   x: number
   y: number
   width: number
@@ -105,10 +106,10 @@ export function parseWatchLine(line: string): ArenaProbe | null {
   if (!t || t.startsWith('F ') || t.startsWith('C ') || t.startsWith('M ')) return null
   if (t === 'NOWIN' || t === 'NOPROC') return { status: 'no-window' }
   const parts = t.split(',').map(v => parseInt(v, 10))
-  if (parts.length !== 5 || parts.some(v => !Number.isFinite(v))) return null
-  const [x, y, width, height, fm] = parts
+  if ((parts.length !== 5 && parts.length !== 6) || parts.some(v => !Number.isFinite(v))) return null
+  const [x, y, width, height, fm, titleBarHeight] = parts
   if (width <= 0 || height <= 0) return { status: 'no-window' }
-  return { status: 'found', rect: { x, y, width, height }, frontmost: fm === 1 }
+  return { status: 'found', rect: { x, y, width, height, ...(titleBarHeight === undefined ? {} : { titleBarHeight }) }, frontmost: fm === 1 }
 }
 
 /** Polls Arena window presence, geometry, focus, and optional luminance frames. */
@@ -172,6 +173,11 @@ export class ArenaGeometryPoller extends EventEmitter {
     this.helperWrite('activate')
   }
 
+  /** Dismiss the native card hover without moving the user's pointer. */
+  dismissHover(): void {
+    this.helperWrite('dismiss-hover')
+  }
+
   /** Turn the helper's frame feed on/off ("capture on|off" over stdin). */
   setCapture(on: boolean): void {
     if (this.wantCapture === on) return
@@ -209,6 +215,7 @@ export class ArenaGeometryPoller extends EventEmitter {
         if (frame) this.emit('frame', frame)
         return
       }
+      if (line === 'K escape') { this.emit('escape'); return }
       if (line.startsWith('M ')) {
         const point = parseClickLine(line)
         if (point) this.emit('click', point)
@@ -251,7 +258,7 @@ export class ArenaGeometryPoller extends EventEmitter {
     if (probe.status === 'found') {
       const prev = this.lastKnown
       const changed = !prev || prev.x !== probe.rect.x || prev.y !== probe.rect.y ||
-        prev.width !== probe.rect.width || prev.height !== probe.rect.height
+        prev.width !== probe.rect.width || prev.height !== probe.rect.height || prev.titleBarHeight !== probe.rect.titleBarHeight
       this.lastKnown = probe.rect
       const wasFound = this.state === 'found'
       this.state = 'found'

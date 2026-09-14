@@ -954,6 +954,13 @@ def card_entry(row):
         "manaValue": _mana_value(row.get("cmc")),
         "type": row.get("type_line") or "",
         "scryfallId": scryfall_id,
+        "oracleText": row.get("oracle_text") or "",
+        "hasBackFace": bool(len(faces) > 1 and faces[1].get("image_uris")),
+        "faces": [
+            {"name": face.get("name") or "", "type": face.get("type_line") or "",
+             "manaCost": face.get("mana_cost") or "", "oracleText": face.get("oracle_text") or ""}
+            for face in faces
+        ],
     }
 
 

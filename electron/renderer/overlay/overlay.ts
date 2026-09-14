@@ -64,7 +64,7 @@ let railStyleKey = ''
 function render(): void {
   // Nothing to paint while hidden; main re-syncs and we repaint on show.
   if (document.visibilityState === 'hidden') return
-  store.view = { width: window.innerWidth, height: window.innerHeight }
+  store.view = { width: window.innerWidth, height: window.innerHeight, titleBarHeight: store.layer.titleBarHeight }
   if (store.view.width <= 0 || store.view.height <= 0) return
   document.body.classList.toggle('calibrating', store.calibrate.active)
   const sidebarEnabled = store.prefs.hud && !store.calibrate.active
@@ -76,14 +76,15 @@ function render(): void {
   // rather than a fixed window percentage; drive it from the pure geometry.
   if (sidebar.open) {
     const shell = sidebarShellFrame(store.view, sidebarSide(store.state.phase))
-    const right = Math.round(store.view.width - shell.x - shell.width)
-    const style = `${Math.round(shell.x)}px:${Math.round(shell.y)}px:${right}px`
+    const right = Math.round(window.innerWidth - shell.x - shell.width)
+    const bottom = Math.round(store.view.height - shell.y - shell.height)
+    const style = `${Math.round(shell.x)}px:${Math.round(shell.y)}px:${right}px:${bottom}px`
     if (railStyleKey !== style) {
       railStyleKey = style
       railRoot.style.left = `${Math.round(shell.x)}px`
       railRoot.style.top = `${Math.round(shell.y)}px`
       railRoot.style.right = `${right}px`
-      railRoot.style.bottom = '0'
+      railRoot.style.bottom = `${bottom}px`
     }
   } else if (railStyleKey !== '') {
     railStyleKey = ''
@@ -117,7 +118,7 @@ function currentLayout(): PackLayout | null {
   const count = store.state.phase === 'active' ? store.state.cards.length : 0
   if (count === 0) { layoutKey = ''; layoutCache = null; return null }
   const cfg = store.calibrate.config
-  const key = `${store.view.width}x${store.view.height}:${count}:${JSON.stringify(cfg)}`
+  const key = `${store.view.titleBarHeight}:${store.view.width}x${store.view.height}:${count}:${JSON.stringify(cfg)}`
   if (key !== layoutKey || !layoutCache) {
     layoutKey = key
     layoutCache = packLayout(store.view, count, cfg)
@@ -130,7 +131,7 @@ function currentLayout(): PackLayout | null {
 // ---------------------------------------------------------------------------
 
 function setHoverCell(cell: number): void {
-  if (cell === store.hoverCell) return
+  if (cell < 0 || cell === store.hoverCell) return
   store.hoverCell = cell
   schedule()
 }
@@ -161,7 +162,7 @@ function onState(raw: unknown): void {
   if (packChanged) {
     store.hoverCell = -1
     // Main resets the detector on the same transition; clear the old pack's
-    // preview synchronously so it cannot hold the rail faded.
+    // preview synchronously so it cannot hide the new pack’s badges.
     store.layer = EMPTY_LAYER
   }
   schedule()
@@ -186,7 +187,8 @@ function onLayer(raw: unknown): void {
   const next: LayerState = {
     cells: Array.isArray(l?.cells) ? l!.cells : [],
     regions: Array.isArray(l?.regions) ? l!.regions : [],
-    covered: l?.covered === true
+    covered: l?.covered === true,
+    titleBarHeight: l?.titleBarHeight
   }
   if (sameLayerState(store.layer, next)) return
   store.layer = next
@@ -210,6 +212,11 @@ function onCalibrate(raw: unknown): void {
 function onCommand(raw: unknown): void {
   const cmd = raw as OverlayCommand | null
   switch (cmd?.name) {
+    case 'hover-card': {
+      const cell = (cmd.data as { cell?: number })?.cell
+      if (typeof cell === 'number' && Number.isInteger(cell) && cell >= 0 && cell < store.state.cards.length) setHoverCell(cell)
+      break
+    }
     case 'toggle-sheet': {
       // Main owns the truth; it sends the resulting state with the command.
       const open = (cmd?.data as { open?: boolean } | undefined)?.open
@@ -245,6 +252,7 @@ function init(): void {
   // Late attach: pull whatever main already has.
   void bridge.getState().then(onState).catch(() => undefined)
   void bridge.getPrefs().then(onPrefs).catch(() => undefined)
+  void bridge.getLayer().then(onLayer).catch(() => undefined)
   render()
 }
 

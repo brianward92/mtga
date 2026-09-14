@@ -32,6 +32,11 @@ describe('inChromeBand', () => {
     expect(inChromeBand({ x: sidebar.x + 40, y: sidebar.y - 2 }, arena)).toBe(true)
   })
 
+  it('recognizes the higher gear position without a fullscreen title bar', () => {
+    expect(inChromeBand({ x: 1368, y: 32 }, { ...arena, titleBarHeight: 0 })).toBe(true)
+    expect(inChromeBand({ x: 1368, y: 32 }, { ...arena, titleBarHeight: 28 })).toBe(false)
+  })
+
   it('ignores degenerate rects', () => {
     expect(inChromeBand({ x: 10, y: 10 }, { width: 0, height: 0 })).toBe(false)
   })
@@ -49,29 +54,40 @@ describe('StandAside', () => {
     expect(s.active).toBe(true)
   })
 
-  it('stays away until a click lands back on the draft screen', () => {
+  it('keeps Graphics controls above DraftFM until both settings pages close', () => {
     const s = new StandAside()
     s.noteClick(gear, arena, 0)
+    expect(s.noteClick({ x: 756, y: 440 }, arena, 100)).toBe(false)
+    expect(s.noteClick({ x: 850, y: 400 }, arena, 200)).toBe(false)
     expect(s.active).toBe(true)
-    // Further clicks inside Arena's own menus keep us away.
-    expect(s.noteClick(gear, arena, 5_000)).toBe(false)
+    expect(s.noteEscape()).toBe(false) // Graphics -> Options
     expect(s.active).toBe(true)
-    // A click back on the draft brings us straight back — no grace, no wait.
-    expect(s.noteClick(pack, arena, 30_000)).toBe(true)
+    expect(s.noteEscape()).toBe(true) // Options -> draft
     expect(s.active).toBe(false)
   })
 
-  it('comes back and holds off while the window is dragged or resized', () => {
+  it('keeps settings exclusive across fullscreen geometry changes', () => {
     const s = new StandAside()
     s.noteClick(gear, arena, 0)
+    expect(s.noteWindowMoved(1_000)).toBe(false)
     expect(s.active).toBe(true)
-    expect(s.noteWindowMoved(1_000)).toBe(true)
-    expect(s.active).toBe(false)
-    // Dragging starts with a click near the band: it must not latch mid-drag.
+    s.noteClick(pack, arena, 1_100)
+    expect(s.active).toBe(true)
+  })
+
+  it('suppresses title-bar dragging without preventing later gear clicks', () => {
+    const s = new StandAside()
+    s.noteWindowMoved(1_000)
     expect(s.noteClick(gear, arena, 1_100)).toBe(false)
-    expect(s.active).toBe(false)
-    // After the drag, clicking the menu bar works again.
     expect(s.noteClick(gear, arena, 1_000 + WINDOW_MOVE_GRACE_MS + 10)).toBe(true)
+  })
+
+  it('handles Escape opening and closing Options without a mouse click', () => {
+    const s = new StandAside()
+    expect(s.noteEscape()).toBe(true)
+    expect(s.active).toBe(true)
+    expect(s.noteEscape()).toBe(true)
+    expect(s.active).toBe(false)
   })
 
   it('release brings the overlay straight back', () => {

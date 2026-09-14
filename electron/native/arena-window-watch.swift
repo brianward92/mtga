@@ -5,7 +5,7 @@
 //   G x,y,width,height,frontmost   window frame in points (top-left origin);
 //                                  printed on change + a 1 Hz heartbeat
 //   G NOWIN                        Arena not running / no on-screen window
-//   F w,h,<base64 gray bytes>      one downscaled luminance frame (160 px wide,
+//   F w,h,<base64 gray bytes>      one downscaled luminance frame (640 px wide,
 //                                  aspect-correct height); only when the image
 //                                  changed vs the previously emitted frame
 //   C on|off                       frames flowing (capture enabled AND Screen
@@ -39,7 +39,7 @@ let arenaBundleIds: Set<String> = ["com.wizards.mtga"]
 let arenaNames: Set<String> = ["MTGA", "MTG Arena", "Magic: The Gathering Arena"]
 let selfBundleIds: Set<String> = ["com.mtga.draft-assistant", "com.mtga.tracker", "com.github.Electron"]
 let FRAME_W = 160
-let DEFAULT_RATE_HZ = 4.0
+let DEFAULT_RATE_HZ = 2.0
 let BURST_WINDOW_S = 1.5
 let out = FileHandle.standardOutput
 let outLock = NSLock()
@@ -59,7 +59,7 @@ func isArena(_ pid: pid_t) -> Bool {
 
 /// Arena's pids, derived from the window list rather than
 /// NSWorkspace.runningApplications: that array is KVO-driven and never refreshes
-/// in this process, which services dispatchMain() and not a main run loop, so an
+/// in this process, which services RunLoop.main.run() and not a main run loop, so an
 /// Arena launched after us would stay invisible forever. The window list and
 /// NSRunningApplication(processIdentifier:) are both read live.
 func arenaPids() -> Set<pid_t> {
@@ -97,7 +97,30 @@ func frontmostOk() -> Bool {
   return false
 }
 
-struct ArenaWin { let id: CGWindowID; let frame: CGRect }
+// Unity's borderless fullscreen removes the title-bar controls even on builds
+// where AXFullScreen itself stays false. Read the actual close button instead.
+var titleCache: (pid: pid_t, at: Date, height: Int)?
+func titleBarHeight(_ pid: pid_t) -> Int {
+  if let c = titleCache, c.pid == pid, Date().timeIntervalSince(c.at) < 0.25 { return c.height }
+  let height = readTitleBarHeight(pid)
+  titleCache = (pid, Date(), height)
+  return height
+}
+func readTitleBarHeight(_ pid: pid_t) -> Int {
+  let application = AXUIElementCreateApplication(pid)
+  var windows: CFTypeRef?
+  guard AXUIElementCopyAttributeValue(application, kAXWindowsAttribute as CFString, &windows) == .success,
+        let list = windows as? [AXUIElement], let window = list.first else { return 28 }
+  var fullscreen: CFTypeRef?
+  if AXUIElementCopyAttributeValue(window, "AXFullScreen" as CFString, &fullscreen) == .success,
+     (fullscreen as? Bool) == true { return 0 }
+  var button: CFTypeRef?
+  guard AXUIElementCopyAttributeValue(window, kAXCloseButtonAttribute as CFString, &button) == .success,
+        let button = button, CFGetTypeID(button) == AXUIElementGetTypeID() else { return 0 }
+  return 28
+}
+
+struct ArenaWin { let id: CGWindowID; let frame: CGRect; let pid: pid_t }
 
 func arenaWindow(pids: Set<pid_t>) -> ArenaWin? {
   guard !pids.isEmpty,
@@ -111,7 +134,7 @@ func arenaWindow(pids: Set<pid_t>) -> ArenaWin? {
     guard let wid = w[kCGWindowNumber as String] as? CGWindowID else { continue }
     let r = CGRect(x: b["X"] ?? 0, y: b["Y"] ?? 0, width: b["Width"] ?? 0, height: b["Height"] ?? 0)
     if r.width < 200 || r.height < 150 { continue }
-    if best == nil || r.width * r.height > best!.frame.width * best!.frame.height { best = ArenaWin(id: wid, frame: r) }
+    if best == nil || r.width * r.height > best!.frame.width * best!.frame.height { best = ArenaWin(id: wid, frame: r, pid: pid) }
   }
   return best
 }
@@ -151,12 +174,22 @@ let shared = Shared()
 // Stdin control channel
 // ---------------------------------------------------------------------------
 /// Hand activation back to Arena. AppKit calls run on the main queue, which
-/// dispatchMain() services.
+/// RunLoop.main.run() services.
 func activateArena() {
   let pids = arenaPids()
   DispatchQueue.main.async {
     for pid in pids { NSRunningApplication(processIdentifier: pid)?.activate(options: []) }
   }
+}
+
+// Send one move directly to Arena's empty left gutter before it loses focus.
+// postToPid does not move the physical cursor or deliver input to other apps.
+func dismissHover() {
+  guard let win = shared.snapshot().win else { return }
+  let point = CGPoint(x: win.frame.minX + win.frame.width * 0.04,
+                      y: win.frame.minY + win.frame.height * 0.5)
+  CGEvent(mouseEventSource: nil, mouseType: .mouseMoved,
+          mouseCursorPosition: point, mouseButton: .left)?.postToPid(win.pid)
 }
 
 DispatchQueue.global(qos: .utility).async {
@@ -165,6 +198,7 @@ DispatchQueue.global(qos: .utility).async {
     guard let command = parts.first else { continue }
     switch command {
     case "activate": activateArena()
+    case "dismiss-hover": dismissHover()
     case "capture": if parts.count >= 2 { shared.setCapture(parts[1] == "on") }
     case "rate": if parts.count >= 2, let hz = Double(parts[1]) { shared.setRate(hz) }
     default: break
@@ -284,28 +318,65 @@ final class Capture {
   }
 }
 let capture = Capture()
-Task { await capture.run() }
+Task.detached { await capture.run() }
 
 // ---------------------------------------------------------------------------
-// Geometry loop (~30Hz, prints on change + 1Hz heartbeat); also polls the
+// Geometry loop (~60Hz, prints on change + 1Hz heartbeat); also polls the
 // cursor so the capture loop can burst while the user is interacting.
 // ---------------------------------------------------------------------------
+// Listen without consuming input. Quick clicks must not disappear between geometry samples.
+let inputMask = (CGEventMask(1) << CGEventType.leftMouseDown.rawValue) |
+  (CGEventMask(1) << CGEventType.rightMouseDown.rawValue) |
+  (CGEventMask(1) << CGEventType.keyDown.rawValue)
+let inputTap = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap,
+  options: .listenOnly, eventsOfInterest: inputMask, callback: { _, type, event, _ in
+    if type == .keyDown {
+      if event.getIntegerValueField(.keyboardEventKeycode) == 53,
+         event.getIntegerValueField(.keyboardEventAutorepeat) == 0 { emit("K escape") }
+    } else if type == .leftMouseDown || type == .rightMouseDown {
+      let p = event.location
+      emit("M \(Int(p.x.rounded())),\(Int(p.y.rounded()))")
+    }
+    return Unmanaged.passUnretained(event)
+  }, userInfo: nil)
+if let inputTap, let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, inputTap, 0) {
+  CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
+  CGEvent.tapEnable(tap: inputTap, enable: true)
+}
+// If input monitoring is unavailable, sample only the cheap input state at
+// 125 Hz; window enumeration remains on the slower adaptive geometry loop.
+if inputTap == nil {
+  DispatchQueue.global(qos: .userInteractive).async {
+    var mouseDown = false
+    var escapeDown = false
+    while true {
+      let down = CGEventSource.buttonState(.combinedSessionState, button: .left) || CGEventSource.buttonState(.combinedSessionState, button: .right)
+      if down && !mouseDown, let p = CGEvent(source: nil)?.location { emit("M \(Int(p.x.rounded())),\(Int(p.y.rounded()))") }
+      let escape = CGEventSource.keyState(.combinedSessionState, key: 53)
+      if escape && !escapeDown { emit("K escape") }
+      mouseDown = down; escapeDown = escape
+      usleep(8_000)
+    }
+  }
+}
+
 DispatchQueue.global(qos: .userInteractive).async {
   var last = ""
   var pids = arenaPids()
   var tick = 0
+  var lastGeometryChange = Date.distantPast
+  var lastHeartbeat = Date.distantPast
   var lastCursor = CGPoint(x: -1, y: -1)
-  var mouseWasDown = false
   while true {
     tick += 1
-    if tick % 30 == 0 { pids = arenaPids() }
+    if tick % 60 == 0 { pids = arenaPids() }
     let win = arenaWindow(pids: pids)
     var line = "G NOWIN"
     var fm = false
     if let w = win {
       let r = w.frame
       fm = frontmostOk()
-      line = "G \(Int(r.origin.x.rounded())),\(Int(r.origin.y.rounded())),\(Int(r.width.rounded())),\(Int(r.height.rounded())),\(fm ? 1 : 0)"
+      line = "G \(Int(r.origin.x.rounded())),\(Int(r.origin.y.rounded())),\(Int(r.width.rounded())),\(Int(r.height.rounded())),\(fm ? 1 : 0),\(titleBarHeight(w.pid))"
     } else if pids.isEmpty {
       pids = arenaPids()
     }
@@ -316,21 +387,14 @@ DispatchQueue.global(qos: .userInteractive).async {
         if lastCursor.x >= 0 { shared.noteActivity() }
         lastCursor = p
       }
-      // Mouse-down edge, sampled rather than monitored: CGEventSource button
-      // state needs no Accessibility grant and no AppKit event loop, unlike
-      // NSEvent's global monitors. The overlay steps aside for Arena's menus
-      // on a real click, never on a hover.
-      let down = CGEventSource.buttonState(.combinedSessionState, button: .left) ||
-        CGEventSource.buttonState(.combinedSessionState, button: .right)
-      if down && !mouseWasDown {
-        emit("M \(Int(p.x.rounded())),\(Int(p.y.rounded()))")
-      }
-      mouseWasDown = down
     }
     // Print on change, plus a 1Hz heartbeat so a consumer that missed the
     // last line (or had it overwritten) converges.
-    if line != last || tick % 30 == 0 { last = line; emit(line) }
-    usleep(33_000)
+    if line != last { lastGeometryChange = Date() }
+    if line != last || Date().timeIntervalSince(lastHeartbeat) >= 1 {
+      last = line; lastHeartbeat = Date(); emit(line)
+    }
+    usleep(Date().timeIntervalSince(lastGeometryChange) < 0.3 ? 16_000 : 100_000)
   }
 }
-dispatchMain()
+RunLoop.main.run()

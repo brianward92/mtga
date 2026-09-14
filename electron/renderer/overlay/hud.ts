@@ -1,3 +1,4 @@
+import { keywordHelp } from './keyword-help'
 /**
  * Context HUD: a compact glass card in a corner. Draft: header (set·format,
  * P#P#, progress dots, model chip), the recommendation (or the hovered
@@ -83,6 +84,9 @@ export class Hud {
   private readonly doneBest: HTMLElement
   private readonly btnBadges: HTMLElement
   private readonly attrib: HTMLElement
+  private inspectorKey = ''
+  private inspectedCard: CardRow | null = null
+  private showingBack = false
   private artUrl: string | null = null
   private readonly failedArt = new Set<string>()
 
@@ -152,6 +156,13 @@ export class Hud {
       this.poolCounts[c] = $(root, 'poolCounts').querySelector<HTMLElement>(`.pc.${c}`)!
     }
 
+    $(root, 'inspectFlip').addEventListener('click', () => {
+      this.showingBack = !this.showingBack
+      this.artUrl = null
+      this.paintArt(this.inspectedCard)
+      setText($(root, 'inspectFlip'), this.showingBack ? 'Front face' : 'Other face')
+    })
+
     this.btnBadges.addEventListener('click', () => this.action('toggle-badges'))
     $(rail, 'btnCalibrate').addEventListener('click', () => this.action('calibrate-start'))
     $(root, 'btnDismiss').addEventListener('click', () => this.action('dismiss'))
@@ -202,6 +213,7 @@ export class Hud {
     // Body
     const active = state.phase === 'active'
     const complete = state.phase === 'complete'
+    $(this.root, 'cardInspector').hidden = !active
     this.rec.hidden = !active
     this.runners.hidden = !active
     this.done.hidden = !complete
@@ -263,6 +275,7 @@ export class Hud {
     }
 
     const conviction = state.scoring ? null : packConviction(state.cards)
+    this.paintInspector(card)
     this.paintArt(card)
     this.paintGrade(card.grade, card.setGrade)
     setText(this.recName, card.name)
@@ -286,6 +299,44 @@ export class Hud {
     }
 
     this.paintRanked(store)
+  }
+
+  private paintInspector(card: CardRow): void {
+    const key = JSON.stringify([card.grpId, card.oracleText, card.faces])
+    if (key === this.inspectorKey) return
+    this.inspectorKey = key
+    this.inspectedCard = card
+    this.showingBack = false
+    const faces = card.faces?.length ? card.faces : [{ name: card.name, type: card.type, manaCost: card.manaCost, oracleText: card.oracleText ?? '' }]
+    const rules = $(this.root, 'inspectRules')
+    rules.replaceChildren()
+    for (const face of faces) {
+      const heading = document.createElement('div')
+      heading.className = 'inspector-face-name'
+      heading.textContent = face.name
+      const text = document.createElement('p')
+      text.textContent = face.oracleText || 'Rules text is not available for this card.'
+      rules.append(heading, text)
+    }
+    const reminders = keywordHelp(faces.map(face => face.oracleText).join('\n'))
+    if (reminders.length) {
+      const details = document.createElement('details')
+      const summary = document.createElement('summary')
+      summary.textContent = 'Keyword help'
+      details.append(summary)
+      for (const [word, explanation] of reminders) {
+        const item = document.createElement('p')
+        const label = document.createElement('strong')
+        label.textContent = word + ': '
+        item.append(label, document.createTextNode(explanation))
+        details.append(item)
+      }
+      rules.append(details)
+    }
+    rules.scrollTop = 0
+    const flip = $(this.root, 'inspectFlip')
+    flip.hidden = card.hasBackFace !== true || !card.scryfallId
+    setText(flip, 'Other face')
   }
 
   /**
@@ -321,7 +372,8 @@ export class Hud {
 
   /** Swaps the lazy recommendation art without allowing failed loads to reflow the hero. */
   private paintArt(card: CardRow | null): void {
-    const url = scryfallImageUrl(card?.scryfallId)
+    const front = scryfallImageUrl(card?.scryfallId)
+    const url = this.showingBack ? front?.replace('/front/', '/back/') ?? null : front
     if (url === this.artUrl) return
     this.artUrl = url
     this.recImage.classList.remove('loaded')

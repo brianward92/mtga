@@ -75,7 +75,7 @@ describe('set bundle', () => {
       manaCost: '{1}{B}{B}',
       manaValue: 3,
       type: 'Instant',
-      scryfallId: 'scry-murder'
+      scryfallId: 'scry-murder', oracleText: '', faces: [], hasBackFace: false
     })
     expect(bundle.cards.get(67900)?.name).toBe('Murder')
     expect(bundle.cards.get(92176)).toMatchObject({ colors: 'B', colorIdentity: 'WB', scryfallId: 'scry-funeral-room' })

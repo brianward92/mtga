@@ -18,14 +18,14 @@ describe('hover pop-out prediction', () => {
     expect(hoveredCardIndex({ x: 300, y: 300 }, cards)).toBe(-1)
   })
 
-  it('places the preview to the right, ~2.1x, vertically centred', () => {
+  it('places the preview to the right, ~2.6x, vertically centred', () => {
     const [preview] = predictPopout(card, view)
     expect(preview.x).toBeGreaterThan(card.x + card.width)
-    expect(preview.width).toBeCloseTo(card.width * 2.1, 5)
+    expect(preview.width).toBeCloseTo(card.width * 2.6, 5)
     expect(preview.y + preview.height / 2).toBeCloseTo(card.y + card.height / 2, 5)
-    // Measured screen: preview spanned roughly x 1020..1330 pt
-    expect(preview.x).toBeGreaterThan(1000)
-    expect(preview.x + preview.width).toBeLessThan(1360)
+    // Measured screen: preview spanned roughly x 1000..1390 pt
+    expect(preview.x).toBeGreaterThan(995)
+    expect(preview.x + preview.width).toBeLessThan(1390)
   })
 
   it('flips left when the preview would run off the right edge', () => {
@@ -47,15 +47,15 @@ describe('hover pop-out prediction', () => {
     for (const index of [4, 9]) {
       const rightmost = grid[index]
       const [rightPreview] = predictPopout(rightmost, view, {
-        flipLeft: isRightmostGridColumn(index, DEFAULT_CALIBRATION.maxCols)
+        flipLeft: false
       })
-      expect(rightPreview.x + rightPreview.width).toBeLessThan(rightmost.x)
+      expect(rightPreview.x).toBeGreaterThan(rightmost.x + rightmost.width)
     }
 
     const [bottomPreview] = predictPopout(bottomRow, view, {
       flipLeft: isRightmostGridColumn(10, DEFAULT_CALIBRATION.maxCols)
     })
-    expect(bottomPreview.y + bottomPreview.height).toBeCloseTo(view.height, 5)
+    expect(bottomPreview.y + bottomPreview.height).toBeCloseTo(view.height * 0.91, 5)
     expect(bottomPreview.y).toBeLessThan(
       bottomRow.y + bottomRow.height / 2 - bottomPreview.height / 2
     )
@@ -63,9 +63,17 @@ describe('hover pop-out prediction', () => {
 
   it('clamps vertically inside the window', () => {
     const [top] = predictPopout({ ...card, y: 0 }, view)
-    expect(top.y).toBe(0)
+    expect(top.y).toBeCloseTo(view.height * 0.098, 5)
     const [bottom] = predictPopout({ ...card, y: 900 }, view)
     expect(bottom.y + bottom.height).toBeLessThanOrEqual(view.height)
+  })
+
+  it('puts a bottom-row helper on the left when the right gutter is too narrow', () => {
+    const full = { width: 1512, height: 949, titleBarHeight: 0 }
+    const cell = packLayout(full, 14, DEFAULT_CALIBRATION).cards[12].card
+    const [preview, helper] = predictPopout(cell, full)
+    expect(preview.x).toBeGreaterThan(cell.x)
+    expect(helper.x + helper.width).toBeCloseTo(preview.x, 5)
   })
 
   it('keeps the portrait prediction unchanged when split mode is omitted or false', () => {
@@ -78,13 +86,12 @@ describe('hover pop-out prediction', () => {
 
     expect(preview).toEqual({
       x: leftCard.x + leftCard.width + leftCard.width * 0.5,
-      y: leftCard.y - leftCard.height * 0.35,
+      y: Math.min(view.height * 0.91 - leftCard.height * 2.35, leftCard.y - leftCard.height * 0.35),
       width: leftCard.width * 5,
       height: leftCard.height * 2.35
     })
-    expect(rulesBox.x).toBe(leftCard.x)
-    expect(rulesBox.x + rulesBox.width).toBe(preview.x + preview.width)
-    expect(rulesBox.y).toBeLessThan(preview.y)
+    expect(rulesBox.x + rulesBox.width).toBe(preview.x)
+    expect(rulesBox.y).toBe(preview.y)
   })
 
   it('flips a landscape split preview left when it would overflow', () => {

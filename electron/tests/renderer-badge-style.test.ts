@@ -114,8 +114,8 @@ describe('badge layer style contract', () => {
     expect(decl('.card-frame.tier-top::before', 'z-index')).toBe('-1')
   })
 
-  it('pulses the top pick over a value that survives reduced motion', () => {
-    expect(decl('.card-frame.tier-top::before', 'animation')).toBe('frame-pulse 2s ease-in-out infinite')
+  it('keeps top-pick emphasis static to avoid continuous overlay repainting', () => {
+    expect(decl('.card-frame.tier-top::before', 'animation')).toBeNull()
     expect(CSS).toMatch(/@keyframes\s+frame-pulse\b/)
     // The global reduced-motion guard kills the animation, so the held
     // opacity must already look finished on its own.
@@ -163,7 +163,7 @@ describe('badge layer style contract', () => {
     for (const selector of ['.badge-chip', '.b-rank', '.b-label']) {
       expect(decl(selector, 'border-radius'), `${selector} radius`).toBe('var(--pill)')
       expect(decl(selector, 'background'), `${selector} surface`).toBe('var(--badge-glass)')
-      expect(decl(selector, 'backdrop-filter'), `${selector} blur`).toBe('var(--badge-blur)')
+      expect(decl(selector, 'backdrop-filter'), `${selector} blur`).toBe('none')
     }
     // The band label reads as a badge, not a sticker.
     expect(decl('.b-label', 'text-transform')).toBe('uppercase')
