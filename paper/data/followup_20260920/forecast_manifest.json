@@ -1,0 +1,79 @@
+{
+  "set": "FRA",
+  "cards_sha256": "b6ec996526299ac0b4ede83b9a28460b5e965102e81d176ba9a3616d9ea487aa",
+  "feature_manifest_content_hash": "793b9db78f8049f6e3f28fdba0c9f73ab36251c78c3da212fc00e97c9d3a100f",
+  "checkpoint_sha256": "9442f1deb45bbe697270b016b73676fc38c31597756014728e3daa729afc7fc5",
+  "features_sha256": "ed2f0fe6d44217a8e619538d6c76d43dc3dc860a0fa2f2eaf5b54406acca5dbf",
+  "card_table_sha256": "823797aff0675882e3f960b482485212c4148bc29af5fd05dee646df6024385e",
+  "n_records": 471,
+  "n_unique": 295,
+  "n_by_set": {
+    "fra": 285,
+    "spg": 10
+  },
+  "unmatched_keywords": [
+    "Replicate"
+  ],
+  "canonical_printing_rule": "main set first, then lowest numeric collector number, then id",
+  "generated_at_utc": "2026-09-20T16:47:20.540572+00:00",
+  "status": "local candidate; not publicly sealed",
+  "conditioning": {
+    "wr_id": 28,
+    "games_id": 4,
+    "format_id": 0,
+    "pack_number": 0,
+    "pick_number": 0,
+    "pool": "empty",
+    "picks_per_pack": 14,
+    "set_scalars": [
+      0.7375,
+      0,
+      1,
+      0
+    ]
+  },
+  "ladder_percent": {
+    "A+": 2.0,
+    "A": 3.0,
+    "A-": 5.0,
+    "B+": 8.0,
+    "B": 12.0,
+    "B-": 12.0,
+    "C+": 13.0,
+    "C": 15.0,
+    "C-": 12.0,
+    "D+": 8.0,
+    "D": 5.0,
+    "D-": 3.0,
+    "F": 2.0
+  },
+  "band_counts": {
+    "A+": 6,
+    "A": 9,
+    "A-": 15,
+    "B+": 24,
+    "B": 35,
+    "B-": 35,
+    "C+": 38,
+    "C": 44,
+    "C-": 35,
+    "D+": 24,
+    "D": 15,
+    "D-": 9,
+    "F": 6
+  },
+  "letter_scope": "all unique names including display-only basics; presentation only",
+  "export_sha256": {
+    "card_encoder.onnx": "4bad475fa45f6533993812bc632362b7ca44debfc11721c4f1581c1cb829c759",
+    "card_encoder.onnx.data": "2e2c593c6a6260901bb223ff6aa4ec67d5b164c02eda698c4640d7012146815e",
+    "constants.npz": "9a8dc5403a0321372ddc91e32fef65a6e452a1b0469a6756dfa2ca8a2df7691a",
+    "scorer.onnx": "a1c4c72af0607bda289bb9498c077695517f2becc2090315a9ba96a7862bf983",
+    "scorer.onnx.data": "a302d3b4723a3eb56cfcdbb4129e8a98e9d0c8db224095471b1be825e7bac32a"
+  },
+  "scorer_sha256": "c133ae5ffa9c32df01aaef868f198ed312ba1c2085ced5d218e2bb9c05cb0456",
+  "reference_scorer_sha256": "abdce5f686777867df6d946e94b8809b5015065d2322d147985f013d50fc52d4",
+  "outputs": {
+    "fra_p1p1_forecast.csv": "116fc528acd83843e283daa73492fa01041f167daebe92103d9f9a52617a348e",
+    "fra_p1p1_forecast.parquet": "b1ae3e47f9617088d0da31c2d3b5a768760efc21091cdc320a1df836b235da3e"
+  }
+}

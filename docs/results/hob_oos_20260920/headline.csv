@@ -1,0 +1,10 @@
+source,expert,all_players,label
+hob_fitted,0.6815031572462652,0.6201299491397562,"HOB-trained choice model, out-of-fold"
+limited_level_ups,0.543349431255638,0.4913329965054103,Limited Level-Ups (Marc Anderson)
+draftfm,0.47343292776836593,0.5061445988367849,"DraftFM, sealed prerelease"
+nicolai_bola,0.46953550710288733,0.45779295048513646,NicolaiBolas
+nizzahon,0.4667082921356755,0.4704321593201694,Nizzahon
+cardgamebase,0.45555965031939155,0.4345485308392617,Card Game Base (Anže Mlakar)
+draftsim_pickorder,0.45324195287232405,0.4535253368375798,Draftsim app pick order
+draftsim_review,0.43113132824360295,0.427491676835239,Draftsim review (Andrew Quinn)
+random,0.07415001447035943,0.07419608109506631,Uniform random

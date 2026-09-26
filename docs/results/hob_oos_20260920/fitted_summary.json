@@ -1,0 +1,297 @@
+{
+  "generated_at_utc": "2026-09-20T23:22:58.304208+00:00",
+  "software": {
+    "numpy": "2.5.3",
+    "pandas": "3.0.5",
+    "scipy": "1.17.1",
+    "pyarrow": "25.0.0"
+  },
+  "kind": "post-release expert-trained card-identity conditional logit",
+  "inputs": {
+    "forecast": {
+      "path": "hob_p1p1_forecast.csv",
+      "sha256": "a16c34767aa382e7703f480207f8480484e29ad22bbab2142aa2195e9b9a94a9"
+    },
+    "grades": {
+      "path": "creator_grades_hob.csv",
+      "sha256": "2e67fa9276b0bf3cb87455c8916df1c56424c7c6ebd6ec83e66f2ba8d66bc40b"
+    },
+    "drafts": {
+      "path": "draft_data_public.HOB.PremierDraft.csv.gz",
+      "sha256": "e4388244f7b0678f45b6c665126e54d9ec3e2c465d11be5b20a8faefd3e4015f",
+      "download": {
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.HOB.PremierDraft.csv.gz",
+        "retrieved_at_utc": "2026-09-19T22:56:02.268256+00:00",
+        "sha256": "e4388244f7b0678f45b6c665126e54d9ec3e2c465d11be5b20a8faefd3e4015f",
+        "bytes": 56648372,
+        "etag": "\"c5063c2d34ece6f3495c323fc7984b29-7\"",
+        "last_modified": "Thu, 03 Sep 2026 11:52:05 GMT"
+      }
+    },
+    "protocol": {
+      "path": "hob_postrelease_benchmark_protocol_20260920.md",
+      "sha256": "d3503cc5ceab046872bedad389bae69cb1f21a47d6c73ba33add80b766fa0764"
+    }
+  },
+  "script_sha256": "658ae07f7bd267c125334d283b36920114a0762286c080da37c7eb0e7206d48d",
+  "evaluation_script_sha256": "2c4b6c06a5e8eb4ff8f1e561314789414b8ba3c9644a3332c1eede4eb0c5be8a",
+  "recipe": {
+    "folds": 5,
+    "assignment": "crc32(draft_id) % 5",
+    "ridge": 1.0,
+    "objective": "sum NLL + 0.5 * sum(weights**2)",
+    "fit_population": "expert P1P1",
+    "initial_weights": 0,
+    "optimizer": "L-BFGS-B",
+    "maxiter": 500,
+    "ftol": 1e-12,
+    "gtol": 1e-06
+  },
+  "raw_pick_rows": 1833289,
+  "p1p1_drafts": 43650,
+  "n_parameters": 188,
+  "folds": [
+    {
+      "fold": 0,
+      "training_expert_drafts": 5548,
+      "heldout_drafts": 8826,
+      "heldout_expert_drafts": 1354,
+      "training_ids_sha256": "da7ae1d30031ef1594f82b98007832b4c87142e795e2733c8bb77cb9f92dbeb9",
+      "heldout_ids_sha256": "6e1caea83b329287937e7bddb1da00c8dc722adbf9b0e2cfaeb287ef88b36002",
+      "training_agreement": 0.6926820475847152,
+      "iterations": 42,
+      "objective": 5581.208815370348,
+      "gradient_max_abs": 0.000443617343664382,
+      "converged": true,
+      "optimizer_message": "CONVERGENCE: RELATIVE REDUCTION OF F <= FACTR*EPSMCH"
+    },
+    {
+      "fold": 1,
+      "training_expert_drafts": 5494,
+      "heldout_drafts": 8674,
+      "heldout_expert_drafts": 1408,
+      "training_ids_sha256": "aab7e4fb230d12a273224a6e59e7676898be7680b28049c6d5fe85a297688af9",
+      "heldout_ids_sha256": "1a3f5a0aa1f7e81da4eaeda0b6985b79d1a7230e901cc9aaad517e7d8612cf6f",
+      "training_agreement": 0.6836548962504551,
+      "iterations": 43,
+      "objective": 5646.520762245823,
+      "gradient_max_abs": 0.0004622026789726785,
+      "converged": true,
+      "optimizer_message": "CONVERGENCE: RELATIVE REDUCTION OF F <= FACTR*EPSMCH"
+    },
+    {
+      "fold": 2,
+      "training_expert_drafts": 5546,
+      "heldout_drafts": 8620,
+      "heldout_expert_drafts": 1356,
+      "training_ids_sha256": "3190303c9ade9a50f04aaf3f486210e4417958b0a1a6c11076f4004bda3b62dc",
+      "heldout_ids_sha256": "c205e762766ef0df081f807ec957002d7be814ac4061de88767f97b92f613804",
+      "training_agreement": 0.6869816083663902,
+      "iterations": 45,
+      "objective": 5674.427118440672,
+      "gradient_max_abs": 0.0007198798054770528,
+      "converged": true,
+      "optimizer_message": "CONVERGENCE: RELATIVE REDUCTION OF F <= FACTR*EPSMCH"
+    },
+    {
+      "fold": 3,
+      "training_expert_drafts": 5516,
+      "heldout_drafts": 8805,
+      "heldout_expert_drafts": 1386,
+      "training_ids_sha256": "5f6d2bfdb0e7cfd12530b4032eb16a2a3b903b6e0882b8130aa6fd79630b1a36",
+      "heldout_ids_sha256": "2ef628e1db620a4ff2a20f746597defbb728b35b268b27d1cd75322f8747bc9c",
+      "training_agreement": 0.6874546773023931,
+      "iterations": 44,
+      "objective": 5565.331581135654,
+      "gradient_max_abs": 0.0007078691626980493,
+      "converged": true,
+      "optimizer_message": "CONVERGENCE: RELATIVE REDUCTION OF F <= FACTR*EPSMCH"
+    },
+    {
+      "fold": 4,
+      "training_expert_drafts": 5504,
+      "heldout_drafts": 8725,
+      "heldout_expert_drafts": 1398,
+      "training_ids_sha256": "22f23efb711ac33498101b000a1b398a63bbb394d5e6f33eff11cc046a8642d9",
+      "heldout_ids_sha256": "9130b26c8c9218ec7aa5ec15ac8b168fab2e9ae1ec3d76823ebc53b371639178",
+      "training_agreement": 0.6858648255813954,
+      "iterations": 43,
+      "objective": 5669.374972722183,
+      "gradient_max_abs": 0.00014106491517185127,
+      "converged": true,
+      "optimizer_message": "CONVERGENCE: RELATIVE REDUCTION OF F <= FACTR*EPSMCH"
+    }
+  ],
+  "populations": {
+    "all": {
+      "shared_drafts": 41093,
+      "hob_fitted_accuracy": 0.6201299491397562,
+      "random_accuracy": 0.07419608109506631,
+      "hob_fitted_inclusive_accuracy": 0.6201299491397562
+    },
+    "expert": {
+      "shared_drafts": 6493,
+      "hob_fitted_accuracy": 0.6815031572462652,
+      "random_accuracy": 0.07415001447035943,
+      "hob_fitted_inclusive_accuracy": 0.6815031572462652
+    }
+  },
+  "comparisons": [
+    {
+      "population": "all",
+      "source": "draftfm",
+      "shared_drafts": 41093,
+      "hob_fitted_accuracy": 0.6201299491397562,
+      "source_accuracy": 0.5061445988367849,
+      "hob_fitted_minus_source": 0.11398535030297131,
+      "delta_ci_low": 0.10843635169006886,
+      "delta_ci_high": 0.11921738495607524
+    },
+    {
+      "population": "all",
+      "source": "nizzahon",
+      "shared_drafts": 41093,
+      "hob_fitted_accuracy": 0.6201299491397562,
+      "source_accuracy": 0.4704321593201694,
+      "hob_fitted_minus_source": 0.14969778981958673,
+      "delta_ci_low": 0.14464696774191396,
+      "delta_ci_high": 0.15459639816666867
+    },
+    {
+      "population": "all",
+      "source": "draftsim_review",
+      "shared_drafts": 41093,
+      "hob_fitted_accuracy": 0.6201299491397562,
+      "source_accuracy": 0.427491676835239,
+      "hob_fitted_minus_source": 0.1926382723045172,
+      "delta_ci_low": 0.18753208628782023,
+      "delta_ci_high": 0.1975377873997773
+    },
+    {
+      "population": "all",
+      "source": "draftsim_pickorder",
+      "shared_drafts": 41093,
+      "hob_fitted_accuracy": 0.6201299491397562,
+      "source_accuracy": 0.4535253368375798,
+      "hob_fitted_minus_source": 0.16660461230217638,
+      "delta_ci_low": 0.161404203067838,
+      "delta_ci_high": 0.1718631518750152
+    },
+    {
+      "population": "all",
+      "source": "limited_level_ups",
+      "shared_drafts": 41093,
+      "hob_fitted_accuracy": 0.6201299491397562,
+      "source_accuracy": 0.4913329965054103,
+      "hob_fitted_minus_source": 0.12879695263434585,
+      "delta_ci_low": 0.12474145318458826,
+      "delta_ci_high": 0.13283186193222574
+    },
+    {
+      "population": "all",
+      "source": "cardgamebase",
+      "shared_drafts": 41093,
+      "hob_fitted_accuracy": 0.6201299491397562,
+      "source_accuracy": 0.4345485308392617,
+      "hob_fitted_minus_source": 0.18558141830049454,
+      "delta_ci_low": 0.1809216038803195,
+      "delta_ci_high": 0.1901788282984898
+    },
+    {
+      "population": "all",
+      "source": "nicolai_bola",
+      "shared_drafts": 41093,
+      "hob_fitted_accuracy": 0.6201299491397562,
+      "source_accuracy": 0.45779295048513646,
+      "hob_fitted_minus_source": 0.16233699865461965,
+      "delta_ci_low": 0.15760080719923333,
+      "delta_ci_high": 0.16690538983583114
+    },
+    {
+      "population": "expert",
+      "source": "draftfm",
+      "shared_drafts": 6493,
+      "hob_fitted_accuracy": 0.6815031572462652,
+      "source_accuracy": 0.47343292776836593,
+      "hob_fitted_minus_source": 0.20807022947789927,
+      "delta_ci_low": 0.19467118435237948,
+      "delta_ci_high": 0.22085322655167103
+    },
+    {
+      "population": "expert",
+      "source": "nizzahon",
+      "shared_drafts": 6493,
+      "hob_fitted_accuracy": 0.6815031572462652,
+      "source_accuracy": 0.4667082921356755,
+      "hob_fitted_minus_source": 0.21479486511058973,
+      "delta_ci_low": 0.2022661391199625,
+      "delta_ci_high": 0.2267589774780211
+    },
+    {
+      "population": "expert",
+      "source": "draftsim_review",
+      "shared_drafts": 6493,
+      "hob_fitted_accuracy": 0.6815031572462652,
+      "source_accuracy": 0.43113132824360295,
+      "hob_fitted_minus_source": 0.25037182900266225,
+      "delta_ci_low": 0.23798468863904718,
+      "delta_ci_high": 0.2625960924952146
+    },
+    {
+      "population": "expert",
+      "source": "draftsim_pickorder",
+      "shared_drafts": 6493,
+      "hob_fitted_accuracy": 0.6815031572462652,
+      "source_accuracy": 0.45324195287232405,
+      "hob_fitted_minus_source": 0.22826120437394118,
+      "delta_ci_low": 0.21504793623902663,
+      "delta_ci_high": 0.2409276656912573
+    },
+    {
+      "population": "expert",
+      "source": "limited_level_ups",
+      "shared_drafts": 6493,
+      "hob_fitted_accuracy": 0.6815031572462652,
+      "source_accuracy": 0.543349431255638,
+      "hob_fitted_minus_source": 0.13815372599062728,
+      "delta_ci_low": 0.12715933551150324,
+      "delta_ci_high": 0.14887566646865122
+    },
+    {
+      "population": "expert",
+      "source": "cardgamebase",
+      "shared_drafts": 6493,
+      "hob_fitted_accuracy": 0.6815031572462652,
+      "source_accuracy": 0.45555965031939155,
+      "hob_fitted_minus_source": 0.22594350692687365,
+      "delta_ci_low": 0.21372912128812718,
+      "delta_ci_high": 0.23778864418091278
+    },
+    {
+      "population": "expert",
+      "source": "nicolai_bola",
+      "shared_drafts": 6493,
+      "hob_fitted_accuracy": 0.6815031572462652,
+      "source_accuracy": 0.46953550710288733,
+      "hob_fitted_minus_source": 0.21196765014337787,
+      "delta_ci_low": 0.2003463986857642,
+      "delta_ci_high": 0.22338634830183424
+    }
+  ],
+  "bootstrap": {
+    "replicates": 2000,
+    "seed": 17,
+    "unit": "draft",
+    "includes_training_variance": false
+  },
+  "attribution": "Data from 17Lands.com (CC BY 4.0)",
+  "outputs": {
+    "comparisons.csv": "837a8ac11de0f64f061b792447532d5113d9a21767c7b113bd19354390d12c29",
+    "fold_0_weights.csv": "f6f8dcbdf5ca251b5d0df06cd18384ddd52b24979bf2b901eb556816bb766f07",
+    "fold_1_weights.csv": "b6beb3656323f59f791c8ece25b4c2aceb4079701571e60605a7a006b6d48dc9",
+    "fold_2_weights.csv": "d3e657f5dbcd9f8718cabee997641977411b8147525fb7fb173bbf3645b8ddf0",
+    "fold_3_weights.csv": "0d9c20d1d410f7ed4456ffead69322f57cb5a693069e8ec44f327b13892b5e6e",
+    "fold_4_weights.csv": "63e15965b735e5218cff8a9e09cc0e58432eaefa85a41053c22ff783cb3a1bb4",
+    "out_of_fold_predictions.parquet": "4b441ba8a35bdc4b54b6f7334a5746edfa89b1aee7c9c441b0e1d4a3e1777cb0"
+  }
+}

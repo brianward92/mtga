@@ -1,0 +1,59 @@
+{
+  "source_snapshot": "data/forecast_20260919/inputs/fra_cards.json",
+  "images": [
+    {
+      "file": "garruk_veiled_butcher.jpg",
+      "name": "Garruk, Veiled Butcher",
+      "set": "FRA",
+      "collector_number": "229",
+      "scryfall_id": "d48bfb8a-d135-45f3-be99-4694b4b9ab93",
+      "image_url": "https://cards.scryfall.io/large/front/d/4/d48bfb8a-d135-45f3-be99-4694b4b9ab93.jpg?1788329269",
+      "sha256": "e31c4f88d05ff9cb9e277b2df6e3323e3836a90b0be3052ed591352f200dc602"
+    },
+    {
+      "file": "ajani_unrelenting.jpg",
+      "name": "Ajani Unrelenting",
+      "set": "FRA",
+      "collector_number": "242",
+      "scryfall_id": "bc3c096f-7f6c-474c-a2c8-75d3e6ddd6f5",
+      "image_url": "https://cards.scryfall.io/large/front/b/c/bc3c096f-7f6c-474c-a2c8-75d3e6ddd6f5.jpg?1788329317",
+      "sha256": "4ad0566a6879e4569ecbe5be066af7d21de03e82d1b2e86ee573485dabd2acc7"
+    },
+    {
+      "file": "garruk_curse_breaker.jpg",
+      "name": "Garruk, Curse Breaker",
+      "set": "FRA",
+      "collector_number": "259",
+      "scryfall_id": "90ca5812-ceb5-46bd-b049-aed7ff10e6af",
+      "image_url": "https://cards.scryfall.io/large/front/9/0/90ca5812-ceb5-46bd-b049-aed7ff10e6af.jpg?1788329370",
+      "sha256": "fbcb5e6c20429a56923a7e7f71bd8e678a18c859a42cc7c0854d1d5275a226de"
+    },
+    {
+      "file": "ajani_resolute.jpg",
+      "name": "Ajani Resolute",
+      "set": "FRA",
+      "collector_number": "195",
+      "scryfall_id": "a5e1a7dd-8c49-4435-935c-bcc78704082b",
+      "image_url": "https://cards.scryfall.io/large/front/a/5/a5e1a7dd-8c49-4435-935c-bcc78704082b.jpg?1788329189",
+      "sha256": "ff1734e25e84bebd7b564605df557e21f5cdf51ee3023b1c6d87a36ff8f55d68"
+    },
+    {
+      "file": "sphinx_of_false_conclusions.jpg",
+      "name": "Sphinx of False Conclusions",
+      "set": "FRA",
+      "collector_number": "40",
+      "scryfall_id": "08ffbd51-2bd3-4262-8809-09576ce2b6f5",
+      "image_url": "https://cards.scryfall.io/large/front/0/8/08ffbd51-2bd3-4262-8809-09576ce2b6f5.jpg?1789385594",
+      "sha256": "2b1176714e8d945e2e325428a69a3c3cecd3ab0adad39fcd861537aba8c86711"
+    },
+    {
+      "file": "terminal_criticism.jpg",
+      "name": "Terminal Criticism",
+      "set": "FRA",
+      "collector_number": "68",
+      "scryfall_id": "7ebd7e38-b27c-4c6e-aaea-e8ee5ba5e5df",
+      "image_url": "https://cards.scryfall.io/large/front/7/e/7ebd7e38-b27c-4c6e-aaea-e8ee5ba5e5df.jpg?1789470810",
+      "sha256": "a7cad1e7add5d78eadb291e13da43b03cb970b3c28a7a8955b41914938665ff0"
+    }
+  ]
+}

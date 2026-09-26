@@ -1,0 +1,6 @@
+# HOB forecast evaluation, fitted benchmark, and report generation.
+numpy
+pandas
+scipy
+pyarrow
+matplotlib

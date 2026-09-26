@@ -1,0 +1,110 @@
+uncommon_rank,overall_rank,name,set,collector_number,rarity,colors,mana_cost,type_line,display_only_basic,n_printings,score,percentile,letter
+1,49,Terminal Criticism,FRA,68,uncommon,B,{1}{B},Instant,False,2,1.759434,83.6735,B+
+2,54,Twisted Fates,FRA,158,uncommon,BW,{2}{W}{W}{B},Sorcery,False,1,1.504842,81.9728,B+
+3,55,"Fblthp, Knows the Way",FRA,258,uncommon,G,{X}{G}{G},Legendary Creature — Homunculus Scout,False,2,1.497832,81.6327,B
+4,57,"Jiang Yanggu, Never Alone",FRA,261,uncommon,G,{3}{G},Legendary Creature — Human Druid,False,1,1.354006,80.9524,B
+5,61,Multiply by Zero,FRA,58,uncommon,B,{1}{B},Instant,False,1,1.267882,79.5918,B
+6,65,Stingerquill Charm,FRA,150,uncommon,BR,{B}{R},Instant,False,2,1.119259,78.2313,B
+7,66,Craftwork Crusher,FRA,127,uncommon,GR,{3}{R}{R}{G}{G},Artifact Creature — Boar Construct,False,1,1.093993,77.8912,B
+8,67,Essence Burn,FRA,82,uncommon,R,{1}{R},Instant,False,2,1.038477,77.551,B
+9,69,"Pia, Aether Ascetic",FRA,264,uncommon,G,{2}{G},Legendary Creature — Human Druid,False,1,0.965541,76.8707,B
+10,71,Warrior's Blades,FRA,163,uncommon,RW,{2}{R}{W},Artifact — Equipment,False,1,0.918848,76.1905,B
+11,72,Prudent Fateseer // Peer Review,FRA,146,uncommon,UW,{1}{W/U}{W/U} // {2}{W/U},Creature — Dwarf Wizard // Sorcery,False,1,0.913544,75.8503,B
+12,73,"Danitha, Sword of Hope",FRA,196,uncommon,W,{2}{W},Legendary Creature — Human Knight,False,1,0.90453,75.5102,B
+13,75,Recursive Recruitment,FRA,147,uncommon,BU,{2}{U}{B},Sorcery,False,1,0.824177,74.8299,B
+14,76,Violent Echoes,FRA,95,uncommon,R,{2}{R}{R},Instant,False,1,0.780874,74.4898,B
+15,77,"Mabel, Valley Hero",FRA,274,uncommon,RW,{1}{R}{W},Legendary Creature — Mouse Soldier,False,1,0.710241,74.1497,B
+16,78,Koth of the Homestead,FRA,199,uncommon,W,{2}{W},Legendary Creature — Human Citizen,False,1,0.676439,73.8095,B
+17,79,"Ruric Thar, Magecrusher",FRA,265,uncommon,G,{5}{G}{G},Legendary Creature — Ogre Warrior,False,1,0.659671,73.4694,B
+18,80,"Pia, Determined Rebuilder",FRA,250,uncommon,R,{2}{R},Legendary Creature — Human Artificer,False,1,0.653127,73.1293,B
+19,83,Way of the Warlord,FRA,255,uncommon,R,{2}{R},Legendary Enchantment,False,1,0.563596,72.1088,B
+20,84,"Yuriko, Hope from the Shadows",FRA,226,uncommon,U,{U},Legendary Creature — Human Ninja,False,1,0.49852,71.7687,B
+21,86,Command the Stage,FRA,77,uncommon,R,{2}{R},Sorcery,False,1,0.449646,71.0884,B
+22,87,"Yoshimaru, Scrappy Stray",FRA,269,uncommon,G,{1}{G},Legendary Creature — Dog,False,1,0.382916,70.7483,B
+23,89,Refute Destiny,FRA,18,uncommon,W,{1}{W},Sorcery,False,2,0.338615,70.068,B
+24,90,Way of the Wildspeaker,FRA,268,uncommon,G,{4}{G},Legendary Enchantment,False,1,0.330652,69.7279,B-
+25,92,Bloombrute,FRA,124,uncommon,GW,{2}{G}{W},Creature — Plant Elemental,False,1,0.260077,69.0476,B-
+26,95,"Hapatra, the Desert Fang",FRA,271,uncommon,BG,{2}{B}{B}{G},Legendary Creature — Human Cleric,False,1,0.190757,68.0272,B-
+27,96,"Tetsuko Umezawa, Fugitive",FRA,221,uncommon,U,{1}{U},Legendary Creature — Human Rogue,False,1,0.186183,67.6871,B-
+28,97,Kiora of Fire and Ashes,FRA,247,uncommon,R,{4}{R}{R},Legendary Creature — Merfolk Noble,False,1,0.150517,67.3469,B-
+29,99,"Proft, Consulting Detective",FRA,218,uncommon,U,{1}{U},Legendary Creature — Human Detective,False,1,0.108559,66.6667,B-
+30,100,"Teyo, Diamondblade Mage",FRA,236,uncommon,B,{3}{B},Legendary Creature — Human Warlock,False,2,0.076191,66.3265,B-
+31,102,Way of the Healer,FRA,207,uncommon,W,{3}{W},Legendary Enchantment,False,1,0.058501,65.6463,B-
+32,104,"Arni, Humble Scribe",FRA,211,uncommon,U,{2}{U},Legendary Creature — Human Wizard,False,1,0.013431,64.966,B-
+33,105,"Edgar, Moonlit Sovereign",FRA,257,uncommon,G,{3}{G}{G},Legendary Creature — Werewolf Noble,False,1,0.011906,64.6259,B-
+34,106,Kiora of Salt and Sand,FRA,273,uncommon,GU,{1}{G}{U},Legendary Creature — Merfolk Noble,False,1,-0.016738,64.2857,B-
+35,107,"Arni, Renowned Champion",FRA,243,uncommon,R,{3}{R},Legendary Creature — Human Berserker,False,1,-0.068883,63.9456,B-
+36,108,"Danitha, Spear of Agony",FRA,227,uncommon,B,{2}{B},Legendary Creature — Human Knight,False,1,-0.072434,63.6054,B-
+37,110,Vigorbloom Vanguard // Seed Suture,FRA,161,uncommon,GW,{1}{G/W} // {G/W},Creature — Troll Druid // Sorcery,False,1,-0.096954,62.9252,B-
+38,111,"Fblthp, Impossibly Lost",FRA,213,uncommon,U,{1}{U},Legendary Creature — Homunculus,False,2,-0.100278,62.585,B-
+39,112,Your Fate Ends Here,FRA,24,uncommon,W,{2}{W},Instant,False,1,-0.118809,62.2449,B-
+40,113,"Edgar, Ancient Bloodlord",FRA,270,uncommon,BW,{W}{B},Legendary Creature — Vampire Noble,False,1,-0.170104,61.9048,B-
+41,115,Heartwood Crafter // Soul Tether,FRA,105,uncommon,G,{G} // {2}{R/G},Creature — Elf Artificer // Sorcery,False,1,-0.221468,61.2245,B-
+42,116,"Titanbones, Towering Heart",FRA,266,uncommon,G,{3}{G},Legendary Creature — Skeleton Druid,False,1,-0.249782,60.8844,B-
+43,117,Rewrite Regrets,FRA,62,uncommon,B,{3}{B},Sorcery,False,1,-0.26154,60.5442,B-
+44,118,"Teyo, Lightshield Expert",FRA,204,uncommon,W,{1}{W},Legendary Creature — Human Cleric,False,2,-0.278624,60.2041,B-
+45,120,Primal Witchstalker,FRA,144,uncommon,BG,{1}{B}{G},Creature — Wolf,False,1,-0.349819,59.5238,B-
+46,121,"Saheeli, Jewel of Avishkar",FRA,275,uncommon,RU,{2}{U}{R},Legendary Creature — Human Artificer,False,1,-0.362277,59.1837,B-
+47,122,"Mabel, Bitter Recluse",FRA,233,uncommon,B,{B},Legendary Creature — Mouse Warlock,False,1,-0.431393,58.8435,B-
+48,125,Grim Repriser,FRA,136,uncommon,BR,{B}{R},Creature — Zombie Bard,False,1,-0.466617,57.8231,C+
+49,126,Way of the Deathbringer,FRA,238,uncommon,B,{2}{B},Legendary Enchantment,False,1,-0.478464,57.483,C+
+50,129,"Saheeli, Consul of Oversight",FRA,203,uncommon,W,{3}{W}{W},Legendary Creature — Human Advisor,False,1,-0.492264,56.4626,C+
+51,132,Clash of Elements,FRA,126,uncommon,RU,{1}{U}{R},Instant,False,1,-0.6058,55.4422,C+
+52,133,"Marwyn, the Preserver",FRA,263,uncommon,G,{1}{G},Legendary Creature — Elf Druid,False,2,-0.614684,55.102,C+
+53,134,Way of the Mentor,FRA,208,uncommon,W,{2}{W},Legendary Enchantment,False,1,-0.617953,54.7619,C+
+54,135,"Gallia, the Merrymaker",FRA,245,uncommon,R,{1}{R},Legendary Creature — Satyr,False,1,-0.62696,54.4218,C+
+55,136,"Hapatra, the Desert Frost",FRA,215,uncommon,U,{3}{U},Legendary Creature — Human Wizard,False,1,-0.633616,54.0816,C+
+56,137,"Jiang Yanggu, Alone",FRA,246,uncommon,R,{4}{R},Legendary Creature — Human Berserker,False,1,-0.639583,53.7415,C+
+57,138,"Tinybones, Pocket Nuisance",FRA,237,uncommon,B,{2}{B},Legendary Creature — Skeleton Rogue,False,1,-0.64162,53.4014,C+
+58,139,"Thalia, the Survivor",FRA,205,uncommon,W,{3}{W},Legendary Creature — Human Soldier,False,2,-0.694211,53.0612,C+
+59,140,"Traxos, Academy Guardian",FRA,222,uncommon,U,{3}{U},Legendary Artifact Creature — Dragon Construct,False,1,-0.698935,52.7211,C+
+60,141,Archive Arbiter,FRA,167,uncommon,,{6},Artifact Creature — Sphinx,False,1,-0.700561,52.381,C+
+61,142,Ghalta the Unstoppable,FRA,260,uncommon,G,{8}{G},Legendary Creature — Elder Dinosaur,False,1,-0.707287,52.0408,C+
+62,143,"Winter, Tormented Loner",FRA,240,uncommon,B,{2}{B},Legendary Creature — Human Warlock,False,2,-0.724291,51.7007,C+
+63,145,Stingerquill Voxmancer // Vicious Verse,FRA,151,uncommon,BR,{B/R} // {B/R},Creature — Goblin Sorcerer // Sorcery,False,1,-0.771398,51.0204,C+
+64,146,"Tomik, Izzet Sparkmage",FRA,253,uncommon,R,{1}{R},Legendary Creature — Human Wizard,False,1,-0.772578,50.6803,C+
+65,148,Way of the Mind Sculptor,FRA,224,uncommon,U,{4}{U},Legendary Enchantment,False,1,-0.776111,50.0,C+
+66,149,"Loot, the Nexus",FRA,262,uncommon,G,{2}{G},Legendary Creature — Beast Noble,False,1,-0.806291,49.6599,C+
+67,152,Way of the Paradox,FRA,267,uncommon,G,{2}{G},Legendary Enchantment,False,1,-0.870835,48.6395,C+
+68,154,Mind Meanderer,FRA,141,uncommon,GU,{3}{G}{U}{U},Creature — Bird Fish Illusion,False,1,-0.899685,47.9592,C+
+69,155,Countersculpt,FRA,25,uncommon,U,{U}{U},Instant,False,1,-0.919226,47.619,C+
+70,156,Way of the Cryomancer,FRA,223,uncommon,U,{2}{U},Legendary Enchantment,False,1,-0.919675,47.2789,C+
+71,157,"Tetsuko Umezawa, Pursuer",FRA,252,uncommon,R,{3}{R},Legendary Creature — Human Mercenary,False,1,-0.935676,46.9388,C+
+72,158,Break Under Pressure,FRA,50,uncommon,B,{2}{B},Instant,False,1,-0.937564,46.5986,C+
+73,159,Fulminous Forte,FRA,84,uncommon,R,{2}{R},Instant,False,1,-0.961686,46.2585,C+
+74,160,"Massacre Girl, Most Wanted",FRA,234,uncommon,B,{4}{B},Legendary Creature — Human Assassin,False,1,-0.974256,45.9184,C+
+75,164,Plan for All Outcomes,FRA,35,uncommon,U,{3}{U},Enchantment,False,1,-1.019328,44.5578,C
+76,165,Desperate Futurescribe,FRA,129,uncommon,UW,{2}{W}{U},Creature — Kor Scout,False,1,-1.022552,44.2177,C
+77,166,Way of the Pyromancer,FRA,254,uncommon,R,{1}{R},Legendary Enchantment,False,1,-1.044367,43.8776,C
+78,168,Ghalta the Immovable,FRA,197,uncommon,W,{8}{W},Legendary Creature — Elder Dinosaur,False,1,-1.127541,43.1973,C
+79,169,Geist of Saint Thalia,FRA,214,uncommon,U,{1}{U},Legendary Creature — Spirit Cleric,False,2,-1.1302,42.8571,C
+80,170,Woodwork Prodigy // Soul Tether,FRA,165,uncommon,GR,{2}{R/G} // {2}{R/G},Creature — Cat Druid // Sorcery,False,1,-1.132895,42.517,C
+81,176,"Yuriko, Blade of the Mighty",FRA,210,uncommon,W,{3}{W},Legendary Creature — Human Samurai,False,1,-1.215296,40.4762,C
+82,177,Way of the Necromancer,FRA,239,uncommon,B,{1}{B},Legendary Enchantment,False,1,-1.234226,40.1361,C
+83,178,Fatehold Charm,FRA,132,uncommon,UW,{W}{U},Instant,False,2,-1.257285,39.7959,C
+84,181,"Tomik, Orzhov Lawmage",FRA,206,uncommon,W,{1}{W},Legendary Creature — Human Advisor,False,1,-1.389567,38.7755,C
+85,182,Konstrari Charm,FRA,138,uncommon,GR,{R}{G},Instant,False,2,-1.423702,38.4354,C
+86,185,"Gallia, Tragic Host",FRA,228,uncommon,B,{1}{B},Legendary Creature — Zombie Satyr,False,1,-1.44835,37.415,C
+87,188,Vigorbloom Charm,FRA,160,uncommon,GW,{G}{W},Instant,False,2,-1.491337,36.3946,C
+88,189,Paradox Shaper // Omit Variables,FRA,143,uncommon,BU,{1}{U/B} // {U/B},Creature — Octopus Wizard // Sorcery,False,1,-1.509005,36.0544,C
+89,192,"Winter, Team Player",FRA,256,uncommon,R,{4}{R},Legendary Creature — Human Warrior,False,2,-1.635264,35.034,C
+90,193,"Rescue Girl, First Responder",FRA,202,uncommon,W,{2}{W},Legendary Creature — Human Cleric,False,1,-1.645072,34.6939,C
+91,199,Generous Revival,FRA,8,uncommon,W,{2}{W},Sorcery,False,1,-1.775716,32.6531,C
+92,200,Eye of Jace,FRA,170,uncommon,,{1},Artifact,False,1,-1.780607,32.3129,C
+93,202,"Ruric Thar, Biomagus",FRA,219,uncommon,U,{4}{U}{U},Legendary Creature — Ogre Crab Wizard,False,1,-1.881056,31.6327,C
+94,205,"Loot, the Anomaly",FRA,232,uncommon,B,{2}{B},Legendary Creature — Beast Horror,False,1,-2.0066,30.6122,C
+95,206,Flourishing Grapple,FRA,102,uncommon,G,{G},Instant,False,2,-2.012704,30.2721,C
+96,207,Theorix Charm,FRA,155,uncommon,BU,{U}{B},Instant,False,2,-2.013221,29.932,C-
+97,208,"Proft, Sinister Mastermind",FRA,235,uncommon,B,{2}{B},Legendary Creature — Human Rogue,False,1,-2.077992,29.5918,C-
+98,211,Prophesied End,FRA,17,uncommon,W,{1}{W},Instant,False,1,-2.121958,28.5714,C-
+99,213,Hunter's Axe,FRA,108,uncommon,G,{G},Artifact — Equipment,False,1,-2.144356,27.8912,C-
+100,214,"Yoshimaru, Beloved Companion",FRA,209,uncommon,W,{2}{W},Legendary Creature — Dog,False,1,-2.175245,27.551,C-
+101,215,"Koth, the Geomancer",FRA,248,uncommon,R,{2}{R},Legendary Creature — Human Warrior,False,1,-2.184566,27.2109,C-
+102,220,"Marwyn, the Clearcutter",FRA,249,uncommon,R,{R},Legendary Creature — Elf Warrior,False,2,-2.259155,25.5102,C-
+103,221,Restore with Empathy,FRA,112,uncommon,G,{2}{G},Instant,False,1,-2.264307,25.1701,C-
+104,233,Perfected Theory,FRA,34,uncommon,U,{U},Instant,False,1,-2.457069,21.0884,C-
+105,248,"Traxos, Scourge Eternal",FRA,280,uncommon,,{4},Legendary Artifact Creature — Dragon Construct,False,1,-2.645174,15.9864,D+
+106,267,Precise Redaction,FRA,36,uncommon,U,{1}{U},Instant,False,2,-2.821553,9.5238,D
+107,271,Hexhaven Dueling Arena,FRA,181,uncommon,,,Land,False,1,-2.879371,8.1633,D
+108,294,"Yargle, Goliath of Otaria",FRA,225,uncommon,U,{4}{U},Legendary Creature — Frog Spirit,False,1,-3.168657,0.3401,F
+109,295,"Yargle, Glutton of Urborg",FRA,241,uncommon,B,{4}{B},Legendary Creature — Frog Spirit,False,1,-3.242852,0.0,F

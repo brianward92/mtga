@@ -42,3 +42,10 @@ electron/tests/e2e/shots/*
 # tables/*.tex never leak these -- but shouldn't be committed). Reproducible
 # from experiments/ledger.jsonl + the training runs.
 paper/data/runs/
+
+# LaTeX build intermediates
+paper/*.aux
+paper/*.fdb_latexmk
+paper/*.fls
+paper/*.log
+paper/*.out

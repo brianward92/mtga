@@ -1,0 +1,8 @@
+{
+  "docs/results/hob_oos_20260920/headline.csv": "927efb8b84d6075d63dd01b97df30c5bc47ecdac8cfeaaec7bb06bf669b94562",
+  "docs/results/hob_oos_20260920/shared_p1p1.csv": "ec765e87456726e20e29cc91553c4f10222aad3cbce8215823fa8b69d6952db0",
+  "docs/results/hob_oos_20260920/fitted_comparisons.csv": "837a8ac11de0f64f061b792447532d5113d9a21767c7b113bd19354390d12c29",
+  "data/forecast_20260919/fra/fra_p1p1_forecast.csv": "116fc528acd83843e283daa73492fa01041f167daebe92103d9f9a52617a348e",
+  "data/forecast_20260919/fra/fra_uncommons.csv": "301db981e2a2968aa4143ac642706dabb643cf0068208ea6eda1001ec78deada",
+  "data/forecast_20260919/fra/forecast_manifest.json": "0394f8c62a98573d048f2d1283e192dbe05217466129d1625af8c935a235f6b0"
+}
