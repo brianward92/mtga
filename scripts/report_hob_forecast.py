@@ -99,7 +99,9 @@ def plot(table, path):
     fig.savefig(svg, bbox_inches="tight")
     # Matplotlib leaves spaces at line ends inside SVG path data. Normalize
     # those generated lines so the checked-in figure passes whitespace checks.
-    svg.write_text("\n".join(line.rstrip() for line in svg.read_text().splitlines()) + "\n")
+    svg.write_text(
+        "\n".join(line.rstrip() for line in svg.read_text().splitlines()) + "\n"
+    )
     fig.savefig(path.with_suffix(".png"), dpi=180, bbox_inches="tight")
     plt.close(fig)
 

@@ -50,9 +50,7 @@ def main() -> None:
 
     archive = OUT / "draftfm_followup_arxiv_source.tar.gz"
     with archive.open("wb") as stream:
-        with gzip.GzipFile(
-            fileobj=stream, mode="wb", filename="", mtime=0
-        ) as zipped:
+        with gzip.GzipFile(fileobj=stream, mode="wb", filename="", mtime=0) as zipped:
             with tarfile.open(fileobj=zipped, mode="w|") as tar:
                 for name, content in sorted(files.items()):
                     info = tarfile.TarInfo(name)
