@@ -297,7 +297,10 @@ def test_build_writes_assets_cards_index(world):
         "manaCost",
         "manaValue",
         "type",
-        "scryfallId", "oracleText", "faces", "hasBackFace",
+        "scryfallId",
+        "oracleText",
+        "faces",
+        "hasBackFace",
     }
     assert cards["cards"][CARD_A] == {
         "rarity": "common",
@@ -309,7 +312,9 @@ def test_build_writes_assets_cards_index(world):
         # CARD_A also has an out-of-set Arena printing. Provenance follows
         # the in-set raw Scryfall printing selected for display metadata.
         "scryfallId": f"scry-{CARD_A.lower().replace(' ', '-')}-tst",
-        "oracleText": f"{CARD_A} does a thing.", "faces": [], "hasBackFace": False,
+        "oracleText": f"{CARD_A} does a thing.",
+        "faces": [],
+        "hasBackFace": False,
     }
     assert all(set(card) == expected_card_keys for card in cards["cards"].values())
     assert cards["cards"][DFC]["manaCost"] == "{1}{R}"  # front face
@@ -924,7 +929,10 @@ def test_helpers_normalize_identity_fields():
         "manaCost": "{2}",
         "manaValue": 2,
         "type": "Artifact — Equipment",
-        "scryfallId": "scry-equipment", "oracleText": "", "faces": [], "hasBackFace": False,
+        "scryfallId": "scry-equipment",
+        "oracleText": "",
+        "faces": [],
+        "hasBackFace": False,
     }
     assert (
         bab.card_entry(

@@ -8,12 +8,30 @@ import { ModelManager } from '../main/model/manager'
 const ROOT = join(__dirname, '..', 'resources', 'draftfm')
 const DSK_ASSETS = join(ROOT, 'sets', 'DSK', 'assets.npz')
 const have = existsSync(DSK_ASSETS)
+const haveFra = existsSync(join(ROOT, 'sets', 'FRA', 'assets.npz'))
 
 function writeJson(path: string, value: unknown): void {
   writeFileSync(path, JSON.stringify(value))
 }
 
 describe('set bundle', () => {
+  it.skipIf(!haveFra)('scores a Reality Fracture pack using Arena card ids', async () => {
+    const m = new ModelManager(mkdtempSync(join(tmpdir(), 'fra-p1p1-')), ROOT)
+    const bundle = m.bundleFor('FRA')!
+    expect(m.hasSet('FRA')).toBe(true)
+    expect(bundle.names).toHaveLength(290)
+    expect(bundle.cards.get(106225)?.name).toBe('Emrakul, the Exigent Doom')
+    expect(bundle.cards.get(106261)?.name).toBe('Plan for All Outcomes')
+    expect(bundle.cards.get(106566)?.name).toBe('Eye of Ugin')
+    const pack = [106225, 106226, 106229, 106230, 106231, 106232,
+      106233, 106234, 106235, 106236, 106237, 106261, 106566, 106575]
+    expect(m.setForGrpIds(pack)).toBe('FRA')
+    const result = await m.score('FRA', 'PremierDraft', pack, [], 0, 0)
+    expect(result?.cards).toHaveLength(14)
+    expect(result?.cards.every(card => card.ev !== null && card.grade !== null)).toBe(true)
+    expect(m.status('FRA', 'PremierDraft').state).toBe('ready')
+  }, 30000)
+
   it.skipIf(!have)('reads name order and grpId aliases from assets.npz', () => {
     const identity = readAssetsIdentity(DSK_ASSETS)
     expect(identity.names).toContain('Murder')

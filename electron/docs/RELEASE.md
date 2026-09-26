@@ -105,6 +105,26 @@ zero-fill option is chosen.
 After changing set assets, repeat the full build/E2E/package gate and inspect
 the mounted artifact—not only the source directory—before publishing it.
 
+### Reality Fracture
+
+FRA uses the saved September 20 forecast feature rows, including its ten
+Special Guests. The five display-only basic lands are omitted from the scored
+bundle. Scryfall's booster flag omits *Plan for All Outcomes* and currently
+lacks most FRA Arena ids, so the ordinary set builder cannot reproduce this
+bundle. With the saved forecast inputs and a current installed Arena card
+database, rebuild it from the repository root:
+
+```bash
+MTGA_DATA_ROOT=/path/to/data .venv/bin/python scripts/build_fra_overlay.py \
+  --scryfall /path/to/default_cards-2026-09-25.jsonl.gz
+```
+
+The builder checks the forecast CSV, frozen features, and model manifest,
+then resolves every scored name against Arena's own FRA/SPG ids. The overlay
+uses its normal serving condition (from the model metadata), which differs
+from the saved P1P1 forecast condition. Therefore live grades need not match
+the paper's FRA letter grades exactly.
+
 ## Permissions
 
 The default overlay uses permission-free Arena window geometry and the
