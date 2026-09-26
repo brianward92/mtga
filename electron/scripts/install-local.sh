@@ -16,8 +16,11 @@ OUT="release/mac-arm64/${APP_NAME}.app"
 test -x "${OUT}/Contents/Resources/native/arena-window-watch"
 test -f "${OUT}/Contents/Resources/draftfm/sets/index.json" || echo "warning: no set bundle index" >&2
 test -f "${OUT}/Contents/Resources/app.asar.unpacked/node_modules/onnxruntime-node/bin/napi-v6/darwin/arm64/onnxruntime_binding.node"
-rm -rf "/Applications/${APP_NAME}.app"
-cp -R "${OUT}" /Applications/
+# /Applications may allow updating an app owned by this user while denying
+# removal of its top-level directory. Sync its contents in place so a failed
+# unlink cannot leave the installed app empty.
+mkdir -p "/Applications/${APP_NAME}.app"
+rsync -a --delete "${OUT}/" "/Applications/${APP_NAME}.app/"
 # Stamp what was built, so the staleness check can compare content instead of
 # timestamps (see scripts/dev/app-source-hash.sh).
 bash scripts/dev/app-source-hash.sh > "/Applications/${APP_NAME}.app/Contents/Resources/.source-hash"
