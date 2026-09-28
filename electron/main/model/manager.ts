@@ -93,7 +93,7 @@ export class ModelManager {
     if (!this.index) return { ...base, state: 'no-bundle', message: 'model bundle missing' }
     if (!set) return { ...base, state: 'ready' }
     if (!this.hasSet(set)) return { ...base, state: 'no-set', message: `${set} not in bundle` }
-    if (this.loaded && this.loaded.key === `${set}:${format}`) return { ...base, state: 'ready' }
+    if (this.loaded && this.loaded.key === `${set}:${format && /sealed/i.test(format) ? 'PremierDraft' : format}`) return { ...base, state: 'ready' }
     if (this.lastError) return { ...base, state: 'error', message: this.lastError }
     return { ...base, state: 'loading' }
   }
@@ -108,6 +108,7 @@ export class ModelManager {
    * session. The error is reported once and stands until the key changes.
    */
   async ensure(set: string, format: string): Promise<Loaded | null> {
+    format = /sealed/i.test(format) ? 'PremierDraft' : format
     const key = `${set}:${format}`
     if (this.loaded?.key === key) return this.loaded
     if (this.failedKey === key) return null

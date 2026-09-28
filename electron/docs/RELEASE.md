@@ -132,3 +132,18 @@ cursor position. It does not require Accessibility permission. **Precise layerin
 is optional and requests Screen Recording only to inspect one-shot luminance
 frames of the Arena window; frames are not stored. Building, packaging, and
 installing do not grant that permission automatically.
+
+## Sealed recommendation validation (0.2.0)
+
+Sealed shares the trained Premier Draft P1P1 rating cache. It does not use an
+untrained Sealed format embedding or pass the whole sealed pool as draft
+context. The renderer compares all ten color pairs using those ratings and
+explicit creature/curve penalties; these scores are not displayed as win rates.
+
+Run the standard gate above. `sealed.test.ts` covers color-pair comparison,
+curve/creature balance, duplicate ownership, hybrid/devoid costs, modal faces,
+unknown cards, unsupported mana, and exact forty-card exports. Parser and
+coordinator tests cover separate event entries and pool recovery after replay.
+The E2E run additionally feeds a synthetic 90-card FRA pool through the real
+parser/model and switches the visible alternative. Live sealed-event behavior
+and recommendation strength still need player validation.

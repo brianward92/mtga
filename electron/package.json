@@ -1,7 +1,7 @@
 {
   "name": "mtga-tracker",
-  "version": "0.1.0",
-  "description": "MTGA Draft Assistant \u2014 a draft overlay for MTG Arena with local DraftFM recommendations",
+  "version": "0.2.0",
+  "description": "MTGA Draft Assistant — a draft overlay for MTG Arena with local DraftFM recommendations",
   "main": "dist/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",

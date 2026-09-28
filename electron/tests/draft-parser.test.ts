@@ -661,6 +661,19 @@ describe('DraftParser — course listings name the pod after a log rotation', ()
 })
 
 describe('DraftParser — deck submission and sealed', () => {
+  it('keeps two entries in the same sealed event separate, including smaller pools', () => {
+    const parser = new DraftParser()
+    const events = capture(parser)
+    for (const [CourseId, CardPool] of [['first', [101, 102, 103]], ['second', [201, 202]]] as const) {
+      feed(parser, ['<== EventJoin(abc)', JSON.stringify({ Course: { CourseId, CardPool,
+        InternalEventName: 'Sealed_FRA_20260929', CurrentModule: 'DeckSelect' } })])
+    }
+    expect(events.starts).toHaveLength(2)
+    expect(events.ends).toHaveLength(2)
+    expect(parser.getSnapshot()?.draftId).toBe('second')
+    expect(parser.getSnapshot()?.pool).toEqual([201, 202])
+  })
+
   it('emits the submitted Limited deck from the EventSetDeckV3 request (real 2026-09-06 fixture)', () => {
     const parser = new DraftParser()
     const decks: Array<{ eventName: string | null; mainCount: number; main: Array<{ grpId: number; quantity: number }>; sideboard: unknown[] }> = []
@@ -684,6 +697,7 @@ describe('DraftParser — deck submission and sealed', () => {
     const s = parser.getSnapshot()!
     expect(s.set).toBe('HOB')
     expect(s.format).toBe('Sealed')
+    expect(s.draftId).toBe('c1')
     expect(s.state).toBe('complete')
     expect(s.pool).toEqual([101, 102, 103, 103])
   })

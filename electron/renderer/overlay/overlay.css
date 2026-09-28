@@ -1092,6 +1092,12 @@ body.calibrating .draft-rail.open { display: none; }
   margin-bottom: 0.3rem;
   border-bottom: 1px solid var(--hairline);
 }
+.sealed-options { margin-bottom: 0.5rem; }
+.sealed-choices { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.4rem; }
+.sealed-options button { font: inherit; font-size: 0.8rem; padding: 0.35rem 0.5rem; color: var(--text); background: var(--panel); border: 1px solid var(--hairline); border-radius: 5px; cursor: pointer; }
+.sealed-options button[aria-pressed="true"] { color: var(--accent); background: var(--accent-dim); border-color: var(--accent); }
+.sealed-options button:disabled { opacity: 0.5; cursor: default; }
+.sealed-options button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .deck-verdict {
   display: flex;
   align-items: baseline;

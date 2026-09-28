@@ -38,6 +38,24 @@ running **locally**, weights bundled, no server.
   the currently displayed recommendation image, fetched directly from
   `cards.scryfall.io`; there is no DraftFM server.
 
+## Sealed deck suggestions
+
+Sealed and Traditional Sealed events now show a suggested deck and up to two
+alternatives when Arena logs the pool. The assistant compares all ten color
+pairs using DraftFM's Premier Draft first-pick ratings, with explicit creature
+and mana-curve preferences. Select a build to see its spells, basic lands,
+and closest cuts. **Copy Arena deck** copies a complete 40-card list for the
+Arena Decks import screen; it does not change or submit your event deck.
+
+This is model-assisted deckbuilding, not a sealed-trained model or a win-rate
+prediction. The first version uses 23 spells and 17 ordinary basic lands.
+Review nonbasic fixing, splashes, sideboarding, and set-specific interactions
+manually. Cards without model ratings or usable metadata, and costs requiring
+colorless or snow mana, are excluded and counted in the panel. Incomplete
+builds are labeled and cannot be exported. Deck suggestions require a bundled
+set and Arena's Detailed Logs; reopening Arena can recover an unsubmitted
+pool from its course listing.
+
 ## Visual checkpoints
 
 The strict E2E run produces the canonical UI screenshots below from an

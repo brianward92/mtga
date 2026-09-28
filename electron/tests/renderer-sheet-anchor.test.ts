@@ -61,6 +61,7 @@ class FakeClassList {
 }
 
 class FakeElement {
+  addEventListener(_name: string, _listener: unknown): void {}
   readonly classList = new FakeClassList()
   readonly dataset: Record<string, string> = {}
   textContent = ''

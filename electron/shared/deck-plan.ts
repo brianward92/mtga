@@ -236,23 +236,24 @@ export function basicSplit(
 }
 
 /** Build the whole recommendation from a finished pool. */
-export function buildDeck(pool: ReadonlyArray<CardRow>): DeckPlan {
+export function buildDeck(pool: ReadonlyArray<CardRow>, options?: { lane: PoolColor[]; spells: CardRow[]; nonbasicLands: CardRow[] }): DeckPlan {
   const summary = poolSummary(pool)
-  const lane = chooseLane(summary)
+  const lane = options?.lane ?? chooseLane(summary)
   const laneLabel = lane.join('/')
 
   const spellsAvailable = pool.filter(c => !isLand(c) && inLane(c, lane)).sort(byModelRank)
-  const chosen = spellsAvailable.slice(0, TARGET_SPELLS)
-  const missed = spellsAvailable.slice(TARGET_SPELLS)
+  const chosen = options?.spells ?? spellsAvailable.slice(0, TARGET_SPELLS)
+  const remaining = [...spellsAvailable]
+  for (const card of chosen) { const i = remaining.indexOf(card); if (i >= 0) remaining.splice(i, 1) }
+  const missed = remaining
 
   // Non-basic lands that cast our spells earn a slot ahead of a basic.
-  const nonbasic = pool
+  const nonbasic = options?.nonbasicLands ?? pool
     .filter(c => isLand(c) && !isBasicLand(c) && inLane(c, lane))
     .sort(byModelRank)
     .slice(0, MAX_NONBASIC_LANDS)
 
-  const landCount = TARGET_LANDS
-  const basics = basicSplit(chosen, lane, Math.max(0, landCount - nonbasic.length))
+  const basics = basicSplit(chosen, lane, Math.max(0, TARGET_LANDS - nonbasic.length))
 
   const cut = (Object.entries(summary.counts) as Array<[PoolColor, number]>)
     .filter(([color, n]) => n > 0 && !lane.includes(color))
@@ -271,6 +272,7 @@ export function buildDeck(pool: ReadonlyArray<CardRow>): DeckPlan {
   const close = missed.filter(c => statusByName[c.name].included === 0).slice(0, CLOSE_COUNT)
   for (const card of close) statusByName[card.name].close = true
 
+  const landCount = basics.reduce((n, b) => n + b.count, 0) + nonbasic.length
   const spellCount = chosen.length
   return {
     lane,

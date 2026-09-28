@@ -48,6 +48,8 @@ npm run e2e -- --keep-tmp --port 9333 --speed 8 --out /tmp/draftfm-e2e-shots
 | `06-p2p6.png` | mid-draft pool with internal list scrolling and a pinned footer |
 | `07-calibrate.png` | calibration panel opened from the sidebar footer |
 | `08-complete.png` | completed draft state |
+| `09-sealed.png` | synthetic 90-card FRA sealed pool, three suggestions and complete deck |
+| `10-sealed-alternative.png` | selecting another color pair changes the displayed build |
 
 The output directory also receives `console_main.log` and
 `console_renderer.log`. Renderer console errors make the run fail.
@@ -73,3 +75,8 @@ and synthetic human choices:
 ```sh
 node tests/e2e/gen-draft-log.mjs --set DSK --picks 42 --seed 11
 ```
+
+The FRA fixture uses real bundled card IDs in a synthetic pool; it is not a
+recording of a live sealed event. The harness feeds it through the log watcher
+after completing and dismissing the draft. Clipboard writes require a user
+click and are not performed by this harness.

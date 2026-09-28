@@ -134,7 +134,7 @@ export function progressDots(state: Pick<DraftState, 'pick' | 'picksPerPack'>): 
 /** "SOS · Premier Draft" — format's trailing "Draft" gets a space. */
 export function eventTitle(state: Pick<DraftState, 'set' | 'format'>): string {
   const set = state.set ?? '?'
-  const format = state.format ? state.format.replace(/([a-z])Draft$/, '$1 Draft').trim() : 'Draft'
+  const format = state.format ? state.format.replace(/([a-z])(Draft|Sealed)$/, '$1 $2').trim() : 'Draft'
   return `${set} · ${format}`
 }
 

@@ -15,7 +15,7 @@ import { sidebarShellFrame } from '../shared/layout'
  *         ArenaGeometryPoller (native helper) → overlay bounds + LayerDetector
  *         prefs/tray/shortcuts → user intent
  */
-import { app, BrowserWindow, globalShortcut, ipcMain, screen, shell } from 'electron'
+import { app, BrowserWindow, clipboard, globalShortcut, ipcMain, screen, shell } from 'electron'
 import { join } from 'path'
 import { writeFileSync } from 'fs'
 import { LogWatcher } from './parser/watcher'
@@ -337,6 +337,12 @@ function setupGeometry(): void {
 }
 
 function setupIpc(): void {
+  ipcMain.handle('overlay:copy-deck', (event, text: unknown) => {
+    if (event.sender !== overlay?.webContents || typeof text !== 'string' ||
+      !text.startsWith('Deck\n') || text.length > 20000) return false
+    clipboard.writeText(text)
+    return true
+  })
   ipcMain.handle('overlay:get-state', () => coordinator.current)
   ipcMain.handle('overlay:get-prefs', () => loadPrefs())
   ipcMain.handle('overlay:get-layer', () => ({ ...layer.state, titleBarHeight: poller.lastKnown?.titleBarHeight }))

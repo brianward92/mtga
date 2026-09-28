@@ -1,3 +1,4 @@
+import { DraftParser } from '../main/parser/draft-parser'
 import { describe, expect, it, vi } from 'vitest'
 import { DraftCoordinator } from '../main/draft/coordinator'
 import { COMPLETE_LINGER_MS } from '../main/draft/completion'
@@ -38,6 +39,26 @@ function snap(over: Partial<DraftSessionSnapshot>): DraftSessionSnapshot {
 const flush = () => new Promise(r => setTimeout(r, 0))
 
 describe('DraftCoordinator', () => {
+  it('restores a sealed pool from a course listing and grades it without draft picks', async () => {
+    const models = stubModels()
+    const c = new DraftCoordinator(models as never, { append() {} } as never)
+    const parser = new DraftParser()
+    parser.on('draft-start', s => c.onDraftStart(s))
+    parser.on('draft-end', s => c.onDraftEnd(s))
+    c.setReplaying(true)
+    parser.handleLine('<== EventGetCoursesV2(abc)')
+    parser.handleLine(JSON.stringify({ Courses: [{ CourseId: 'sealed-restart',
+      InternalEventName: 'Sealed_DSK_20260929', CurrentModule: 'DeckSelect', CardPool: [1, 2, 2] }] }))
+    c.resumeAfterReplay()
+    await flush()
+    expect(c.current.phase).toBe('complete')
+    expect(c.current.format).toBe('Sealed')
+    expect(c.current.pool.map(card => card.setPercentile)).toEqual([0.4, 0.97, 0.97])
+    expect(c.current.picks).toEqual([])
+    expect(models.score).not.toHaveBeenCalled()
+    c.idle()
+  })
+
   it('keeps the completed pool for the full linger window, then idles', () => {
     vi.useFakeTimers()
     const c = new DraftCoordinator(stubModels() as never, { append() {} } as never)

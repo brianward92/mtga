@@ -16,7 +16,7 @@
  * Usage: npm run e2e [-- --keep-tmp --port 9333 --speed 8]
  */
 import { spawn, spawnSync } from 'child_process'
-import { mkdtempSync, mkdirSync, writeFileSync, appendFileSync, rmSync, existsSync } from 'fs'
+import { mkdtempSync, mkdirSync, writeFileSync, appendFileSync, rmSync, existsSync, readFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
@@ -590,6 +590,25 @@ try {
       !visible(S.sheetRoot) && document.querySelectorAll(S.cell).length === 0
   }, 'dismiss returns completion rail to the idle pill', 3000)
 
+  // Real FRA ids in a synthetic 90-card sealed pool, delivered through the
+  // same log watcher/parser/model path as a joined Arena event.
+  appendFileSync(logPath, readFileSync(join(here, '..', 'fixtures', 'sealed-fra.log'), 'utf8'))
+  await waitFor(page, () => document.querySelectorAll('[data-sealed-build]').length === 3 &&
+    document.querySelector('.deck-meta')?.textContent?.includes('creatures') &&
+    document.querySelector('.hud-done-title')?.textContent === 'Sealed pool ready',
+    'sealed pool produces three scored builds', 15000)
+  await waitFor(page, () => document.querySelector('.deck-plan .deck-meta')?.textContent?.includes('40 cards') &&
+    !document.querySelector('[data-sealed-copy]')?.disabled,
+    'sealed recommendation has forty cards and can be exported')
+  await shot(page, '09-sealed')
+  const firstLane = await page.$eval('.deck-lane', el => el.textContent)
+  await page.click('[data-sealed-build="1"]')
+  const alternative = await page.$eval('.deck-lane', el => el.textContent)
+  if (firstLane === alternative) failures.push('sealed alternative did not change deck')
+  await waitFor(page, () => document.querySelector('[data-sealed-build="1"]')?.getAttribute('aria-pressed') === 'true',
+    'sealed alternative selection is visible')
+  await shot(page, '10-sealed-alternative')
+  await page.click('[data-sealed-build="0"]')
   await browser.disconnect()
 } catch (err) {
   failures.push(String(err))

@@ -583,7 +583,9 @@ export class DraftParser extends EventEmitter {
       // the course IS the pool, so the session is born complete.
       const pool = toGrpIds((j.Course as { CardPool?: unknown }).CardPool)
       if (pool.length > 0 && /sealed/i.test(c.name)) {
-        const session = this.ensureSession({ eventName: c.name, isBot: false, reviveIfComplete: false })
+        const courseId = (j.Course as { CourseId?: unknown }).CourseId
+        const draftId = typeof courseId === 'string' ? courseId : `sealed:${[...pool].sort((a, b) => a - b).join('.')}`
+        const session = this.ensureSession({ draftId, eventName: c.name, isBot: false, reviveIfComplete: false })
         this.completeSession(session, pool)
         return
       }
@@ -616,7 +618,7 @@ export class DraftParser extends EventEmitter {
         const name = c.InternalEventName as string
         const pool = toGrpIds(c.CardPool)
         const courseId = typeof c.CourseId === 'string' ? c.CourseId : null
-        const existing = s && s.eventName === name ? s : null
+        const existing = s && s.eventName === name && (!courseId || !s.draftId || s.draftId === courseId) ? s : null
         if (existing) {
           if (courseId && !existing.draftId) existing.draftId = courseId
           this.completeSession(existing, pool)

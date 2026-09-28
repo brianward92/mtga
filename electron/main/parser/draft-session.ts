@@ -146,7 +146,8 @@ export class DraftSession {
   identity(): string | null {
     if (this.draftId) return this.draftId
     const first = [...this.packs.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))[0]
-    if (!first) return null
+    if (!first) return /sealed/i.test(this.eventName ?? '') && this.poolOverride?.length
+      ? `sealed:${[...this.poolOverride].sort((a, b) => a - b).join('.')}` : null
     const [key, grpIds] = first
     if (grpIds.length === 0) return null
     return `pack:${key}:${[...grpIds].sort((a, b) => a - b).join('.')}`

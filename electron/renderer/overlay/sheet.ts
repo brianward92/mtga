@@ -12,6 +12,7 @@ import { isBasicLand as isBasicLandCard } from '../../shared/cards'
 import { COLOR_NAMES, POOL_COLORS, poolSummary } from './hud-logic'
 import { escapeHtml, renderManaCost } from './shared'
 import type { Store } from './types'
+import { arenaDeckText, isSealed, recommendSealed, type SealedRecommendation } from '../../shared/sealed'
 import { sheetShouldRender } from './visibility'
 import {
   BASIC_LAND_NAMES, buildDeck, type CardStatus, type DeckEntry, type DeckPlan
@@ -166,7 +167,7 @@ function deckLine(entry: DeckEntry): string {
  * The deckbuild panel shown once the draft is over: the verdict first (lane and
  * dead colours, readable at a glance), then the proposed 40.
  */
-export function deckHtml(plan: DeckPlan): string {
+export function deckHtml(plan: DeckPlan, sealed = false): string {
   if (plan.lane.length === 0) return ''
   const cut = plan.cut.length
     ? `cut ${plan.cut.map(c => `${c.color} ${c.count}`).join(' · ')}`
@@ -193,8 +194,24 @@ export function deckHtml(plan: DeckPlan): string {
       ${plan.spells.map(deckLine).join('')}
       <div class="deck-lands">${escapeHtml(lands)}</div>
       ${close}
-      <div class="deck-note">Order is the model's. Deck size, land split and the splash rule are ours.</div>
+      <div class="deck-note">${sealed ? 'Model-assisted suggestion, not a win-rate prediction. Uses draft card ratings and creature/curve balance. 17 basic lands; splashes and nonbasic fixing are left for your review.' : "Order is the model's. Deck size, land split and the splash rule are ours."}</div>
     </div>`
+}
+
+export function sealedHtml(result: SealedRecommendation, selected = 0): string {
+  const build = result.builds[selected]
+  const omitted = result.unscored || result.unsupportedMana
+    ? `<p class="deck-short">Excluded: ${result.unscored} cards without ratings or complete metadata; ${result.unsupportedMana} cards requiring unsupported mana. Review these in your pool.</p>` : ''
+  if (!build) return `<div class="s-group"><h3 class="sheet-h">Sealed deck suggestions</h3><p>No scored build available for this pool.</p>${omitted}</div>`
+  return `<div class="sealed-options" data-testid="sealed-options">
+    <h3 class="sheet-h">Sealed · compare builds</h3>
+    <div class="sealed-choices">${result.builds.map((b, i) => `<button type="button" data-sealed-build="${i}" aria-pressed="${i === selected}">${i === 0 ? 'Recommended' : `Alternative ${i}`} · ${b.plan.laneLabel}</button>`).join('')}</div>
+    <p class="deck-meta">${build.creatures} creatures · ${build.early} spells costing 3 or less · ${build.expensive} costing 5+</p>
+    <p class="deck-meta">Compares all ten color pairs by card ratings, creature count and curve.</p>
+    ${omitted}
+    <button type="button" data-sealed-copy ${build.plan.short ? 'disabled' : ''}>Copy Arena deck</button>
+    <span class="deck-meta" data-copy-status role="status"></span>
+  </div>${deckHtml(build.plan, true)}`
 }
 
 /** Render pick history newest-first with agreement and recommendation tags. */
@@ -226,12 +243,34 @@ export class Sheet {
   private readonly pool: HTMLElement
   private renderedKey = ''
   private open = false
+  private selected = 0
+  private sealedKey = ''
+  private sealedResult: SealedRecommendation | null = null
+  private lastStore: Store | null = null
 
   constructor(private root: HTMLElement, private readonly rating: HTMLElement) {
     this.pool = root.querySelector('#sheetPool')!
+    this.pool.addEventListener('click', async event => {
+      const button = (event.target as HTMLElement).closest('button')
+      if (!button || !this.sealedResult) return
+      if (button.dataset.sealedBuild !== undefined) {
+        this.selected = Number(button.dataset.sealedBuild)
+        this.renderedKey = ''
+        if (this.lastStore) this.update(this.lastStore)
+      } else if (button.hasAttribute('data-sealed-copy')) {
+        const plan = this.sealedResult.builds[this.selected]?.plan
+        if (!plan) return
+        const status = this.pool.querySelector('[data-copy-status]')
+        try {
+          const ok = await window.overlay.copyDeck(arenaDeckText(plan))
+          if (status) status.textContent = ok ? 'Copied — import in Arena’s Decks screen.' : 'Unable to copy deck.'
+        } catch { if (status) status.textContent = 'Unable to copy deck.' }
+      }
+    })
   }
 
   update(store: Store): void {
+    this.lastStore = store
     const shouldOpen = store.prefs.hud && !store.calibrate.active && sheetShouldRender(store.state.phase, store.sheetOpen)
     if (shouldOpen !== this.open) {
       this.open = shouldOpen
@@ -253,7 +292,22 @@ export class Sheet {
     this.rating.className = `sheet-rating ${rating.grade ? `grade-${gradeTier(rating.grade as never)}` : 'grade-none'}`
     // The draft is over: lead with the deckbuild plan, and tag the pool rows
     // with where each card landed in it.
-    const plan = state.phase === 'complete' && state.pool.length > 0 ? buildDeck(state.pool) : null
-    this.pool.innerHTML = (plan ? deckHtml(plan) : '') + poolHtml(state.pool, state.picks, plan?.statusByName ?? null)
+    if (state.phase === 'complete' && isSealed(state.format, state.eventName)) {
+      const key = JSON.stringify([state.eventName, state.pool.map(c => [c.grpId, c.setPercentile])])
+      if (key !== this.sealedKey) {
+        this.sealedKey = key
+        this.selected = 0
+        this.sealedResult = recommendSealed(state.pool)
+      }
+      const ready = state.model.state === 'ready'
+      const plan = ready ? this.sealedResult?.builds[this.selected]?.plan : null
+      this.pool.innerHTML = (ready && this.sealedResult ? sealedHtml(this.sealedResult, this.selected)
+        : '<div class="s-group"><h3 class="sheet-h">Sealed deck suggestions</h3><p>Waiting for card ratings. Model status is shown above.</p></div>')
+        + poolHtml(state.pool, [], plan?.statusByName ?? null)
+    } else {
+      this.sealedKey = ''; this.sealedResult = null
+      const plan = state.phase === 'complete' && state.pool.length > 0 ? buildDeck(state.pool) : null
+      this.pool.innerHTML = (plan ? deckHtml(plan) : '') + poolHtml(state.pool, state.picks, plan?.statusByName ?? null)
+    }
   }
 }

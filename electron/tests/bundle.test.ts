@@ -15,6 +15,16 @@ function writeJson(path: string, value: unknown): void {
 }
 
 describe('set bundle', () => {
+  it.skipIf(!haveFra)('uses the trained Premier Draft first-pick ratings for sealed', async () => {
+    const m = new ModelManager(mkdtempSync(join(tmpdir(), 'fra-sealed-')), ROOT)
+    await m.ensure('FRA', 'PremierDraft')
+    const draftRating = m.intrinsic(106225)
+    await m.ensure('FRA', 'Sealed')
+    expect(m.status('FRA', 'Sealed').state).toBe('ready')
+    expect(m.intrinsic(106225)).toEqual(draftRating)
+    expect(draftRating).not.toBeNull()
+  })
+
   it.skipIf(!haveFra)('scores a Reality Fracture pack using Arena card ids', async () => {
     const m = new ModelManager(mkdtempSync(join(tmpdir(), 'fra-p1p1-')), ROOT)
     const bundle = m.bundleFor('FRA')!

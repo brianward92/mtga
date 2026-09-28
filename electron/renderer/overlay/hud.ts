@@ -1,3 +1,4 @@
+import { isSealed } from '../../shared/sealed'
 import { keywordHelp } from './keyword-help'
 /**
  * Context HUD: a compact glass card in a corner. Draft: header (set·format,
@@ -232,7 +233,7 @@ export class Hud {
   // ---- pieces --------------------------------------------------------------
 
   private updateDots(store: Store): void {
-    const dots = progressDots(store.state)
+    const dots = isSealed(store.state.format, store.state.eventName) ? [] : progressDots(store.state)
     while (this.dotNodes.length < dots.length) {
       const s = document.createElement('span')
       s.className = 'dot'
@@ -417,8 +418,8 @@ export class Hud {
     this.poolSegs.C.style.flexGrow = String(summary.colorless)
     setText(this.poolCounts.C.querySelector('b')!, String(summary.colorless))
     this.pool.classList.toggle('empty', total === 0)
-    setText(this.poolTotal, `${state.picks.length}/${state.totalPicks}`)
-    const lean = laneLean(summary)
+    setText(this.poolTotal, isSealed(state.format, state.eventName) ? `${state.pool.length} cards` : `${state.picks.length}/${state.totalPicks}`)
+    const lean = isSealed(state.format, state.eventName) ? null : laneLean(summary)
     this.lane.hidden = !lean
     setText(this.lane, lean ? `Leaning ${lean.label}` : '')
     const cls = lean ? `hud-lane lane-${lean.colors.join('')}` : 'hud-lane'
@@ -427,11 +428,13 @@ export class Hud {
 
   private updateComplete(store: Store): void {
     const { state } = store
+    const sealed = isSealed(state.format, state.eventName)
+    setText(this.done.querySelector('.hud-done-title')!, sealed ? 'Sealed pool ready' : 'Draft complete')
     const a = agreement(state.picks)
     const pct = a.rate !== null ? ` (${Math.round(a.rate * 100)}%)` : ''
-    setText(this.doneAgree, a.scored > 0 ? `Agreed with the model on ${a.agreed}/${a.scored} picks${pct}` : `${state.picks.length} picks`)
+    setText(this.doneAgree, sealed ? `${state.pool.length} cards · compare suggested builds below` : a.scored > 0 ? `Agreed with the model on ${a.agreed}/${a.scored} picks${pct}` : `${state.picks.length} picks`)
     const best = bestPick(state.pool)
-    setText(this.doneBest, best ? `Best pick: ${best.name}${best.grade ? ` (${best.grade})` : ''}` : '')
+    setText(this.doneBest, best ? `${sealed ? 'Top-rated card' : 'Best pick'}: ${best.name}${best.grade ? ` (${best.grade})` : ''}` : '')
     this.doneBest.hidden = !best
   }
 }

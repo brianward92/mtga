@@ -14,6 +14,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
 const api = {
+  copyDeck: (text: string): Promise<boolean> => ipcRenderer.invoke('overlay:copy-deck', text),
   getState: () => ipcRenderer.invoke('overlay:get-state'),
   getPrefs: () => ipcRenderer.invoke('overlay:get-prefs'),
   getLayer: () => ipcRenderer.invoke('overlay:get-layer'),
