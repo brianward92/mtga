@@ -10,13 +10,19 @@
 //                                  changed vs the previously emitted frame
 //   C on|off                       frames flowing (capture enabled AND Screen
 //                                  Recording granted) / not
+//   D <JSON>                       independent deck OCR observation, text only;
+//                                  epoch milliseconds, point dimensions, and
+//                                  normalized line bounds from the top-left
 //   M x,y                          a mouse button went down anywhere on screen
 //                                  (global point, top-left origin). The overlay
 //                                  steps aside for Arena's menus on a real
 //                                  click, never on a hover.
 // Args:  --capture   start with capture enabled (default: off).
+//        --deck-scan start with deck OCR enabled (default: off).
 // Stdin control channel (one command per line):
 //   capture on | capture off       enable / disable the frame feed
+//   deck-scan on | deck-scan off   deck OCR: 1 Hz briefly after interaction,
+//                                  one scan per 5 seconds while idle
 //   rate <hz>                      base capture rate (default 4; 0 pauses)
 //   activate                       make Arena the active application again
 //                                  (the overlay takes activation while the
@@ -34,6 +40,7 @@ import Foundation
 import AppKit
 import ScreenCaptureKit
 import CoreGraphics
+import Vision
 
 let arenaBundleIds: Set<String> = ["com.wizards.mtga"]
 let arenaNames: Set<String> = ["MTGA", "MTG Arena", "Magic: The Gathering Arena"]
@@ -41,6 +48,9 @@ let selfBundleIds: Set<String> = ["com.mtga.draft-assistant", "com.mtga.tracker"
 let FRAME_W = 160
 let DEFAULT_RATE_HZ = 2.0
 let BURST_WINDOW_S = 1.5
+let DECK_ACTIVE_INTERVAL_S = 1.0
+let DECK_IDLE_INTERVAL_S = 5.0
+let DECK_INTERACTION_WINDOW_S = 3.0
 let out = FileHandle.standardOutput
 let outLock = NSLock()
 
@@ -147,25 +157,45 @@ final class Shared {
   private var _win: ArenaWin? = nil
   private var _frontmost = false
   private var _captureEnabled = CommandLine.arguments.contains("--capture")
+  private var _deckScanEnabled = CommandLine.arguments.contains("--deck-scan")
+  private var _deckScanGeneration = 0
   private var _rateHz = DEFAULT_RATE_HZ
   /// Last time the cursor moved or the Arena rect changed (drives the burst rate).
   private var _lastActivity = Date.distantPast
+  private var _lastDeckInteraction = Date.distantPast
 
   func setWindow(_ win: ArenaWin?, frontmost: Bool) {
     lock.lock(); defer { lock.unlock() }
-    if let a = _win, let b = win, a.frame != b.frame { _lastActivity = Date() }
-    else if (_win == nil) != (win == nil) { _lastActivity = Date() }
+    let windowChanged = _win?.id != win?.id || _win?.frame != win?.frame
+    if windowChanged { _lastActivity = Date(); _lastDeckInteraction = Date() }
+    if frontmost && !_frontmost { _lastDeckInteraction = Date() }
     _win = win
     _frontmost = frontmost
   }
   func noteActivity() { lock.lock(); _lastActivity = Date(); lock.unlock() }
+  func noteDeckInteraction(_ point: CGPoint? = nil) {
+    lock.lock(); defer { lock.unlock() }
+    guard _frontmost, let win = _win else { return }
+    if let point, !win.frame.contains(point) { return }
+    _lastDeckInteraction = Date()
+  }
   func setCapture(_ on: Bool) { lock.lock(); _captureEnabled = on; lock.unlock() }
+  func setDeckScan(_ on: Bool) {
+    lock.lock(); defer { lock.unlock() }
+    if _deckScanEnabled != on { _deckScanGeneration += 1 }
+    _deckScanEnabled = on
+    if on { _lastDeckInteraction = Date() }
+  }
   func setRate(_ hz: Double) { lock.lock(); _rateHz = max(0, hz); lock.unlock() }
 
-  struct Snapshot { let win: ArenaWin?; let frontmost: Bool; let enabled: Bool; let rateHz: Double; let lastActivity: Date }
+  struct Snapshot {
+    let win: ArenaWin?; let frontmost: Bool; let enabled: Bool; let rateHz: Double; let lastActivity: Date
+    let deckScanEnabled: Bool; let deckScanGeneration: Int; let lastDeckInteraction: Date
+  }
   func snapshot() -> Snapshot {
     lock.lock(); defer { lock.unlock() }
-    return Snapshot(win: _win, frontmost: _frontmost, enabled: _captureEnabled, rateHz: _rateHz, lastActivity: _lastActivity)
+    return Snapshot(win: _win, frontmost: _frontmost, enabled: _captureEnabled, rateHz: _rateHz, lastActivity: _lastActivity,
+                    deckScanEnabled: _deckScanEnabled, deckScanGeneration: _deckScanGeneration, lastDeckInteraction: _lastDeckInteraction)
   }
 }
 let shared = Shared()
@@ -200,6 +230,7 @@ DispatchQueue.global(qos: .utility).async {
     case "activate": activateArena()
     case "dismiss-hover": dismissHover()
     case "capture": if parts.count >= 2 { shared.setCapture(parts[1] == "on") }
+    case "deck-scan": if parts.count >= 2 { shared.setDeckScan(parts[1] == "on") }
     case "rate": if parts.count >= 2, let hz = Double(parts[1]) { shared.setRate(hz) }
     default: break
     }
@@ -321,21 +352,210 @@ let capture = Capture()
 Task.detached { await capture.run() }
 
 // ---------------------------------------------------------------------------
+// Deck OCR: separate full-resolution one-shot captures, never a recording.
+// The permission preflight precedes ALL ScreenCaptureKit calls here, including
+// enumerating shareable windows: enabling OCR must not trigger a system prompt.
+// ---------------------------------------------------------------------------
+struct DeckTextLine: Encodable {
+  let text: String
+  let confidence: Float
+  let x: CGFloat, y: CGFloat, width: CGFloat, height: CGFloat
+}
+
+struct DeckObservation: Encodable {
+  let at: Double
+  let width: CGFloat, height: CGFloat
+  let status: String
+  let reason: String?
+  let lines: [DeckTextLine]
+}
+
+final class DeckScanner {
+  private var filter: SCContentFilter?
+  private var filterWindowId: CGWindowID = 0
+
+  private func resetFilter() { filter = nil; filterWindowId = 0 }
+
+  private func publish(_ observation: DeckObservation, generation: Int) {
+    let current = shared.snapshot()
+    guard current.deckScanEnabled, current.deckScanGeneration == generation,
+          let data = try? JSONEncoder().encode(observation), let json = String(data: data, encoding: .utf8) else { return }
+    emit("D \(json)")
+  }
+
+  private func unavailable(_ reason: String, snapshot: Shared.Snapshot) {
+    publish(DeckObservation(at: Date().timeIntervalSince1970 * 1000,
+                            width: snapshot.win?.frame.width ?? 0, height: snapshot.win?.frame.height ?? 0,
+                            status: "unavailable", reason: reason, lines: []), generation: snapshot.deckScanGeneration)
+  }
+
+  private func filterFor(_ win: ArenaWin) async throws -> SCContentFilter? {
+    if let filter, filterWindowId == win.id { return filter }
+    let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+    guard let window = content.windows.first(where: { $0.windowID == win.id }) else { return nil }
+    let next = SCContentFilter(desktopIndependentWindow: window)
+    filter = next
+    filterWindowId = win.id
+    return next
+  }
+
+  private func recognizeRegion(_ image: CGImage, region: CGRect) throws -> [DeckTextLine] {
+    try autoreleasepool {
+      let imageBounds = CGRect(x: 0, y: 0, width: image.width, height: image.height)
+      let pixels = CGRect(x: region.minX * imageBounds.width, y: region.minY * imageBounds.height,
+                          width: region.width * imageBounds.width, height: region.height * imageBounds.height)
+        .integral.intersection(imageBounds)
+      guard let crop = image.cropping(to: pixels) else { return [] }
+      let request = VNRecognizeTextRequest()
+      request.recognitionLevel = .accurate
+      request.recognitionLanguages = ["en-US"]
+      request.usesLanguageCorrection = false
+      request.preferBackgroundProcessing = true
+      try VNImageRequestHandler(cgImage: crop, options: [:]).perform([request])
+      return (request.results ?? []).compactMap { observation in
+        guard let candidate = observation.topCandidates(1).first,
+              !candidate.string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        // Vision uses bottom-left coordinates within this crop. Map back through
+        // the actual rounded pixel bounds to the complete Arena window, including
+        // its title bar, with a top-left origin.
+        let rect = observation.boundingBox
+        let x = max(0, min(1, (pixels.minX + rect.minX * pixels.width) / imageBounds.width))
+        let y = max(0, min(1, (pixels.minY + (1 - rect.maxY) * pixels.height) / imageBounds.height))
+        let width = min(1 - x, max(0, rect.width * pixels.width / imageBounds.width))
+        let height = min(1 - y, max(0, rect.height * pixels.height / imageBounds.height))
+        guard width > 0, height > 0 else { return nil }
+        return DeckTextLine(text: candidate.string, confidence: candidate.confidence,
+                            x: x, y: y, width: width, height: height)
+      }
+    }
+  }
+
+  private func recognize(_ image: CGImage) throws -> [DeckTextLine] {
+    // Vision internally downsamples large inputs. On a full Retina window that
+    // discards small "1x" rail quantities, even while reading card names well.
+    // Separate physical crops keep these glyphs readable and keep the pool's
+    // card titles available for associating a real click with the chosen card.
+    let rail = CGRect(x: 0.76, y: 0.12, width: 0.24, height: 0.80)
+    let pool = CGRect(x: 0, y: 0.18, width: 0.76, height: 0.74)
+    let quantityColumn = CGRect(x: 0.785, y: 0.20, width: 0.03, height: 0.71)
+    let quantities = try recognizeRegion(image, region: quantityColumn).filter {
+      $0.text.range(of: "^\\s*(?:[0-9]{1,3}|[Il])\\s*(?:[x×])?\\s*[()\\[\\]|]*\\s*$",
+                    options: [.regularExpression, .caseInsensitive]) != nil
+    }
+    let railLines = try recognizeRegion(image, region: rail).filter { line in
+      // Prefer the dedicated numeric crop on the same row. Leave every other
+      // rail result intact: either pass can miss a small isolated quantity.
+      !(line.x >= 0.782 && line.x + line.width <= 0.816 && quantities.contains {
+        abs(($0.y + $0.height / 2) - (line.y + line.height / 2)) < 0.012
+      })
+    }
+    return try quantities + railLines + recognizeRegion(image, region: pool)
+  }
+
+  private func scan(_ snapshot: Shared.Snapshot, win: ArenaWin) async {
+    do {
+      guard let filter = try await filterFor(win) else {
+        unavailable("capture-failed", snapshot: snapshot)
+        return
+      }
+      let beforeCapture = shared.snapshot()
+      guard beforeCapture.deckScanEnabled, beforeCapture.deckScanGeneration == snapshot.deckScanGeneration,
+            beforeCapture.frontmost, beforeCapture.win?.id == win.id else { return }
+      let config = SCStreamConfiguration()
+      config.width = max(1, Int((win.frame.width * 2).rounded()))
+      config.height = max(1, Int((win.frame.height * 2).rounded()))
+      config.scalesToFit = true
+      config.showsCursor = false
+      config.ignoreShadowsSingleWindow = true
+      config.ignoreGlobalClipSingleWindow = true
+      config.pixelFormat = kCVPixelFormatType_32BGRA
+      config.capturesAudio = false
+      let at = Date().timeIntervalSince1970 * 1000
+      let image = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
+      let lines = try recognize(image)
+      let current = shared.snapshot()
+      // A slow OCR request must not publish a result from a window that has
+      // since moved, closed, lost focus, or had scanning disabled and reenabled.
+      guard current.frontmost, current.win?.id == win.id, current.win?.frame == win.frame else { return }
+      publish(DeckObservation(at: at, width: win.frame.width, height: win.frame.height,
+                              status: "ok", reason: nil, lines: lines), generation: snapshot.deckScanGeneration)
+    } catch {
+      resetFilter()
+      unavailable(CGPreflightScreenCaptureAccess() ? "capture-failed" : "permission", snapshot: snapshot)
+    }
+  }
+
+  func run() async {
+    var lastScan = Date.distantPast
+    var lastGeneration = -1
+    var lastInteraction = Date.distantPast
+    var confirmationReads = 0
+    while true {
+      let snapshot = shared.snapshot()
+      guard snapshot.deckScanEnabled else {
+        resetFilter()
+        lastScan = Date.distantPast
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        continue
+      }
+      if snapshot.deckScanGeneration != lastGeneration {
+        lastGeneration = snapshot.deckScanGeneration
+        lastScan = Date.distantPast
+        confirmationReads = 2
+      }
+      if snapshot.lastDeckInteraction > lastInteraction {
+        lastInteraction = snapshot.lastDeckInteraction
+        confirmationReads = 2
+      }
+      // Edits and scrolling wake a short 1 Hz scan burst. Two reads are always
+      // allowed to confirm a change, even when OCR itself takes a few seconds.
+      // Quiet deck screens need only a 5-second fallback for unobserved changes.
+      let active = confirmationReads > 0 || Date().timeIntervalSince(snapshot.lastDeckInteraction) < DECK_INTERACTION_WINDOW_S
+      let interval = active ? DECK_ACTIVE_INTERVAL_S : DECK_IDLE_INTERVAL_S
+      if Date().timeIntervalSince(lastScan) < interval {
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        continue
+      }
+      lastScan = Date()
+      if !CGPreflightScreenCaptureAccess() {
+        resetFilter()
+        unavailable("permission", snapshot: snapshot)
+      } else if let win = snapshot.win {
+        if snapshot.frontmost { await scan(snapshot, win: win) }
+        else { unavailable("background", snapshot: snapshot) }
+      } else {
+        resetFilter()
+        unavailable("no-window", snapshot: snapshot)
+      }
+      confirmationReads = max(0, confirmationReads - 1)
+    }
+  }
+}
+let deckScanner = DeckScanner()
+Task.detached(priority: .utility) { await deckScanner.run() }
+
+// ---------------------------------------------------------------------------
 // Geometry loop (~60Hz, prints on change + 1Hz heartbeat); also polls the
 // cursor so the capture loop can burst while the user is interacting.
 // ---------------------------------------------------------------------------
 // Listen without consuming input. Quick clicks must not disappear between geometry samples.
 let inputMask = (CGEventMask(1) << CGEventType.leftMouseDown.rawValue) |
   (CGEventMask(1) << CGEventType.rightMouseDown.rawValue) |
+  (CGEventMask(1) << CGEventType.scrollWheel.rawValue) |
   (CGEventMask(1) << CGEventType.keyDown.rawValue)
 let inputTap = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap,
   options: .listenOnly, eventsOfInterest: inputMask, callback: { _, type, event, _ in
     if type == .keyDown {
+      shared.noteDeckInteraction()
       if event.getIntegerValueField(.keyboardEventKeycode) == 53,
          event.getIntegerValueField(.keyboardEventAutorepeat) == 0 { emit("K escape") }
     } else if type == .leftMouseDown || type == .rightMouseDown {
       let p = event.location
+      shared.noteDeckInteraction(p)
       emit("M \(Int(p.x.rounded())),\(Int(p.y.rounded()))")
+    } else if type == .scrollWheel {
+      // Wheel input refreshes visible rows without pretending a card was clicked.
+      shared.noteDeckInteraction(event.location)
     }
     return Unmanaged.passUnretained(event)
   }, userInfo: nil)
@@ -349,11 +569,21 @@ if inputTap == nil {
   DispatchQueue.global(qos: .userInteractive).async {
     var mouseDown = false
     var escapeDown = false
+    var keyEvents = CGEventSource.counterForEventType(.combinedSessionState, eventType: .keyDown)
+    var scrollEvents = CGEventSource.counterForEventType(.combinedSessionState, eventType: .scrollWheel)
     while true {
       let down = CGEventSource.buttonState(.combinedSessionState, button: .left) || CGEventSource.buttonState(.combinedSessionState, button: .right)
-      if down && !mouseDown, let p = CGEvent(source: nil)?.location { emit("M \(Int(p.x.rounded())),\(Int(p.y.rounded()))") }
+      if down && !mouseDown, let p = CGEvent(source: nil)?.location {
+        shared.noteDeckInteraction(p)
+        emit("M \(Int(p.x.rounded())),\(Int(p.y.rounded()))")
+      }
       let escape = CGEventSource.keyState(.combinedSessionState, key: 53)
       if escape && !escapeDown { emit("K escape") }
+      let keys = CGEventSource.counterForEventType(.combinedSessionState, eventType: .keyDown)
+      let scrolls = CGEventSource.counterForEventType(.combinedSessionState, eventType: .scrollWheel)
+      if keys != keyEvents { shared.noteDeckInteraction() }
+      if scrolls != scrollEvents, let p = CGEvent(source: nil)?.location { shared.noteDeckInteraction(p) }
+      keyEvents = keys; scrollEvents = scrolls
       mouseDown = down; escapeDown = escape
       usleep(8_000)
     }

@@ -86,9 +86,19 @@ export interface ModelInfo {
   message: string | null
 }
 
+/** Live deck counts observed from Arena; incomplete reads remain explicitly uncertain. */
+export interface DeckEditingState {
+  counts: Record<string, number>
+  total: number | null
+  status: 'scanning' | 'live' | 'uncertain' | 'permission' | 'saved'
+  message: string
+  observedAt: number | null
+}
+
 /** Complete JSON-plain renderer snapshot for the current draft lifecycle. */
 export interface DraftState {
   phase: 'idle' | 'active' | 'complete'
+  deckEditing?: DeckEditingState
   /**
    * The Arena screen currently showing (Client.SceneChange's toSceneName), or
    * null before one is seen. A draft stays active while the drafter wanders to
@@ -102,7 +112,7 @@ export interface DraftState {
    */
   restoredFromHistory?: boolean
   /** Arena's own submitted Limited deck (from EventSetDeck), once Done is pressed. */
-  submittedDeck?: { main: Array<{ grpId: number; quantity: number }>; sideboard: Array<{ grpId: number; quantity: number }>; mainCount: number } | null
+  submittedDeck?: { main: Array<{ grpId: number; quantity: number; name?: string }>; sideboard: Array<{ grpId: number; quantity: number }>; mainCount: number } | null
   set: string | null
   format: string | null
   eventName: string | null
@@ -168,6 +178,8 @@ export interface Prefs {
   badges: boolean
   hud: boolean
   hudCorner: HudCorner
+  /** Override the deckbuilding panel edge; otherwise Sealed adds, Draft cuts. */
+  deckbuildingSide?: 'left' | 'right'
   layerDetection: boolean
   /** Start the assistant at login so it is already waiting when Arena opens. */
   openAtLogin: boolean

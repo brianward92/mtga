@@ -17,7 +17,8 @@ or renderer errors.
 It launches the repository's built `dist/` app with the local Electron binary,
 connects Puppeteer over CDP, streams the generated log, waits on renderer test
 hooks, and captures PNGs. This does not install, replace, or read data from the
-normal app. A temporary overlay window does appear while the harness runs.
+normal app. A temporary overlay window appears unless `--offscreen` places it
+outside the visible desktop.
 
 ## Running
 
@@ -28,12 +29,15 @@ npm run e2e
 
 # Optional harness controls:
 npm run e2e -- --keep-tmp --port 9333 --speed 8 --out /tmp/draftfm-e2e-shots
+# Keep the test window off the desktop:
+npm run e2e -- --offscreen --out /tmp/draftfm-e2e-shots
 ```
 
 - `--keep-tmp` preserves the isolated home, log, and fake Arena file.
 - `--port` selects the CDP port (default `9333`).
 - `--speed` controls how often log streaming briefly yields (default `10`).
 - `--out` selects the screenshot/log directory (default `tests/e2e/shots`).
+- `--offscreen` places the fake Arena window outside the visible desktop.
 
 ## Checkpoints
 
@@ -47,15 +51,15 @@ npm run e2e -- --keep-tmp --port 9333 --speed 8 --out /tmp/draftfm-e2e-shots
 | `05-p1p7.png` | eight-card pack with a populated, persistent sidebar |
 | `06-p2p6.png` | mid-draft pool with internal list scrolling and a pinned footer |
 | `07-calibrate.png` | calibration panel opened from the sidebar footer |
-| `08-complete.png` | completed draft state |
-| `09-sealed.png` | synthetic 90-card FRA sealed pool, three suggestions and complete deck |
+| `08-complete.png` | compact completed-draft guide with Add/Cut progress and collapsed full pool |
+| `09-sealed.png` | synthetic 90-card FRA sealed pool, live Add/Cut counts and compact guide geometry |
 | `10-sealed-alternative.png` | selecting another color pair changes the displayed build |
 
 The output directory also receives `console_main.log` and
 `console_renderer.log`. Renderer console errors make the run fail.
 
 The strict run uses the live-shaped 1512×949 fake Arena rectangle. Its
-sidebar assertions pin the shell 74% through Arena's centred, height-scaled
+active-draft sidebar assertions pin the shell 74% through Arena's centred, height-scaled
 content box and y=11.5%, through the right and bottom edges; verify the design
 in `04-sheet.png`. The corresponding pure geometry test exercises the same
 contract at three window sizes, including letterboxed aspect ratios. The
@@ -63,6 +67,12 @@ harness also proves that resting the pointer on the sidebar never yields it,
 while an Arena preview leaves it opaque and lifts the covered badge. Ranked
 rows and badge chips use the same rounded pack-softmax probability; the WHY
 gap uses those probabilities rather than head-to-head dominance.
+
+Completed deckbuilding uses a narrower shell occupying 21.5% of the window
+width on either edge. The harness checks the sticky progress header, visible
+action rows, duplicate quantities, and shrinking Add/Cut lists using native
+observation-shaped input. Pure geometry tests also protect Arena's pool
+paging arrow and rightmost card at the smaller live window size.
 
 ## Synthetic log
 
@@ -78,5 +88,5 @@ node tests/e2e/gen-draft-log.mjs --set DSK --picks 42 --seed 11
 
 The FRA fixture uses real bundled card IDs in a synthetic pool; it is not a
 recording of a live sealed event. The harness feeds it through the log watcher
-after completing and dismissing the draft. Clipboard writes require a user
+after completing and hiding the draft. Clipboard writes require a user
 click and are not performed by this harness.

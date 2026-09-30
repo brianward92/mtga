@@ -166,12 +166,19 @@ export class Hud {
 
     this.btnBadges.addEventListener('click', () => this.action('toggle-badges'))
     $(rail, 'btnCalibrate').addEventListener('click', () => this.action('calibrate-start'))
+    $(root, 'btnDeckbuildingSide').addEventListener('click', () => this.action('switch-deckbuilding-side'))
     $(root, 'btnDismiss').addEventListener('click', () => this.action('dismiss'))
   }
 
   update(store: Store): void {
     const { state, prefs } = store
     const idle = state.phase === 'idle'
+    const complete = state.phase === 'complete'
+    const rail = this.root.closest<HTMLElement>('.draft-rail')
+    rail?.classList.toggle('deckbuilding', complete)
+    const footer = rail?.querySelector<HTMLElement>('.hud-foot')
+    if (footer) footer.hidden = complete
+    $(this.root, 'deckbuildingTools').hidden = !complete
     this.corner = hudCornerForPhase(state.phase, prefs.hudCorner)
 
     // The idle pill has nothing to click: stay click-through so Arena's own
@@ -199,25 +206,29 @@ export class Hud {
     if (idle) { setText(this.idleText, idleLabel(state)); return }
 
     // Header
-    setText(this.title, eventTitle(state))
+    setText(this.title, complete ? `${state.set ?? '?'} · ${isSealed(state.format, state.eventName) ? 'Sealed' : 'Draft'}` : eventTitle(state))
+    this.pos.hidden = complete
+    this.dots.hidden = complete
+    this.model.hidden = complete
+    $(this.root, 'sheetRating').hidden = complete
     setText(this.pos, pickPosition(state))
     this.updateDots(store)
     setText(this.model, modelDisplayName(state.model.modelId))
     this.model.title = state.model.modelId ?? ''
     this.model.classList.toggle('off', state.model.state !== 'ready')
     const modelMsg = state.model.state !== 'ready' ? (state.model.message ?? `model ${state.model.state}`) : ''
-    this.modelMsg.hidden = false
+    this.modelMsg.hidden = complete && modelMsg === ''
     this.modelMsg.classList.toggle('empty', modelMsg === '')
     this.modelMsg.title = modelMsg
     setText(this.modelMsg, modelMsg)
 
     // Body
     const active = state.phase === 'active'
-    const complete = state.phase === 'complete'
     $(this.root, 'cardInspector').hidden = !active
     this.rec.hidden = !active
     this.runners.hidden = !active
-    this.done.hidden = !complete
+    this.done.hidden = true
+    this.pool.hidden = complete
     if (active) this.updateRecommendation(store)
     if (complete) this.updateComplete(store)
     this.updatePool(store)

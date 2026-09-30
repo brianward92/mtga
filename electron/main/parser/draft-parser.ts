@@ -69,7 +69,7 @@ const POST_DRAFT_MODULES = new Set(['DeckSelect', 'DeckBuilder', 'DeckBuild'])
  * CreateMatch the pool stopped being adopted at the exact moment the raw log
  * rotates away, which is the worst possible time to stop recording it.
  */
-const POOL_MODULES = new Set([...POST_DRAFT_MODULES, 'CreateMatch', 'Match'])
+const POOL_MODULES = new Set([...POST_DRAFT_MODULES, 'CreateMatch', 'Match', 'MatchResults'])
 
 /**
  * Bare response marker line: "[UnityCrossThreadLogger]<== BotDraftDraftStatus(guid)"
@@ -165,6 +165,7 @@ function toGrpIds(value: unknown): number[] {
 /** Decodes MTGA Player.log lines and emits normalized draft snapshots. */
 export class DraftParser extends EventEmitter {
   private session: DraftSession | null = null
+  private lastCourseDeckKey = ''
   /** EventName from the last draft Event_Join — human packs carry no name. */
   private pendingEventName: string | null = null
   /**
@@ -535,6 +536,22 @@ export class DraftParser extends EventEmitter {
     })
   }
 
+  /** Recover only the saved deck belonging to the course we actually adopted. */
+  private restoreCourseDeck(raw: unknown): void {
+    if (!raw || typeof raw !== 'object') return
+    const course = raw as { InternalEventName?: unknown; CourseId?: unknown; CourseDeck?: { MainDeck?: unknown } }
+    const session = this.session
+    if (!session || session.state !== 'complete' || course.InternalEventName !== session.eventName) return
+    if (typeof course.CourseId === 'string' && session.draftId && course.CourseId !== session.draftId) return
+    if (!Array.isArray(course.CourseDeck?.MainDeck) || course.CourseDeck.MainDeck.length === 0) return
+    const key = JSON.stringify([session.draftId, session.eventName, course.CourseDeck])
+    if (key === this.lastCourseDeckKey) return
+    this.lastCourseDeckKey = key
+    // CourseDeck has the same MainDeck/Sideboard schema as EventSetDeckV3.
+    // Reuse its validation and event shape, after draft-end has loaded the pool.
+    this.handleSetDeck(JSON.stringify({ EventName: session.eventName, Deck: course.CourseDeck }))
+  }
+
   /**
    * [UnityCrossThreadLogger]Client.SceneChange {"fromSceneName":"Home","toSceneName":"Draft","initiator":"System","context":"HumanDraft"}
    * Emits the scene being entered. Parsed as JSON rather than pattern-matched:
@@ -577,16 +594,17 @@ export class DraftParser extends EventEmitter {
     if (single) {
       // Event_Join response: one course, authoritative for the pod we joined.
       const c = courses[0]
-      if (!IN_DRAFT_MODULES.has(c.module) && !POST_DRAFT_MODULES.has(c.module)) return
+      if (!IN_DRAFT_MODULES.has(c.module) && !POOL_MODULES.has(c.module)) return
       this.pendingEventName = c.name
-      // Sealed (and any join that already carries a pool): there are no picks,
-      // the course IS the pool, so the session is born complete.
+      // A completed Limited join already carries the pool and may also carry
+      // the saved deck. This remains available after Player.log rotates.
       const pool = toGrpIds((j.Course as { CardPool?: unknown }).CardPool)
-      if (pool.length > 0 && /sealed/i.test(c.name)) {
+      if (pool.length > 0 && (/sealed/i.test(c.name) || POOL_MODULES.has(c.module))) {
         const courseId = (j.Course as { CourseId?: unknown }).CourseId
         const draftId = typeof courseId === 'string' ? courseId : `sealed:${[...pool].sort((a, b) => a - b).join('.')}`
-        const session = this.ensureSession({ draftId, eventName: c.name, isBot: false, reviveIfComplete: false })
+        const session = this.ensureSession({ draftId, eventName: c.name, isBot: c.bot, reviveIfComplete: false })
         this.completeSession(session, pool)
+        this.restoreCourseDeck(j.Course)
         return
       }
       if (s) { if (!s.eventName) s.applyEventName(c.name) }
@@ -622,10 +640,12 @@ export class DraftParser extends EventEmitter {
         if (existing) {
           if (courseId && !existing.draftId) existing.draftId = courseId
           this.completeSession(existing, pool)
+          this.restoreCourseDeck(c)
         } else if (!s) {
           const session = this.ensureSession({ draftId: courseId, eventName: name, isBot: parseDraftEventName(name)!.format === 'QuickDraft', reviveIfComplete: false })
           if (courseId && !session.draftId) session.draftId = courseId
           this.completeSession(session, pool)
+          this.restoreCourseDeck(c)
         }
         return
       }

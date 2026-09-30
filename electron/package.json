@@ -72,7 +72,7 @@
       ],
       "extendInfo": {
         "LSUIElement": true,
-        "NSScreenCaptureUsageDescription": "Used only to lift card badges from under Arena's own card previews and menus. Only the Arena window is captured; nothing is recorded or stored."
+        "NSScreenCaptureUsageDescription": "Reads card names and quantities in Arena’s deckbuilder so additions and cuts update automatically, and detects covered draft badges. Only the Arena window is captured; images are never saved."
       }
     },
     "directories": {

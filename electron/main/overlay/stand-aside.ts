@@ -31,7 +31,8 @@ export interface Rect { x: number; y: number; width: number; height: number }
 export function inChromeBand(
   local: Point,
   rect: Pick<Rect, 'width' | 'height'> & { titleBarHeight?: number },
-  side: SidebarSide = 'right'
+  side: SidebarSide = 'right',
+  phase: string = 'active'
 ): boolean {
   if (rect.width <= 0 || rect.height <= 0) return false
   const top = rect.titleBarHeight === 0 ? 0 : rect.height * CHROME_BAND_TOP_FRACTION
@@ -40,7 +41,7 @@ export function inChromeBand(
   // Our own sidebar is not Arena's menu bar. Its top edge reaches up into the
   // band; only the sidebar's real rect is excused, because Arena's gear sits
   // just above it and clicking that must still step us aside.
-  const sidebar = sidebarShellFrame(rect as { width: number; height: number }, side)
+  const sidebar = sidebarShellFrame(rect as { width: number; height: number }, side, phase)
   if (sidebar.width > 0 && local.y >= sidebar.y &&
     local.x >= sidebar.x && local.x < sidebar.x + sidebar.width) return false
   const box = arenaContentBox(rect)
@@ -61,7 +62,7 @@ export class StandAside {
    * A menu click opens an exclusive Arena interaction. Keep it latched
    * through settings clicks and fullscreen transitions.
    */
-  noteClick(local: Point, rect: Pick<Rect, 'width' | 'height'> & { titleBarHeight?: number }, now: number, side: SidebarSide = 'right'): boolean {
+  noteClick(local: Point, rect: Pick<Rect, 'width' | 'height'> & { titleBarHeight?: number }, now: number, side: SidebarSide = 'right', phase: string = 'active'): boolean {
     const x = local.x / rect.width, y = local.y / rect.height
     if (this.wasActive) {
       // Menu choices are in the centre of the game. They must never release
@@ -75,13 +76,13 @@ export class StandAside {
         if (this.menuDepth > 1) { this.menuDepth--; return false }
         return this.release()
       }
-      if (inChromeBand(local, rect, side)) return false
+      if (inChromeBand(local, rect, side, phase)) return false
       // Remain hidden across ambiguous clicks; Escape or a new draft event
       // is the reliable way back. A settings backdrop is not the draft.
       return false
     }
     if (now < this.suppressUntil) return false
-    if (!inChromeBand(local, rect, side)) return false
+    if (!inChromeBand(local, rect, side, phase)) return false
     this.menuDepth = 1
     return this.settle(true)
   }

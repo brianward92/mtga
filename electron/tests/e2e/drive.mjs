@@ -71,7 +71,7 @@ const SIDEBAR_GEOMETRY = { contentAspect: 1512 / 949, leftFraction: 0.74, topFra
 const tmp = mkdtempSync(join(tmpdir(), 'mtga-e2e-'))
 const home = join(tmp, 'home'); mkdirSync(home, { recursive: true })
 const logPath = join(tmp, 'Player.log'); writeFileSync(logPath, '')
-const arenaRect = { x: 0, y: 33, width: 1512, height: 949 }
+const arenaRect = { x: args.includes('--offscreen') ? 10000 : 0, y: args.includes('--offscreen') ? 10000 : 33, width: 1512, height: 949 }
 const arenaFile = join(tmp, 'arena.json'); writeFileSync(arenaFile, JSON.stringify(arenaRect))
 const fixture = spawnSync('node', [join(here, 'gen-draft-log.mjs'), '--picks', '42', '--seed', '11'], { encoding: 'utf8' }).stdout.split('\n')
 
@@ -123,6 +123,30 @@ async function expectPage(page, fn, label) {
   failures.push(label)
   console.error('  FAIL', label)
   return false
+}
+
+async function observeDeck(page, entries) {
+  const total = entries.reduce((n, [, count]) => n + count, 0)
+  const line = (text, x, y, width = .16) => ({text, x, y, width, height: .02, confidence: 1})
+  const observation = {at: Date.now(), width: 1512, height: 949, status: 'ok', lines: [line(`${total}/40 Cards`, .83, .16), ...entries.flatMap(([name, count], i) => [line(`${count}x`, .79, .23 + i * .04, .02), line(name, .816, .23 + i * .04)])]}
+  await page.evaluate(o => { window.overlay.action('e2e-deck-screen', o); window.overlay.action('e2e-deck-screen', {...o, at: o.at + 500}) }, observation)
+}
+
+async function expectDeckbuildingGeometry(page) {
+  const result = await page.evaluate(() => {
+    const rail = document.querySelector('#draftRail').getBoundingClientRect()
+    const header = document.querySelector('#hud').getBoundingClientRect()
+    const body = document.querySelector('.sheet-body')
+    const row = document.querySelector('.guide-actions:not([hidden]) [data-guide-card]')?.getBoundingClientRect()
+    const overview = document.querySelector('.guide-overview').getBoundingClientRect()
+    const firstOffset = row ? row.top - rail.top : null
+    const before = overview.top
+    body.scrollTop = body.scrollHeight
+    const sticky = document.querySelector('.guide-overview').getBoundingClientRect().top
+    body.scrollTop = 0
+    return {ok: !!row && firstOffset <= 205 && row.width > 180 && header.bottom <= overview.top + 1 && Math.abs(before-sticky) <= 1, firstOffset, rail: rail.toJSON(), header: header.toJSON(), overview: overview.toJSON(), sticky}
+  })
+  if (!result.ok) failures.push(`compact deckbuilding geometry: ${JSON.stringify(result)}`)
 }
 
 async function expectSheetContained(page, label, requireScroll = false) {
@@ -561,47 +585,61 @@ try {
       !!sheet && sheet.classList.contains('open') && !!document.querySelector(S.sheet) &&
       document.querySelector(S.sheetRating)?.textContent?.startsWith('Pool rating ') &&
       poolCopies === 42 && pickLabels.length === 42 && bestToWorst && landsOrdered &&
-      !document.querySelector('.sheet-picks') && visiblePoolCards.length > 0 && sheetBody?.scrollTop === 0 &&
+      !document.querySelector('.sheet-picks') && !!document.querySelector('[data-testid="deck-guide"]') && sheetBody?.scrollTop === 0 &&
       document.querySelectorAll(S.cell).length === 0
-  }, 'completion sidebar keeps grouped ordered pool, pick labels, lands divider, and no badge leak', 6000)
+  }, 'completion sidebar leads with checklist and retains grouped pool details', 6000)
   await sleep(500)
-  await expectDraftSidebarGeometry(page, 'completion keeps the full opaque sidebar on the left column', 'left')
-  await expectLongPoolScroll(page, 'long grouped pool scrolls internally without moving the pinned footer', 'left')
+  await expectDeckbuildingGeometry(page)
   await shot(page, '08-complete')
 
-  // The explicit Dismiss control ends the linger immediately and leaves only
-  // the fixed click-through idle glyph.
-  await page.click(SEL.hudDismiss).catch(e => failures.push(`completion dismiss: ${e.message}`))
-  await waitFor(page, S => {
-    const visible = selector => {
-      const el = document.querySelector(selector)
-      if (!el || el.hidden) return false
-      const style = getComputedStyle(el)
-      const rect = el.getBoundingClientRect()
-      return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0
-    }
-    const rail = document.querySelector(S.rail)
-    const hud = document.querySelector(S.hud)
-    const sheet = document.querySelector(S.sheetRoot)
-    return !!rail && !rail.classList.contains('open') && rail.getAttribute('aria-hidden') === 'false' &&
-      !!hud && hud.classList.contains('idle') &&
-      hud.classList.contains('hud-tr') && !hud.classList.contains('interactive') &&
-      visible(S.hudIdle) && !visible(S.hudMain) && !!sheet && !sheet.classList.contains('open') &&
-      !visible(S.sheetRoot) && document.querySelectorAll(S.cell).length === 0
-  }, 'dismiss returns completion rail to the idle pill', 3000)
+  // Hiding is reversible and retains the completed pool.
+  const completedPool = await page.evaluate(async () => (await window.overlay.getState()).pool.length)
+  await page.click(SEL.hudDismiss)
+  const hiddenPool = await page.evaluate(async () => (await window.overlay.getState()).pool.length)
+  if (hiddenPool !== completedPool) failures.push('hiding cleared the completed pool')
+  await page.evaluate(() => window.overlay.action('toggle-overlay'))
+  await waitFor(page, () => document.querySelector('#draftRail')?.classList.contains('open') &&
+    !!document.querySelector('.deck-guide'), 'toggle restores completion advice', 3000)
 
   // Real FRA ids in a synthetic 90-card sealed pool, delivered through the
   // same log watcher/parser/model path as a joined Arena event.
   appendFileSync(logPath, readFileSync(join(here, '..', 'fixtures', 'sealed-fra.log'), 'utf8'))
   await waitFor(page, () => document.querySelectorAll('[data-sealed-build]').length === 3 &&
-    document.querySelector('.deck-meta')?.textContent?.includes('creatures') &&
+    !!document.querySelector('.deck-guide') &&
     document.querySelector('.hud-done-title')?.textContent === 'Sealed pool ready',
     'sealed pool produces three scored builds', 15000)
-  await waitFor(page, () => document.querySelector('.deck-plan .deck-meta')?.textContent?.includes('40 cards') &&
+  await observeDeck(page, [])
+  await waitFor(page, () => document.querySelector('.guide-progress')?.getAttribute('aria-valuemax') === '40' &&
     !document.querySelector('[data-sealed-copy]')?.disabled,
     'sealed recommendation has forty cards and can be exported')
+  await waitFor(page, () => document.querySelector('#draftRail')?.getBoundingClientRect().x > window.innerWidth / 2,
+    'sealed panel leaves the pool available for adding cards')
+  await page.click('#btnDeckbuildingSide')
+  await waitFor(page, () => document.querySelector('#draftRail')?.getBoundingClientRect().x === 0,
+    'switching sides uncovers the deck for cuts')
+  await page.click('#btnDeckbuildingSide')
+  await waitFor(page, () => document.querySelector('#draftRail')?.getBoundingClientRect().x > window.innerWidth / 2,
+    'switching back uncovers the pool')
+  await waitFor(page, () => document.querySelector('[data-guide-tab="add"]')?.textContent.includes('40'), 'live empty deck needs forty cards')
+  const firstGuideName = await page.$eval('[data-guide-card]', el => el.dataset.guideCard)
+  await observeDeck(page, [[firstGuideName, 1]])
+  await waitFor(page, () => document.querySelector('[data-guide-tab="add"]')?.textContent.includes('39'), 'observed addition reduces the queue')
+  const extraName = await page.evaluate(async () => {
+    const names = new Set([...document.querySelectorAll('[data-guide-card]')].map(el => el.dataset.guideCard))
+    return (await window.overlay.getState()).pool.find(c => !names.has(c.name))?.name
+  })
+  if (!extraName) throw new Error('fixture needs an off-plan card')
+  await observeDeck(page, [[firstGuideName, 1], [extraName, 1]])
+  await waitFor(page, () => document.querySelector('[data-guide-tab="cut"]')?.textContent.includes('1'), 'off-plan addition appears in cuts')
+  await page.click('[data-guide-tab="cut"]')
+  await waitFor(page, () => document.querySelector('#draftRail').getBoundingClientRect().x === 0, 'cut tab uncovers Arena deck')
+  await observeDeck(page, [[firstGuideName, 1]])
+  await waitFor(page, () => document.querySelector('[data-guide-tab="cut"]')?.textContent.includes('0'), 'observed removal clears cut')
+  await page.click('[data-guide-tab="add"]')
+  await expectDeckbuildingGeometry(page)
   await shot(page, '09-sealed')
   const firstLane = await page.$eval('.deck-lane', el => el.textContent)
+  await page.click('[data-detail-key="builds"] > summary')
   await page.click('[data-sealed-build="1"]')
   const alternative = await page.$eval('.deck-lane', el => el.textContent)
   if (firstLane === alternative) failures.push('sealed alternative did not change deck')
@@ -609,6 +647,46 @@ try {
     'sealed alternative selection is visible')
   await shot(page, '10-sealed-alternative')
   await page.click('[data-sealed-build="0"]')
+
+  // A fresh submission is authoritative even when its list is identical to an
+  // earlier save. Exercise the actual log/parser/coordinator/main wiring after
+  // reopening and editing, with the restored rows outside the OCR viewport.
+  const submitBody = await page.evaluate(async () => {
+    const state = await window.overlay.getState()
+    const quantities = new Map()
+    for (const card of state.pool.slice(0, 40)) quantities.set(card.grpId, (quantities.get(card.grpId) ?? 0) + 1)
+    return { EventName: state.eventName, Deck: {
+      MainDeck: [...quantities].map(([cardId, quantity]) => ({ cardId, quantity })), Sideboard: []
+    } }
+  })
+  const sceneLine = toSceneName => `Client.SceneChange ${JSON.stringify({ toSceneName })}\n`
+  const submitLine = `==> EventSetDeckV3 ${JSON.stringify({ request: JSON.stringify(submitBody) })}\n`
+  appendFileSync(logPath, sceneLine('DeckBuilder') + submitLine)
+  await waitFor(page, async () => {
+    const state = await window.overlay.getState()
+    return state.deckEditing?.status === 'saved' && state.deckEditing.total === 40
+  }, 'first submission verifies the saved deck')
+  const savedCounts = await page.evaluate(async () => (await window.overlay.getState()).deckEditing.counts)
+  appendFileSync(logPath, sceneLine('Home') + sceneLine('DeckBuilder'))
+  await waitFor(page, async () => {
+    const state = await window.overlay.getState()
+    return state.arenaScene === 'DeckBuilder' && state.deckEditing?.status === 'uncertain'
+  }, 'reopening invalidates the earlier saved observation')
+  await observeDeck(page, [[firstGuideName, 1]])
+  await waitFor(page, async () => {
+    const state = await window.overlay.getState()
+    return state.deckEditing?.status === 'live' && state.deckEditing.total === 1
+  }, 'editing replaces the saved observation instead of replaying it')
+  appendFileSync(logPath, sceneLine('Home'))
+  await waitFor(page, async () => (await window.overlay.getState()).deckEditing?.status === 'uncertain',
+    'leaving the edited deck invalidates live tracking')
+  appendFileSync(logPath, submitLine)
+  await waitFor(page, async () => {
+    const state = await window.overlay.getState()
+    return state.deckEditing?.status === 'saved' && state.deckEditing.total === 40
+  }, 'an identical resubmission restores saved verification after edits')
+  const resavedCounts = await page.evaluate(async () => (await window.overlay.getState()).deckEditing.counts)
+  if (JSON.stringify(resavedCounts) !== JSON.stringify(savedCounts)) failures.push('identical resubmission did not restore every saved copy')
   await browser.disconnect()
 } catch (err) {
   failures.push(String(err))

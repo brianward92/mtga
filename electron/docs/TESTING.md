@@ -36,11 +36,12 @@ npm run e2e
 It launches the local `dist/` app with an isolated temporary home, a fake
 1512×949 Arena window, a synthetic 42-pick DSK Quick Draft, and the repository
 model bundle. A temporary overlay appears during the run. It does not touch
-the installed app.
+the installed app. Use `npm run e2e -- --offscreen` to keep the test window
+off the desktop while retaining screenshots and assertions.
 
 By default, artifacts go to `tests/e2e/shots/`:
 
-- `00-idle.png` … `08-complete.png` (see the
+- `00-idle.png` … `10-sealed-alternative.png` (see the
   [E2E harness reference](../tests/e2e/README.md) for what each proves)
 - `console_main.log` and `console_renderer.log`
 
@@ -57,6 +58,7 @@ npm run e2e -- --keep-tmp --port 9334 --speed 8 --out /tmp/mtga-e2e-shots
 | `--port PORT` | Chrome DevTools Protocol port; default `9333`. |
 | `--speed N` | Pause briefly after every `N` streamed log lines; default `10`. |
 | `--out PATH` | Screenshot and console-log directory; default `tests/e2e/shots`. |
+| `--offscreen` | Place the fake Arena window outside the visible desktop. |
 
 ## Environment seams
 
@@ -138,7 +140,7 @@ with each observation.
   on a card is a card click, not an activation click.
 - [ ] Resting the pointer anywhere on the sidebar does not fade it.
 
-### Sidebar bounds and content
+### Draft sidebar bounds and content
 
 - [ ] At 1512×949 and after moving/resizing Arena, one sidebar shell owns the
   full right column: its left edge is approximately 74% through Arena's
@@ -154,11 +156,29 @@ with each observation.
 - [ ] Long Pack 2 and Pack 3 pools scroll only inside the list viewport while
   the provenance and button footer stays pinned to the bottom.
 
-### Complete and dismiss
+### Deckbuilding and visibility
 
-- [ ] Completion removes every badge, shows `Draft complete`, moves the
-  sidebar to the left of the deck builder, and displays the complete pool with
-  the proposed deck.
-- [ ] `Dismiss` immediately returns to the idle glyph with no badge or sidebar
-  leak. Without dismissal, the summary returns to idle after its 15-second
-  linger.
+- [ ] Completion removes every badge and shows a compact deck guide. Sealed
+  defaults to the right for adding cards; Draft defaults to the left for cuts.
+  The panel occupies 21.5% of the window width and leaves Arena's right pool
+  paging arrow and rightmost card selectable at 1280×748 and 1512×949.
+- [ ] Add and Cut show the remaining copies in WUBRG order, then mana value
+  and name, with lands last. Adding/removing cards in Arena updates those
+  lists and In place, including duplicate copies and automatic basic lands.
+- [ ] Switching Add/Cut uncovers the relevant side of Arena. Move switches
+  edges manually. The progress header stays visible while the list scrolls;
+  incoming reads do not reset the user's scroll position.
+- [ ] A partial or uncertain read asks for a sync rather than claiming the
+  deck is complete. Scrolling Arena's deck list through the lands provides
+  fresh evidence. Backgrounding/reopening Arena invalidates stale reads.
+- [ ] Done verifies the exact saved named-card counts from Arena's log. A
+  later save of the same deck verifies again. Restarting Arena recovers the
+  pool and saved deck from the matching Limited course.
+- [ ] Hide removes the overlay without clearing the pool. ⌘⇧O and the tray's
+  Show Overlay restore it, including after Arena's menu; ⌘⇧O toggles it off
+  again. Completed pools remain available until a new event replaces them.
+- [ ] Without Screen Recording, live tracking explains the missing permission
+  while recommendations and log-based saved-deck verification still work.
+- [ ] Deck scanning runs only while Arena's deckbuilder is foregrounded. It
+  checks up to once per second briefly after input, backs off to once every
+  five seconds while idle, and stops outside deckbuilding.

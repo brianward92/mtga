@@ -24,6 +24,13 @@ describe('main overlay activity policy', () => {
     expect(wantsOverlayContent({ ...ACTIVE, phase: 'idle', badgesEnabled: false, hudEnabled: false, calibrating: true })).toBe(true)
   })
 
+  it('honors the user toggle across scenes and calibration', () => {
+    expect(wantsOverlayContent({ ...ACTIVE, manuallyHidden: true })).toBe(false)
+    expect(wantsOverlayContent({ ...ACTIVE, manuallyHidden: true, calibrating: true })).toBe(false)
+    expect(badgesAreLive({ ...ACTIVE, manuallyHidden: true })).toBe(false)
+    expect(wantsOverlayContent({ ...ACTIVE, manuallyHidden: false })).toBe(true)
+  })
+
   it('stays off the screens the draft is not on', () => {
     // A draft stays active while the drafter goes to Home or the store, so the
     // overlay drew a full pack grid over Arena's menus and swallowed clicks on

@@ -13,7 +13,7 @@ export function draftStateAdvanced(currentSeq: number, nextSeq: number): boolean
 /** Compare normalized renderer preferences field-for-field. */
 export function sameViewPrefs(a: ViewPrefs, b: ViewPrefs): boolean {
   return a.badges === b.badges && a.hud === b.hud &&
-    a.hudCorner === b.hudCorner && a.layerDetection === b.layerDetection
+    a.deckbuildingSide === b.deckbuildingSide && a.hudCorner === b.hudCorner && a.layerDetection === b.layerDetection
 }
 
 /** Compare layer-awareness payloads without relying on object identity. */

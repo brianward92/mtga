@@ -25,8 +25,8 @@ export interface Point { x: number; y: number }
 export interface Size { width: number; height: number }
 
 /** True when a window-relative point lies on the sidebar strip. */
-export function pointOnSidebar(local: Point, view: Size, side: SidebarSide): boolean {
-  const r = sidebarShellFrame(view, side)
+export function pointOnSidebar(local: Point, view: Size, side: SidebarSide, phase: string = 'active'): boolean {
+  const r = sidebarShellFrame(view, side, phase)
   return r.width > 0 && r.height > 0 &&
     local.x >= r.x && local.x < r.x + r.width && local.y >= r.y && local.y < r.y + r.height
 }

@@ -7,14 +7,16 @@
  *   F w,h,<base64 gray>   one-shot ScreenCaptureKit luminance frame (only with
  *                         capture on — an opt-in that needs Screen Recording)
  *   C on|off              whether frames are flowing
- * and takes "capture on|off" / "rate <hz>" / "activate" on stdin. Geometry
+ *   D <JSON>              independent, opt-in deck-screen text observations
+ * and takes "capture on|off" / "deck-scan on|off" / "rate <hz>" / "activate" on stdin. Geometry
  * needs NO permission (CGWindowList); we never use AppleScript/Accessibility.
  *
  * Test seam: MTGA_FAKE_ARENA_FILE names a JSON {x,y,width,height} that is
  * polled instead of spawning the helper (e2e / dev without Arena).
  *
  * Events: 'geometry' (rect), 'lost', 'frontmost' (bool), 'frame' (HelperFrame),
- * 'capture' (bool), 'click' (global point), 'helper-missing' (once).
+ * 'capture' (bool), 'deck-screen' (DeckScreenObservation), 'click' (global point),
+ * 'helper-missing' (once).
  */
 import { EventEmitter } from 'events'
 import { spawn, ChildProcess } from 'child_process'
@@ -77,6 +79,57 @@ export interface HelperFrame {
   data: Uint8Array
 }
 
+/** One recognized line, normalized to the Arena window including its title bar. */
+export interface DeckScreenLine {
+  text: string
+  confidence: number
+  /** Fractional bounds with a top-left origin, independent of Retina scale. */
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+/** Text-only observation; screenshots are neither sent to Electron nor saved. */
+export interface DeckScreenObservation {
+  /** Capture start time in epoch milliseconds, so stale observations can be rejected. */
+  at: number
+  /** Arena window size in screen points (zero when no window is available). */
+  width: number
+  height: number
+  status: 'ok' | 'unavailable'
+  reason?: string
+  lines: DeckScreenLine[]
+}
+
+/** Validate the native boundary instead of letting malformed observations alter a deck. */
+export function parseDeckScreenLine(line: string): DeckScreenObservation | null {
+  if (!line.startsWith('D ')) return null
+  try {
+    const raw: unknown = JSON.parse(line.slice(2))
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+    const o = raw as Record<string, unknown>
+    const finite = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n)
+    const fraction = (n: unknown): n is number => finite(n) && n >= 0 && n <= 1
+    if (!finite(o.at) || o.at < 0 || !finite(o.width) || o.width < 0 ||
+        !finite(o.height) || o.height < 0 || (o.status !== 'ok' && o.status !== 'unavailable') ||
+        (o.reason !== undefined && typeof o.reason !== 'string') || !Array.isArray(o.lines)) return null
+    if (o.status === 'ok' && (o.width <= 0 || o.height <= 0)) return null
+    if (o.status === 'unavailable' && o.lines.length > 0) return null
+    const lines: DeckScreenLine[] = []
+    for (const item of o.lines) {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) return null
+      const l = item as Record<string, unknown>
+      if (typeof l.text !== 'string' || !l.text.trim() || !fraction(l.confidence) ||
+          !fraction(l.x) || !fraction(l.y) || !fraction(l.width) || !fraction(l.height) ||
+          l.width <= 0 || l.height <= 0 || l.x + l.width > 1.000001 || l.y + l.height > 1.000001) return null
+      lines.push({ text: l.text, confidence: l.confidence, x: l.x, y: l.y, width: l.width, height: l.height })
+    }
+    return { at: o.at, width: o.width, height: o.height, status: o.status,
+      ...(o.reason === undefined ? {} : { reason: o.reason }), lines }
+  } catch { return null }
+}
+
 /** Parse a helper "F w,h,base64" line. */
 export function parseFrameLine(line: string): HelperFrame | null {
   if (!line.startsWith('F ')) return null
@@ -103,7 +156,7 @@ export function parseClickLine(line: string): { x: number; y: number } | null {
 export function parseWatchLine(line: string): ArenaProbe | null {
   let t = line.trim()
   if (t.startsWith('G ')) t = t.slice(2)
-  if (!t || t.startsWith('F ') || t.startsWith('C ') || t.startsWith('M ')) return null
+  if (!t || t.startsWith('F ') || t.startsWith('C ') || t.startsWith('M ') || t.startsWith('D ')) return null
   if (t === 'NOWIN' || t === 'NOPROC') return { status: 'no-window' }
   const parts = t.split(',').map(v => parseInt(v, 10))
   if ((parts.length !== 5 && parts.length !== 6) || parts.some(v => !Number.isFinite(v))) return null
@@ -122,6 +175,8 @@ export class ArenaGeometryPoller extends EventEmitter {
   captureOn = false
   /** Desired capture state; applied at spawn and live via setCapture(). */
   wantCapture = false
+  /** Deck OCR is independent from the low-resolution occlusion feed. */
+  wantDeckScan = false
 
   private helper: ChildProcess | null = null
   private fakeTimer: NodeJS.Timeout | null = null
@@ -185,6 +240,13 @@ export class ArenaGeometryPoller extends EventEmitter {
     this.helperWrite(`capture ${on ? 'on' : 'off'}`)
   }
 
+  /** Observe deck text only while requested; never asks for Screen Recording permission. */
+  setDeckScan(on: boolean): void {
+    if (this.wantDeckScan === on) return
+    this.wantDeckScan = on
+    this.helperWrite(`deck-scan ${on ? 'on' : 'off'}`)
+  }
+
   private helperWrite(cmd: string): void {
     const stdin = this.helper?.stdin
     if (!stdin || stdin.destroyed || !stdin.writable) return
@@ -201,7 +263,8 @@ export class ArenaGeometryPoller extends EventEmitter {
     }
     let child: ChildProcess
     try {
-      child = spawn(path, this.wantCapture ? ['--capture'] : [], { stdio: ['pipe', 'pipe', 'ignore'] })
+      const args = [...(this.wantCapture ? ['--capture'] : []), ...(this.wantDeckScan ? ['--deck-scan'] : [])]
+      child = spawn(path, args, { stdio: ['pipe', 'pipe', 'ignore'] })
     } catch {
       this.scheduleRetry()
       return
@@ -210,6 +273,11 @@ export class ArenaGeometryPoller extends EventEmitter {
     child.stdin?.on('error', () => { /* helper gone; 'exit' handles it */ })
     const rl = createInterface({ input: child.stdout! })
     rl.on('line', line => {
+      if (line.startsWith('D ')) {
+        const observation = parseDeckScreenLine(line)
+        if (observation && this.wantDeckScan) this.emit('deck-screen', observation)
+        return
+      }
       if (line.startsWith('F ')) {
         const frame = parseFrameLine(line)
         if (frame) this.emit('frame', frame)

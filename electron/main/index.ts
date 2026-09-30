@@ -20,9 +20,10 @@ import { join } from 'path'
 import { writeFileSync } from 'fs'
 import { LogWatcher } from './parser/watcher'
 import { startDraftLogPipeline } from './parser/pipeline'
-import { ArenaGeometryPoller, type ArenaRect } from './arena-geometry'
+import { ArenaGeometryPoller, parseDeckScreenLine, type ArenaRect } from './arena-geometry'
 import { ModelManager } from './model/manager'
 import { DraftHistory } from './data/history'
+import { LiveDeckTracker } from './deck/live-deck'
 import { DraftCoordinator } from './draft/coordinator'
 import { sheetOpenForPhaseTransition } from './draft/completion'
 import { createOverlayWindow, setOverlayRect, showOverlay, hideOverlay, setOverlayInteractive } from './overlay/window'
@@ -39,6 +40,7 @@ import type { DraftState, Prefs } from '../shared/state'
 import { calibrationFor, packLayout, sidebarSide, type CalibrationOp } from '../shared/layout'
 import { arenaDisplayOrder } from '../shared/display-order'
 import { buildDeck } from '../shared/deck-plan'
+import { isSealed, recommendSealed } from '../shared/sealed'
 
 // ---------------------------------------------------------------------------
 // Singletons
@@ -58,7 +60,13 @@ const poller = new ArenaGeometryPoller()
 let quitCommitted = false
 let quitTimer: NodeJS.Timeout | null = null
 /** Pool & picks section of the rail: open by default during a draft. */
+const deckTracker = new LiveDeckTracker()
+let lastSubmittedDeck: DraftState['submittedDeck'] = null
+let lastTrackedPool = ''
+let latestDeckScreen: unknown = null
 let sheetOpen = true
+/** Explicit user toggle, independent of Arena menus and scene changes. */
+let overlayHidden = false
 /**
  * Test seam: the e2e harness fakes the Arena window over the whole screen and
  * drives a synthetic mouse, so the real cursor must not claim the strip or
@@ -84,6 +92,7 @@ function currentOverlayActivity(): OverlayActivity {
     badgesEnabled: prefs.badges,
     hudEnabled: prefs.hud,
     standAside: standAside.active,
+    manuallyHidden: overlayHidden,
     inDraftScene: isDraftScene(draft.arenaScene)
   }
 }
@@ -112,7 +121,7 @@ function syncSidebarPointer(local: { x: number; y: number }): void {
   const onStrip = !!rect && sidebarOpen() && !standAside.active && !calibration.active &&
     poller.isFound() && overlay.isVisible() &&
     (() => {
-      const r = sidebarShellFrame(rect, sidebarSide(coordinator.current.phase))
+      const r = sidebarShellFrame(rect, sidebarSide(coordinator.current.phase, loadPrefs().deckbuildingSide, /sealed/i.test(coordinator.current.eventName ?? '')), coordinator.current.phase)
       return local.x >= r.x && local.x < r.x + r.width && local.y >= r.y && local.y < r.y + r.height
     })()
   const action = sidebarPointer.update(onStrip)
@@ -167,7 +176,7 @@ function noteGlobalClick(point: { x: number; y: number }): void {
   if (!poller.arenaFrontmost) return
   if (point.x < rect.x || point.y < rect.y || point.x > rect.x + rect.width || point.y > rect.y + rect.height) return
   const local = { x: point.x - rect.x, y: point.y - rect.y }
-  if (standAside.noteClick(local, rect, Date.now(), sidebarSide(coordinator.current.phase))) syncOverlay()
+  if (standAside.noteClick(local, rect, Date.now(), sidebarSide(coordinator.current.phase, loadPrefs().deckbuildingSide, /sealed/i.test(coordinator.current.eventName ?? '')), coordinator.current.phase)) syncOverlay()
 }
 
 /** The draft moved on (or the user asked for it back): show the overlay again. */
@@ -197,6 +206,10 @@ const overlayGeometrySync = new OverlayGeometrySync({
     if (sidebarPointer.active) pointerTick()
     // Cursor polling is useful only while badge geometry is live.
     layer?.syncActivity()
+    // Deck OCR is independent of badge layering and keeps following edits
+    // while the panel is hidden. It captures only the Arena window.
+    poller.setDeckScan(coordinator.current.phase === 'complete' &&
+      (coordinator.current.arenaScene === 'DeckBuilder' || coordinator.current.arenaScene == null))
     // Window capture only while badges need layer awareness.
     poller.setCapture(loadPrefs().layerDetection && areBadgesLive())
   }
@@ -212,11 +225,46 @@ function send(channel: string, payload: unknown): void {
 }
 
 let lastPickKey = ''
+let lastArenaScene: string | null | undefined = null
 
 function pushState(state: DraftState): void {
   // A new pack or pick means the drafter is back at the table.
   const pickKey = `${state.phase}:${state.pack}:${state.pick}`
   if (pickKey !== lastPickKey) { lastPickKey = pickKey; lastHoverCell = -1; releaseStandAside() }
+  const deckSceneChanged = state.arenaScene !== lastArenaScene &&
+    (lastArenaScene === 'DeckBuilder' || state.arenaScene === 'DeckBuilder')
+  if (state.arenaScene !== lastArenaScene) {
+    lastArenaScene = state.arenaScene
+    if (isDraftScene(state.arenaScene)) releaseStandAside()
+  }
+  if (state.phase === 'complete') {
+    const key = `${state.eventName}:${state.pool.map(c => c.grpId).sort((a, b) => a - b).join('.')}`
+    if (key !== lastTrackedPool) { lastTrackedPool = key; lastSubmittedDeck = null }
+    deckTracker.setPool(key, state.pool)
+    // Leaving this scene disables OCR before it can report an unreadable
+    // frame. Never reuse unseen rows as evidence on the next visit.
+    const staleDeck = deckSceneChanged ? deckTracker.invalidate() : null
+    if (state.submittedDeck) {
+      // The coordinator creates a new object for each submission. An identical
+      // list saved again still verifies edits made since the previous save;
+      // ordinary state pushes retain the same object and must not replay it.
+      if (state.submittedDeck !== lastSubmittedDeck) {
+        lastSubmittedDeck = state.submittedDeck
+        const counts: Record<string, number> = {}
+        for (const e of state.submittedDeck.main) {
+          const name = e.name ?? state.pool.find(c => c.grpId === e.grpId)?.name ?? `Unknown card ${e.grpId}`
+          counts[name] = (counts[name] ?? 0) + e.quantity
+        }
+        coordinator.setDeckEditing(deckTracker.saved(counts))
+        return
+      }
+    }
+    if (staleDeck && state.deckEditing &&
+      (state.arenaScene === 'DeckBuilder' || state.deckEditing.status !== 'saved')) {
+      coordinator.setDeckEditing(staleDeck)
+      return
+    }
+  }
   send('overlay:state', state)
   syncOverlay()
   refreshTray()
@@ -240,8 +288,8 @@ function mirrorState(state: DraftState): void {
     const packSlots = layout
       ? ordered.map((card, i) => ({ grpId: card.grpId, rect: layout.cards[i]?.card })).filter(slot => slot.rect)
       : []
-    const plan = state.phase === 'complete' ? buildDeck(state.pool) : null
-    writeFileSync(file, JSON.stringify({ ...state, arena, standAside: standAside.active, packSlots, plan }))
+    const plan = state.phase === 'complete' ? (isSealed(state.format, state.eventName) ? recommendSealed(state.pool).builds[0]?.plan ?? null : buildDeck(state.pool)) : null
+    writeFileSync(file, JSON.stringify({ ...state, arena, standAside: standAside.active, packSlots, plan, deckScreen: latestDeckScreen }))
   } catch { /* the mirror is best-effort */ }
 }
 
@@ -261,6 +309,7 @@ function refreshTray(): void {
     draft: coordinator.current,
     prefs: loadPrefs(),
     layerDetectionAvailable: poller.captureOn || screenCaptureGranted(),
+    overlayHidden,
     arenaFound: poller.isFound() && poller.lastKnown !== null
   })
 }
@@ -302,7 +351,19 @@ function setupGeometry(): void {
   poller.on('lost', () => { syncOverlay(); refreshTray() })
   poller.on('frontmost', () => syncOverlay())
   poller.on('capture', () => refreshTray())
-  poller.on('click', (point: { x: number; y: number }) => noteGlobalClick(point))
+  poller.on('click', (point: { x: number; y: number }) => {
+    const r = poller.lastKnown
+    if (r && coordinator.current.phase === 'complete' && poller.arenaFrontmost && !sidebarPointer.active) {
+      deckTracker.noteClick((point.x - r.x) / r.width, (point.y - r.y) / r.height)
+    }
+    noteGlobalClick(point)
+  })
+  poller.on('deck-screen', observation => {
+    if (coordinator.current.phase !== 'complete') return
+    latestDeckScreen = observation
+    coordinator.setDeckEditing(deckTracker.observe(observation))
+    mirrorState(coordinator.current)
+  })
   poller.on('escape', () => {
     if (!poller.arenaFrontmost) return
     if (calibration.active) return
@@ -363,7 +424,25 @@ function setupIpc(): void {
         if (c) pushPrefs(savePrefs({ hudCorner: c }))
         break
       }
-      case 'dismiss': coordinator.idle(); break
+      case 'set-deckbuilding-side': {
+        const side = (msg.data as { side?: unknown })?.side
+        if (side === 'left' || side === 'right') { pushPrefs(savePrefs({ deckbuildingSide: side })); pointerTick() }
+        break
+      }
+      case 'switch-deckbuilding-side': {
+        const side = sidebarSide(coordinator.current.phase, loadPrefs().deckbuildingSide, /sealed/i.test(coordinator.current.eventName ?? ''))
+        pushPrefs(savePrefs({ deckbuildingSide: side === 'left' ? 'right' : 'left' }))
+        pointerTick()
+        break
+      }
+      case 'e2e-deck-screen': {
+        if (!E2E) break
+        const observation = parseDeckScreenLine(`D ${JSON.stringify(msg.data)}`)
+        if (observation) coordinator.setDeckEditing(deckTracker.observe(observation))
+        break
+      }
+      case 'dismiss': hideRequestedOverlay(); break
+      case 'toggle-overlay': toggleRequestedOverlay(); break
       case 'calibrate-start': calibration.start(poller.lastKnown); break
       case 'calibrate-op': calibration.adjust(msg.data as CalibrationOp, poller.lastKnown); break
       case 'calibrate-count': calibration.setCount(Number((msg.data as { count?: number })?.count)); break
@@ -402,6 +481,7 @@ function openScreenRecordingSettings(): void {
 
 function setupTray(): void {
   tray = new StatusTray({
+    toggleOverlay: toggleRequestedOverlay,
     toggleBadges: () => pushPrefs(savePrefs({ badges: !loadPrefs().badges })),
     toggleHud: () => pushPrefs(savePrefs({ hud: !loadPrefs().hud })),
     toggleLayerDetection: () => pushPrefs(savePrefs({ layerDetection: !loadPrefs().layerDetection })),
@@ -412,7 +492,26 @@ function setupTray(): void {
   refreshTray()
 }
 
+function hideRequestedOverlay(): void {
+  overlayHidden = true
+  syncOverlay()
+  refreshTray()
+}
+
+function toggleRequestedOverlay(): void {
+  if (!overlayHidden && overlay?.isVisible()) {
+    hideRequestedOverlay()
+    return
+  }
+  overlayHidden = false
+  releaseStandAside()
+  pushPrefs(savePrefs({ hud: true }))
+  setSheetOpen(true)
+  poller.activateArena()
+}
+
 function setupShortcuts(): void {
+  globalShortcut.register('CommandOrControl+Shift+O', toggleRequestedOverlay)
   // The overlay is never focused; these are global by necessity.
   globalShortcut.register('CommandOrControl+Shift+B', () => {
     releaseStandAside()

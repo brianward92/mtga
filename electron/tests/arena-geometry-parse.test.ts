@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseWatchLine, parseFrameLine } from '../main/arena-geometry'
+import { parseWatchLine, parseFrameLine, parseDeckScreenLine } from '../main/arena-geometry'
 
 describe('parseWatchLine', () => {
   it('parses a G geometry line with frontmost flag', () => {
@@ -69,5 +69,62 @@ describe('parseFrameLine', () => {
     expect(parseFrameLine('F 3,2')).toBeNull()
     expect(parseFrameLine('F 0,2,AA==')).toBeNull()
     expect(parseFrameLine('F x,y,AA==')).toBeNull()
+  })
+})
+
+describe('parseDeckScreenLine', () => {
+  const observation = {
+    at: 1790700000123,
+    width: 1280,
+    height: 748,
+    status: 'ok',
+    lines: [
+      { text: '40/40 Cards', confidence: 0.98, x: 0.82, y: 0.13, width: 0.12, height: 0.025 },
+      { text: '2 Fractured Reality', confidence: 0.91, x: 0.8, y: 0.22, width: 0.18, height: 0.022 }
+    ]
+  }
+
+  it('preserves capture time, point dimensions, text and normalized top-left bounds', () => {
+    expect(parseDeckScreenLine(`D ${JSON.stringify(observation)}`)).toEqual(observation)
+    expect(parseWatchLine(`D ${JSON.stringify(observation)}`)).toBeNull()
+  })
+
+  it('accepts a readable window with no text without inventing deck data', () => {
+    const empty = { ...observation, lines: [] }
+    expect(parseDeckScreenLine(`D ${JSON.stringify(empty)}`)).toEqual(empty)
+  })
+
+  it('reports permission failure and no-window observations without pretending they are empty decks', () => {
+    for (const reason of ['permission', 'no-window', 'background', 'capture-failed']) {
+      const unavailable = { at: observation.at, width: 0, height: 0, status: 'unavailable', reason, lines: [] }
+      expect(parseDeckScreenLine(`D ${JSON.stringify(unavailable)}`)).toEqual(unavailable)
+    }
+  })
+
+  it('rejects malformed envelopes and wrong native channels', () => {
+    for (const line of ['D ', 'D {', 'D null', 'D []', 'F 2,1,AAA=', 'G 0,0,1280,748,1']) {
+      expect(parseDeckScreenLine(line)).toBeNull()
+    }
+    for (const patch of [
+      { at: '1790700000123' }, { at: -1 }, { at: null }, { width: 0 }, { height: -1 },
+      { width: '1280' }, { status: 'ready' }, { reason: 1 }, { lines: null }, { lines: {} },
+      { status: 'unavailable' }
+    ]) {
+      expect(parseDeckScreenLine(`D ${JSON.stringify({ ...observation, ...patch })}`)).toBeNull()
+    }
+  })
+
+  it('rejects any unsafe line rather than using a partially validated deck observation', () => {
+    for (const patch of [
+      { text: '' }, { text: ' ' }, { text: 2 }, { confidence: -0.1 }, { confidence: 1.1 },
+      { confidence: null }, { x: -0.1 }, { x: 1.1 }, { y: -0.1 }, { width: 0 },
+      { height: 0 }, { width: 0.5 }, { y: 0.99, height: 0.1 }, { x: '0.82' }
+    ]) {
+      const invalid = { ...observation.lines[0], ...patch }
+      expect(parseDeckScreenLine(`D ${JSON.stringify({ ...observation, lines: [observation.lines[0], invalid] })}`)).toBeNull()
+    }
+    for (const line of [null, [], '40/40 Cards']) {
+      expect(parseDeckScreenLine(`D ${JSON.stringify({ ...observation, lines: [line] })}`)).toBeNull()
+    }
   })
 })

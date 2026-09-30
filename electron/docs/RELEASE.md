@@ -127,11 +127,12 @@ the paper's FRA letter grades exactly.
 
 ## Permissions
 
-The default overlay uses permission-free Arena window geometry and the
-cursor position. It does not require Accessibility permission. **Precise layering**
-is optional and requests Screen Recording only to inspect one-shot luminance
-frames of the Arena window; frames are not stored. Building, packaging, and
-installing do not grant that permission automatically.
+Draft recommendations use permission-free Arena window geometry and the
+cursor position. Live deck tracking and optional **Precise layering** require
+Screen Recording; both capture only the Arena window, process it locally,
+and never store images. Saved-deck verification from Arena's logs works without
+Screen Recording. The app does not require Accessibility permission. Building,
+packaging, and installing do not grant permissions automatically.
 
 ## Sealed recommendation validation (0.2.0)
 
@@ -145,5 +146,8 @@ curve/creature balance, duplicate ownership, hybrid/devoid costs, modal faces,
 unknown cards, unsupported mana, and exact forty-card exports. Parser and
 coordinator tests cover separate event entries and pool recovery after replay.
 The E2E run additionally feeds a synthetic 90-card FRA pool through the real
-parser/model and switches the visible alternative. Live sealed-event behavior
-and recommendation strength still need player validation.
+parser/model, switches the visible alternative, and checks live Add/Cut counts
+and compact panel geometry. A live FRA Sealed session verified additions,
+cuts, duplicate quantities, pool paging, automatic lands, and recovery of the
+exact saved forty-card deck from Arena's course data. Recommendation strength
+still needs broader player validation.

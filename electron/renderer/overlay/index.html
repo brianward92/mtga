@@ -30,6 +30,10 @@
     <div class="hud-main" id="hudMain" hidden>
       <header class="hud-head">
         <span class="hud-title" id="hudTitle"></span>
+        <span class="deckbuilding-tools" id="deckbuildingTools" hidden>
+          <button class="hud-btn" id="btnDeckbuildingSide" type="button" title="Move the panel to uncover the pool or deck" aria-label="Move panel to other side">⇄ Move</button>
+          <button class="hud-btn hud-dismiss" id="btnDismiss" type="button" title="Hide overlay; bring it back with ⌘⇧O">Hide</button>
+        </span>
         <span class="hud-pos" id="hudPos"></span>
         <span class="hud-dots" id="hudDots" aria-hidden="true"></span>
         <span class="hud-model" id="hudModel" title="">DraftFM</span>
@@ -94,7 +98,6 @@
         <div class="hud-done-title">Draft complete</div>
         <div class="hud-done-line" id="doneAgree"></div>
         <div class="hud-done-line" id="doneBest"></div>
-        <button class="hud-btn hud-dismiss" id="btnDismiss" type="button">Dismiss</button>
       </section>
 
     </div>

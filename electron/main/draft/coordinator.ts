@@ -14,7 +14,7 @@ import { type SetBundle, type CardInfo } from '../data/bundle'
 import { resolveFromArenaDb } from '../data/arena-card-db'
 import { DraftHistory, type RecordedDraft } from '../data/history'
 import { EMPTY_STATE, type CardRow, type DraftState, type PickRecord } from '../../shared/state'
-import { COMPLETE_LINGER_MS, RESTORE_MAX_AGE_MS } from './completion'
+import { RESTORE_MAX_AGE_MS } from './completion'
 
 /** Converts parser snapshots into renderer-ready draft state and history. */
 export class DraftCoordinator extends EventEmitter {
@@ -24,7 +24,6 @@ export class DraftCoordinator extends EventEmitter {
   private scoreToken = 0
   lastSubmittedDeck: SubmittedDeck | null = null
   private lastScores: { pack: number; pick: number; cards: ScoredCard[]; modelId: string } | null = null
-  private endTimer: NodeJS.Timeout | null = null
   private replaying = false
   /** Bumped whenever the draft changes; in-flight backfills check it and abort. */
   private draftToken = 0
@@ -63,7 +62,6 @@ export class DraftCoordinator extends EventEmitter {
 
   onDraftStart(snap: DraftSessionSnapshot): void {
     snap = this.fill(snap)
-    this.clearEndTimer()
     this.draftToken++
     this.snapshot = snap
     this.bundle = snap.set ? this.models.bundleFor(snap.set) : null
@@ -176,7 +174,7 @@ export class DraftCoordinator extends EventEmitter {
     const submitSnap = this.snapshot
     this.history.append({ at: new Date().toISOString(), type: 'deck-submit', draftId: submitSnap?.draftId ?? null, eventName: deck.eventName ?? submitSnap?.eventName ?? null, set: submitSnap?.set ?? null, format: submitSnap?.format ?? null,
       mainCount: deck.mainCount, main: deck.main, sideboard: deck.sideboard })
-    this.state = { ...this.state, submittedDeck: { main: deck.main, sideboard: deck.sideboard, mainCount: deck.mainCount }, seq: this.state.seq + 1 }
+    this.state = { ...this.state, submittedDeck: { main: deck.main.map(e => ({ ...e, name: this.card(e.grpId)?.name })), sideboard: deck.sideboard, mainCount: deck.mainCount }, seq: this.state.seq + 1 }
     this.publish()
   }
 
@@ -193,8 +191,6 @@ export class DraftCoordinator extends EventEmitter {
     if (snap.pool.length > 0) {
       this.history.append({ at, type: 'draft-pool', draftId: snap.draftId, eventName: snap.eventName, set: snap.set, format: snap.format, pool: snap.pool })
     }
-    this.clearEndTimer()
-    this.endTimer = setTimeout(() => { this.endTimer = null; this.idle() }, COMPLETE_LINGER_MS)
   }
 
   /**
@@ -260,8 +256,6 @@ export class DraftCoordinator extends EventEmitter {
     }
     this.publish()
     if (draft.format) void this.models.ensure(draft.set, draft.format).then(() => this.refreshModelInfo())
-    this.clearEndTimer()
-    this.endTimer = setTimeout(() => { this.endTimer = null; this.idle() }, COMPLETE_LINGER_MS)
   }
 
   /** Surface (or clear) a setup warning without touching draft state. */
@@ -271,9 +265,19 @@ export class DraftCoordinator extends EventEmitter {
     this.publish()
   }
 
-  /** User dismissed / timer: back to idle. */
+  /** Publish read-only live deck observations without altering the pool/model. */
+  setDeckEditing(editing: import('../../shared/state').DeckEditingState): void {
+    const before = this.state.deckEditing
+    if (before && JSON.stringify({ ...before, observedAt: null }) === JSON.stringify({ ...editing, observedAt: null })) {
+      this.state = { ...this.state, deckEditing: editing }
+      return
+    }
+    this.state = { ...this.state, deckEditing: editing, seq: this.state.seq + 1 }
+    this.publish()
+  }
+
+  /** User dismissed: back to idle. */
   idle(): void {
-    this.clearEndTimer()
     this.draftToken++
     this.snapshot = null
     this.lastScores = null
@@ -435,10 +439,6 @@ export class DraftCoordinator extends EventEmitter {
         setGrade: intrinsic?.grade ?? null
       }
     })
-  }
-
-  private clearEndTimer(): void {
-    if (this.endTimer) { clearTimeout(this.endTimer); this.endTimer = null }
   }
 
   private publish(): void {

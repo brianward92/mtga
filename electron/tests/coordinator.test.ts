@@ -1,7 +1,6 @@
 import { DraftParser } from '../main/parser/draft-parser'
 import { describe, expect, it, vi } from 'vitest'
 import { DraftCoordinator } from '../main/draft/coordinator'
-import { COMPLETE_LINGER_MS } from '../main/draft/completion'
 import type { DraftSessionSnapshot } from '../main/parser/draft-session'
 import type { DraftState } from '../shared/state'
 
@@ -59,7 +58,7 @@ describe('DraftCoordinator', () => {
     c.idle()
   })
 
-  it('keeps the completed pool for the full linger window, then idles', () => {
+  it('keeps the completed pool available until explicitly dismissed', () => {
     vi.useFakeTimers()
     const c = new DraftCoordinator(stubModels() as never, { append() {} } as never)
     try {
@@ -67,15 +66,14 @@ describe('DraftCoordinator', () => {
       c.onDraftStart(snap({ pool: [1] }))
       c.onDraftEnd(snap({ state: 'complete', pool: [1, 2] }))
 
-      expect(COMPLETE_LINGER_MS).toBe(30 * 60_000)
       expect(c.current.phase).toBe('complete')
       expect(c.current.pool.map(card => card.name)).toEqual(['Murder', 'Funeral Room'])
 
-      vi.advanceTimersByTime(COMPLETE_LINGER_MS - 1)
+      vi.advanceTimersByTime(60 * 60_000)
       expect(c.current.phase).toBe('complete')
       expect(c.current.pool).toHaveLength(2)
 
-      vi.advanceTimersByTime(1)
+      c.idle()
       expect(c.current.phase).toBe('idle')
       expect(c.current.pool).toEqual([])
     } finally {

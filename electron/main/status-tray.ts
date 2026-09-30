@@ -9,6 +9,7 @@ import type { DraftState, Prefs } from '../shared/state'
 import { draftLabel, modelLabel } from './status-labels'
 
 interface TrayState {
+  overlayHidden: boolean
   draft: DraftState
   prefs: Prefs
   layerDetectionAvailable: boolean
@@ -16,6 +17,7 @@ interface TrayState {
 }
 
 interface TrayActions {
+  toggleOverlay: () => void
   toggleBadges: () => void
   toggleHud: () => void
   toggleLayerDetection: () => void
@@ -73,6 +75,7 @@ export class StatusTray {
       { label: modelLabel(s.draft), enabled: false },
       { label: draftLabel(s.draft, s.arenaFound), enabled: false },
       { type: 'separator' },
+      { label: s.overlayHidden ? 'Show Overlay' : 'Hide Overlay', accelerator: 'CommandOrControl+Shift+O', click: () => this.actions.toggleOverlay() },
       { label: 'Card Badges', type: 'checkbox', checked: s.prefs.badges, click: () => this.actions.toggleBadges() },
       { label: 'Draft Sidebar', type: 'checkbox', checked: s.prefs.hud, click: () => this.actions.toggleHud() },
       { type: 'separator' },

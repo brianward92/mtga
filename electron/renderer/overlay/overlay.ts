@@ -75,7 +75,7 @@ function render(): void {
   // Arena letterboxes its UI, so the rail's left edge tracks the content box
   // rather than a fixed window percentage; drive it from the pure geometry.
   if (sidebar.open) {
-    const shell = sidebarShellFrame(store.view, sidebarSide(store.state.phase))
+    const shell = sidebarShellFrame(store.view, sidebarSide(store.state.phase, store.prefs.deckbuildingSide, /sealed/i.test(store.state.eventName ?? '')), store.state.phase)
     const right = Math.round(window.innerWidth - shell.x - shell.width)
     const bottom = Math.round(store.view.height - shell.y - shell.height)
     const style = `${Math.round(shell.x)}px:${Math.round(shell.y)}px:${right}px:${bottom}px`
@@ -175,6 +175,7 @@ function onPrefs(raw: unknown): void {
     badges: p.badges !== false,
     hud: p.hud !== false,
     hudCorner: p.hudCorner === 'tl' || p.hudCorner === 'tr' || p.hudCorner === 'bl' || p.hudCorner === 'br' ? p.hudCorner : 'tr',
+    deckbuildingSide: p.deckbuildingSide === 'left' || p.deckbuildingSide === 'right' ? p.deckbuildingSide : undefined,
     layerDetection: p.layerDetection === true
   }
   if (sameViewPrefs(store.prefs, next)) return

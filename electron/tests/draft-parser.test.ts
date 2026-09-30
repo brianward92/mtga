@@ -784,3 +784,76 @@ describe('DraftParser — the pool is still served after the deck is submitted',
     expect(captured.ends[0].draftId).toBe('d6112364')
   })
 })
+
+describe('DraftParser — restores the adopted course’s saved Limited deck', () => {
+  const savedCourse = (over: Record<string, unknown> = {}) => ({
+    CourseId: 'saved-fra', InternalEventName: 'Sealed_FRA_20260929', CurrentModule: 'MatchResults',
+    CardPool: Array.from({ length: 84 }, (_, i) => 100000 + i),
+    CourseDeck: {
+      MainDeck: [{ cardId: 100000, quantity: 23 }, { cardId: 87021, quantity: 10 }, { cardId: 97168, quantity: 7 }],
+      Sideboard: [{ cardId: 100001, quantity: 2 }]
+    }, ...over
+  })
+  const feedCourses = (parser: DraftParser, ...courses: unknown[]) => feed(parser, ['<== EventGetCoursesV2(restart)', JSON.stringify({ Courses: courses })])
+  const submitted = (parser: DraftParser) => {
+    const decks: Array<{ eventName: string; mainCount: number; main: Array<{ grpId: number; quantity: number }>; sideboard: unknown[] }> = []
+    parser.on('deck-submitted', deck => decks.push(deck))
+    return decks
+  }
+
+  it('restores forty saved cards after log rotation, after publishing the 84-card pool', () => {
+    const parser = new DraftParser()
+    const decks = submitted(parser)
+    const order: string[] = []
+    parser.on('draft-end', () => order.push('pool'))
+    parser.on('deck-submitted', () => order.push('deck'))
+    feedCourses(parser, savedCourse())
+    expect(parser.getSnapshot()?.pool).toHaveLength(84)
+    expect(order).toEqual(['pool', 'deck'])
+    expect(decks).toHaveLength(1)
+    expect(decks[0].eventName).toBe('Sealed_FRA_20260929')
+    expect(decks[0].mainCount).toBe(40)
+    expect(decks[0].main).toContainEqual({ grpId: 87021, quantity: 10 })
+    expect(decks[0].sideboard).toEqual([{ grpId: 100001, quantity: 2 }])
+    feedCourses(parser, savedCourse())
+    expect(decks).toHaveLength(1)
+  })
+
+  it('restores an authoritative single join, including a completed draft', () => {
+    for (const InternalEventName of ['Sealed_FRA_20260929', 'QuickDraft_LCI_20260908']) {
+      const parser = new DraftParser()
+      const decks = submitted(parser)
+      feed(parser, ['<== EventJoin(resume)', JSON.stringify({ Course: savedCourse({ InternalEventName, CurrentModule: 'DeckSelect' }) })])
+      expect(parser.getSnapshot()?.state).toBe('complete')
+      expect(decks).toHaveLength(1)
+      expect(decks[0].eventName).toBe(InternalEventName)
+      expect(decks[0].mainCount).toBe(40)
+    }
+  })
+
+  it('does not guess a deck from two completed Limited courses', () => {
+    const parser = new DraftParser()
+    const decks = submitted(parser)
+    feedCourses(parser, savedCourse(), savedCourse({ CourseId: 'second', InternalEventName: 'PremierDraft_FRA_20260929' }))
+    expect(parser.getSnapshot()).toBeNull()
+    expect(decks).toEqual([])
+  })
+
+  it('does not replace the adopted deck with a different course of the same event', () => {
+    const parser = new DraftParser()
+    const decks = submitted(parser)
+    feedCourses(parser, savedCourse())
+    feedCourses(parser, savedCourse({ CourseId: 'different-run' }))
+    expect(parser.getSnapshot()?.draftId).toBe('saved-fra')
+    expect(decks).toHaveLength(1)
+  })
+
+  it('ignores empty saved decks and unrelated constructed courses', () => {
+    for (const course of [savedCourse({ CourseDeck: { MainDeck: [], Sideboard: [] } }), savedCourse({ InternalEventName: 'Ladder' })]) {
+      const parser = new DraftParser()
+      const decks = submitted(parser)
+      feedCourses(parser, course)
+      expect(decks).toEqual([])
+    }
+  })
+})

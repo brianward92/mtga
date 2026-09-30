@@ -18,6 +18,7 @@ describe('renderer change detection', () => {
     const prefs = { badges: true, hud: true, hudCorner: 'tr' as const, layerDetection: false }
     expect(sameViewPrefs(prefs, { ...prefs })).toBe(true)
     expect(sameViewPrefs(prefs, { ...prefs, badges: false })).toBe(false)
+    expect(sameViewPrefs(prefs, { ...prefs, deckbuildingSide: 'right' })).toBe(false)
   })
 
   it('recognizes equivalent layer arrays and regions', () => {

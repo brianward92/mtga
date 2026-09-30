@@ -44,7 +44,22 @@ Sealed and Traditional Sealed events now show a suggested deck and up to two
 alternatives when Arena logs the pool. The assistant compares all ten color
 pairs using DraftFM's Premier Draft first-pick ratings, with explicit creature
 and mana-curve preferences. Select a build to see its spells, basic lands,
-and closest cuts. **Copy Arena deck** copies a complete 40-card list for the
+and closest cuts. Sealed places the panel on the right to leave the pool available
+for adding cards; Draft places it on the left for cuts. Live deck tracking reads
+Arena's visible deck names and quantities locally and updates **Add**, **Cut**,
+and **In place** as you edit. Cards follow WUBRG, then mana value/name, with
+lands last. Counts include duplicate copies and automatic lands. Add/Cut tabs
+move the panel to uncover the area you need; Hide and ⌘⇧O preserve the session.
+The reader checks up to once per second after interaction, backs off to once
+every five seconds while idle, and stops outside the deckbuilder.
+A matching total is not enough: the guide compares every named card and copy.
+When rows are obscured or offscreen, the guide keeps known counts and asks you
+to scroll the deck list to sync. It never labels an uncertain read complete.
+Arena's saved deck, logged when you press Done, provides final verification.
+**Move** switches the panel to the other edge whenever you need access
+underneath. **Show Overlay** in the assistant menu bar or **⌘⇧O** brings a hidden
+overlay back, including after an Arena menu. Completed pools remain available
+until replaced by a new event. **Copy Arena deck** copies a complete 40-card list for the
 Arena Decks import screen; it does not change or submit your event deck.
 
 This is model-assisted deckbuilding, not a sealed-trained model or a win-rate
@@ -67,7 +82,7 @@ checked-in product assets; generate them with `npm run build && npm run e2e`.
 | `00-idle.png` | Tiny click-through idle glyph and no draft UI leakage |
 | `04-sheet.png` | Full right-column sidebar and fixed #1–#5 probability table |
 | `06-p2p6.png` | Populated Pack 2 pool with internal scrolling and pinned footer |
-| `08-complete.png` | Draft summary, grouped duplicate rows, pick labels, and Lands divider |
+| `08-complete.png` | Compact deck guide with Add/Cut progress and collapsed full pool |
 
 The complete checkpoint list and harness controls live in
 [`tests/e2e/README.md`](tests/e2e/README.md).
@@ -76,8 +91,9 @@ The complete checkpoint list and harness controls live in
 
 - macOS 14+ (Apple silicon build), MTG Arena with **Detailed Logs** enabled
   (Options → Account → Detailed Logs (Plugin Support)).
-- No macOS permissions are required by default. **Precise layering** is opt-in
-  and requires Screen Recording. Accessibility permission is never required.
+- Live deck tracking and optional **Precise layering** need Screen Recording.
+  The draft recommendations and log-based saved-deck verification work without
+  it. Captures contain only Arena, are processed locally, and are never saved.
 
 ## Package / install
 

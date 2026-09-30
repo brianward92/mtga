@@ -12,6 +12,8 @@ export interface OverlayActivity {
   hudEnabled: boolean
   /** The drafter is in Arena's own menus: our overlay steps aside entirely. */
   standAside: boolean
+  /** Explicitly hidden by the user, including during calibration. */
+  manuallyHidden?: boolean
   /** Arena is showing the draft or the deckbuilder, not Home or the store. */
   inDraftScene: boolean
 }
@@ -36,7 +38,7 @@ export function isDraftScene(scene: string | null | undefined): boolean {
 
 /** Whether any overlay content should be visible for the current app state. */
 export function wantsOverlayContent(activity: OverlayActivity): boolean {
-  if (!activity.arenaFound) return false
+  if (!activity.arenaFound || activity.manuallyHidden) return false
   if (activity.calibrating) return true
   if (activity.standAside) return false
   if (!activity.inDraftScene) return false

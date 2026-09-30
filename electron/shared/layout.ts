@@ -278,6 +278,8 @@ export function arenaContentBox(view: { width: number; height: number }): { x: n
 
 const SIDEBAR_LEFT_FRACTION = 0.74
 const SIDEBAR_TOP_FRACTION = 0.115
+/** Deckbuilder pool paging ends before this window-relative deck rail edge. */
+const DECKBUILDING_RAIL_FRACTION = 0.785
 
 /**
  * The full opaque, pointer-owning right strip of the Arena window, in window
@@ -290,20 +292,21 @@ export type SidebarSide = 'left' | 'right'
 
 /**
  * Which window edge the sidebar owns. During deckbuilding (`complete`) Arena's
- * own deck list occupies the right column — cuts happen there — so the panel
- * mirrors to the left edge; while drafting it lives on the right as before.
+ * deck list occupies the right column. Draft defaults to the left for cuts;
+ * Sealed defaults to the right for adding from the pool. Either can be switched.
  */
-export function sidebarSide(phase: string): SidebarSide {
-  return phase === 'complete' ? 'left' : 'right'
+export function sidebarSide(phase: string, preferred?: SidebarSide, sealed = false): SidebarSide {
+  return phase === 'complete' ? (preferred ?? (sealed ? 'right' : 'left')) : 'right'
 }
 
 export function sidebarShellFrame(
   view: LayoutView,
-  side: SidebarSide = 'right'
+  side: SidebarSide = 'right',
+  phase: string = 'active'
 ): Rect {
   const offset = 28 - (view.titleBarHeight ?? 28)
   if (offset) {
-    const r = sidebarShellFrame({ width: view.width, height: view.height + offset }, side)
+    const r = sidebarShellFrame({ width: view.width, height: view.height + offset }, side, phase)
     return { ...r, y: r.y - offset }
   }
   const width = Number.isFinite(view.width) ? Math.max(0, view.width) : 0
@@ -311,8 +314,14 @@ export function sidebarShellFrame(
   if (width === 0 || height === 0) return { x: 0, y: 0, width: 0, height: 0 }
   // Arena's rails sit in its centred, height-scaled content box, so ours
   // starts there too — and always runs to the window's outer/bottom edge.
-  const box = arenaContentBox({ width, height })
   const y = height * SIDEBAR_TOP_FRACTION
+  // Arena's deckbuilder spans the window, unlike the height-scaled draft
+  // layout. Keep its rightmost pool card and page arrow outside our hit area.
+  if (phase === 'complete') {
+    const railWidth = width * (1 - DECKBUILDING_RAIL_FRACTION)
+    return { x: side === 'left' ? 0 : width - railWidth, y, width: railWidth, height: height - y }
+  }
+  const box = arenaContentBox({ width, height })
   if (side === 'left') {
     const edge = Math.max(0, Math.min(width, box.x + box.width * (1 - SIDEBAR_LEFT_FRACTION)))
     return { x: 0, y, width: edge, height: height - y }
