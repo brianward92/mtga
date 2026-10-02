@@ -19,5 +19,8 @@ describe('deckbuilding panel side', () => {
     expect(sidebarSide('complete', 'left', true)).toBe('left')
     expect(sidebarSide('complete', 'right')).toBe('right')
     expect(sidebarSide('active', 'left', true)).toBe('right')
+    expect(sidebarSide('active', 'right', false, 'left')).toBe('left')
+    expect(sidebarSide('active', 'left', false, 'right')).toBe('right')
+    expect(sidebarSide('complete', 'left', false, 'right')).toBe('left')
   })
 })

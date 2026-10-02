@@ -49,6 +49,7 @@ export function loadPrefs(): Prefs {
     hudCorner: (['tl', 'tr', 'bl', 'br'] as const).includes(raw.hudCorner as HudCorner)
       ? (raw.hudCorner as HudCorner)
       : DEFAULT_PREFS.hudCorner,
+    draftSidebarSide: raw.draftSidebarSide === 'left' || raw.draftSidebarSide === 'right' ? raw.draftSidebarSide : undefined,
     deckbuildingSide: raw.deckbuildingSide === 'left' || raw.deckbuildingSide === 'right' ? raw.deckbuildingSide : undefined,
     layerDetection: raw.layerDetection === true ? true : DEFAULT_PREFS.layerDetection,
     openAtLogin: raw.openAtLogin === false ? false : DEFAULT_PREFS.openAtLogin,

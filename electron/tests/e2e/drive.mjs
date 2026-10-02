@@ -409,6 +409,12 @@ try {
       chips.every(chip => /^\d+$/.test(chip.querySelector('b')?.textContent ?? ''))
   }, 'single WUBRGC pool summary in the sidebar')
   await expectDraftSidebarGeometry(page, 'P1P1 full right-column sidebar geometry, hierarchy, and ownership')
+  await page.click('#btnDeckbuildingSide')
+  await waitFor(page, () => document.querySelector('#draftRail')?.getBoundingClientRect().x === 0,
+    'active draft Move control places the sidebar on the left')
+  await page.click('#btnDeckbuildingSide')
+  await waitFor(page, () => document.querySelector('#draftRail')?.getBoundingClientRect().x > window.innerWidth / 2,
+    'active draft Move control restores the right sidebar')
   await expectPage(page, S => {
     const footer = document.querySelector(S.hudFooter)
     const buttonIds = footer ? [...footer.querySelectorAll('button')].map(button => button.id) : []

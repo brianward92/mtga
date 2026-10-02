@@ -5,7 +5,7 @@
 import type { DraftState, LayerState, CalibrateState, Prefs } from '../../shared/state'
 
 /** Renderer prefs: the persisted prefs minus the calibration table. */
-export type ViewPrefs = Pick<Prefs, 'badges' | 'hud' | 'hudCorner' | 'layerDetection' | 'deckbuildingSide'>
+export type ViewPrefs = Pick<Prefs, 'badges' | 'hud' | 'hudCorner' | 'layerDetection' | 'deckbuildingSide' | 'draftSidebarSide'>
 
 /** User intent emitted by renderer controls through the preload bridge. */
 export type OverlayAction = (name: string, data?: unknown) => void

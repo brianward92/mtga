@@ -877,6 +877,7 @@ body.calibrating .sheet { display: none; }
   grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 0.25rem 0.45rem;
 }
+.draft-rail.open:not(.deckbuilding) .deckbuilding-tools { grid-column: 1 / 4; grid-row: 3; justify-self: end; }
 .draft-rail.open .hud-title { grid-column: 1; grid-row: 1; }
 .draft-rail.open .hud-pos { grid-column: 2; grid-row: 1; }
 .draft-rail.open .sheet-rating { grid-column: 3; grid-row: 1; }

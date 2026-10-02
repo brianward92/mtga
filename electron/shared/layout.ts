@@ -291,12 +291,12 @@ const DECKBUILDING_RAIL_FRACTION = 0.785
 export type SidebarSide = 'left' | 'right'
 
 /**
- * Which window edge the sidebar owns. During deckbuilding (`complete`) Arena's
+ * Draft uses the right edge unless moved. During deckbuilding (`complete`) Arena's
  * deck list occupies the right column. Draft defaults to the left for cuts;
  * Sealed defaults to the right for adding from the pool. Either can be switched.
  */
-export function sidebarSide(phase: string, preferred?: SidebarSide, sealed = false): SidebarSide {
-  return phase === 'complete' ? (preferred ?? (sealed ? 'right' : 'left')) : 'right'
+export function sidebarSide(phase: string, preferred?: SidebarSide, sealed = false, draftPreferred?: SidebarSide): SidebarSide {
+  return phase === 'complete' ? (preferred ?? (sealed ? 'right' : 'left')) : (draftPreferred ?? 'right')
 }
 
 export function sidebarShellFrame(

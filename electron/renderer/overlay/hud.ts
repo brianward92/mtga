@@ -178,7 +178,7 @@ export class Hud {
     rail?.classList.toggle('deckbuilding', complete)
     const footer = rail?.querySelector<HTMLElement>('.hud-foot')
     if (footer) footer.hidden = complete
-    $(this.root, 'deckbuildingTools').hidden = !complete
+    $(this.root, 'deckbuildingTools').hidden = idle
     this.corner = hudCornerForPhase(state.phase, prefs.hudCorner)
 
     // The idle pill has nothing to click: stay click-through so Arena's own

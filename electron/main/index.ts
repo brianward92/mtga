@@ -121,7 +121,7 @@ function syncSidebarPointer(local: { x: number; y: number }): void {
   const onStrip = !!rect && sidebarOpen() && !standAside.active && !calibration.active &&
     poller.isFound() && overlay.isVisible() &&
     (() => {
-      const r = sidebarShellFrame(rect, sidebarSide(coordinator.current.phase, loadPrefs().deckbuildingSide, /sealed/i.test(coordinator.current.eventName ?? '')), coordinator.current.phase)
+      const r = sidebarShellFrame(rect, sidebarSide(coordinator.current.phase, loadPrefs().deckbuildingSide, /sealed/i.test(coordinator.current.eventName ?? ''), loadPrefs().draftSidebarSide), coordinator.current.phase)
       return local.x >= r.x && local.x < r.x + r.width && local.y >= r.y && local.y < r.y + r.height
     })()
   const action = sidebarPointer.update(onStrip)
@@ -176,7 +176,7 @@ function noteGlobalClick(point: { x: number; y: number }): void {
   if (!poller.arenaFrontmost) return
   if (point.x < rect.x || point.y < rect.y || point.x > rect.x + rect.width || point.y > rect.y + rect.height) return
   const local = { x: point.x - rect.x, y: point.y - rect.y }
-  if (standAside.noteClick(local, rect, Date.now(), sidebarSide(coordinator.current.phase, loadPrefs().deckbuildingSide, /sealed/i.test(coordinator.current.eventName ?? '')), coordinator.current.phase)) syncOverlay()
+  if (standAside.noteClick(local, rect, Date.now(), sidebarSide(coordinator.current.phase, loadPrefs().deckbuildingSide, /sealed/i.test(coordinator.current.eventName ?? ''), loadPrefs().draftSidebarSide), coordinator.current.phase)) syncOverlay()
 }
 
 /** The draft moved on (or the user asked for it back): show the overlay again. */
@@ -430,8 +430,8 @@ function setupIpc(): void {
         break
       }
       case 'switch-deckbuilding-side': {
-        const side = sidebarSide(coordinator.current.phase, loadPrefs().deckbuildingSide, /sealed/i.test(coordinator.current.eventName ?? ''))
-        pushPrefs(savePrefs({ deckbuildingSide: side === 'left' ? 'right' : 'left' }))
+        const side = sidebarSide(coordinator.current.phase, loadPrefs().deckbuildingSide, /sealed/i.test(coordinator.current.eventName ?? ''), loadPrefs().draftSidebarSide)
+        pushPrefs(savePrefs({ [coordinator.current.phase === 'complete' ? 'deckbuildingSide' : 'draftSidebarSide']: side === 'left' ? 'right' : 'left' }))
         pointerTick()
         break
       }

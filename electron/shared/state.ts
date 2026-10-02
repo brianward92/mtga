@@ -178,6 +178,8 @@ export interface Prefs {
   badges: boolean
   hud: boolean
   hudCorner: HudCorner
+  /** Override the draft sidebar edge; defaults to the right. */
+  draftSidebarSide?: 'left' | 'right'
   /** Override the deckbuilding panel edge; otherwise Sealed adds, Draft cuts. */
   deckbuildingSide?: 'left' | 'right'
   layerDetection: boolean
