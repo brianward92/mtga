@@ -12,12 +12,13 @@ import { isBasicLand as isBasicLandCard } from '../../shared/cards'
 import { COLOR_NAMES, POOL_COLORS, poolSummary } from './hud-logic'
 import { escapeHtml, renderManaCost } from './shared'
 import type { Store } from './types'
+import { recommendDraftBuilds } from '../../shared/draft-builds'
 import { arenaDeckText, isSealed, recommendSealed, type SealedRecommendation } from '../../shared/sealed'
 import { deckGuide, guideOrder, type DeckCounts, type GuideRow } from '../../shared/deck-guide'
 import { sheetShouldRender } from './visibility'
 import { bundleProvenance } from './model-tag'
 import {
-  BASIC_LAND_NAMES, buildDeck, type CardStatus, type DeckEntry, type DeckPlan
+  BASIC_LAND_NAMES, type CardStatus, type DeckEntry, type DeckPlan
 } from '../../shared/deck-plan'
 
 /** Set-review grade for pool display: the raw set rating (falls back to the pool grade). */
@@ -263,21 +264,21 @@ export function deckHtml(plan: DeckPlan, sealed = false, guide = ''): string {
     </div>`
 }
 
-export function sealedHtml(result: SealedRecommendation, selected = 0, guide = ''): string {
+export function sealedHtml(result: SealedRecommendation, selected = 0, guide = '', draft = false): string {
   const build = result.builds[selected]
   const omitted = result.unscored || result.unsupportedMana
     ? `<p class="deck-short">Excluded: ${result.unscored} cards without ratings or complete metadata; ${result.unsupportedMana} cards requiring unsupported mana. Review these in your pool.</p>` : ''
-  if (!build) return `<div class="s-group"><h3 class="sheet-h">Sealed deck suggestions</h3><p>No scored build available for this pool.</p>${omitted}</div>`
+  if (!build) return `<div class="s-group"><h3 class="sheet-h">${draft ? 'Draft' : 'Sealed'} deck suggestions</h3><p>No scored build available for this pool.</p>${omitted}</div>`
   const comparison = `<details class="sealed-options guide-detail" data-detail-key="builds" data-testid="sealed-options"><summary>Compare builds <span>${result.builds.length} options</span></summary>
-    <div class="sealed-choices">${result.builds.map((b, i) => `<button type="button" data-sealed-build="${i}" aria-pressed="${i === selected}">${i === 0 ? 'Recommended' : `Alternative ${i}`} · ${b.plan.laneLabel}</button>`).join('')}</div>
+    <div class="sealed-choices">${result.builds.map((b, i) => `<button type="button" data-sealed-build="${i}" aria-pressed="${i === selected}">${i === 0 ? 'Recommended' : draft ? `${b.plan.lane.length} colors` : `Alternative ${i}`} · ${b.plan.laneLabel}</button>`).join('')}</div>
     <p class="deck-meta">${build.creatures} creatures · ${build.early} spells costing 3 or less · ${build.expensive} costing 5+</p>
-    <p class="deck-meta">Compares all ten color pairs by card ratings, creature count and curve.</p>
+    <p class="deck-meta">${draft ? 'Compares one through five colors using card ratings, creature count, curve and land-source shortfalls.' : 'Compares all ten color pairs by card ratings, creature count and curve.'}</p>
     ${omitted}
     <button type="button" data-sealed-copy ${build.plan.short ? 'disabled' : ''}>Copy Arena deck</button>
     <span class="deck-meta" data-copy-status role="status"></span>
-    <p class="deck-note">Ratings, creature count and curve guide the suggestion. Review splashes and nonbasic fixing.</p>
+    <p class="deck-note">${draft ? 'Mana estimates count basic lands and printed land sources. Review conditional lands and fixing spells before committing to extra colors.' : 'Ratings, creature count and curve guide the suggestion. Review splashes and nonbasic fixing.'}</p>
   </details>`
-  return `${deckHtml(build.plan, true, guide)}${comparison}`
+  return `${deckHtml(build.plan, !draft, guide)}${comparison}`
 }
 
 /** Render pick history newest-first with agreement and recommendation tags. */
@@ -388,7 +389,7 @@ export class Sheet {
     // OCR timestamps advance even when nothing visible changed. Keep the same
     // nodes in that case so a click, hover or keyboard focus is not interrupted.
     const key = state.phase === 'complete'
-      ? JSON.stringify([state.phase, state.eventName, state.model.state, state.pool.map(c => [c.grpId, c.setPercentile]), this.selected, this.tab,
+      ? JSON.stringify([state.phase, state.eventName, state.model.state, state.pool.map(c => [c.grpId, c.setPercentile, c.percentile]), this.selected, this.tab,
           observation?.counts, observation?.total, observation?.status, observation?.message, !!observation?.observedAt])
       : `${state.seq}:${state.phase}`
     if (key === this.renderedKey) return
@@ -402,25 +403,24 @@ export class Sheet {
     const rating = poolRatingLabel(state.pool)
     this.rating.textContent = state.pool.length === 0 ? '' : `Pool rating ${rating.text}`
     this.rating.className = `sheet-rating ${rating.grade ? `grade-${gradeTier(rating.grade as never)}` : 'grade-none'}`
-    if (state.phase === 'complete' && isSealed(state.format, state.eventName)) {
-      const sealedKey = JSON.stringify([state.eventName, state.pool.map(c => [c.grpId, c.setPercentile])])
+    if (state.phase === 'complete') {
+      const draft = !isSealed(state.format, state.eventName)
+      const sealedKey = JSON.stringify([state.eventName, state.pool.map(c => [c.grpId, c.setPercentile, c.percentile])])
       if (sealedKey !== this.sealedKey) {
         this.sealedKey = sealedKey
         this.selected = 0
-        this.sealedResult = recommendSealed(state.pool)
+        this.sealedResult = draft ? recommendDraftBuilds(state.pool) : recommendSealed(state.pool)
       }
       const ready = state.model.state === 'ready'
       const plan = ready ? this.sealedResult?.builds[this.selected]?.plan : null
       if (plan && !this.tab) this.tab = deckGuide(plan, state.pool, counts).add.length ? 'add' : 'cut'
-      this.paint((ready && this.sealedResult ? sealedHtml(this.sealedResult, this.selected, plan ? guideHtml(plan, state.pool, counts, observation, this.tab) : '')
+      this.paint((ready && this.sealedResult ? sealedHtml(this.sealedResult, this.selected, plan ? guideHtml(plan, state.pool, counts, observation, this.tab) : '', draft)
         : '<div class="s-group"><h3 class="sheet-h">Preparing suggested deck</h3><p class="deck-meta">Waiting for card ratings…</p></div>')
-        + `<details class="guide-pool guide-detail" data-detail-key="pool"><summary>Full pool <span>${state.pool.length} cards</span></summary>${poolHtml(state.pool, [], plan?.statusByName ?? null)}</details>`
+        + `<details class="guide-pool guide-detail" data-detail-key="pool"><summary>Full pool <span>${state.pool.length} cards</span></summary>${poolHtml(state.pool, draft ? state.picks : [], plan?.statusByName ?? null)}</details>`
         + this.provenance(store))
     } else {
       this.sealedKey = ''; this.sealedResult = null
-      const plan = state.phase === 'complete' && state.pool.length > 0 ? buildDeck(state.pool) : null
-      if (plan && !this.tab) this.tab = deckGuide(plan, state.pool, counts).cut.length ? 'cut' : 'add'
-      this.paint((plan ? deckHtml(plan, false, guideHtml(plan, state.pool, counts, observation, this.tab)) : '') + (plan ? `<details class="guide-pool guide-detail" data-detail-key="pool"><summary>Full pool <span>${state.pool.length} cards</span></summary>${poolHtml(state.pool, state.picks, plan.statusByName)}</details>${this.provenance(store)}` : poolHtml(state.pool, state.picks)))
+      this.paint(poolHtml(state.pool, state.picks))
     }
   }
 

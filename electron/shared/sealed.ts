@@ -26,7 +26,7 @@ export interface SealedRecommendation {
 
 // Use the castable front face for modal double-faced cards. No credit for a
 // back-face land: this first version uses seventeen ordinary basics.
-function front(card: CardRow): CardRow {
+export function front(card: CardRow): CardRow {
   const face = card.faces?.[0]
   return { ...card, type: face?.type ?? card.type.split(' // ')[0],
     manaCost: face?.manaCost ?? card.manaCost.split(' // ')[0],
@@ -34,7 +34,7 @@ function front(card: CardRow): CardRow {
     percentile: card.setPercentile, grade: card.setGrade }
 }
 
-function castable(card: CardRow, lane: PoolColor[]): boolean {
+export function castable(card: CardRow, lane: PoolColor[]): boolean {
   if (card.unresolved || !card.type || /\{[CS]\}/.test(card.manaCost)) return false
   const symbols = [...card.manaCost.matchAll(/\{([^}]+)\}/g)].map(m => m[1])
   // Printed cost handles hybrid and devoid; printed colors alone do not.
@@ -47,7 +47,7 @@ function castable(card: CardRow, lane: PoolColor[]): boolean {
   return false // Missing or absent casting cost is not a free, castable spell.
 }
 
-function facts(cards: CardRow[]) {
+export function facts(cards: CardRow[]) {
   return {
     creatures: cards.filter(c => /\bCreature\b/.test(c.type)).length,
     early: cards.filter(c => c.manaValue !== null && c.manaValue <= 3).length,
@@ -55,7 +55,7 @@ function facts(cards: CardRow[]) {
   }
 }
 
-function value(cards: CardRow[]): number {
+export function value(cards: CardRow[]): number {
   const { creatures, early, expensive } = facts(cards)
   return cards.reduce((sum, c) => sum + (c.percentile ?? 0), 0)
     - Math.max(0, TARGET_SPELLS - cards.length) * 2
@@ -66,7 +66,7 @@ function value(cards: CardRow[]): number {
 }
 
 /** Deterministic best-improving swaps; preserves each physical pool copy. */
-function select(available: CardRow[]): CardRow[] {
+export function select(available: CardRow[]): CardRow[] {
   const chosen = available.slice(0, TARGET_SPELLS)
   const rest = available.slice(TARGET_SPELLS)
   for (let step = 0; step < TARGET_SPELLS; step++) {

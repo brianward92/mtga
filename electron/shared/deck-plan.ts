@@ -110,7 +110,7 @@ export interface CardStatus {
 
 /** The full deckbuild recommendation for a finished pool. */
 export interface DeckPlan {
-  /** One or two colours, most-drafted first. */
+  /** Colors used by the proposed deck. */
   lane: PoolColor[]
   /** 'B/G', or 'G' for a mono lane. */
   laneLabel: string

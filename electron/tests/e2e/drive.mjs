@@ -596,6 +596,16 @@ try {
   }, 'completion sidebar leads with checklist and retains grouped pool details', 6000)
   await sleep(500)
   await expectDeckbuildingGeometry(page)
+  await page.click('[data-detail-key="builds"] > summary')
+  const alternativeDraftLane = await page.$eval('[data-sealed-build="1"]', el => el.textContent.split(' · ')[1])
+  await page.click('[data-sealed-build="1"]')
+  await waitFor(page, () => document.querySelector('[data-sealed-build="1"]')?.getAttribute('aria-pressed') === 'true',
+    'draft color-count alternative becomes selected')
+  const actualDraftLane = await page.$eval('.deck-lane', el => el.textContent)
+  if (actualDraftLane !== alternativeDraftLane) failures.push('draft alternative updates the proposed deck lane')
+  await page.click('[data-sealed-build="0"]')
+  await waitFor(page, () => document.querySelector('[data-sealed-build="0"]')?.getAttribute('aria-pressed') === 'true',
+    'draft returns to the recommended color combination')
   await shot(page, '08-complete')
 
   // Hiding is reversible and retains the completed pool.
